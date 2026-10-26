@@ -1,14 +1,14 @@
 # Build order and session prompts
 
-The one place to see what has shipped and what is next. Status is one of: `not started`, `spec needed` (write the spec in Cowork before any code), `in progress`, `shipped`. Claude Code flips the status at the end of an area, together with the `CHANGELOG.md` line and the Current area pointer in `CLAUDE.md`. No dates, no estimates; the hours in the planning doc were only for ordering.
+The one place to see what has shipped and what is next. Status is one of: `not started`, `spec needed` (write the spec in Cowork before any code), `in progress`, `in review` (the review brief is in `docs/reviews/`, waiting for Adam's `approved`), `shipped` (merged to `main`). Claude Code flips the status, writes the `CHANGELOG.md` line and rewrites `docs/STATUS.md` (`/wrap-up`, at the end of every session); Adam only ever writes `approved`. No dates, no estimates; the hours in the planning doc were only for ordering.
 
-To start an area: copy its prompt from the section below into a new Code session (Fable, Plan mode, max effort; after approving the plan, Accept edits, high effort; `area/<name>` branch, worktree on). One area per session.
+To start an area: copy its prompt from the section below into a new Code session on `~/Developer/project-o` (Fable, Plan mode, max effort; after approving the plan, Accept edits, high effort; plain `area/<name>` branch, worktree off). One area per session. The session ends by writing the review brief and running `/wrap-up`, which puts the brief and the status documents on `main` while the code stays on the branch; Adam reads the brief, asks questions, and writes `approved`, and the same session merges and can start the next area.
 
 ## v1 — run a Sunday at one campus from a linked playlist
 
 | # | Area | Spec | Status |
 | --- | --- | --- | --- |
-| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | in progress |
+| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | in review |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | not started |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | not started |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | not started |
@@ -53,14 +53,15 @@ Slide designer; timelines and clocks (LTC, MTC, Art-Net, chase, playlist timelin
 Every prompt starts the same way; the per-area part follows.
 
 ```
-Read CLAUDE.md. Work on exactly one area from docs/build-order.md, named below.
-Read its spec in full and only the sections of other specs you need. Propose a
-plan before writing code and wait for my OK. Then tests first, then the
-implementation, in small commits that name the spec section. Every public
-function gets a doc comment quoting the spec section it implements. Do not merge;
-when swift test is green, summarise the diff by spec section, add one line to
-CHANGELOG.md, flip the area's status in docs/build-order.md, and update the
-Current area in CLAUDE.md to the next area.
+Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
+docs/build-order.md, named below. Read its spec in full and only the sections of
+other specs you need. Propose a plan before writing code and wait for my OK. Then
+tests first, then the implementation, in small commits that name the spec section.
+Every public function gets a doc comment quoting the spec section it implements.
+When swift test is green, write the review brief from docs/reviews/TEMPLATE.md and
+run /wrap-up, which commits the brief, the CHANGELOG.md line, the area's "in review"
+status and docs/STATUS.md on main and leaves the code on the branch. Then stop.
+Merge only when I write "approved".
 ```
 
 **Area 1 — Channel state and projection** (branch `area/projection`)
