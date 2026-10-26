@@ -8,7 +8,7 @@ To start an area: copy its prompt from the section below into a new Code session
 
 | # | Area | Spec | Status |
 | --- | --- | --- | --- |
-| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | in progress |
+| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | shipped |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | not started |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | not started |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | not started |

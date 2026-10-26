@@ -15,11 +15,12 @@ corrected first (say so, and stop) or the code is wrong. Never silently reinterp
 
 ## Current area
 
-**Spec 3 — channel state and projection** (`docs/specs/3-channel-state-and-projection.md`).
-Target: `core/` (OCore): the value types in §10, the projection in §6, the 24-row test
-table in §9 as individual tests in `tests/OCoreTests`, plus the determinism and
-`Codable` round-trip tests. Specs 1 and 2 supply the object and command shapes; read
-the sections you need. When an area ships, point this section at the next one.
+**Area 2 — object model and library format** (`docs/specs/1-objects-and-format.md`).
+Target: `core/` (documents, loader, writer, validator, migrations) and `formats/` (JSON
+schemas). Start with the fixture library in `tests/fixtures/library-v1/` from the worked
+examples in §9, then the §10 tests, then the code. Reuse the types Area 1 left in
+`core/Library/`, `core/Commands/` and `core/State/`; extend, do not duplicate. The full
+prompt is in `docs/build-order.md`. When an area ships, point this section at the next one.
 
 ## The loop (one area, one branch, one goal)
 
