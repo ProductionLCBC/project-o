@@ -97,7 +97,8 @@ failure there blocks merging.
 
 Spec page updated if needed → tests written from it → implementation → all tests
 green in CI → soak green if the area touches the frame path → one `CHANGELOG.md` line
-→ the area's chip flipped in the planning doc's build-order table.
+→ the area's status flipped in `docs/build-order.md` and the Current area above
+pointed at the next one.
 
 ## When unsure
 
