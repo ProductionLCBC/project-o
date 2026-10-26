@@ -6,21 +6,21 @@ Work accordingly: read the spec, write the tests, build to the tests, and never 
 
 ## Read first, every session
 
-1. `ARCHITECTURE.md` — the model in one page.
-2. The one spec for the area you are working on, in `docs/specs/`. Not all of them.
-3. The relevant section of `docs/ux-spec.md` only if the spec points you there.
+1. `docs/STATUS.md` — the one-page view: which area is live and on which branch, where
+   the last session stopped, what Adam has not yet decided, and the next area's prompt.
+2. `ARCHITECTURE.md` — the model in one page.
+3. The one spec for the area you are working on, in `docs/specs/`. Not all of them.
+4. The relevant section of `docs/ux-spec.md` only if the spec points you there.
 
 The specs are the authority. If the code and a spec disagree, either the spec is
 corrected first (say so, and stop) or the code is wrong. Never silently reinterpret.
 
 ## Current area
 
-**Area 2 — object model and library format** (`docs/specs/1-objects-and-format.md`).
-Target: `core/` (documents, loader, writer, validator, migrations) and `formats/` (JSON
-schemas). Start with the fixture library in `tests/fixtures/library-v1/` from the worked
-examples in §9, then the §10 tests, then the code. Reuse the types Area 1 left in
-`core/Library/`, `core/Commands/` and `core/State/`; extend, do not duplicate. The full
-prompt is in `docs/build-order.md`. When an area ships, point this section at the next one.
+See `docs/STATUS.md`. Its **Now** line names the live area, its branch and where the last
+session stopped; its **Next** block holds the next area's prompt, verbatim from
+`docs/build-order.md`. `/wrap-up` moves both at the end of every session. Nothing about
+the current area is written here, so this file never disagrees with STATUS.md.
 
 ## The loop (one area, one branch, one goal)
 
@@ -30,8 +30,39 @@ prompt is in `docs/build-order.md`. When an area ships, point this section at th
    failing tests before implementation.
 3. **Build in small commits**, each one leaving `main`-mergeable code.
 4. **Run the tests.** `swift test` must be green before you report done.
-5. **Report**: what you built, what you did not, and anything in the spec that
-   turned out ambiguous. Then add one line to `CHANGELOG.md`.
+5. **Write the review brief** at `docs/reviews/area-N-<name>.md` from
+   `docs/reviews/TEMPLATE.md`: what the spec asked for, what was built, every place
+   the spec left a choice and which option was taken and why, anything ambiguous or
+   wrong in the spec, how the tests prove it, and what Adam needs to decide. Written
+   for someone who knows the spec well and Swift barely; name files and spec sections,
+   not line numbers. Leave the brief uncommitted and run `/wrap-up`: it commits the code
+   on the branch and pushes it, then puts the brief, the `CHANGELOG.md` line, the area's
+   `in review` status and `docs/STATUS.md` on `main`. Then stop.
+6. **Wait for approval.** Adam reads the brief, not the Swift. He may ask questions;
+   answer them from the code and the spec. Only when he writes `approved` do you merge
+   the area branch into `main` with `--no-ff`, push, delete the branch, flip the area's
+   status in `docs/build-order.md` to `shipped`, rewrite `docs/STATUS.md` so its Now and
+   Next point at the next area (`/wrap-up` again), and start it in the same session if he
+   asks.
+
+Branches are plain branches in this folder (`area/<name>`); no worktrees, no pull
+requests while the repository has one developer.
+
+## Session contract
+
+Every session, whatever it works on, docs sessions included:
+
+- **Starts** by reading `docs/STATUS.md`, before the spec and before any code.
+- **Ends** by running `/wrap-up` (`.claude/commands/wrap-up.md`), which rewrites
+  `docs/STATUS.md` from the current truth, appends the session's line to `CHANGELOG.md`,
+  files every new spec interpretation under Needs Adam (what the spec left open, what was
+  chosen, the alternative), and commits.
+
+`docs/STATUS.md` lives on `main` and is current on `main` after every session, even while
+an area's code waits on its branch. So the end-of-session commit goes to `main` and carries
+only status documents: `docs/STATUS.md`, `CHANGELOG.md`, `docs/build-order.md`,
+`docs/reviews/` and this file. Code and tests stay on `area/<name>` until Adam writes
+`approved`. A session that ends without that commit on `main` is not finished.
 
 ## Hard rules
 
@@ -52,7 +83,8 @@ Do not work around them; if one blocks you, stop and say so.
   and synthetic media. OFL fonts only.
 - Secrets (API tokens, Planning Center credentials) live in the Keychain, never in
   files, fixtures or commits.
-- Never merge to `main`. Open the change for review.
+- Merge to `main` only after Adam has written `approved` in reply to the area's review
+  brief. Never on your own judgement, never because the tests are green.
 
 ## What you may do unattended
 
@@ -63,7 +95,7 @@ documentation; dependency bumps with green tests; release notes.
 
 Anything under `engine/` or `core/`; anything touching the render thread, decoders,
 outputs, audio, or the show format; changes to `ARCHITECTURE.md`, a spec, or these
-rules; adding a dependency; merging.
+rules; adding a dependency; merging (which happens only on Adam's `approved`).
 
 ## Code conventions
 
@@ -97,9 +129,20 @@ failure there blocks merging.
 ## Definition of done for an area
 
 Spec page updated if needed → tests written from it → implementation → all tests
-green in CI → soak green if the area touches the frame path → one `CHANGELOG.md` line
-→ the area's status flipped in `docs/build-order.md` and the Current area above
-pointed at the next one.
+green in CI → soak green if the area touches the frame path → review brief in
+`docs/reviews/` → one `CHANGELOG.md` line and `docs/STATUS.md` current on `main`
+(`/wrap-up`) → Adam's `approved` → merged to `main` → the area's status flipped in
+`docs/build-order.md` and `docs/STATUS.md` rewritten so Now and Next point at the
+next area.
+
+## Explaining your work
+
+Adam is a production and AV engineer who knows the specs deeply and is new to Swift.
+When you report, lead with decisions and consequences, not files and line counts.
+Explain a Swift idiom the first time it matters to a decision (value semantics,
+`Codable` synthesis, enums with associated values, `Sendable`), then stop explaining it.
+If he asks "why did you do X", answer with the spec section, the alternatives you saw,
+and the trade-off, in that order. Never attach time estimates.
 
 ## When unsure
 
