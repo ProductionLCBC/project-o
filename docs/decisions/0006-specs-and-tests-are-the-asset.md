@@ -1,0 +1,5 @@
+# ADR 0006: Specs and tests are the durable assets; code is regenerated against them
+
+Date: 2026-10-25 · Status: accepted
+
+**Context.** The project is built largely by coding agents, by one part-time developer, over a period in which the tools will change several times. **Decision.** Every area follows the same loop (spec, tests first, build, review the diff, verify, ship, one changelog line); the spec in `docs/specs/` outranks the code; engine rules are tests and lints rather than prose; and when a better tool makes an area cheap to regenerate, it is regenerated against the spec rather than patched. Nothing under `engine/` or `core/`, the show format, the engine rules or a merge to `main` runs unattended; UI, tooling, tests and documentation may. **Consequences.** Hours go to the spec, the diff and the soak rig; the repository must always let an agent find everything from the top level (`ARCHITECTURE.md`, `CLAUDE.md`, the specs); and no estimates or burndown are kept, since progress is read from what has shipped.

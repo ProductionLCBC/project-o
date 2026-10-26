@@ -1,0 +1,5 @@
+# ADR 0001: Swift, a Metal-native engine, DeckLink SDI as the output tier
+
+Date: 2026-10-21 · Status: accepted
+
+**Context.** LCBC is replacing ProPresenter across twenty campuses whose presenter machines are all moving to Apple Silicon Macs, with outputs over 12G-SDI (an LED wall at 4K30 and side screens at 1080i60) and audio over Dante Virtual Soundcard. Existing open-source presenters (FreeShow, OpenLP) were judged to have architectural limits a new project could avoid. **Decision.** Build a new application in Swift with a Metal-native render engine and Blackmagic DeckLink SDI as the first-class output tier, with a native macOS UI; keep Windows as a possible later backend behind a `RenderBackend` seam rather than a current target. **Consequences.** The engine can use IOSurface, VideoToolbox and the DeckLink hardware clock directly, which is what the frame budget needs; the price is a macOS-only v1, a non-redistributable SDK that lives outside the repository, and a team learning Swift as it goes.

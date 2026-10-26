@@ -1,0 +1,35 @@
+# Swift Package Manager
+.build/
+.swiftpm/xcode/xcuserdata/
+.swiftpm/configuration/registries.json
+Package.resolved.lock
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Vendored SDKs that are not redistributable
+vendor/DeckLinkSDK/
+
+# Test bench output
+tests/soak-output/
+*.golden-diff.png
+
+# macOS
+.DS_Store
+._*
+
+# Claude Code (per-machine settings and notes stay local)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Python tooling
+tools/**/__pycache__/
+tools/**/.venv/

@@ -1,0 +1,5 @@
+# ADR 0003: Render once per channel, composite per output; nothing edits live
+
+Date: 2026-10-24 · Status: accepted
+
+**Context.** Several outputs of different sizes show overlapping subsets of the same content, a confidence monitor needs to show the next cue, and most mid-service accidents in presenters come from edits that take effect while something is on screen. **Decision.** A cue writes content to numbered channels; each channel renders once (decode, grade, transition) into an RGBA16Float texture; each output composites its own ordered stack of channels; previews, multiviewer, offset slots and thumbnails are sampling passes over textures that already exist. What is on a channel is an instance of a cue, attributes track lighting-console style, and any edit takes effect on the next fire. State changes go through one pure projection function (Spec 3). **Consequences.** The frame budget is a small fixed set of passes; lookahead, thumbnails, replay and undo all reuse the projection; text is the one exception, rendered per channel-and-stack pair and cached; "apply to live" does not exist and will not be added.
