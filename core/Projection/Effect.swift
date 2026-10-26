@@ -72,6 +72,11 @@ public enum Effect: Equatable, Sendable {
     case steppedOn(channel: Int, dropped: String)
     /// Log records it; the strip shows a lock glint.
     case blocked(channel: Int, command: Command)
+    /// The command changed state only, with nothing to animate (transport,
+    /// end behaviour, lock, freeze); the engine reads the new state. Logged
+    /// as `ok`. Addition flagged for the spec: §6 wants one result per
+    /// command, and these verbs have no row in its effects table.
+    case applied(Command)
     /// Nothing, but logged.
     case noop(Command)
     /// The caller (engine, history, scheduler) handles it.

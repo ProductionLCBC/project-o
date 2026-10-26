@@ -127,7 +127,9 @@ final class ProjectionSupplementaryTests: XCTestCase {
         ])
         XCTAssertEqual(state.channels[1]?.content,
                        .media(MediaInstance(ref: F.mediaA, startedAtFrame: 10, transport: .paused, endBehavior: .clear)))
-        XCTAssertEqual(effects, [.noop(.channelEndBehavior(channel: .number(2), mode: .loop))])
+        XCTAssertEqual(effects, [.applied(.channelEndBehavior(channel: .number(1), mode: .clear)),
+                                 .applied(.channelTransport(channel: .number(1), mode: .pause)),
+                                 .noop(.channelEndBehavior(channel: .number(2), mode: .loop))])
     }
 
     func test_missingMediaProducesTheInstanceWithMissingSet() {

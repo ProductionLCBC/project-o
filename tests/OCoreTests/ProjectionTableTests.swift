@@ -205,8 +205,9 @@ final class ProjectionTableTests: XCTestCase {
         for n in 1...3 {
             XCTAssertEqual(channel(n, in: state).content, .empty, "channel \(n)")
             XCTAssertEqual(channel(n, in: state).attributes, defaultAttributes, "channel \(n)")
-            XCTAssertEqual(channel(n, in: state).outgoing, [], "channel \(n)")
         }
+        XCTAssertEqual(channel(1, in: state).outgoing, [OutgoingInstance(instance: MediaInstance(ref: F.mediaA, startedAtFrame: 10), endsAtFrame: 100)],
+                       "the clear is a write of empty, so A goes outgoing until its (cut) transition ends")
         XCTAssertEqual(transitions(in: effects).map(\.channel), [1, 2, 3])
         XCTAssertFalse(effects.contains(.noop(.systemClearAll)))
     }
@@ -389,7 +390,7 @@ final class ProjectionTableTests: XCTestCase {
         let (state, effects) = run(before, [stopOne, stopTwo], frame: 300)
         XCTAssertEqual(channel(1, in: state).content, media(F.mediaA, startedAt: 300, transport: .stopped))
         XCTAssertEqual(channel(2, in: state).content, text("y"))
-        XCTAssertEqual(effects, [.noop(stopTwo)])
+        XCTAssertEqual(effects, [.applied(stopOne), .noop(stopTwo)])
     }
 
     /// Row 23 — Any state: `timer 1 set 5:00`. `passthrough` effect; state unchanged.
