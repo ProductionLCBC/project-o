@@ -8,7 +8,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 
 | # | Area | Spec | Status |
 | --- | --- | --- | --- |
-| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | in review |
+| 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | shipped |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | not started |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | not started |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | not started |
@@ -85,7 +85,10 @@ Build in core/ (documents, loader, writer, validator, migrations) and formats/
 (JSON schemas). Start by creating the fixture library in tests/fixtures/library-v1/
 from the worked examples in §9, then the tests in §10 (round trip, identity,
 cue addressing, validation report, migration, atomic writes, stack rule), then
-the code. Reuse the types Area 1 created; extend, do not duplicate.
+the code. Reuse the types Area 1 created; extend, do not duplicate. Also close
+the Area 1 brief's deviation 1: add the media index to ProjectionContext.library
+so a media write falls back to the pool item's defaults (Spec 3 §4 Media, §6),
+with a test.
 ```
 
 **Area 3 — Command vocabulary** (branch `area/commands`)
@@ -96,7 +99,9 @@ Build in core/: the canonical text grammar (§2), the full v1 vocabulary as Comm
 objects (§3), parse and print with parse(print(x)) == x (§4), validation and
 results (§8), selection expansion and groups (§5), the OSC address mapping both
 ways (§6, as pure functions; no sockets in core/), guards (§7), and the log entry
-shape (§9). Tests from §10 first.
+shape (§9). Tests from §10 first. Also close the Area 1 brief's deviation 2: the
+command decoder accepts the bare cmd names Spec 1 §6 used before its correction
+("next", "macro") on input and prints only the Spec 2 §3 object names.
 ```
 
 **Area 4 — Engine spike** (branch `area/spike`)
