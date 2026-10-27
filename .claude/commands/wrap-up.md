@@ -1,6 +1,6 @@
 ---
 description: "End the session: commit code on its branch, rewrite docs/STATUS.md, add the CHANGELOG line, file spec interpretations under Needs Adam, commit the status documents on main"
-allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git add:*), Bash(git commit:*), Bash(git checkout:*), Bash(git push:*), Bash(git worktree:*), Bash(swift test:*), Read, Edit, Write, Grep, Glob
+allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git add:*), Bash(git commit:*), Bash(git merge:*), Bash(git push:*), Bash(git worktree:*), Bash(git -C:*), Bash(swift test:*), Read, Edit, Write, Grep, Glob
 ---
 
 End this session the way `CLAUDE.md` ("Session contract") requires. Do the steps in order.
