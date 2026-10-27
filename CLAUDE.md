@@ -30,23 +30,23 @@ the current area is written here, so this file never disagrees with STATUS.md.
    failing tests before implementation.
 3. **Build in small commits**, each one leaving `main`-mergeable code.
 4. **Run the tests.** `swift test` must be green before you report done.
-5. **Write the review brief** at `docs/reviews/area-N-<name>.md` from
-   `docs/reviews/TEMPLATE.md`: what the spec asked for, what was built, every place
-   the spec left a choice and which option was taken and why, anything ambiguous or
-   wrong in the spec, how the tests prove it, and what Adam needs to decide. Written
-   for someone who knows the spec well and Swift barely; name files and spec sections,
-   not line numbers. Leave the brief uncommitted and run `/wrap-up`: it commits the code
-   on the branch and pushes it, then puts the brief, the `CHANGELOG.md` line, the area's
-   `in review` status and `docs/STATUS.md` on `main`. Then stop.
+5. **Run `/wrap-up`, then end with the brief.** `/wrap-up` commits the code on the
+   branch and pushes it, then puts the `CHANGELOG.md` line, the area's `in review` status
+   and `docs/STATUS.md` on `main`. The brief is the session's final message, under the
+   four headings in "Working in Nimbalyst" below (`docs/reviews/TEMPLATE.md` has the
+   shape): what changed, every place the spec left a choice and which option was taken
+   and why, how the tests prove it, and what Adam needs to decide. Written for someone
+   who knows the spec well and Swift barely; name files and spec sections, not line
+   numbers. Then stop.
 6. **Wait for approval.** Adam reads the brief, not the Swift. He may ask questions;
-   answer them from the code and the spec. Only when he writes `approved` do you merge
-   the area branch into `main` with `--no-ff`, push, delete the branch, flip the area's
-   status in `docs/build-order.md` to `shipped`, rewrite `docs/STATUS.md` so its Now and
-   Next point at the next area (`/wrap-up` again), and start it in the same session if he
-   asks.
+   answer them from the code and the spec. Only when he writes `approved` in the session
+   do you merge the area branch into `main` with `--no-ff`, push, delete the branch, flip
+   the area's status in `docs/build-order.md` and its task in the Build tracker to
+   `shipped`, rewrite `docs/STATUS.md` so its Now and Next point at the next area
+   (`/wrap-up` again), and remove the worktree. The next area starts in its own session.
 
-Branches are plain branches in this folder (`area/<name>`); no worktrees, no pull
-requests while the repository has one developer.
+Each area has its own branch, `area/<name>`, in its own Nimbalyst worktree session
+("Working in Nimbalyst" below); no pull requests while the repository has one developer.
 
 ## Session contract
 
@@ -60,9 +60,37 @@ Every session, whatever it works on, docs sessions included:
 
 `docs/STATUS.md` lives on `main` and is current on `main` after every session, even while
 an area's code waits on its branch. So the end-of-session commit goes to `main` and carries
-only status documents: `docs/STATUS.md`, `CHANGELOG.md`, `docs/build-order.md`,
-`docs/reviews/` and this file. Code and tests stay on `area/<name>` until Adam writes
+only status documents: `docs/STATUS.md`, `CHANGELOG.md`, `docs/build-order.md` and this
+file. A worktree session cannot check `main` out, so `/wrap-up` makes that commit through
+the main checkout (its step 4). Code and tests stay on `area/<name>` until Adam writes
 `approved`. A session that ends without that commit on `main` is not finished.
+
+## Working in Nimbalyst
+
+Sessions run in the Nimbalyst editor. Its Build tracker has one task per area, in the
+order of `docs/build-order.md`, with that file's statuses (`not started`, `spec needed`,
+`in progress`, `in review`, `shipped`). `docs/build-order.md` stays the plan of record;
+the tracker mirrors it, so a status changes in both places or in neither.
+
+- **One area, one worktree session.** Every area runs in its own Nimbalyst worktree
+  session on branch `area/<name>`; rename the branch on start if the session created it
+  under another name. `main` stays checked out in the main folder, `~/Developer/project-o`.
+- **On start**, set the area's task to `in progress` and link the session to it.
+- **Never merge to `main`** until Adam writes `approved` in the session, in reply to the
+  brief.
+- **When the spec is silent or ambiguous, ask in the session before guessing.** A question
+  costs a minute; an assumption in `core/` costs a Sunday.
+- **End every area with the brief as the final message**, after `/wrap-up`, under four
+  headings and nothing else (`docs/reviews/TEMPLATE.md` has the shape):
+  - *What changed*: in plain language, for someone who knows the spec and not Swift.
+  - *Spec interpretations*: one entry per place the spec left room: the question, what
+    was chosen, the alternative.
+  - *Tests*: which tests prove which spec sections, and what is not covered yet.
+  - *What's next*: what Adam must decide, then the next area.
+- **On `approved`**, in the same session: merge `area/<name>` into `main` with `--no-ff`
+  and push; mark the task `shipped`; flip the area to `shipped` in `docs/build-order.md`;
+  append the `CHANGELOG.md` line; rewrite `docs/STATUS.md` (`/wrap-up`); delete the branch
+  and remove the worktree. The next area starts in its own session.
 
 ## Hard rules
 
@@ -83,8 +111,8 @@ Do not work around them; if one blocks you, stop and say so.
   and synthetic media. OFL fonts only.
 - Secrets (API tokens, Planning Center credentials) live in the Keychain, never in
   files, fixtures or commits.
-- Merge to `main` only after Adam has written `approved` in reply to the area's review
-  brief. Never on your own judgement, never because the tests are green.
+- Merge to `main` only after Adam has written `approved` in the session, in reply to the
+  area's brief. Never on your own judgement, never because the tests are green.
 
 ## What you may do unattended
 
@@ -129,11 +157,11 @@ failure there blocks merging.
 ## Definition of done for an area
 
 Spec page updated if needed → tests written from it → implementation → all tests
-green in CI → soak green if the area touches the frame path → review brief in
-`docs/reviews/` → one `CHANGELOG.md` line and `docs/STATUS.md` current on `main`
-(`/wrap-up`) → Adam's `approved` → merged to `main` → the area's status flipped in
-`docs/build-order.md` and `docs/STATUS.md` rewritten so Now and Next point at the
-next area.
+green in CI → soak green if the area touches the frame path → one `CHANGELOG.md` line
+and `docs/STATUS.md` current on `main` (`/wrap-up`) → the brief as the session's final
+message → Adam's `approved` → merged to `main` → the area's status flipped to `shipped`
+in `docs/build-order.md` and the Build tracker, `docs/STATUS.md` rewritten so Now and
+Next point at the next area, the worktree removed.
 
 ## Explaining your work
 

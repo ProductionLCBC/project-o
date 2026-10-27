@@ -3,8 +3,10 @@
 The one-page view. Every session starts by reading this page and ends by rewriting it
 (`CLAUDE.md`, "Session contract"; `/wrap-up` does the rewrite). It lives on `main` and is
 current on `main` after every session, even while an area's code waits on its branch. The
-detail is elsewhere: the areas and their prompts in `docs/build-order.md`, one review brief
-per area in `docs/reviews/`, one line per session in `CHANGELOG.md`.
+detail is elsewhere: the areas and their prompts in `docs/build-order.md`, mirrored by the
+Build tracker in Nimbalyst; each area's brief as the final message of its session (Area 1's
+predates that and is a file, `docs/reviews/area-1-projection.md`); one line per session in
+`CHANGELOG.md`.
 
 ## Areas
 
@@ -25,26 +27,34 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | presets-and-text spec | not started | Spec needed first. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | not started | Spec needed first. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec needed first; nothing in `app/` starts before the spike passes. |
-| 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first. |
+| 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first; in `app/`, so after the spike passes. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | After Area 3. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | not started | After the spike. |
 | 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | not started | Spec needed first. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | not started | Spec needed first. |
-| v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. |
+| v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
 **Area 1, channel state and projection, on `area/projection`.** The code is done and
-`swift test` is green; the review brief is written; the area stopped at waiting for Adam's
-`approved`. Nothing from it is on `main`. The last session (docs only) added this page, the
-session contract in `CLAUDE.md` and `/wrap-up`, and committed the Area 1 brief on `main`.
+`swift test` is green; the brief is written; the area stopped at waiting for Adam's
+`approved`. Nothing from it is on `main`. The last session (docs only, 2026-10-27) set up
+the Nimbalyst way of working: the Build tracker with one task per area of
+`docs/build-order.md` (its statuses, prompts and dependencies mirrored), the "Working in
+Nimbalyst" section in `CLAUDE.md` (one worktree session per area, the brief as the
+session's final message under four headings, merge only on `approved` in the session),
+`docs/reviews/` retired for new briefs, and `/wrap-up` reworked to reach `main` from a
+worktree. One edit was refused and is left for Adam by hand: the `allowed-tools` line in
+`.claude/commands/wrap-up.md` still lists `git checkout` and not `git merge` or `git -C`,
+so the reworked step 4 will prompt for permission until that line is changed.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 1** — `docs/reviews/area-1-projection.md`. It asks:
+- **Area 1** — a file, `docs/reviews/area-1-projection.md`, written before briefs moved
+  into the session. It asks:
   1. Approve with the spec corrections below applied? Recommended: yes. The wording items
      change no code on the branch; the pool-defaults gap goes to Area 2 and the `next`
      decoding to Area 3.
@@ -61,7 +71,9 @@ session contract in `CLAUDE.md` and `/wrap-up`, and committed the Area 1 brief o
 ### Spec interpretations made so far
 
 Where a spec left more than one reading, what Area 1 chose, and the other reading. An
-item stays here until Adam has answered it; the brief keeps the record afterwards.
+item stays here until Adam has answered it; the area's session (or, for Area 1, the file
+brief) keeps the record afterwards. The docs session of 2026-10-27 touched no spec and
+added nothing here.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
@@ -117,19 +129,22 @@ the code does, and the fix proposed.
 
 ## Next
 
-**Area 2 — Object model and library format** (branch `area/format`). The prompt, verbatim
-from `docs/build-order.md`: the common preamble, then the area's own block.
+**Area 2 — Object model and library format** (branch `area/format`, its own Nimbalyst
+worktree session). The prompt, verbatim from `docs/build-order.md`: the common preamble,
+then the area's own block.
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
-docs/build-order.md, named below. Read its spec in full and only the sections of
-other specs you need. Propose a plan before writing code and wait for my OK. Then
-tests first, then the implementation, in small commits that name the spec section.
-Every public function gets a doc comment quoting the spec section it implements.
-When swift test is green, write the review brief from docs/reviews/TEMPLATE.md and
-run /wrap-up, which commits the brief, the CHANGELOG.md line, the area's "in review"
-status and docs/STATUS.md on main and leaves the code on the branch. Then stop.
-Merge only when I write "approved".
+docs/build-order.md, named below. Set its task in the Build tracker to "in
+progress". Read its spec in full and only the sections of other specs you need.
+Propose a plan before writing code and wait for my OK. Then tests first, then the
+implementation, in small commits that name the spec section. Every public function
+gets a doc comment quoting the spec section it implements. When the spec is silent
+or ambiguous, ask me before guessing. When swift test is green, run /wrap-up, which
+commits the CHANGELOG.md line, the area's "in review" status and docs/STATUS.md on
+main and leaves the code on the branch, then end with the brief as your final
+message under the four headings in CLAUDE.md. Then stop. Merge only when I write
+"approved".
 ```
 
 ```
@@ -143,6 +158,7 @@ the code. Reuse the types Area 1 created; extend, do not duplicate.
 
 Areas 2 and 3 both build on Area 1's types, so neither starts until `area/projection` has
 merged. Once it has, Area 3 (command vocabulary) depends only on the `Command` enum and
-could run in parallel with Area 2 on its own branch; the brief recommends 2 then 3. Area 4
-waits for Areas 1–3 and the DeckLink SDK. The specs for the areas marked "Spec needed
-first" above can be written in Cowork at any time.
+could run in parallel with Area 2 in its own worktree session; the Area 1 brief recommends
+2 then 3. Area 4 waits for Areas 1–3 and the DeckLink SDK. The specs for the areas marked
+"Spec needed first" above can be written in Cowork at any time; each already has its task
+in the Build tracker, marked `spec needed`.

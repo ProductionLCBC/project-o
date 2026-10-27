@@ -1,0 +1,133 @@
+# Shared with your team. Saving this file updates it for everyone. Last changed by Adam Granby.
+
+type: build
+displayName: Build
+displayNamePlural: Build
+icon: construction
+color: '#0f766e'
+modes:
+  inline: true
+  fullDocument: true
+idPrefix: bld
+idFormat: ulid
+fields:
+  - name: title
+    type: string
+    required: true
+    displayInline: true
+  - name: status
+    type: select
+    required: false
+    default: not-started
+    displayInline: true
+    options:
+      - value: not-started
+        label: Not started
+        icon: circle
+        color: '#6b7280'
+        category: unstarted
+      - value: spec-needed
+        label: Spec needed
+        icon: edit_note
+        color: '#a855f7'
+        category: backlog
+      - value: in-progress
+        label: In progress
+        icon: motion_photos_on
+        color: '#f59e0b'
+        category: started
+      - value: in-review
+        label: In review
+        icon: rate_review
+        color: '#3b82f6'
+        category: started
+      - value: shipped
+        label: Shipped
+        icon: check_circle
+        color: '#22c55e'
+        category: done
+  - name: area
+    type: number
+    required: false
+    displayInline: true
+    min: 1
+  - name: release
+    type: select
+    required: false
+    default: v1
+    displayInline: true
+    options:
+      - value: v1
+        label: v1
+      - value: v1.5
+        label: v1.5
+      - value: v2
+        label: v2
+  - name: spec
+    type: string
+    required: false
+    displayInline: true
+  - name: branch
+    type: string
+    required: false
+    displayInline: true
+  - name: owner
+    type: user
+    required: false
+    displayInline: true
+  - name: description
+    type: text
+    required: false
+    displayInline: true
+  - name: dependsOn
+    type: relationship
+    required: false
+    displayInline: true
+    relationshipTypeKey: depends-on
+    targetTrackerTypes: '*'
+    multiValue: true
+    inverseFieldId: blocks
+    inverseRelationshipTypeKey: blocks
+  - name: blocks
+    type: relationship
+    required: false
+    displayInline: true
+    relationshipTypeKey: blocks
+    targetTrackerTypes: '*'
+    multiValue: true
+    inverseFieldId: dependsOn
+    inverseRelationshipTypeKey: depends-on
+  - name: tags
+    type: array
+    required: false
+    displayInline: false
+    itemType: string
+tableView:
+  defaultColumns:
+    - area
+    - title
+    - status
+    - spec
+    - branch
+    - release
+  sortable: true
+  filterable: true
+  exportable: true
+statusBarLayout:
+  - row:
+      - field: status
+        width: 180
+      - field: area
+        width: 90
+      - field: release
+        width: 110
+      - field: branch
+        width: 220
+inlineTemplate: '{icon} {title} {status}'
+roles:
+  title: title
+  workflowStatus: status
+  assignee: owner
+  tags: tags
+sharing: team
+draftByDefault: false

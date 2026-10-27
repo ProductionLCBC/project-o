@@ -1,8 +1,8 @@
 # Build order and session prompts
 
-The one place to see what has shipped and what is next. Status is one of: `not started`, `spec needed` (write the spec in Cowork before any code), `in progress`, `in review` (the review brief is in `docs/reviews/`, waiting for Adam's `approved`), `shipped` (merged to `main`). Claude Code flips the status, writes the `CHANGELOG.md` line and rewrites `docs/STATUS.md` (`/wrap-up`, at the end of every session); Adam only ever writes `approved`. No dates, no estimates; the hours in the planning doc were only for ordering.
+The one place to see what has shipped and what is next. Status is one of: `not started`, `spec needed` (write the spec in Cowork before any code), `in progress`, `in review` (the brief has been posted as the final message of the area's session, waiting for Adam's `approved`), `shipped` (merged to `main`). Claude Code flips the status, writes the `CHANGELOG.md` line and rewrites `docs/STATUS.md` (`/wrap-up`, at the end of every session); Adam only ever writes `approved`. This file is the plan of record; the Build tracker in Nimbalyst has one task per area with the same statuses and mirrors it (`CLAUDE.md`, "Working in Nimbalyst"). No dates, no estimates; the hours in the planning doc were only for ordering.
 
-To start an area: copy its prompt from the section below into a new Code session on `~/Developer/project-o` (Fable, Plan mode, max effort; after approving the plan, Accept edits, high effort; plain `area/<name>` branch, worktree off). One area per session. The session ends by writing the review brief and running `/wrap-up`, which puts the brief and the status documents on `main` while the code stays on the branch; Adam reads the brief, asks questions, and writes `approved`, and the same session merges and can start the next area.
+To start an area: open its task in the Build tracker and start a new Nimbalyst worktree session on `~/Developer/project-o` from it, with the prompt from the section below (Fable, Plan mode, max effort; after approving the plan, Accept edits, high effort; branch `area/<name>`). One area per session; the session sets the task to `in progress`. The session ends by running `/wrap-up`, which puts the status documents on `main` while the code stays on the branch, and then the brief as its final message; Adam reads the brief, asks questions, and writes `approved` in the session, and the same session merges, marks the task `shipped` and removes its worktree. The next area starts in its own session.
 
 ## v1 — run a Sunday at one campus from a linked playlist
 
@@ -54,14 +54,16 @@ Every prompt starts the same way; the per-area part follows.
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
-docs/build-order.md, named below. Read its spec in full and only the sections of
-other specs you need. Propose a plan before writing code and wait for my OK. Then
-tests first, then the implementation, in small commits that name the spec section.
-Every public function gets a doc comment quoting the spec section it implements.
-When swift test is green, write the review brief from docs/reviews/TEMPLATE.md and
-run /wrap-up, which commits the brief, the CHANGELOG.md line, the area's "in review"
-status and docs/STATUS.md on main and leaves the code on the branch. Then stop.
-Merge only when I write "approved".
+docs/build-order.md, named below. Set its task in the Build tracker to "in
+progress". Read its spec in full and only the sections of other specs you need.
+Propose a plan before writing code and wait for my OK. Then tests first, then the
+implementation, in small commits that name the spec section. Every public function
+gets a doc comment quoting the spec section it implements. When the spec is silent
+or ambiguous, ask me before guessing. When swift test is green, run /wrap-up, which
+commits the CHANGELOG.md line, the area's "in review" status and docs/STATUS.md on
+main and leaves the code on the branch, then end with the brief as your final
+message under the four headings in CLAUDE.md. Then stop. Merge only when I write
+"approved".
 ```
 
 **Area 1 — Channel state and projection** (branch `area/projection`)

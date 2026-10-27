@@ -1,3 +1,5 @@
 # Review briefs
 
-One per area, written by the agent at the end of the area from `TEMPLATE.md`, before anything merges. The brief is what Adam reads to approve the area; the code is the long version. A brief stays in the repository after the merge as the record of the decisions it describes.
+Retired on 2026-10-27. The brief for an area is now the final message of the area's session, under the four headings in `TEMPLATE.md` (`CLAUDE.md`, "Working in Nimbalyst"); Adam reads it there and writes `approved` there. Nothing new is written to this folder.
+
+`area-1-projection.md` predates the change and stays as the record of Area 1's decisions; `docs/STATUS.md` points at it until Adam has answered it.
