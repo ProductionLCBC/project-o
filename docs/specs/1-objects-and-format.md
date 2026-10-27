@@ -1,6 +1,6 @@
 # Spec 1: Objects and format
 
-2026-10-25 · @Adam Granby · Status: accepted 2026-10-25 · Source: the UX and system design spec, the Decisions tab and the Spec review tab of the planning doc
+2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§6 command names) · Source: the UX and system design spec, the Decisions tab and the Spec review tab of the planning doc
 
 ## 1. Purpose and scope
 
@@ -190,7 +190,7 @@ Text content is inline, which is what keeps a song self-contained in its list fi
 
 **Hold** is the absence of a command for that channel; nothing is stored for a held channel.
 
-**Everything else** in the vocabulary is a plain command object with scalar parameters: `{"cmd": "output.stack", "output": 1, "stack": 4}`, `{"cmd": "timer.set", "timer": 1, "ms": 300000}`, `{"cmd": "next"}`. Macro references are `{"cmd": "macro", "macro": 12}`. Selection is never stored; the UI expands "selected" to absolute channel numbers before a command is recorded.
+**Everything else** in the vocabulary is a plain command object with scalar parameters, its `cmd` taken from the object column of Spec 2 §3 even where the text form is a bare verb: `{"cmd": "output.stack", "output": 1, "stack": 4}`, `{"cmd": "timer.set", "timer": 1, "ms": 300000}`, `{"cmd": "playlist.next"}`. Macro references are `{"cmd": "macro.run", "macro": 12}`. Selection is never stored; the UI expands "selected" to absolute channel numbers before a command is recorded.
 
 **Validation.** The loader checks each command against the vocabulary in Spec 2 and flags unknown commands or bad parameters on the cue rather than dropping them; the cue shows a warning chip and the command is kept verbatim so a newer version can still read it.
 

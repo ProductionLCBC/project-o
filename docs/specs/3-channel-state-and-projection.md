@@ -1,6 +1,6 @@
 # Spec 3: Channel state and projection
 
-2026-10-25 · @Adam Granby · Status: accepted 2026-10-25 · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
+2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§2, §4, §6) · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
 
 ## 1. Purpose and scope
 
@@ -20,8 +20,8 @@ This spec defines what is on a channel at any moment, how commands change it, an
 
 | Group | Fields | Lifetime |
 | --- | --- | --- |
-| Content | `content` (an instance, below) and `provenance` (the cue uuid that wrote it, or `restored`, or `ui`) | Holds until the next write, across list boundaries; outgoing (the previous instance and the frame its transition ends, kept for the decoder budget) lives here too |
-| Tracked attributes | `grade`, `transition`, `audioTransition`, `gain`, `chase` (reserved), `build` | Each holds until written again, or until a list boundary resets it to the channel default |
+| Content | `content` (an instance, below) and `provenance` (the cue uuid that wrote it, or `restored`, or `ui`); `build` is part of slide content (§3 rule 8), not a tracked attribute | Holds until the next write, across list boundaries; outgoing (the previous instance and the frame its transition ends, kept for the decoder budget) lives here too |
+| Tracked attributes | `grade`, `transition`, `audioTransition`, `gain`, `chase` (reserved) | Each holds until written again, or until a list boundary resets it to the channel default |
 | Operator state | `lock` | Outside tracking entirely; never reset, never restored by undo |
 
 Each tracked attribute is stored with how it was set: `{value, origin}` where origin is `default`, `tracked` (from a `track` write) or `once` (from a rider on the current content write). The origin is what lets the cue grid colour a chip as new, held or redundant, and what lets a `once` value fall back when the content changes.
@@ -76,7 +76,7 @@ A write replaces the channel's content instance, applies its riders, and emits a
 
 **Attribute writes without content** (`channel N grade 5`, `channel N gain -6`, `channel N transition 2 500`) change only the attribute, with origin `tracked`, and emit an `attribute` effect. A grade change carries an optional duration: with none it applies on the next frame; with one, the engine interpolates each grade parameter from the old values (none counts as identity) to the new over that time, which is why the attribute effect carries ms. A gain change ramps over 50 ms in the engine to avoid clicks, an engine detail and not state.
 
-**Transport.** `play`, `pause` and `stop` change `transport`; `stop` also resets the playhead by setting `startedAtFrame` to the landing frame and `transport: stopped`, which the engine renders as the poster frame. `end loop | hold | clear` sets `endBehavior`. These are `noop` on non-media content.
+**Transport.** `play`, `pause` and `stop` change `transport`; `stop` also resets the playhead by setting `startedAtFrame` to the landing frame and `transport: stopped`, which the engine renders as the poster frame. `play` after `pause` resumes from the engine's playhead; `startedAtFrame` is reset only by a write or `stop`. `end loop | hold | clear` sets `endBehavior`. These are `noop` on non-media content.
 
 **Popups** write `popups[N]`; the effect is `variable` so boxes that opted into transitioning on change can do so.
 
@@ -113,7 +113,7 @@ func project(_ state: ShowState,
              context: ProjectionContext) -> (ShowState, [Effect])
 ```
 
-**ProjectionContext** carries everything the fold needs that is not state and not a command, all of it plain data: `frame` (the engine frame the group lands on), `library` (channels, presets, transitions, grades, lists; read only), `machine` (stacks, outputs, tracking switches), `missing` (the set of media ids the resolver cannot find), `source` (Spec 2's source record for lock decisions), and `variables` (a closure or table that resolves `[Timer 1]` and friends for guards). Nothing in the context is mutable and nothing has a side effect.
+**ProjectionContext** carries everything the fold needs that is not state and not a command, all of it plain data: `frame` (the engine frame the group lands on), `rate` (the machine's frame rate, `{num, den}`, so durations become frames), `library` (channels, presets, transitions, grades, lists, and the media index whose entry defaults a media write falls back to; read only), `machine` (stacks, outputs, playlists and local copies, tracking switches, decoder cap default), `missing` (the set of media ids the resolver cannot find), `source` (Spec 2's source record for lock decisions), and `variables` (a closure or table that resolves `[Timer 1]` and friends for guards). Nothing in the context is mutable and nothing has a side effect.
 
 **Commands** are the Spec 2 objects. The projection handles every command that touches ShowState: channel writes and attribute writes, transport, clear and reset, output and stack commands, popups, pointer moves (`next`, `previous`, `cue`, `item`, `list`, `section`, `playlist`), and `macro` by inlining the macro's commands with their guards. Commands that do not touch state (`timer`, `history`, `system preflight`, `system snapshot`, `edit`) pass through as a `passthrough` effect for the caller to act on, so the fold stays total: every command in, one result out.
 
@@ -125,11 +125,12 @@ func project(_ state: ShowState,
 | `build` | channel, from build, to build | Engine animates the slide |
 | `attribute` | channel, attribute, old, new, ms (grades only) | Engine applies the gain, or interpolates the grade over ms; UI updates chips |
 | `stackSwitch`, `blackout`, `mute` | output or stack, old, new, transition ref | Engine runs the output transition |
-| `variable` | popup slot, text | Engine re-rasterizes affected boxes |
-| `boundary` | list entered, attributes reset | UI shows the reset in the strip |
+| `variable` | popup slot, text, `clearAfterMs` (when the write set one) | Engine re-rasterizes affected boxes; the scheduler clears the slot after `clearAfterMs`, since timers are not state |
+| `boundary` | list entered, `reset` (bool: false when the list has `trackThrough`) | UI shows the reset in the strip |
 | `pointer` | old, new, armed | UI moves the live marker; the scheduler arms or disarms its timer |
 | `steppedOn` | channel, dropped ref | Engine cuts the content; strip flashes; log records it |
 | `blocked` | channel, command | Log records it; the strip shows a lock glint |
+| `applied` | command | State changed with nothing to animate (transport, end behaviour, lock, freeze); logged as `ok` |
 | `noop` | command | Nothing, but logged |
 | `passthrough` | command | The caller (engine, history, scheduler) handles it |
 
@@ -237,3 +238,5 @@ The case the question was really about: if song 1 ended on the bridge (grade 7 o
 **Provenance** stays in ChannelState for v1: one UUID per channel, free to keep, and it makes the strip's "which cue put this here" instant.
 
 **Lookahead across a boundary** shows reset attributes, as confirmed; the confidence stack reflects what will actually happen.
+
+**Pause and resume** (Area 1 review, 2026-10-27): `play` after `pause` resumes from the engine's playhead, which Spec 4 owns per instance; ShowState keeps `startedAtFrame` as the frame the write landed on, reset only by a write or `stop` (§4 Transport). The alternative, a `pausedAtFrame` field, would carry engine detail into lookahead and replay for no gain.

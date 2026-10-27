@@ -2,6 +2,8 @@
 
 Branch: `area/projection` · Spec: `docs/specs/3-channel-state-and-projection.md` · Tests: 50 passing on `swift test` (per the branch's changelog line; not re-run for this brief) · CI: not yet run on this branch
 
+**Outcome (2026-10-27).** Adam wrote `approved` with these answers to "For Adam to decide": 1, yes, the spec corrections below are applied to Spec 3 (§2, §4, §6) and Spec 1 (§6); 2, the recommendation, so ShowState is unchanged and Spec 3 §4 Transport carries the one sentence; 3, Area 2 next. `area/projection` was merged into `main` the same day and the area is `shipped`. Deviation 1 (pool-item defaults) goes to Area 2 and deviation 2's decoder aliases to Area 3; both are in their prompts in `docs/build-order.md`.
+
 ## What the spec asked for
 
 Spec 3 defines what is on a channel at any moment (`ShowState`, §2), how tracked attributes behave across writes and list boundaries (§3), what each kind of write does (§4), how the live pointer moves and triggers arm (§5), and the one pure function that computes all of it: `project(state, commands, context) -> (state, effects)` (§6), run from three starting points (§7) with lock decided by the command's source (§8). It fixes a 24-row test table (§9) to be written before the code, and the Swift shape (§10): value types only, Foundation only, no clock, no traps on bad input, a doc comment per public function quoting its spec section. Specs 1 and 2 supply the object and command shapes the projection reads.
