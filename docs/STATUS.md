@@ -45,9 +45,8 @@ the Nimbalyst way of working: the Build tracker with one task per area of
 Nimbalyst" section in `CLAUDE.md` (one worktree session per area, the brief as the
 session's final message under four headings, merge only on `approved` in the session),
 `docs/reviews/` retired for new briefs, and `/wrap-up` reworked to reach `main` from a
-worktree. One edit was refused and is left for Adam by hand: the `allowed-tools` line in
-`.claude/commands/wrap-up.md` still lists `git checkout` and not `git merge` or `git -C`,
-so the reworked step 4 will prompt for permission until that line is changed.
+worktree. Its `allowed-tools` line was changed by Adam by hand (the auto-mode classifier
+refuses permission changes to command files) and committed on `main`.
 
 ## Needs Adam
 
