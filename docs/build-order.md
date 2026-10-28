@@ -10,7 +10,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | --- | --- | --- | --- |
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | shipped |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | shipped |
-| 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | not started |
+| 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | in review |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | not started |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | spec needed |
