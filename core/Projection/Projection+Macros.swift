@@ -5,9 +5,10 @@ extension Fold {
     /// guards." Spec 3 §8 — "A macro fired by a cue inherits `cue` as its
     /// source kind, so lock cannot be dodged by wrapping a write in a macro."
     /// Spec 2 §5 — depth is capped at 8. An unknown macro, or one whose
-    /// guards all fail, is a `noop`.
+    /// guards all fail, is a `noop`. Spec 1 §2 — a macro that names a stack
+    /// or an output lives in the machine root, so both roots are searched.
     mutating func runMacro(_ number: Int, command: Command, source: CommandSource, depth: Int) {
-        guard depth < Fold.maxDepth, let macro = context.library.macro(number) else {
+        guard depth < Fold.maxDepth, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
             effects.append(.noop(command))
             return
         }
