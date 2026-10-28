@@ -112,9 +112,10 @@ final class OSCMappingTests: XCTestCase {
     /// argument is parsed as the remainder of the text form ... Both spellings
     /// reach the same command object."
     func test_typedAndSingleStringFormsAgree() {
-        func same(_ a: OSCMessage, _ b: OSCMessage, file: StaticString = #filePath, line: UInt = #line) {
-            let left = OSCMapping.command(from: a)
-            let right = OSCMapping.command(from: b)
+        func same(_ a: OSCMessage, _ b: OSCMessage, options: ParseOptions = ParseOptions(),
+                  file: StaticString = #filePath, line: UInt = #line) {
+            let left = OSCMapping.command(from: a, options: options)
+            let right = OSCMapping.command(from: b, options: options)
             guard case .success(let x) = left, case .success(let y) = right else {
                 return XCTFail("\(a) → \(left); \(b) → \(right)", file: file, line: line)
             }
@@ -136,7 +137,8 @@ final class OSCMappingTests: XCTestCase {
         same(OSCMessage("/o/cue", [s("7")]), OSCMessage("/o/cue", [i(7)]))
         same(OSCMessage("/o/next", [s("")]), OSCMessage("/o/next"))
         same(OSCMessage("/o/channel/2/write", [s("media \(Self.dawn) loop transition 2 1.0 once")]),
-             OSCMessage("/o/channel/2/write", [s("media sha256:55c84469c37e loop tr 2 1 once")]))
+             OSCMessage("/o/channel/2/write", [s("media sha256:55c84469c37e loop tr 2 1 once")]),
+             options: ParseOptions(mediaIDs: [Self.dawn]))
         // The address is case-insensitive like the text keywords; `ch` expands.
         same(OSCMessage("/o/CHANNEL/2/Clear"), OSCMessage("/o/channel/2/clear"))
         same(OSCMessage("/o/ch/2/clear"), OSCMessage("/o/channel/2/clear"))
