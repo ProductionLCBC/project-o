@@ -1,0 +1,40 @@
+{
+  "app": "0.1.0",
+  "bindings": [
+    {
+      "command": { "cmd": "playlist.next" },
+      "device": "keyboard",
+      "key": "space"
+    },
+    {
+      "command": { "cmd": "playlist.next" },
+      "device": "keyboard",
+      "key": "right"
+    },
+    {
+      "command": { "cmd": "playlist.previous" },
+      "device": "keyboard",
+      "key": "left"
+    },
+    {
+      "command": { "cmd": "system.clearAll" },
+      "device": "keyboard",
+      "key": "escape"
+    },
+    {
+      "command": { "cmd": "stack.blackout", "stack": 1, "state": "toggle" },
+      "device": "streamdeck:AL12K3",
+      "key": "button 1"
+    },
+    {
+      "command": { "cmd": "macro.run", "macro": 2 },
+      "device": "scheduler",
+      "when": {
+        "days": ["sunday"],
+        "time": "09:55"
+      }
+    }
+  ],
+  "kind": "keys",
+  "schema": 1
+}

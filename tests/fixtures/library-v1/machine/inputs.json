@@ -1,0 +1,25 @@
+{
+  "app": "0.1.0",
+  "inputs": [
+    {
+      "audioMap": [0, 1],
+      "bufferingMs": 40,
+      "colorRange": "limited",
+      "deinterlace": true,
+      "device": "decklink:8f3a21c0:in1",
+      "expected": false,
+      "format": {
+        "height": 1080,
+        "interlaced": true,
+        "rate": { "den": 1001, "num": 30000 },
+        "width": 1920
+      },
+      "kind": "sdi",
+      "label": "Camera 1",
+      "number": 1,
+      "uuid": "19b00000-0000-4000-8000-000000000001"
+    }
+  ],
+  "kind": "inputs",
+  "schema": 1
+}

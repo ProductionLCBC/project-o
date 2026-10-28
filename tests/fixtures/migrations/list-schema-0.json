@@ -1,0 +1,64 @@
+{
+  "app": "0.0.9",
+  "author": "Thomas Ken",
+  "ccli": "56204",
+  "copyright": "Public domain",
+  "cues": [
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Praise God, from whom all blessings flow;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse",
+      "note": "",
+      "section": "Verse",
+      "trigger": "go",
+      "uuid": "55ee0000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Praise Him, all creatures here below;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse",
+      "note": "",
+      "section": "Verse",
+      "trigger": "time",
+      "triggerMs": 4000,
+      "uuid": "66ff0000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": 5000,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" }
+      ],
+      "label": "Out",
+      "note": "",
+      "section": "Out",
+      "trigger": "timecode",
+      "triggerTc": "01:00:30:00",
+      "uuid": "77aa0000-0000-4000-8000-000000000003"
+    }
+  ],
+  "kind": "list",
+  "number": 7,
+  "schema": 0,
+  "timeline": null,
+  "title": "Doxology",
+  "uuid": "a9f00000-0000-4000-8000-000000000007",
+  "version": 2
+}

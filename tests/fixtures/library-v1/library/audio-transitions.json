@@ -1,0 +1,10 @@
+{
+  "app": "0.1.0",
+  "audioTransitions": [
+    { "easing": "linear", "label": "Cut", "ms": 0, "number": 1, "offsetMs": 0, "type": "cut", "uuid": "a0d10000-0000-4000-8000-000000000001" },
+    { "easing": "easeInOut", "label": "Crossfade", "ms": 500, "number": 2, "offsetMs": 0, "type": "crossfade", "uuid": "a0d10000-0000-4000-8000-000000000002" },
+    { "easing": "easeOut", "label": "Fade through silence", "ms": 800, "number": 3, "offsetMs": -200, "type": "fadeThroughSilence", "uuid": "a0d10000-0000-4000-8000-000000000003" }
+  ],
+  "kind": "audioTransitions",
+  "schema": 1
+}

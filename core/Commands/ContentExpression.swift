@@ -7,7 +7,8 @@ public enum Scope: String, Codable, Equatable, Sendable {
 }
 
 /// Spec 1 §6 — `media` content: "`ref` is a hash; optional `in`, `out` in ms,
-/// `loop`, `gain` override, `syncOffsetMs` override".
+/// `loop`, `gain` override, `syncOffsetMs` override". As in the §9 example,
+/// absent optionals are omitted and `loop` is written only when true.
 public struct MediaContent: Codable, Equatable, Sendable {
     public var ref: String
     public var inMs: Int?
@@ -15,18 +16,20 @@ public struct MediaContent: Codable, Equatable, Sendable {
     public var loop: Bool
     public var gain: Double?
     public var syncOffsetMs: Int?
+    public var extra: [String: JSONValue]
 
     public init(ref: String, inMs: Int? = nil, outMs: Int? = nil, loop: Bool = false,
-                gain: Double? = nil, syncOffsetMs: Int? = nil) {
+                gain: Double? = nil, syncOffsetMs: Int? = nil, extra: [String: JSONValue] = [:]) {
         self.ref = ref
         self.inMs = inMs
         self.outMs = outMs
         self.loop = loop
         self.gain = gain
         self.syncOffsetMs = syncOffsetMs
+        self.extra = extra
     }
 
-    private enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey, CaseIterable {
         case ref
         case inMs = "in"
         case outMs = "out"
@@ -41,9 +44,12 @@ public struct MediaContent: Codable, Equatable, Sendable {
         loop = try c.decodeIfPresent(Bool.self, forKey: .loop) ?? false
         gain = try c.decodeIfPresent(Double.self, forKey: .gain)
         syncOffsetMs = try c.decodeIfPresent(Int.self, forKey: .syncOffsetMs)
+        // `kind` belongs to the enclosing content object (ContentExpression).
+        extra = try decoder.unknownKeys(besides: CodingKeys.known.union(["kind"]))
     }
 
     public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(ref, forKey: .ref)
         try c.encodeIfPresent(inMs, forKey: .inMs)
@@ -89,8 +95,8 @@ public enum ContentExpression: Codable, Equatable, Sendable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .media(let m):
-            try c.encode("media", forKey: .kind)
             try m.encode(to: encoder)
+            try c.encode("media", forKey: .kind)
         case .text(let fields):
             try c.encode("text", forKey: .kind)
             try c.encode(fields, forKey: .fields)
@@ -105,6 +111,15 @@ public enum ContentExpression: Codable, Equatable, Sendable {
             try c.encode("empty", forKey: .kind)
         }
     }
+
+    /// The media or slide id this content names, if any.
+    public var mediaRef: String? {
+        switch self {
+        case .media(let m): return m.ref
+        case .slide(let ref, _): return ref
+        default: return nil
+        }
+    }
 }
 
 /// Spec 2 §2 — `transition REF [DURATION] SCOPE` and
@@ -113,10 +128,31 @@ public struct TransitionRider: Codable, Equatable, Sendable {
     public var ref: Int
     public var ms: Int?
     public var scope: Scope
-    public init(ref: Int, ms: Int? = nil, scope: Scope) {
+    public var extra: [String: JSONValue]
+
+    public init(ref: Int, ms: Int? = nil, scope: Scope, extra: [String: JSONValue] = [:]) {
         self.ref = ref
         self.ms = ms
         self.scope = scope
+        self.extra = extra
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case ref, ms, scope }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ref = try c.decode(Int.self, forKey: .ref)
+        ms = try c.decodeIfPresent(Int.self, forKey: .ms)
+        scope = try c.decode(Scope.self, forKey: .scope)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(ref, forKey: .ref)
+        try c.encodeIfPresent(ms, forKey: .ms)
+        try c.encode(scope, forKey: .scope)
     }
 }
 
@@ -126,10 +162,31 @@ public struct GradeRider: Codable, Equatable, Sendable {
     public var ref: Int
     public var ms: Int?
     public var scope: Scope
-    public init(ref: Int, ms: Int? = nil, scope: Scope) {
+    public var extra: [String: JSONValue]
+
+    public init(ref: Int, ms: Int? = nil, scope: Scope, extra: [String: JSONValue] = [:]) {
         self.ref = ref
         self.ms = ms
         self.scope = scope
+        self.extra = extra
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case ref, ms, scope }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ref = try c.decode(Int.self, forKey: .ref)
+        ms = try c.decodeIfPresent(Int.self, forKey: .ms)
+        scope = try c.decode(Scope.self, forKey: .scope)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(ref, forKey: .ref)
+        try c.encodeIfPresent(ms, forKey: .ms)
+        try c.encode(scope, forKey: .scope)
     }
 }
 
@@ -137,16 +194,54 @@ public struct GradeRider: Codable, Equatable, Sendable {
 public struct GainRider: Codable, Equatable, Sendable {
     public var db: Double
     public var scope: Scope
-    public init(db: Double, scope: Scope) {
+    public var extra: [String: JSONValue]
+
+    public init(db: Double, scope: Scope, extra: [String: JSONValue] = [:]) {
         self.db = db
         self.scope = scope
+        self.extra = extra
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case db, scope }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        db = try c.decode(Double.self, forKey: .db)
+        scope = try c.decode(Scope.self, forKey: .scope)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(db, forKey: .db)
+        try c.encode(scope, forKey: .scope)
     }
 }
 
 /// Spec 2 §2 — `chase SCOPE` (reserved); stored as `{scope}`.
 public struct ChaseRider: Codable, Equatable, Sendable {
     public var scope: Scope
-    public init(scope: Scope) { self.scope = scope }
+    public var extra: [String: JSONValue]
+
+    public init(scope: Scope, extra: [String: JSONValue] = [:]) {
+        self.scope = scope
+        self.extra = extra
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case scope }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        scope = try c.decode(Scope.self, forKey: .scope)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(scope, forKey: .scope)
+    }
 }
 
 /// Spec 1 §6 — "Attribute riders on a write: `transition`, `audioTransition`,

@@ -1,0 +1,24 @@
+{
+  "app": "0.1.0",
+  "color": { "a": 1, "b": 0.9, "g": 0.5, "r": 0.2 },
+  "commands": [
+    {
+      "channel": 2,
+      "cmd": "channel.write",
+      "content": {
+        "fields": { "body": "Welcome" },
+        "kind": "text"
+      },
+      "when": { "op": "is empty", "var": "Channel 2 Content" }
+    },
+    { "cmd": "timer.set", "ms": 300000, "timer": 1 },
+    { "cmd": "timer.start", "timer": 1 },
+    { "clearAfterMs": 30000, "cmd": "popup.set", "popup": 3, "text": "Nursery: please come to room 12" }
+  ],
+  "kind": "macro",
+  "label": "Welcome",
+  "number": 1,
+  "schema": 1,
+  "tileLabel": "WELCOME",
+  "uuid": "3ac70000-0000-4000-8000-000000000001"
+}

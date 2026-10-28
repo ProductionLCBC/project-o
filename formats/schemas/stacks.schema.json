@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/stacks.schema.json",
+  "title": "stacks.json",
+  "description": "Spec 1 §3 — Stack: slots (ordered, bottom to top; {channel, preset, offset -2..+3, opacity 0–1, mute}), base, defaultPreset, gammaBlend. A channel appears at most once per stack at each offset (§9).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "stacks"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "stacks" },
+    "stacks": { "type": "array", "items": { "$ref": "#/$defs/stack" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "slot": {
+      "type": "object",
+      "required": ["channel", "preset", "offset", "opacity", "mute"],
+      "properties": {
+        "channel": { "type": "integer", "minimum": 1 },
+        "preset": { "type": ["integer", "null"] },
+        "offset": { "type": "integer", "minimum": -2, "maximum": 3 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mute": { "type": "boolean" }
+      }
+    },
+    "stack": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "slots", "base", "defaultPreset", "gammaBlend"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
+        "base": { "enum": ["black", "transparent"] },
+        "defaultPreset": { "type": ["integer", "null"] },
+        "gammaBlend": { "type": "boolean" }
+      }
+    }
+  }
+}

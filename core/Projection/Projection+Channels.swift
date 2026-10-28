@@ -8,18 +8,38 @@ extension Fold {
     /// default). A `cut` emits a transition effect with zero duration."
     /// A `track` rider has already become the attribute by the time the
     /// effect is built, so any rider wins here.
-    func selectTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int) {
+    ///
+    /// Spec 1 §8 — a reference to a transition that does not exist degrades to
+    /// "the channel default transition", as that transition is defined (its own
+    /// duration, not the rider's); when the channel default is missing too, to
+    /// a zero-second cut (Adam, Area 2 review), which Spec 3 §4 defines as the
+    /// zero-duration effect. The ref carried is the one that plays, or the one
+    /// the cue asked for when nothing does.
+    func selectTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>, channel number: Int) -> (ref: Int, ms: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        let ms = setting.ms ?? context.library.transition(setting.ref)?.ms ?? 0
-        return (setting.ref, max(0, ms))
+        if let object = context.library.transition(setting.ref) {
+            return (setting.ref, max(0, setting.ms ?? object.ms))
+        }
+        let fallback = defaults(for: number).transition
+        if let object = context.library.transition(fallback) {
+            return (fallback, max(0, object.ms))
+        }
+        return (setting.ref, 0)
     }
 
-    /// Spec 3 §4 — "The same order applies to the audio transition."
-    func selectAudioTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int, offsetMs: Int) {
+    /// Spec 3 §4 — "The same order applies to the audio transition." A missing
+    /// audio transition degrades the same way: the channel's default audio
+    /// transition as defined, else a zero-second cut with no offset.
+    func selectAudioTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>, channel number: Int) -> (ref: Int, ms: Int, offsetMs: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        let object = context.library.audioTransition(setting.ref)
-        let ms = setting.ms ?? object?.ms ?? 0
-        return (setting.ref, max(0, ms), object?.offsetMs ?? 0)
+        if let object = context.library.audioTransition(setting.ref) {
+            return (setting.ref, max(0, setting.ms ?? object.ms), object.offsetMs)
+        }
+        let fallback = defaults(for: number).audioTransition
+        if let object = context.library.audioTransition(fallback) {
+            return (fallback, max(0, object.ms), object.offsetMs)
+        }
+        return (setting.ref, 0, 0)
     }
 
     // MARK: - Decoder budget
@@ -76,13 +96,21 @@ extension Fold {
         switch write.content {
         case .media(let m):
             // Spec 3 §4 — Media: "`startedAtFrame` set to the frame the write
-            // lands on, `transport: playing` ... `endBehavior` starts as `loop`
-            // when the expression says loop, otherwise `hold`."
+            // lands on, `transport: playing`, and `inMs`, `outMs`, `loop`,
+            // `gainOverride`, `syncOffsetMs` taken from the content expression,
+            // falling back to the pool item's defaults, then to none.
+            // `endBehavior` starts as `loop` when the expression says loop,
+            // otherwise `hold`." Spec 1 §7 — the machine index is consulted
+            // first, then the library index. The expression's `loop` can ask
+            // for a loop, not refuse the pool's (`end hold` does that).
+            let pool = (context.machine.mediaLocal.entry(m.ref) ?? context.library.mediaIndex.entry(m.ref))?.defaults
+            let loop = m.loop || (pool?.loop ?? false)
             restart = current.media?.ref == m.ref
             newContent = .media(MediaInstance(
-                ref: m.ref, inMs: m.inMs, outMs: m.outMs, loop: m.loop, gainOverride: m.gain,
-                syncOffsetMs: m.syncOffsetMs, startedAtFrame: frame, transport: .playing,
-                endBehavior: m.loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
+                ref: m.ref, inMs: m.inMs ?? pool?.trimInMs, outMs: m.outMs ?? pool?.trimOutMs, loop: loop,
+                gainOverride: m.gain ?? pool?.gain, syncOffsetMs: m.syncOffsetMs ?? pool?.syncOffsetMs,
+                startedAtFrame: frame, transport: .playing,
+                endBehavior: loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
         case .text(let fields):
             // Spec 3 §4 — Text: "If the fields are identical to the current
             // text, the result is `noop`. Fields not written are absent."
@@ -130,8 +158,8 @@ extension Fold {
         riderEffectsStart = effects.count
 
         if let to = newContent {
-            let transition = selectTransition(rider: write.riders.transition, attribute: channel.attributes.transition)
-            let audio = selectAudioTransition(rider: write.riders.audioTransition, attribute: channel.attributes.audioTransition)
+            let transition = selectTransition(rider: write.riders.transition, attribute: channel.attributes.transition, channel: number)
+            let audio = selectAudioTransition(rider: write.riders.audioTransition, attribute: channel.attributes.audioTransition, channel: number)
             let stepped = replaceContent(of: &channel, number: number, with: to, transitionMs: transition.ms, restart: restart)
             channel.provenance = provenance(source)
             effects.append(.transition(TransitionEffect(
@@ -165,8 +193,8 @@ extension Fold {
         }
         let current = channel.content
         guard !current.isEmpty else { return false }
-        let transition = selectTransition(rider: nil, attribute: channel.attributes.transition)
-        let audio = selectAudioTransition(rider: nil, attribute: channel.attributes.audioTransition)
+        let transition = selectTransition(rider: nil, attribute: channel.attributes.transition, channel: number)
+        let audio = selectAudioTransition(rider: nil, attribute: channel.attributes.audioTransition, channel: number)
         _ = replaceContent(of: &channel, number: number, with: .empty, transitionMs: transition.ms, restart: false)
         channel.provenance = provenance(source)
         state.channels[number] = channel

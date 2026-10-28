@@ -1,0 +1,16 @@
+{
+  "builds": [],
+  "editableLayers": [],
+  "fieldTags": { "body": "layer-body" },
+  "layers": [
+    {
+      "frame": { "h": 0.2, "w": 0.8, "x": 0.1, "y": 0.4 },
+      "id": "layer-body",
+      "kind": "text",
+      "text": "Welcome"
+    }
+  ],
+  "schema": 1,
+  "size": { "height": 1080, "width": 1920 },
+  "uuid": "51de0000-0000-4000-8000-000000000001"
+}

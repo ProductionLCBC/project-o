@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/grades.schema.json",
+  "title": "grades.json",
+  "description": "Spec 1 §2 — Grade: hue, saturation, brightness, contrast, blur, tint (RGBA), opacity; all with a defined identity value.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "grades"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "grades" },
+    "grades": { "type": "array", "items": { "$ref": "#/$defs/grade" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "grade": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "hue", "saturation", "brightness", "contrast", "blur", "tint", "opacity"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "hue": { "type": "number" },
+        "saturation": { "type": "number", "minimum": 0 },
+        "brightness": { "type": "number" },
+        "contrast": { "type": "number", "minimum": 0 },
+        "blur": { "type": "number", "minimum": 0 },
+        "tint": { "$ref": "#/$defs/color" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

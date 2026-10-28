@@ -1,0 +1,59 @@
+{
+  "app": "0.1.0",
+  "author": "Thomas Chisholm",
+  "ccli": "18723",
+  "copyright": "Public domain",
+  "cues": [
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "media", "ref": "sha256:eb6384847a49f7a4ef82aedb9e2019080777b8be748690c33d91bba67c32a3d2" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Great is Thy faithfulness,\nO God my Father" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse 1",
+      "note": "",
+      "section": "Verse 1",
+      "trigger": { "type": "go" },
+      "uuid": "11aa0000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "There is no shadow\nof turning with Thee" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse 1",
+      "note": "",
+      "section": "Verse 1",
+      "trigger": { "type": "go" },
+      "uuid": "22bb0000-0000-4000-8000-000000000002"
+    }
+  ],
+  "kind": "list",
+  "number": 42,
+  "provenance": { "detachedAt": "2026-10-25T14:03:22Z", "masterUuid": "a9f00000-0000-4000-8000-00000000002a", "masterVersion": 16 },
+  "schema": 1,
+  "timeline": null,
+  "title": "Great Is Thy Faithfulness (Manheim)",
+  "trackThrough": false,
+  "uuid": "10ca1000-0000-4000-8000-00000000002a",
+  "version": 2
+}

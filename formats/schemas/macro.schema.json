@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/macro.schema.json",
+  "title": "macros/NNN-slug.json",
+  "description": "Spec 1 §2 — Macro: commands (command objects of §6, each with an optional when guard, Spec 2 §7), color, tileLabel. Scope is computed, not stored.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "number", "label", "uuid", "commands", "color", "tileLabel"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "macro" },
+    "number": { "type": "integer", "minimum": 1 },
+    "label": { "type": "string" },
+    "uuid": { "$ref": "#/$defs/uuid" },
+    "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } },
+    "color": { "$ref": "#/$defs/color" },
+    "tileLabel": { "type": "string" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "guard": {
+      "type": "object",
+      "required": ["var", "op"],
+      "properties": {
+        "var": { "type": "string" },
+        "op": { "enum": ["is", "is not", "greater than", "less than", "is empty", "is not empty"] },
+        "value": { "type": "string" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": ["cmd"],
+      "properties": {
+        "cmd": { "type": "string", "pattern": "^[a-z]+(\\.[a-zA-Z]+)?$" },
+        "when": { "$ref": "#/$defs/guard" }
+      }
+    }
+  }
+}

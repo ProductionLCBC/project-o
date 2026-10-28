@@ -1,0 +1,26 @@
+{
+  "app": "0.1.0",
+  "color": { "a": 1, "b": 0.2, "g": 0.3, "r": 0.9 },
+  "commands": [
+    { "cmd": "system.clearAll" },
+    { "cmd": "output.stack", "output": 1, "stack": 1 },
+    { "cmd": "stack.blackout", "stack": 1, "state": "off" },
+    { "channel": 2, "cmd": "stack.mute", "stack": 2, "state": "off" },
+    { "audio": "all", "cmd": "audio.mute", "state": "off" },
+    {
+      "channel": 1,
+      "cmd": "channel.write",
+      "content": { "kind": "media", "ref": "sha256:eb6384847a49f7a4ef82aedb9e2019080777b8be748690c33d91bba67c32a3d2" },
+      "when": { "op": "is", "value": "1", "var": "Output 1 Stack" }
+    },
+    { "channel": 1, "cmd": "channel.endBehavior", "mode": "hold" },
+    { "channel": 1, "cmd": "channel.lock", "locked": false },
+    { "channel": "all", "cmd": "channel.reset" }
+  ],
+  "kind": "macro",
+  "label": "Preshow",
+  "number": 2,
+  "schema": 1,
+  "tileLabel": "PRESHOW",
+  "uuid": "3ac70000-0000-4000-8000-000000000002"
+}

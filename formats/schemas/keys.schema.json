@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/keys.schema.json",
+  "title": "keys.json",
+  "description": "Spec 1 §3 — key bindings: an array of {device, key, command}; the scheduler is the same array with {when: {days, time}} in place of key.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "bindings"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "keys" },
+    "bindings": { "type": "array", "items": { "$ref": "#/$defs/binding" } }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "required": ["cmd"],
+      "properties": { "cmd": { "type": "string", "pattern": "^[a-z]+(\\.[a-zA-Z]+)?$" } }
+    },
+    "binding": {
+      "type": "object",
+      "required": ["device", "command"],
+      "properties": {
+        "device": { "type": "string" },
+        "key": { "type": ["string", "null"] },
+        "when": {
+          "type": "object",
+          "required": ["days", "time"],
+          "properties": {
+            "days": { "type": "array", "items": { "enum": ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] } },
+            "time": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$" }
+          }
+        },
+        "command": { "$ref": "#/$defs/command" }
+      },
+      "oneOf": [
+        { "required": ["key"] },
+        { "required": ["when"] }
+      ]
+    }
+  }
+}

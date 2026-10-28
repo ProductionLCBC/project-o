@@ -18,17 +18,35 @@ public struct Guard: Codable, Equatable, Sendable {
     public var variable: String
     public var op: GuardOperator
     public var value: String?
+    public var extra: [String: JSONValue]
 
-    public init(variable: String, op: GuardOperator, value: String? = nil) {
+    public init(variable: String, op: GuardOperator, value: String? = nil, extra: [String: JSONValue] = [:]) {
         self.variable = variable
         self.op = op
         self.value = value
+        self.extra = extra
     }
 
-    private enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey, CaseIterable {
         case variable = "var"
         case op
         case value
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        variable = try c.decode(String.self, forKey: .variable)
+        op = try c.decode(GuardOperator.self, forKey: .op)
+        value = try c.decodeIfPresent(String.self, forKey: .value)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(variable, forKey: .variable)
+        try c.encode(op, forKey: .op)
+        try c.encodeIfPresent(value, forKey: .value)
     }
 
     /// Spec 2 §7 — "Values compare as durations when both sides parse as
@@ -79,5 +97,35 @@ public struct Guard: Codable, Equatable, Sendable {
             total = total * 60 + n
         }
         return Int((total * 1000).rounded())
+    }
+
+    // MARK: - Spec 1 §4, the numbers a guard's value names
+
+    /// Spec 2 §7 — `[Channel N ...]`, `[Output N Stack]` and `[Stack N
+    /// Blackout]` name objects by number, so renumbering rewrites them (Spec 1
+    /// §4). Timers and popups are slots, not objects.
+    public func mapReferences(_ transform: (NumberedType, Int) -> Int) -> Guard {
+        let words = variable.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+        guard words.count >= 3, let number = Int(words[1]) else { return self }
+        let type: NumberedType?
+        switch words[0].lowercased() {
+        case "channel": type = .channel
+        case "output": type = .output
+        case "stack": type = .stack
+        default: type = nil
+        }
+        guard let type else { return self }
+        var copy = self
+        var rewritten = words
+        rewritten[1] = String(transform(type, number))
+        copy.variable = rewritten.joined(separator: " ")
+        return copy
+    }
+
+    public func forEachReference(of type: NumberedType, _ body: (Int) -> Void) {
+        _ = mapReferences { found, number in
+            if found == type { body(number) }
+            return number
+        }
     }
 }

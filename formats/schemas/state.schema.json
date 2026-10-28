@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/state.schema.json",
+  "title": "state/last.json",
+  "description": "Spec 1 §5 — channel state at last clean shutdown (restore-last-state): the ShowState of Spec 3 §2, as the projection writes it, under state.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "state"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "state" },
+    "state": {
+      "type": "object",
+      "required": ["channels", "outputs", "stacks", "popups"],
+      "properties": {
+        "channels": { "type": "object" },
+        "outputs": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "stacks": { "type": "object" },
+        "pointer": { "type": "object" },
+        "armed": { "type": "object" },
+        "popups": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  }
+}

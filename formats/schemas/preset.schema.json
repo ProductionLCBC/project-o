@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/preset.schema.json",
+  "title": "presets/NNN-slug.json",
+  "description": "Spec 1 §2 — Preset: layouts, a map from stack number (or \"*\") to a layout of boxes and a reserved mask. Box: binding, frame, fit, textStyle, transition, transitionOnVariableChange, fallback, grade.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "number", "label", "uuid", "builtIn", "layouts"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "preset" },
+    "number": { "type": "integer", "minimum": 1 },
+    "label": { "type": "string" },
+    "uuid": { "$ref": "#/$defs/uuid" },
+    "builtIn": { "type": "boolean" },
+    "layouts": {
+      "type": "object",
+      "patternProperties": { "^(\\*|[1-9][0-9]*)$": { "$ref": "#/$defs/layout" } },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "layout": {
+      "type": "object",
+      "required": ["boxes", "mask"],
+      "properties": {
+        "boxes": { "type": "array", "items": { "$ref": "#/$defs/box" } },
+        "mask": { "type": ["object", "null"] }
+      }
+    },
+    "box": {
+      "type": "object",
+      "required": ["binding", "frame", "fit", "transition", "fallback", "grade"],
+      "properties": {
+        "binding": {
+          "oneOf": [
+            { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "pixels" } } },
+            { "type": "object", "required": ["kind", "name"], "properties": { "kind": { "const": "field" }, "name": { "type": "string" } } },
+            { "type": "object", "required": ["kind", "text"], "properties": { "kind": { "const": "static" }, "text": { "type": "string" } } }
+          ]
+        },
+        "frame": {
+          "type": "object",
+          "required": ["x", "y", "w", "h"],
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" } },
+          "additionalProperties": false
+        },
+        "fit": {
+          "oneOf": [
+            { "enum": ["fill", "fit", "stretch", "crop"] },
+            {
+              "type": "object",
+              "required": ["policy", "maxLines", "minSize"],
+              "properties": {
+                "policy": { "enum": ["shrinkToFit", "maxLines"] },
+                "maxLines": { "type": "integer", "minimum": 1 },
+                "minSize": { "type": "number", "minimum": 0 }
+              }
+            }
+          ]
+        },
+        "textStyle": { "oneOf": [{ "$ref": "#/$defs/textStyle" }, { "type": "null" }] },
+        "transition": {
+          "type": "object",
+          "required": ["ref", "ms"],
+          "properties": { "ref": { "type": "integer", "minimum": 1 }, "ms": { "type": ["integer", "null"] } }
+        },
+        "transitionOnVariableChange": { "type": "boolean" },
+        "fallback": { "type": "boolean" },
+        "grade": { "type": ["integer", "null"] }
+      }
+    },
+    "textStyle": {
+      "type": "object",
+      "required": ["font", "size", "weight", "color", "alignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations", "fromStyle"],
+      "properties": {
+        "font": { "type": "string" },
+        "size": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "properties": { "value": { "type": "number", "minimum": 0 }, "unit": { "enum": ["pt", "percent"] } },
+          "additionalProperties": false
+        },
+        "weight": { "type": "number" },
+        "color": { "$ref": "#/$defs/color" },
+        "alignment": { "enum": ["left", "center", "right"] },
+        "lineSpacing": { "type": "number" },
+        "letterSpacing": { "type": "number" },
+        "outline": {
+          "type": "object",
+          "required": ["width", "color"],
+          "properties": { "width": { "type": "number", "minimum": 0 }, "color": { "$ref": "#/$defs/color" } },
+          "additionalProperties": false
+        },
+        "shadow": {
+          "type": "object",
+          "required": ["x", "y", "blur", "color"],
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "blur": { "type": "number", "minimum": 0 }, "color": { "$ref": "#/$defs/color" } },
+          "additionalProperties": false
+        },
+        "allCaps": { "type": "boolean" },
+        "variations": { "type": "object", "additionalProperties": { "type": "number" } },
+        "fromStyle": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}

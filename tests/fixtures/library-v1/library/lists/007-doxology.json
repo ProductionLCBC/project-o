@@ -1,0 +1,77 @@
+{
+  "app": "0.1.0",
+  "author": "Thomas Ken",
+  "ccli": "56204",
+  "copyright": "Public domain",
+  "cues": [
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "gain": -3, "in": 2000, "kind": "media", "out": 60000, "ref": "sha256:9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b", "syncOffsetMs": 40 },
+          "transition": { "ref": 3, "scope": "track" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Praise God, from whom all blessings flow;\nPraise Him, all creatures here below;", "title": "Doxology" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse",
+      "note": "",
+      "section": "Verse",
+      "trigger": { "tc": "01:00:10:00", "type": "timecode" },
+      "uuid": "55ee0000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Praise Him above, ye heavenly host;\nPraise Father, Son, and Holy Ghost." },
+            "kind": "text"
+          }
+        },
+        { "channel": 1, "cmd": "channel.transition", "ms": 750, "ref": 2 }
+      ],
+      "label": "Verse",
+      "note": "",
+      "section": "Verse",
+      "trigger": { "type": "go" },
+      "uuid": "66ff0000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": 5000,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" },
+        { "cmd": "macro.run", "macro": 1 },
+        {
+          "build": 2,
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "slide", "ref": "slide:51de0000-0000-4000-8000-000000000001" }
+        }
+      ],
+      "label": "Out",
+      "note": "",
+      "section": "Out",
+      "trigger": { "type": "go" },
+      "uuid": "77aa0000-0000-4000-8000-000000000003"
+    }
+  ],
+  "kind": "list",
+  "number": 7,
+  "schema": 1,
+  "timeline": null,
+  "title": "Doxology",
+  "trackThrough": true,
+  "uuid": "a9f00000-0000-4000-8000-000000000007",
+  "version": 3
+}

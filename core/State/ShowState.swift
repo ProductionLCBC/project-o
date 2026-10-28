@@ -22,6 +22,17 @@ public struct LivePointer: Codable, Equatable, Sendable {
         self.listUuid = listUuid
         self.cueUuid = cueUuid
     }
+
+    private enum CodingKeys: String, CodingKey { case playlist, item, listUuid, cueUuid }
+
+    /// Spec 1 §9 — UUIDs are written lowercase.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(playlist?.uuidString.lowercased(), forKey: .playlist)
+        try c.encodeIfPresent(item, forKey: .item)
+        try c.encodeIfPresent(listUuid?.uuidString.lowercased(), forKey: .listUuid)
+        try c.encodeIfPresent(cueUuid?.uuidString.lowercased(), forKey: .cueUuid)
+    }
 }
 
 /// Spec 3 §5 — "`armed = {cue: next, at: fireFrame + ms}`". The scheduler
@@ -32,6 +43,15 @@ public struct ArmedTrigger: Codable, Equatable, Sendable {
     public init(cueUuid: UUID, atFrame: Int) {
         self.cueUuid = cueUuid
         self.atFrame = atFrame
+    }
+
+    private enum CodingKeys: String, CodingKey { case cueUuid, atFrame }
+
+    /// Spec 1 §9 — UUIDs are written lowercase.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(cueUuid.uuidString.lowercased(), forKey: .cueUuid)
+        try c.encode(atFrame, forKey: .atFrame)
     }
 }
 

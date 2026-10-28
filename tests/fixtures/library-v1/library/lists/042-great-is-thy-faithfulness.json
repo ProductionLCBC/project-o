@@ -1,0 +1,97 @@
+{
+  "app": "0.1.0",
+  "author": "Thomas Chisholm",
+  "ccli": "18723",
+  "copyright": "Public domain",
+  "cues": [
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "media", "loop": true, "ref": "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Great is Thy faithfulness,\nO God my Father" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse 1",
+      "note": "",
+      "section": "Verse 1",
+      "trigger": { "type": "go" },
+      "uuid": "11aa0000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "There is no shadow\nof turning with Thee" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse 1",
+      "note": "",
+      "section": "Verse 1",
+      "trigger": { "type": "go" },
+      "uuid": "22bb0000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": 12000,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Thou changest not,\nThy compassions, they fail not" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Verse 1",
+      "note": "",
+      "section": "Verse 1",
+      "trigger": { "ms": 8000, "type": "time" },
+      "uuid": "33cc0000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "audioTransition": { "ref": 2, "scope": "once" },
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Great is Thy faithfulness!\nGreat is Thy faithfulness!" },
+            "kind": "text"
+          },
+          "grade": { "ms": 2000, "ref": 1, "scope": "track" }
+        },
+        { "channel": 1, "cmd": "channel.gain", "db": -6 }
+      ],
+      "label": "Chorus",
+      "note": "Build the lights here",
+      "section": "Chorus",
+      "trigger": { "type": "go" },
+      "uuid": "44dd0000-0000-4000-8000-000000000004"
+    }
+  ],
+  "kind": "list",
+  "number": 42,
+  "schema": 1,
+  "timeline": null,
+  "title": "Great Is Thy Faithfulness",
+  "trackThrough": false,
+  "uuid": "a9f00000-0000-4000-8000-00000000002a",
+  "version": 17
+}

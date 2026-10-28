@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/audio-transitions.schema.json",
+  "title": "audio-transitions.json",
+  "description": "Spec 1 §2 — Audio Transition: type (cut, crossfade, fadeThroughSilence), ms, easing, offsetMs (signed, measured from the trigger).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "audioTransitions"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "audioTransitions" },
+    "audioTransitions": { "type": "array", "items": { "$ref": "#/$defs/audioTransition" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "audioTransition": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "type", "ms", "easing", "offsetMs"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "type": { "enum": ["cut", "crossfade", "fadeThroughSilence"] },
+        "ms": { "type": "integer", "minimum": 0 },
+        "easing": { "enum": ["linear", "easeIn", "easeOut", "easeInOut"] },
+        "offsetMs": { "type": "integer", "minimum": -1000, "maximum": 1000 }
+      }
+    }
+  }
+}

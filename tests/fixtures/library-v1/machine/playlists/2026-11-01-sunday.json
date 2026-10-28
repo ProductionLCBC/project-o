@@ -1,0 +1,16 @@
+{
+  "app": "0.1.0",
+  "archived": false,
+  "items": [
+    { "kind": "header", "label": "Welcome" },
+    { "kind": "linked", "list": 42 },
+    { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a" },
+    { "kind": "header", "label": "Response" },
+    { "kind": "linked", "list": 7 }
+  ],
+  "kind": "playlist",
+  "schema": 1,
+  "serviceDate": "2026-11-01",
+  "title": "Sunday",
+  "uuid": "b1a70000-0000-4000-8000-000000000001"
+}
