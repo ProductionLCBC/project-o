@@ -49,16 +49,16 @@ Some verbs have no target number (`next`, `previous`, `undo`), and a few targets
 
 **Content expressions** follow `write`: `media sha256:... [in DURATION] [out DURATION] [loop] [gain DECIBELS] [sync MS]`, `text "..."` for a body-only write or `text body "..." title "..."` for several fields, `slide:<uuid> [build N]`, `input N`, or `empty`. Hashes may be abbreviated to their first 12 hex characters in the command bar and are expanded on parse; stored and logged forms are always full.
 
-**Riders** sit at the end of a write in any order, each ending in its scope. `once` applies to this write only; `track` holds until something writes the attribute again. A rider without a scope is an error, not a default, so the two meanings never get confused in a cue.
+**Riders** sit at the end of a write in any order, each ending in its scope. `once` applies to this write only; `track` holds until something writes the attribute again. A rider without a scope is an error, not a default, so the two meanings never get confused in a cue. Inside a media write, `gain DECIBELS` with no scope after it is the content's gain override; with a scope it is the rider. A standalone attribute write (`channel N transition`, `audiotransition`, `grade`, `gain`) is always tracked (Spec 3 §3 rule 2): the parser accepts a trailing `track`, rejects `once`, and prints neither.
 
 **Examples**
 
 ```
 channel 1 write media sha256:9f2c... loop transition 2 1.0 once
 channel 2 write text "There is no shadow\nof turning with Thee"
-channel 2 grade 5 track
-channel 2 grade 5 2.0 track
-channel 2 gain -6 track
+channel 2 grade 5
+channel 2 grade 5 2.0
+channel 2 gain -6
 channel 2 clear
 channel 2 reset
 output 1 stack 4
@@ -145,7 +145,7 @@ The object form is what is stored (Spec 1) and sent over the API; the text form 
 
 - `cmd` is `target.verb` in camelCase; the target's number becomes a field named after the target (`"channel": 2`, `"output": 1`, `"timer": 1`). Two-number commands name both (`"item": 4, "cue": 3`).
 - Keyword arguments become enum strings (`"state": "on"`, `"mode": "stop"`); numeric arguments keep their names from the vocabulary table (`"stack": 4`, `"db": -6`).
-- Durations are written in text as `MM:SS` or seconds and stored as integer `ms`. Timecode stays a string.
+- Durations are written in text as `MM:SS` or seconds and stored as integer `ms`. Every spelling parses in every field; printing is canonical per field: in and out points and timers print clock style (`0:02`, `5:00`, `1:02:03` from an hour, `0:01.5` for a fraction), transition, audio transition and grade durations print seconds with a decimal point (`1.0`, `0.25`). Timecode stays a string.
 - Content expressions become the `content` object defined in Spec 1 section 6; riders become the `transition`, `audioTransition`, `grade`, `gain`, `chase` and `build` fields with `scope`.
 - Strings are JSON strings in both forms; the text form escapes them the same way JSON does.
 - Printing is canonical: lowercase keywords, one space between tokens, full hashes, riders in the fixed order transition, audiotransition, grade, gain, chase, build. Any accepted spelling parses; only the canonical spelling is printed.
@@ -211,7 +211,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |
 
-**Argument rules.** Typed OSC arguments map positionally to the verb's arguments: integers for numbers and seconds, floats for decibels and decimal durations, strings for text and keywords. As an alternative for any command, a single string argument is parsed as the remainder of the text form, which is how a write with riders travels in one message. Both spellings reach the same command object; the log records the object.
+**Argument rules.** Typed OSC arguments map positionally to the verb's arguments: integers for numbers and seconds, floats for decibels and decimal durations, strings for text and keywords. As an alternative for any command, a single string argument is parsed as the remainder of the text form, which is how a write with riders travels in one message; a single string is read as the remainder first and as the typed argument when that fails, so a caption's plain text still lands in `popup N set`. Both spellings reach the same command object; the log records the object. The address words are case-insensitive like keywords, and the `ch` and `tr` short forms expand there too. A value that does not survive a 32-bit float (`-6.1` dB) is sent and accepted as a double (`d`); integers and whole seconds are `i`.
 
 **Bundles** run as one group (section 5), in order, and either all validate or none run.
 
@@ -281,7 +281,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 **Log entry.** One JSON line per executed command, appended to the day's log file in the machine root. The history view is this session's slice of it; runtime undo (v1.5) reads the `snapshot` reference.
 
 ```json
-{ "ts": "2026-11-01T09:14:03.117-05:00", "seq": 4821, "group": "g-7f1a",
+{ "ts": "2026-11-01T09:14:03.117-05:00", "seq": 4821, "group": "g-7f1a2b3c",
   "source": { "kind": "cue", "list": "a9f0...", "cue": "11aa...", "playlist": "2b2b..." },
   "kind": "runtime", "undo": "runtime", "result": "ok",
   "command": { "cmd": "channel.write", "channel": 1, "content": { "kind": "media", "ref": "sha256:9f2c..." } },
@@ -290,7 +290,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
   "fire": { "listTitle": "Great Is Thy Faithfulness", "ccli": "18723" } }
 ```
 
-`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime` or `edit`; edit entries carry `inverse`, another command object. Navigation that only browses (not in the vocabulary above, UI-only) is logged with `undo: "none"`.
+`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime` or `edit`; edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number; a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) is logged with `undo: "none"`.
 
 **API envelope.** The WebSocket API carries the same objects. A client sends a request and receives a response with the same `id`; the engine pushes `event` messages for state changes to subscribed clients. The operator app is a client of this API over localhost.
 

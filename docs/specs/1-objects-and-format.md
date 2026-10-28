@@ -187,7 +187,7 @@ Text content is inline, which is what keeps a song self-contained in its list fi
 
 **Content kinds** (`content.kind`): `media` (`ref` is a hash; optional `in`, `out` in ms, `loop`, `gain` override, `syncOffsetMs` override), `text` (`fields` map), `slide` (`ref` is `slide:<uuid>`, optional `build` index, default final), `input` (`input` number), and `empty` (a clear; `channel.clear` is sugar for it).
 
-**Attribute riders** on a write: `transition`, `audioTransition`, `grade`, `gain`, `chase`, `build`, each with `scope` of `once` (this cue only) or `track` (from here on); the grade rider also takes an optional ms over which the change interpolates. A tracked attribute written on its own, without content, is its own command (`channel.transition`, `channel.grade`, `channel.gain`), so a cue can change a grade without touching content.
+**Attribute riders** on a write: `transition`, `audioTransition`, `grade`, `gain`, `chase`, each with `scope` of `once` (this cue only) or `track` (from here on); the grade rider also takes an optional ms over which the change interpolates. A slide's build index is the `build` of its `slide` content, not a rider (Spec 3 §3 rule 8); a top-level `build` in an older file is read as the content's build. A tracked attribute written on its own, without content, is its own command (`channel.transition`, `channel.grade`, `channel.gain`), so a cue can change a grade without touching content.
 
 **Hold** is the absence of a command for that channel; nothing is stored for a held channel.
 
