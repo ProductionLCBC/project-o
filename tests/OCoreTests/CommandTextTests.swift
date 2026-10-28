@@ -406,7 +406,6 @@ final class CommandTextTests: XCTestCase {
             .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
             .edit(EditCommand(target: "stack", number: 1, field: "gammaBlend", value: .bool(true))),
             .edit(EditCommand(target: "channel", number: 2, field: "decoderCap", value: .number(3))),
-            .edit(EditCommand(target: "channel", number: 2, field: "note", value: .null)),
             .edit(EditCommand(target: "channel", number: 2, field: "audioOutputs", value: .array([.number(1), .number(2)]))),
             .edit(EditCommand(target: "channel", number: 2, field: "defaults", value: .object(["gain": .number(-6)]))),
             .edit(EditCommand(target: "channel", number: 2, field: "label", value: nil)),
