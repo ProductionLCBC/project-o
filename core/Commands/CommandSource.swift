@@ -18,6 +18,8 @@ public enum SourceKind: String, Codable, Equatable, Sendable {
 
 /// Spec 2 §9 — the `source` record of a log entry: `{kind, list, cue,
 /// playlist}`, plus the macro number for `macro` sources (Spec 2 §5).
+/// Written with lowercase UUIDs (Spec 1 §9) and only the fields it has, as
+/// the §9 example shows.
 public struct CommandSource: Codable, Equatable, Sendable {
     public var kind: SourceKind
     public var list: UUID?
@@ -31,5 +33,25 @@ public struct CommandSource: Codable, Equatable, Sendable {
         self.cue = cue
         self.playlist = playlist
         self.macro = macro
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, list, cue, playlist, macro }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(SourceKind.self, forKey: .kind)
+        list = try c.uuidIfPresent(.list)
+        cue = try c.uuidIfPresent(.cue)
+        playlist = try c.uuidIfPresent(.playlist)
+        macro = try c.decodeIfPresent(Int.self, forKey: .macro)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(kind, forKey: .kind)
+        if let list { try c.encode(uuid: list, forKey: .list) }
+        if let cue { try c.encode(uuid: cue, forKey: .cue) }
+        if let playlist { try c.encode(uuid: playlist, forKey: .playlist) }
+        try c.encodeIfPresent(macro, forKey: .macro)
     }
 }

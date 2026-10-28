@@ -26,6 +26,46 @@ public enum JSONCanonical {
         Data((string(value) + "\n").utf8)
     }
 
+    /// Spec 2 §9 — "One JSON line per executed command": the value on one
+    /// line, keys sorted, the same spacing as a flat container above.
+    public static func line(_ value: JSONValue) -> String {
+        var out = ""
+        writeLine(value, into: &out)
+        return out
+    }
+
+    static func writeLine(_ value: JSONValue, into out: inout String) {
+        switch value {
+        case .null, .bool, .number, .string:
+            write(value, indent: 0, into: &out)
+        case .array(let items):
+            if items.isEmpty {
+                out += "[]"
+                return
+            }
+            out += "["
+            for (i, item) in items.enumerated() {
+                if i > 0 { out += ", " }
+                writeLine(item, into: &out)
+            }
+            out += "]"
+        case .object(let members):
+            let keys = sortedKeys(members)
+            if keys.isEmpty {
+                out += "{}"
+                return
+            }
+            out += "{ "
+            for (i, key) in keys.enumerated() {
+                if i > 0 { out += ", " }
+                writeString(key, into: &out)
+                out += ": "
+                if let member = members[key] { writeLine(member, into: &out) }
+            }
+            out += " }"
+        }
+    }
+
     /// A member that keeps its container on one line.
     static func isFlat(_ value: JSONValue) -> Bool {
         switch value {

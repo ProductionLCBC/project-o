@@ -53,10 +53,9 @@
         { "channel": 2, "cmd": "channel.clear" },
         { "cmd": "macro.run", "macro": 1 },
         {
-          "build": 2,
           "channel": 1,
           "cmd": "channel.write",
-          "content": { "kind": "slide", "ref": "slide:51de0000-0000-4000-8000-000000000001" }
+          "content": { "build": 2, "kind": "slide", "ref": "slide:51de0000-0000-4000-8000-000000000001" }
         }
       ],
       "label": "Out",

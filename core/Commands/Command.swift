@@ -177,15 +177,18 @@ public enum Command: Codable, Equatable, Sendable {
         }
     }
 
-    /// Spec 2 §3 — every `cmd` the vocabulary knows, plus the bare `macro`
-    /// Spec 1 §6 used before its correction.
+    /// Spec 2 §3 — every `cmd` the vocabulary knows, plus the bare names
+    /// Spec 1 §6 used before its correction for the verbs whose text form is
+    /// bare (`next`, `previous`, `cue`, `undo`, `redo`, `macro`): accepted on
+    /// input, never printed (Area 1 brief, deviation 2).
     public static let knownNames: Set<String> = [
         "channel.write", "channel.clear", "channel.reset", "channel.transition", "channel.audioTransition", "channel.grade",
         "channel.gain", "channel.transport", "channel.endBehavior", "channel.lock", "channel.freeze", "channel.track",
         "channel.build", "output.stack", "stack.blackout", "stack.mute", "playlist.next", "playlist.previous",
         "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "timer.set", "timer.start",
-        "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "macro", "history.undo",
+        "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "history.undo",
         "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot", "edit",
+        "next", "previous", "cue", "undo", "redo", "macro",
     ]
 
     public var isUnknown: Bool {
@@ -249,17 +252,22 @@ public enum Command: Codable, Equatable, Sendable {
         func string(_ name: String) throws -> String { try c.decode(String.self, forKey: Key(name)) }
         switch cmd {
         case "channel.write":
-            let riders = Riders(
+            var riders = Riders(
                 transition: try c.decodeIfPresent(TransitionRider.self, forKey: Key("transition")),
                 audioTransition: try c.decodeIfPresent(TransitionRider.self, forKey: Key("audioTransition")),
                 grade: try c.decodeIfPresent(GradeRider.self, forKey: Key("grade")),
                 gain: try c.decodeIfPresent(GainRider.self, forKey: Key("gain")),
                 chase: try c.decodeIfPresent(ChaseRider.self, forKey: Key("chase")),
                 build: try intIf("build"))
-            self = .channelWrite(ChannelWrite(
-                channel: try target("channel"),
-                content: try c.decode(ContentExpression.self, forKey: Key("content")),
-                riders: riders))
+            var content = try c.decode(ContentExpression.self, forKey: Key("content"))
+            // Spec 3 §3 rule 8 — "Build is an attribute of slide content": a
+            // `build` rider on a slide write with no build of its own is the
+            // content's build (Area 3 plan, decision 4).
+            if case .slide(let ref, nil) = content, let build = riders.build {
+                content = .slide(ref: ref, build: build)
+                riders.build = nil
+            }
+            self = .channelWrite(ChannelWrite(channel: try target("channel"), content: content, riders: riders))
         case "channel.clear": self = .channelClear(channel: try target("channel"))
         case "channel.reset": self = .channelReset(channel: try target("channel"))
         case "channel.transition":
@@ -290,9 +298,9 @@ public enum Command: Codable, Equatable, Sendable {
         case "stack.mute":
             self = .stackMute(stack: try int("stack"), channel: try int("channel"),
                               state: try c.decode(SwitchState.self, forKey: Key("state")))
-        case "playlist.next": self = .next
-        case "playlist.previous": self = .previous
-        case "playlist.cue": self = .cue(try int("cue"))
+        case "playlist.next", "next": self = .next
+        case "playlist.previous", "previous": self = .previous
+        case "playlist.cue", "cue": self = .cue(try int("cue"))
         case "playlist.goto": self = .itemCue(item: try int("item"), cue: try int("cue"))
         case "playlist.section": self = .itemSection(item: try int("item"), section: try string("section"))
         case "list.goto": self = .listCue(list: try int("list"), cue: try int("cue"))
@@ -308,8 +316,8 @@ public enum Command: Codable, Equatable, Sendable {
         case "audio.mute":
             self = .audioMute(audio: try target("audio"), state: try c.decode(SwitchState.self, forKey: Key("state")))
         case "macro.run", "macro": self = .macro(try int("macro"))
-        case "history.undo": self = .undo
-        case "history.redo": self = .redo
+        case "history.undo", "undo": self = .undo
+        case "history.redo", "redo": self = .redo
         case "history.jump": self = .historyJump(try int("position"))
         case "system.clearAll": self = .systemClearAll
         case "system.preflight": self = .systemPreflight
