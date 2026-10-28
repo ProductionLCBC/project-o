@@ -1,0 +1,31 @@
+{
+  "app": "0.1.0",
+  "channels": [
+    {
+      "audioOutputs": [1],
+      "decoderCap": 2,
+      "defaultPreset": 1,
+      "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+      "label": "Background",
+      "number": 1,
+      "renderSize": "largest",
+      "textThumbnail": "body",
+      "usualContent": "media",
+      "uuid": "8d1e0000-0000-4000-8000-000000000001"
+    },
+    {
+      "audioOutputs": [1],
+      "decoderCap": 2,
+      "defaultPreset": 1,
+      "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+      "label": "Foreground",
+      "number": 2,
+      "renderSize": { "height": 1080, "width": 1920 },
+      "textThumbnail": "body",
+      "usualContent": "text",
+      "uuid": "2b770000-0000-4000-8000-000000000002"
+    }
+  ],
+  "kind": "channels",
+  "schema": 1
+}

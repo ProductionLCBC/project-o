@@ -1,0 +1,33 @@
+{
+  "app": "0.1.0",
+  "campusName": "Manheim",
+  "commandBar": false,
+  "decoderCapDefault": 2,
+  "defaultImportFolder": "imports",
+  "defaultRole": "editor",
+  "fallbackFont": "HelveticaNeue",
+  "kind": "machine",
+  "libraryMode": "readOnlyMasters",
+  "mediaRoot": "../library/media",
+  "network": {
+    "apiPort": 8220,
+    "apiToken": "keychain",
+    "oscInPort": 8000,
+    "oscOutTargets": [
+      { "host": "10.20.0.15", "port": 9000 }
+    ]
+  },
+  "operatorLock": { "enabled": false },
+  "popups": 4,
+  "restoreLastState": false,
+  "schema": 1,
+  "shutdownMacro": null,
+  "snapshots": { "cadence": "launchAndService", "retention": "7d-daily-weekly" },
+  "startupMacro": 2,
+  "thumbnailStack": 1,
+  "timeFormat": "h:mm a",
+  "timeZone": "America/New_York",
+  "timers": 4,
+  "tracking": { "audioTransition": true, "chase": true, "gain": true, "grade": true, "transition": true },
+  "uuid": "7a7a0000-0000-4000-8000-000000000001"
+}

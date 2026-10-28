@@ -1,0 +1,26 @@
+{
+  "app": "0.1.0",
+  "entries": [
+    {
+      "addedAt": "2026-10-24T18:12:00Z",
+      "codec": "png",
+      "defaults": { "defaultChannel": 1, "gain": null, "grade": null, "loop": false, "syncOffsetMs": null, "trimInMs": null, "trimOutMs": null },
+      "durationMs": null,
+      "folder": "local",
+      "fps": null,
+      "hasAlpha": false,
+      "hasAudio": false,
+      "height": 36,
+      "id": "sha256:fa3021eba9c15cb8aa65b79e04c0df3d5291d79d397e5930610248bab8d3e2e0",
+      "kind": "image",
+      "modified": "2026-10-24T18:11:58Z",
+      "path": "local/announcement.png",
+      "poster": null,
+      "size": 160,
+      "width": 64
+    }
+  ],
+  "kind": "mediaLocal",
+  "overrides": { "sha256:eb6384847a49f7a4ef82aedb9e2019080777b8be748690c33d91bba67c32a3d2": "local/cross-fast.png" },
+  "schema": 1
+}

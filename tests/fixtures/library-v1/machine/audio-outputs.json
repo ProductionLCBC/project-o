@@ -1,0 +1,27 @@
+{
+  "app": "0.1.0",
+  "audioOutputs": [
+    {
+      "channels": [0, 1],
+      "delayMs": 0,
+      "device": "BuiltInSpeakerDevice",
+      "fallbackDevice": null,
+      "kind": "device",
+      "label": "System default",
+      "number": 1,
+      "uuid": "a0d00000-0000-4000-8000-000000000001"
+    },
+    {
+      "channels": [0, 1],
+      "delayMs": 80,
+      "device": 2,
+      "fallbackDevice": "BuiltInSpeakerDevice",
+      "kind": "sdiEmbedded",
+      "label": "SDI embedded",
+      "number": 2,
+      "uuid": "a0d00000-0000-4000-8000-000000000002"
+    }
+  ],
+  "kind": "audioOutputs",
+  "schema": 1
+}

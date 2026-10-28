@@ -1,0 +1,52 @@
+{
+  "app": "0.1.0",
+  "kind": "state",
+  "schema": 1,
+  "state": {
+    "channels": {
+      "1": {
+        "attributes": {
+          "audioTransition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          },
+          "chase": { "origin": "default", "value": false },
+          "gain": { "origin": "default", "value": 0 },
+          "grade": { "origin": "default", "value": 0 },
+          "transition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          }
+        },
+        "content": { "endBehavior": "loop", "kind": "media", "loop": true, "missing": false, "ref": "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527", "startedAtFrame": 0, "transport": "playing" },
+        "lock": false,
+        "outgoing": [],
+        "provenance": { "cue": "11aa0000-0000-4000-8000-000000000001", "kind": "cue" }
+      },
+      "2": {
+        "attributes": {
+          "audioTransition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          },
+          "chase": { "origin": "default", "value": false },
+          "gain": { "origin": "default", "value": 0 },
+          "grade": { "origin": "default", "value": 0 },
+          "transition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          }
+        },
+        "content": { "kind": "empty" },
+        "lock": false,
+        "outgoing": []
+      }
+    },
+    "outputs": { "1": 1, "2": 1 },
+    "popups": {},
+    "stacks": {
+      "1": { "blackout": false, "muted": [] },
+      "2": { "blackout": false, "muted": [] }
+    }
+  }
+}

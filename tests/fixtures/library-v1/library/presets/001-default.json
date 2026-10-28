@@ -1,0 +1,55 @@
+{
+  "app": "0.1.0",
+  "builtIn": true,
+  "kind": "preset",
+  "label": "Default",
+  "layouts": {
+    "*": {
+      "boxes": [
+        {
+          "binding": { "kind": "pixels" },
+          "fallback": false,
+          "fit": "fit",
+          "frame": { "h": 1, "w": 1, "x": 0, "y": 0 },
+          "grade": null,
+          "transition": { "ms": null, "ref": 1 }
+        },
+        {
+          "binding": { "kind": "field", "name": "body" },
+          "fallback": true,
+          "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
+          "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 },
+          "grade": null,
+          "textStyle": {
+            "alignment": "center",
+            "allCaps": false,
+            "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+            "font": "HelveticaNeue-Bold",
+            "fromStyle": 1,
+            "letterSpacing": 0,
+            "lineSpacing": 1.1,
+            "outline": {
+              "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+              "width": 0
+            },
+            "shadow": {
+              "blur": 8,
+              "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 },
+              "x": 0,
+              "y": 2
+            },
+            "size": { "unit": "pt", "value": 72 },
+            "variations": {},
+            "weight": 700
+          },
+          "transition": { "ms": 250, "ref": 2 },
+          "transitionOnVariableChange": false
+        }
+      ],
+      "mask": null
+    }
+  },
+  "number": 1,
+  "schema": 1,
+  "uuid": "c0de0000-0000-4000-8000-000000000001"
+}
