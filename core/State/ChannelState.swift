@@ -76,7 +76,8 @@ public enum Provenance: Codable, Equatable, Sendable {
         switch self {
         case .cue(let uuid):
             try c.encode("cue", forKey: .kind)
-            try c.encode(uuid, forKey: .cue)
+            // Spec 1 §9 — UUIDs are written lowercase.
+            try c.encode(uuid.uuidString.lowercased(), forKey: .cue)
         case .restored:
             try c.encode("restored", forKey: .kind)
         case .source(let s):

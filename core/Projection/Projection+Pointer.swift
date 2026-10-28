@@ -23,7 +23,7 @@ extension Fold {
     /// Spec 1 §3 — a playlist item is a header, a linked master (by list
     /// number) or a local copy (by uuid, in the machine root).
     func list(for item: PlaylistItem) -> List? {
-        switch item {
+        switch item.kind {
         case .header: return nil
         case .linked(let number): return context.library.list(number: number)
         case .local(let uuid): return context.machine.localList(uuid: uuid) ?? context.library.list(uuid: uuid)
@@ -125,8 +125,10 @@ extension Fold {
         }
 
         let source = CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid, playlist: position.playlist?.uuid)
-        for command in cue.commands {
-            apply(command, source: source, depth: depth + 1)
+        // Spec 1 §6 — a `when` guard on a cue command is reserved: "the field
+        // exists without the behaviour" (Spec 2 §7), so the command runs unguarded.
+        for entry in cue.commands {
+            apply(entry.command, source: source, depth: depth + 1)
         }
 
         let new = position.pointer
@@ -144,7 +146,7 @@ extension Fold {
         guard let next = following(position) else { return nil }
         let nextCue = next.cue
         var ms: Int?
-        switch nextCue.trigger {
+        switch nextCue.trigger.kind {
         case .time(let t): ms = t
         case .timecode: return nil
         case .go: break

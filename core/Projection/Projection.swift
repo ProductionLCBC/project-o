@@ -135,7 +135,8 @@ struct Fold {
              .systemPreflight, .systemSnapshot, .edit:
             effects.append(.passthrough(command))
 
-        case .unknown:
+        case .unknown, .invalid:
+            // Spec 1 §6 — kept verbatim and flagged by the loader; Spec 3 §6 answers `noop`.
             effects.append(.noop(command))
         }
     }

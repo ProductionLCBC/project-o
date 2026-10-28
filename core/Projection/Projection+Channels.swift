@@ -8,18 +8,24 @@ extension Fold {
     /// default). A `cut` emits a transition effect with zero duration."
     /// A `track` rider has already become the attribute by the time the
     /// effect is built, so any rider wins here.
+    ///
+    /// Spec 1 §8 — a reference to a transition that does not exist degrades
+    /// (Area 2, as Adam decided): a zero-second cut, whatever duration the
+    /// rider carried; Spec 3 §4 defines a cut as the zero-duration effect. The
+    /// ref is carried as written so the strip and the log can show what the
+    /// cue asked for.
     func selectTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        let ms = setting.ms ?? context.library.transition(setting.ref)?.ms ?? 0
-        return (setting.ref, max(0, ms))
+        guard let object = context.library.transition(setting.ref) else { return (setting.ref, 0) }
+        return (setting.ref, max(0, setting.ms ?? object.ms))
     }
 
-    /// Spec 3 §4 — "The same order applies to the audio transition."
+    /// Spec 3 §4 — "The same order applies to the audio transition." A
+    /// missing audio transition is likewise a zero-second cut with no offset.
     func selectAudioTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int, offsetMs: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        let object = context.library.audioTransition(setting.ref)
-        let ms = setting.ms ?? object?.ms ?? 0
-        return (setting.ref, max(0, ms), object?.offsetMs ?? 0)
+        guard let object = context.library.audioTransition(setting.ref) else { return (setting.ref, 0, 0) }
+        return (setting.ref, max(0, setting.ms ?? object.ms), object.offsetMs)
     }
 
     // MARK: - Decoder budget
@@ -76,13 +82,21 @@ extension Fold {
         switch write.content {
         case .media(let m):
             // Spec 3 §4 — Media: "`startedAtFrame` set to the frame the write
-            // lands on, `transport: playing` ... `endBehavior` starts as `loop`
-            // when the expression says loop, otherwise `hold`."
+            // lands on, `transport: playing`, and `inMs`, `outMs`, `loop`,
+            // `gainOverride`, `syncOffsetMs` taken from the content expression,
+            // falling back to the pool item's defaults, then to none.
+            // `endBehavior` starts as `loop` when the expression says loop,
+            // otherwise `hold`." Spec 1 §7 — the machine index is consulted
+            // first, then the library index. The expression's `loop` can ask
+            // for a loop, not refuse the pool's (`end hold` does that).
+            let pool = (context.machine.mediaLocal.entry(m.ref) ?? context.library.mediaIndex.entry(m.ref))?.defaults
+            let loop = m.loop || (pool?.loop ?? false)
             restart = current.media?.ref == m.ref
             newContent = .media(MediaInstance(
-                ref: m.ref, inMs: m.inMs, outMs: m.outMs, loop: m.loop, gainOverride: m.gain,
-                syncOffsetMs: m.syncOffsetMs, startedAtFrame: frame, transport: .playing,
-                endBehavior: m.loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
+                ref: m.ref, inMs: m.inMs ?? pool?.trimInMs, outMs: m.outMs ?? pool?.trimOutMs, loop: loop,
+                gainOverride: m.gain ?? pool?.gain, syncOffsetMs: m.syncOffsetMs ?? pool?.syncOffsetMs,
+                startedAtFrame: frame, transport: .playing,
+                endBehavior: loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
         case .text(let fields):
             // Spec 3 §4 — Text: "If the fields are identical to the current
             // text, the result is `noop`. Fields not written are absent."

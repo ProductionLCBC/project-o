@@ -71,8 +71,15 @@ public struct EditCommand: Codable, Equatable, Sendable {
 
 /// Spec 2 §3 and Spec 3 §10 — `Command`: the Spec 2 objects. One case per
 /// row of the vocabulary table, encoded in the Spec 1 §6 object form with
-/// `cmd` as `target.verb`. An unknown `cmd` decodes to `.unknown` rather than
-/// failing, so a loader keeps it and the projection answers `noop`.
+/// `cmd` as `target.verb`.
+///
+/// Spec 1 §6 — "The loader checks each command against the vocabulary in
+/// Spec 2 and flags unknown commands or bad parameters on the cue rather than
+/// dropping them; ... the command is kept verbatim so a newer version can
+/// still read it." An unknown `cmd` decodes to `.unknown` with every
+/// parameter; a known `cmd` whose parameters do not decode becomes `.invalid`
+/// with every parameter. Both re-encode as they were read and the projection
+/// answers `noop` (Spec 3 §6).
 public enum Command: Codable, Equatable, Sendable {
     // Channels
     case channelWrite(ChannelWrite)
@@ -117,8 +124,10 @@ public enum Command: Codable, Equatable, Sendable {
     case systemPreflight
     case systemSnapshot
     case edit(EditCommand)
-    /// Spec 1 §6 — unknown commands are kept verbatim; Spec 3 §6 answers `noop`.
-    case unknown(cmd: String)
+    /// Spec 1 §6 — an unknown `cmd`, kept verbatim with its parameters.
+    case unknown(cmd: String, fields: [String: JSONValue] = [:])
+    /// Spec 1 §6 — a known `cmd` whose parameters did not decode, kept verbatim.
+    case invalid(cmd: String, fields: [String: JSONValue])
 
     // MARK: - Spec 2 §4 mapping rules: `cmd` is `target.verb` in camelCase.
 
@@ -163,7 +172,43 @@ public enum Command: Codable, Equatable, Sendable {
         case .systemPreflight: return "system.preflight"
         case .systemSnapshot: return "system.snapshot"
         case .edit: return "edit"
-        case .unknown(let cmd): return cmd
+        case .unknown(let cmd, _): return cmd
+        case .invalid(let cmd, _): return cmd
+        }
+    }
+
+    /// Spec 2 §3 — every `cmd` the vocabulary knows, plus the bare `macro`
+    /// Spec 1 §6 used before its correction.
+    public static let knownNames: Set<String> = [
+        "channel.write", "channel.clear", "channel.reset", "channel.transition", "channel.audioTransition", "channel.grade",
+        "channel.gain", "channel.transport", "channel.endBehavior", "channel.lock", "channel.freeze", "channel.track",
+        "channel.build", "output.stack", "stack.blackout", "stack.mute", "playlist.next", "playlist.previous",
+        "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "timer.set", "timer.start",
+        "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "macro", "history.undo",
+        "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot", "edit",
+    ]
+
+    public var isUnknown: Bool {
+        if case .unknown = self { return true }
+        return false
+    }
+
+    public var isInvalid: Bool {
+        if case .invalid = self { return true }
+        return false
+    }
+
+    /// Spec 1 §6 — why an `.invalid` command's parameters did not decode;
+    /// nil for every other case.
+    public var invalidReason: String? {
+        guard case .invalid(let cmd, let fields) = self else { return nil }
+        var object = fields
+        object["cmd"] = .string(cmd)
+        do {
+            _ = try JSONCoding.decode(StrictCommand.self, from: .object(object))
+            return "parameters did not decode"
+        } catch {
+            return JSONCoding.describe(error)
         }
     }
 
@@ -175,9 +220,29 @@ public enum Command: Codable, Equatable, Sendable {
         init?(intValue: Int) { nil }
     }
 
+    /// Spec 1 §6 — the parameters of a command object: everything but `cmd`
+    /// and the `when` guard that belongs to the entry around it.
+    static func parameters(from decoder: Decoder) throws -> [String: JSONValue] {
+        try decoder.unknownKeys(besides: ["cmd", "when"])
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Key.self)
         let cmd = try c.decode(String.self, forKey: Key("cmd"))
+        guard Command.knownNames.contains(cmd) else {
+            self = .unknown(cmd: cmd, fields: try Command.parameters(from: decoder))
+            return
+        }
+        do {
+            self = try Command(strict: cmd, from: decoder)
+        } catch is DecodingError {
+            self = .invalid(cmd: cmd, fields: try Command.parameters(from: decoder))
+        }
+    }
+
+    /// The strict decoder: a known `cmd` with its parameters, or a `DecodingError`.
+    init(strict cmd: String, from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
         func target(_ name: String) throws -> Target { try c.decode(Target.self, forKey: Key(name)) }
         func int(_ name: String) throws -> Int { try c.decode(Int.self, forKey: Key(name)) }
         func intIf(_ name: String) throws -> Int? { try c.decodeIfPresent(Int.self, forKey: Key(name)) }
@@ -250,11 +315,18 @@ public enum Command: Codable, Equatable, Sendable {
         case "system.preflight": self = .systemPreflight
         case "system.snapshot": self = .systemSnapshot
         case "edit": self = .edit(try EditCommand(from: decoder))
-        default: self = .unknown(cmd: cmd)
+        default:
+            throw DecodingError.dataCorruptedError(forKey: Key("cmd"), in: c, debugDescription: "unknown command \(cmd)")
         }
     }
 
     public func encode(to encoder: Encoder) throws {
+        if case .unknown(_, let fields) = self {
+            try encoder.encode(unknownKeys: fields)
+        }
+        if case .invalid(_, let fields) = self {
+            try encoder.encode(unknownKeys: fields)
+        }
         var c = encoder.container(keyedBy: Key.self)
         try c.encode(cmd, forKey: Key("cmd"))
         switch self {
@@ -305,7 +377,7 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(stack, forKey: Key("stack"))
             try c.encode(channel, forKey: Key("channel"))
             try c.encode(state, forKey: Key("state"))
-        case .next, .previous, .undo, .redo, .systemClearAll, .systemPreflight, .systemSnapshot, .unknown:
+        case .next, .previous, .undo, .redo, .systemClearAll, .systemPreflight, .systemSnapshot, .unknown, .invalid:
             break
         case .cue(let n):
             try c.encode(n, forKey: Key("cue"))
@@ -343,17 +415,147 @@ public enum Command: Codable, Equatable, Sendable {
             try e.encode(to: encoder)
         }
     }
+
+    // MARK: - Reading a command's parts
+
+    /// The channel target of a channel command, if it has one.
+    public var channelTarget: Target? {
+        switch self {
+        case .channelWrite(let w): return w.channel
+        case .channelClear(let ch), .channelReset(let ch), .channelTransition(let ch, _, _), .channelAudioTransition(let ch, _, _),
+             .channelGrade(let ch, _, _), .channelGain(let ch, _), .channelTransport(let ch, _), .channelEndBehavior(let ch, _),
+             .channelLock(let ch, _), .channelFreeze(let ch, _), .channelTrack(let ch, _), .channelBuild(let ch, _):
+            return ch
+        default: return nil
+        }
+    }
+
+    /// A write's riders, if this is a write.
+    public var riders: Riders? {
+        if case .channelWrite(let w) = self { return w.riders }
+        return nil
+    }
+
+    /// Replace a write's riders; anything else is unchanged.
+    public mutating func setRiders(_ riders: Riders) {
+        guard case .channelWrite(var w) = self else { return }
+        w.riders = riders
+        self = .channelWrite(w)
+    }
+
+    /// The media or slide id a write names, if any.
+    public var mediaRef: String? {
+        if case .channelWrite(let w) = self { return w.content.mediaRef }
+        return nil
+    }
+
+    // MARK: - Spec 1 §4, references by number
+
+    /// Spec 1 §4 — "When an object's number changes, every internal
+    /// reference in the library and the machine root is rewritten". Returns
+    /// this command with every numbered reference passed through `transform`.
+    /// Unknown and invalid commands are left as they were read.
+    public func mapReferences(_ transform: (NumberedType, Int) -> Int) -> Command {
+        func target(_ type: NumberedType, _ t: Target) -> Target {
+            if case .number(let n) = t { return .number(transform(type, n)) }
+            return t
+        }
+        switch self {
+        case .channelWrite(var w):
+            w.channel = target(.channel, w.channel)
+            if case .input(let n) = w.content { w.content = .input(transform(.input, n)) }
+            if var r = w.riders.transition { r.ref = transform(.transition, r.ref); w.riders.transition = r }
+            if var r = w.riders.audioTransition { r.ref = transform(.audioTransition, r.ref); w.riders.audioTransition = r }
+            if var r = w.riders.grade { r.ref = transform(.grade, r.ref); w.riders.grade = r }
+            return .channelWrite(w)
+        case .channelClear(let ch): return .channelClear(channel: target(.channel, ch))
+        case .channelReset(let ch): return .channelReset(channel: target(.channel, ch))
+        case .channelTransition(let ch, let ref, let ms):
+            return .channelTransition(channel: target(.channel, ch), ref: transform(.transition, ref), ms: ms)
+        case .channelAudioTransition(let ch, let ref, let ms):
+            return .channelAudioTransition(channel: target(.channel, ch), ref: transform(.audioTransition, ref), ms: ms)
+        case .channelGrade(let ch, let ref, let ms):
+            return .channelGrade(channel: target(.channel, ch), ref: transform(.grade, ref), ms: ms)
+        case .channelGain(let ch, let db): return .channelGain(channel: target(.channel, ch), db: db)
+        case .channelTransport(let ch, let mode): return .channelTransport(channel: target(.channel, ch), mode: mode)
+        case .channelEndBehavior(let ch, let mode): return .channelEndBehavior(channel: target(.channel, ch), mode: mode)
+        case .channelLock(let ch, let locked): return .channelLock(channel: target(.channel, ch), locked: locked)
+        case .channelFreeze(let ch, let state): return .channelFreeze(channel: target(.channel, ch), state: state)
+        case .channelTrack(let ch, let direction): return .channelTrack(channel: target(.channel, ch), direction: direction)
+        case .channelBuild(let ch, let build): return .channelBuild(channel: target(.channel, ch), build: build)
+        case .outputStack(let output, let stack):
+            return .outputStack(output: transform(.output, output), stack: transform(.stack, stack))
+        case .stackBlackout(let stack, let state): return .stackBlackout(stack: transform(.stack, stack), state: state)
+        case .stackMute(let stack, let channel, let state):
+            return .stackMute(stack: transform(.stack, stack), channel: transform(.channel, channel), state: state)
+        case .listCue(let list, let cue): return .listCue(list: transform(.list, list), cue: cue)
+        case .audioMute(let audio, let state): return .audioMute(audio: target(.audioOutput, audio), state: state)
+        case .macro(let n): return .macro(transform(.macro, n))
+        case .edit(var e):
+            if let type = NumberedType(editTarget: e.target) { e.number = transform(type, e.number) }
+            return .edit(e)
+        case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .timerSet, .timerStart, .timerPause, .timerReset,
+             .popupSet, .popupClear, .undo, .redo, .historyJump, .systemClearAll, .systemPreflight, .systemSnapshot,
+             .unknown, .invalid:
+            return self
+        }
+    }
+
+    /// Every number this command uses to name an object of `type`.
+    public func forEachReference(of type: NumberedType, _ body: (Int) -> Void) {
+        _ = mapReferences { found, number in
+            if found == type { body(number) }
+            return number
+        }
+    }
+
+    /// Spec 1 §7 — `replace media`: this command with every media or slide id
+    /// passed through `transform`.
+    public func mapMediaRefs(_ transform: (String) -> String) -> Command {
+        guard case .channelWrite(var w) = self else { return self }
+        switch w.content {
+        case .media(var m):
+            m.ref = transform(m.ref)
+            w.content = .media(m)
+        case .slide(let ref, let build):
+            w.content = .slide(ref: transform(ref), build: build)
+        default:
+            break
+        }
+        return .channelWrite(w)
+    }
 }
 
-/// Spec 2 §7 — "Any command in a macro can carry one guard." Encoded flat:
-/// the command's own keys plus an optional `when`.
+/// The strict decoding of a command object, for diagnosing an `.invalid` one.
+private struct StrictCommand: Decodable {
+    let command: Command
+
+    private struct Key: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Key.self)
+        guard let key = Key(stringValue: "cmd") else { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "cmd")) }
+        command = try Command(strict: try c.decode(String.self, forKey: key), from: decoder)
+    }
+}
+
+/// Spec 2 §7 — "Any command in a macro can carry one guard." Spec 1 §6 — the
+/// guard is "reserved on cues". Encoded flat: the command's own keys plus an
+/// optional `when`, plus any keys the vocabulary does not know (Spec 1 §8).
 public struct GuardedCommand: Codable, Equatable, Sendable {
     public var command: Command
     public var when: Guard?
+    public var extra: [String: JSONValue]
 
-    public init(_ command: Command, when: Guard? = nil) {
+    public init(_ command: Command, when: Guard? = nil, extra: [String: JSONValue] = [:]) {
         self.command = command
         self.when = when
+        self.extra = extra
     }
 
     private enum CodingKeys: String, CodingKey { case when }
@@ -362,11 +564,22 @@ public struct GuardedCommand: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         when = try c.decodeIfPresent(Guard.self, forKey: .when)
         command = try Command(from: decoder)
+        // The keys the command itself writes back are not unknown.
+        let written = (try? JSONCoding.encode(command).objectValue?.keys).map { Set($0) } ?? []
+        extra = try decoder.unknownKeys(besides: written.union(["cmd", "when"]))
     }
 
     public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
         try command.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(when, forKey: .when)
+    }
+
+    /// Spec 1 §6 — a cue's or macro's commands decode one at a time, so one
+    /// command with bad parameters never takes the document down.
+    static func decodeList<K: CodingKey>(from container: KeyedDecodingContainer<K>, forKey key: K) throws -> [GuardedCommand] {
+        let raw = try container.decodeIfPresent([JSONValue].self, forKey: key) ?? []
+        return try raw.map { try JSONCoding.decode(GuardedCommand.self, from: $0) }
     }
 }
