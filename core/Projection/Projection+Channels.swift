@@ -9,23 +9,37 @@ extension Fold {
     /// A `track` rider has already become the attribute by the time the
     /// effect is built, so any rider wins here.
     ///
-    /// Spec 1 §8 — a reference to a transition that does not exist degrades
-    /// (Area 2, as Adam decided): a zero-second cut, whatever duration the
-    /// rider carried; Spec 3 §4 defines a cut as the zero-duration effect. The
-    /// ref is carried as written so the strip and the log can show what the
-    /// cue asked for.
-    func selectTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int) {
+    /// Spec 1 §8 — a reference to a transition that does not exist degrades to
+    /// "the channel default transition", as that transition is defined (its own
+    /// duration, not the rider's); when the channel default is missing too, to
+    /// a zero-second cut (Adam, Area 2 review), which Spec 3 §4 defines as the
+    /// zero-duration effect. The ref carried is the one that plays, or the one
+    /// the cue asked for when nothing does.
+    func selectTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>, channel number: Int) -> (ref: Int, ms: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        guard let object = context.library.transition(setting.ref) else { return (setting.ref, 0) }
-        return (setting.ref, max(0, setting.ms ?? object.ms))
+        if let object = context.library.transition(setting.ref) {
+            return (setting.ref, max(0, setting.ms ?? object.ms))
+        }
+        let fallback = defaults(for: number).transition
+        if let object = context.library.transition(fallback) {
+            return (fallback, max(0, object.ms))
+        }
+        return (setting.ref, 0)
     }
 
-    /// Spec 3 §4 — "The same order applies to the audio transition." A
-    /// missing audio transition is likewise a zero-second cut with no offset.
-    func selectAudioTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>) -> (ref: Int, ms: Int, offsetMs: Int) {
+    /// Spec 3 §4 — "The same order applies to the audio transition." A missing
+    /// audio transition degrades the same way: the channel's default audio
+    /// transition as defined, else a zero-second cut with no offset.
+    func selectAudioTransition(rider: TransitionRider?, attribute: Tracked<TransitionSetting>, channel number: Int) -> (ref: Int, ms: Int, offsetMs: Int) {
         let setting = rider.map { TransitionSetting(ref: $0.ref, ms: $0.ms) } ?? attribute.value
-        guard let object = context.library.audioTransition(setting.ref) else { return (setting.ref, 0, 0) }
-        return (setting.ref, max(0, setting.ms ?? object.ms), object.offsetMs)
+        if let object = context.library.audioTransition(setting.ref) {
+            return (setting.ref, max(0, setting.ms ?? object.ms), object.offsetMs)
+        }
+        let fallback = defaults(for: number).audioTransition
+        if let object = context.library.audioTransition(fallback) {
+            return (fallback, max(0, object.ms), object.offsetMs)
+        }
+        return (setting.ref, 0, 0)
     }
 
     // MARK: - Decoder budget
@@ -144,8 +158,8 @@ extension Fold {
         riderEffectsStart = effects.count
 
         if let to = newContent {
-            let transition = selectTransition(rider: write.riders.transition, attribute: channel.attributes.transition)
-            let audio = selectAudioTransition(rider: write.riders.audioTransition, attribute: channel.attributes.audioTransition)
+            let transition = selectTransition(rider: write.riders.transition, attribute: channel.attributes.transition, channel: number)
+            let audio = selectAudioTransition(rider: write.riders.audioTransition, attribute: channel.attributes.audioTransition, channel: number)
             let stepped = replaceContent(of: &channel, number: number, with: to, transitionMs: transition.ms, restart: restart)
             channel.provenance = provenance(source)
             effects.append(.transition(TransitionEffect(
@@ -179,8 +193,8 @@ extension Fold {
         }
         let current = channel.content
         guard !current.isEmpty else { return false }
-        let transition = selectTransition(rider: nil, attribute: channel.attributes.transition)
-        let audio = selectAudioTransition(rider: nil, attribute: channel.attributes.audioTransition)
+        let transition = selectTransition(rider: nil, attribute: channel.attributes.transition, channel: number)
+        let audio = selectAudioTransition(rider: nil, attribute: channel.attributes.audioTransition, channel: number)
         _ = replaceContent(of: &channel, number: number, with: .empty, transitionMs: transition.ms, restart: false)
         channel.provenance = provenance(source)
         state.channels[number] = channel

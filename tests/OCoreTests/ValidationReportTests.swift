@@ -130,22 +130,34 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(none.issues, [])
     }
 
-    /// A rider naming a missing transition → one line; degrade (Adam, Area 2
-    /// plan): a zero-second cut, whatever duration the rider carried.
-    func test_aMissingTransitionIsReportedOnceAndPlaysAsAZeroSecondCut() {
+    /// A rider naming a missing transition → one line; degrade (Spec 1 §8,
+    /// Adam's answer on the Area 2 brief): the channel's default transition as
+    /// it is defined; when that is missing too, a zero-second cut.
+    func test_aMissingTransitionIsReportedOnceAndPlaysAsTheChannelDefault() {
         var (library, machine) = fresh()
         library.lists[1].cues[0].commands[0].command.setRiders(Riders(transition: TransitionRider(ref: 9, ms: 1000, scope: .once)))
         let issue = only(.missingTransition, in: report(library, machine))
         XCTAssertEqual(issue?.subject, "list 42 cue 1")
 
-        let context = ProjectionContext(frame: 100, library: library, machine: machine, source: CommandSource(kind: .ui))
-        let (_, effects) = project(ShowState.fresh(library: library, machine: machine), [.listCue(list: 42, cue: 1)], context: context)
-        let transition = effects.compactMap(\.transitionEffect).first { $0.channel == 1 }
-        XCTAssertEqual(transition?.ms, 0)
-        XCTAssertEqual(transition?.transition, 9, "the ref is carried as written so the strip can say what the cue asked for")
+        func effect(_ library: Library) -> TransitionEffect? {
+            let context = ProjectionContext(frame: 100, library: library, machine: machine, source: CommandSource(kind: .ui))
+            let (_, effects) = project(ShowState.fresh(library: library, machine: machine), [.listCue(list: 42, cue: 1)], context: context)
+            return effects.compactMap(\.transitionEffect).first { $0.channel == 1 }
+        }
+        // Channel 1's default is transition 1, the cut.
+        XCTAssertEqual(effect(library)?.transition, 1)
+        XCTAssertEqual(effect(library)?.ms, 0)
+        // With a dissolve as the channel default, the dissolve plays at its own duration, not the rider's.
+        library.channels[0].defaults.transition = 2
+        XCTAssertEqual(effect(library)?.transition, 2)
+        XCTAssertEqual(effect(library)?.ms, 500)
+        // With the channel default missing too: a zero-second cut, the ref as the cue asked for it.
+        library.channels[0].defaults.transition = 8
+        XCTAssertEqual(effect(library)?.transition, 9)
+        XCTAssertEqual(effect(library)?.ms, 0)
+        XCTAssertEqual(report(library, machine).issues.map(\.code), [.missingTransition, .missingTransition])
 
         library.lists[1].cues[0].commands[0].command.setRiders(Riders(transition: TransitionRider(ref: 2, ms: 1000, scope: .once)))
-        library.channels[0].defaults.transition = 8
         XCTAssertEqual(only(.missingTransition, in: report(library, machine))?.subject, "channel 1")
     }
 
