@@ -1,6 +1,6 @@
 # Spec 3: Channel state and projection
 
-2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§2, §4, §6) · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
+2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§2, §4, §6); corrected 2026-10-28 from the Area 2 review (§4 pool defaults) · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
 
 ## 1. Purpose and scope
 
@@ -58,7 +58,7 @@ Tracking is the lighting-console idea that a cue only has to say what changes. T
 
 A write replaces the channel's content instance, applies its riders, and emits a `transition` effect that tells the engine what to animate between. The rules below decide what instance results and whether a transition happens at all.
 
-**Media.** A new instance with `startedAtFrame` set to the frame the write lands on, `transport: playing`, and `inMs`, `outMs`, `loop`, `gainOverride`, `syncOffsetMs` taken from the content expression, falling back to the pool item's defaults, then to none. `endBehavior` starts as `loop` when the expression says loop, otherwise `hold`. If the same media ref is already on the channel, the instance restarts from its in-point and the effect is a dissolve from the current frame rather than from the previous content.
+**Media.** A new instance with `startedAtFrame` set to the frame the write lands on, `transport: playing`, and `inMs`, `outMs`, `loop`, `gainOverride`, `syncOffsetMs` taken from the content expression, falling back to the pool item's defaults, then to none. `loop` in the expression asks for a loop and cannot refuse the pool item's (`end hold` does that); the pool item's default grade is not a fall-back. `endBehavior` starts as `loop` when the expression says loop, otherwise `hold`. If the same media ref is already on the channel, the instance restarts from its in-point and the effect is a dissolve from the current frame rather than from the previous content.
 
 **Text.** A new instance with the written fields. If the fields are identical to the current text, the result is `noop`: no state change, no transition. Fields not written are absent, not inherited.
 

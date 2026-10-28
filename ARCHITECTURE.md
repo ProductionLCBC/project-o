@@ -35,7 +35,7 @@ Paths are never identity. Everything is plain JSON in two folder roots (Spec 1).
 app/      Operator app (Swift, AppKit + SwiftUI). A client of the engine's API over localhost.
 engine/   OEngine: the playback engine as its own process. Metal, VideoToolbox, Core Audio, DeckLink.
 core/     OCore: objects, commands, channel state and the projection. Pure Swift, no Apple frameworks.
-formats/  JSON schemas and the .pro importer. (The fixture library lives in tests/fixtures/, Spec 1 §10.)
+formats/  JSON schemas, the OFormats file adapter (the one place that touches disk for the Spec 1 roots) and the .pro importer. (The fixture library lives in tests/fixtures/, Spec 1 §10.)
 tools/    Python importers and Planning Center tooling, as API clients.
 docs/     specs/ (the authority), decisions/ (ADRs), the UX spec.
 tests/    Unit, golden-image and soak scenarios. Public-domain content only.

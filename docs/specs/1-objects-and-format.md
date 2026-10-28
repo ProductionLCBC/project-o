@@ -1,6 +1,6 @@
 # Spec 1: Objects and format
 
-2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§6 command names) · Source: the UX and system design spec, the Decisions tab and the Spec review tab of the planning doc
+2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§6 command names); corrected 2026-10-28 from the Area 2 review (§2 macro scope, §3 scheduler entries, §5 JSON rules, §7 index documents, §8 degrades and hard failures) · Source: the UX and system design spec, the Decisions tab and the Spec review tab of the planning doc
 
 ## 1. Purpose and scope
 
@@ -61,7 +61,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 
 **Audio Transition**: `type` (`cut`, `crossfade`, `fadeThroughSilence`), `ms`, `easing`, `offsetMs` (signed; measured from the trigger).
 
-**Macro**: `commands` (array of command objects, see section 6), `color`, `tileLabel`. `scope` is computed, not stored: a macro that references a stack or output is machine-level and is written to the machine root instead of the library.
+**Macro**: `commands` (array of command objects, see section 6), `color`, `tileLabel`. `scope` is computed, not stored: a macro that references a stack or output is machine-level and is written to the machine root instead of the library. A guard that names a stack or output (`[Output N Stack]`, `[Stack N Blackout]`) counts as a reference.
 
 **List** (a master): `title`, `author`, `copyright`, `ccli`, `trackThrough` (bool), `version` (integer, incremented on every save), `cues` (ordered array), `timeline` (*reserved*). A local copy is the same document with `provenance` `{masterUuid, masterVersion, detachedAt}` and lives in the machine root.
 
@@ -92,7 +92,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `archived` (bool), `items` (ordered). An item is one of `{kind: "header", label}`, `{kind: "linked", list: list number}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root. Playlists carry no cues of their own. The playlist's name is its title; the pair of title and date must be unique on a machine (case-insensitive), and the UI prompts for a different name on a clash, so a weekly "Sunday" playlist is fine as long as each has its date. The tree sorts dated playlists by date and lists undated ones by name in their own group.
 
-**Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. Exportable as its own file so stations can be standardized.
+**Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
 **Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false), `snapshots` `{cadence, retention}`, `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
 
@@ -153,7 +153,8 @@ File names carry the number and a slug of the label for human reading only; the 
 
 **JSON rules**
 
-- UTF-8, LF line endings, two-space indentation, keys sorted, one object per line in arrays of objects. The point is diffs that read.
+- UTF-8, LF line endings, two-space indentation, keys sorted by UTF-8 byte order. A container whose members are all scalars or empty containers prints on one line; any other container prints one member per line, so an array of small objects is one object per line. UUIDs are lowercase. The point is diffs that read.
+- Catalog objects write every known key, nullable ones as `null`. Command objects (section 6) omit absent optionals and write `loop` only when true, as the examples show.
 - Keys are camelCase. Enums are lowercase strings. Booleans are real booleans, never 0 and 1.
 - Times on disk are integer milliseconds (`ms` suffix), timecode is `"HH:MM:SS:FF"`, frame rates are `{num, den}` (so 59.94 is `{60000, 1001}`), dates are ISO 8601. Internally the engine uses nanoseconds; conversion happens at the file boundary.
 - Colors are `{r, g, b, a}` floats 0–1 in sRGB. Normalized geometry is 0–1 of the containing size.
@@ -196,7 +197,7 @@ Text content is inline, which is what keeps a song self-contained in its list fi
 
 ## 7. Media index and resolver
 
-The media root is a plain folder tree the user organizes freely. The index maps identity to what the app knows about each file and is kept in two tiers: a **library index** (`library/media-index.json`, synced with the library, written only by machines in writable library mode) for media that belongs to the library, and a **machine index** (`machine/media-local.json`) for media that exists only on this machine plus any path overrides. Both can be rebuilt from the files if lost.
+The media root is a plain folder tree the user organizes freely. The index maps identity to what the app knows about each file and is kept in two tiers: a **library index** (`library/media-index.json`, synced with the library, written only by machines in writable library mode) for media that belongs to the library, and a **machine index** (`machine/media-local.json`) for media that exists only on this machine plus any path overrides. Both can be rebuilt from the files if lost. `library/media-index.json` holds `entries` (in id order) and the `replaced` map that `replace media` records; `machine/media-local.json` holds `entries` and `overrides` (id to local path).
 
 **Index entry**
 
@@ -238,11 +239,11 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 
-**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, media ids with no path, and fonts not installed. A broken reference degrades to the documented default (Preset 1, the channel default transition, an empty slot) and is reported; nothing refuses to load because of it.
+**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, media ids with no path, and fonts not installed. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
 
 **External changes.** When a document changes on disk under the app (a master arriving by sync, a hand edit), the app reloads it on the control thread and applies the nothing-edits-live rule: the live list keeps playing from its loaded cues, each cue picks up the new version on its next fire, and the cue grid marks the list as updated. A reload never touches channel state or the live pointer.
 
-**Hard failures** are only malformed JSON and a schema newer than the app can read. Both leave the previous good state in place and surface a plain message naming the file.
+**Hard failures** are malformed JSON, a schema outside what the app can read, and a document whose shape does not decode. All leave the previous good state in place and surface a plain message naming the file, and where inside it.
 
 **Concurrency.** Last write wins at the file level. Because each list and preset is its own file and every master save first copies the previous version aside, the worst case of two machines editing one master is a recoverable one-version rollback, never a merge.
 
