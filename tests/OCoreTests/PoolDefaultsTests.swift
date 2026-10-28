@@ -76,9 +76,11 @@ final class PoolDefaultsTests: XCTestCase {
         XCTAssertEqual(MediaResolver.resolve(F.announcement, library: library, machine: machine)?.tier, .machine)
         XCTAssertNil(MediaResolver.resolve("sha256:" + String(repeating: "cd", count: 32), library: library, machine: machine))
         library.mediaIndex.replaced[F.mountains] = F.dawn
-        XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.tier, .machine, "a machine entry still wins")
+        XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.entry.id, F.dawn,
+                       "a replaced id means its replacement before either index is consulted")
         machine.mediaLocal.entries.removeAll()
-        XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.entry.id, F.dawn, "a replaced id resolves to its replacement")
+        XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.entry.id, F.dawn)
+        XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.tier, .library)
     }
 
     /// Spec 3 §4 Media still holds with the defaults applied: writing the same

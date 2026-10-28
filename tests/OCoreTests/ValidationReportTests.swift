@@ -29,19 +29,19 @@ final class ValidationReportTests: XCTestCase {
     func test_aCueWritingADeletedChannelIsReportedOnceAndIgnoredAtUse() {
         var (library, machine) = fresh()
         library.channels.removeAll { $0.number == 1 }
-        var list = library.list(number: 42)
-        list?.cues = [list?.cues[0]].compactMap { $0 }
-        library.lists = [list].compactMap { $0 }
-        library.macros = []
-        machine.localLists = []
-        machine.macros = []
-        machine.stacks = []
-        machine.keys = []
-        library.mediaIndex.entries = library.mediaIndex.entries.filter { $0.defaults.defaultChannel != 1 }
-        machine.mediaLocal.entries = []
-        let issue = only(.missingChannel, in: report(library, machine))
+        // Keep one cue that writes the deleted channel; clear the other places that name channel 1.
+        library.lists = library.lists.filter { $0.number == 42 }
+        library.lists[0].cues = [library.lists[0].cues[0]]
+        library.mediaIndex.entries = library.mediaIndex.entries.map { entry in
+            var e = entry
+            if e.defaults.defaultChannel == 1 { e.defaults.defaultChannel = nil }
+            return e
+        }
+        let issue = only(.missingChannel, in: report(library, nil))
         XCTAssertEqual(issue?.subject, "list 42 cue 1")
         XCTAssertEqual(issue?.severity, .warning)
+        XCTAssertTrue(issue?.message.contains("channel 1") == true)
+        machine.localLists = []
 
         let context = ProjectionContext(frame: 1, library: library, machine: machine, source: CommandSource(kind: .ui))
         let (_, effects) = project(ShowState.fresh(library: library, machine: machine), [.listCue(list: 42, cue: 1)], context: context)
@@ -144,6 +144,7 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(transition?.ms, 0)
         XCTAssertEqual(transition?.transition, 9, "the ref is carried as written so the strip can say what the cue asked for")
 
+        library.lists[1].cues[0].commands[0].command.setRiders(Riders(transition: TransitionRider(ref: 2, ms: 1000, scope: .once)))
         library.channels[0].defaults.transition = 8
         XCTAssertEqual(only(.missingTransition, in: report(library, machine))?.subject, "channel 1")
     }

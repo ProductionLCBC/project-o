@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/text-styles.schema.json",
+  "title": "text-styles.json",
+  "description": "Spec 1 §2 — Text Style: a numbered template of the text style value (font, size, weight, color, alignment, lineSpacing, letterSpacing, outline, shadow, allCaps, variations).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "textStyles"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "textStyles" },
+    "textStyles": { "type": "array", "items": { "$ref": "#/$defs/textStyle" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "textStyle": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "font", "size", "weight", "color", "alignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "font": { "type": "string" },
+        "size": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "properties": { "value": { "type": "number", "minimum": 0 }, "unit": { "enum": ["pt", "percent"] } },
+          "additionalProperties": false
+        },
+        "weight": { "type": "number" },
+        "color": { "$ref": "#/$defs/color" },
+        "alignment": { "enum": ["left", "center", "right"] },
+        "lineSpacing": { "type": "number" },
+        "letterSpacing": { "type": "number" },
+        "outline": {
+          "type": "object",
+          "required": ["width", "color"],
+          "properties": { "width": { "type": "number", "minimum": 0 }, "color": { "$ref": "#/$defs/color" } },
+          "additionalProperties": false
+        },
+        "shadow": {
+          "type": "object",
+          "required": ["x", "y", "blur", "color"],
+          "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "blur": { "type": "number", "minimum": 0 }, "color": { "$ref": "#/$defs/color" } },
+          "additionalProperties": false
+        },
+        "allCaps": { "type": "boolean" },
+        "variations": { "type": "object", "additionalProperties": { "type": "number" } }
+      }
+    }
+  }
+}

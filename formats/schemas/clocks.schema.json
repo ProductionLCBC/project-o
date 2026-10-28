@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/clocks.schema.json",
+  "title": "clocks.json",
+  "description": "Spec 1 §5 — reserved for the clock sources of the timelines-and-clocks spec (v2): which audio input carries LTC, which MIDI port MTC, which Art-Net universe. The loader keeps the body as read.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "clocks"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "clocks" },
+    "clocks": { "type": "array", "items": { "type": "object" } }
+  }
+}

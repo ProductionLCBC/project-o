@@ -11,7 +11,7 @@
           "channel": 1,
           "cmd": "channel.write",
           "content": { "gain": -3, "in": 2000, "kind": "media", "out": 60000, "ref": "sha256:9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b", "syncOffsetMs": 40 },
-          "transition": { "ms": null, "ref": 3, "scope": "track" }
+          "transition": { "ref": 3, "scope": "track" }
         },
         {
           "channel": 2,

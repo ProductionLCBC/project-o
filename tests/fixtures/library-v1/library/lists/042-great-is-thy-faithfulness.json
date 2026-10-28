@@ -68,7 +68,7 @@
       "advanceAfterMs": null,
       "commands": [
         {
-          "audioTransition": { "ms": null, "ref": 2, "scope": "once" },
+          "audioTransition": { "ref": 2, "scope": "once" },
           "channel": 2,
           "cmd": "channel.write",
           "content": {

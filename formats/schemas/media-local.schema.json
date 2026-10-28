@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/media-local.schema.json",
+  "title": "media-local.json",
+  "description": "Spec 1 §7 — the machine index: local-only media with the same entry shape as the library index, plus overrides from id to a local path.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "entries", "overrides"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "mediaLocal" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "overrides": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "$defs": {
+    "mediaId": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64}|slide:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$" },
+    "rate": {
+      "type": "object",
+      "required": ["num", "den"],
+      "properties": { "num": { "type": "integer", "minimum": 1 }, "den": { "type": "integer", "minimum": 1 } },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "path", "kind", "size", "modified", "durationMs", "fps", "width", "height", "hasAudio", "hasAlpha", "codec", "poster", "defaults", "addedAt", "folder"],
+      "properties": {
+        "id": { "$ref": "#/$defs/mediaId" },
+        "path": { "type": "string" },
+        "kind": { "enum": ["video", "image", "audio", "audioSet", "slide", "template"] },
+        "size": { "type": "integer", "minimum": 0 },
+        "modified": { "type": ["string", "null"] },
+        "durationMs": { "type": ["integer", "null"] },
+        "fps": { "oneOf": [{ "$ref": "#/$defs/rate" }, { "type": "null" }] },
+        "width": { "type": ["integer", "null"] },
+        "height": { "type": ["integer", "null"] },
+        "hasAudio": { "type": "boolean" },
+        "hasAlpha": { "type": "boolean" },
+        "codec": { "type": ["string", "null"] },
+        "poster": { "type": ["string", "null"] },
+        "defaults": {
+          "type": "object",
+          "required": ["trimInMs", "trimOutMs", "loop", "gain", "grade", "syncOffsetMs", "defaultChannel"],
+          "properties": {
+            "trimInMs": { "type": ["integer", "null"] },
+            "trimOutMs": { "type": ["integer", "null"] },
+            "loop": { "type": "boolean" },
+            "gain": { "type": ["number", "null"] },
+            "grade": { "type": ["integer", "null"] },
+            "syncOffsetMs": { "type": ["integer", "null"], "minimum": -1000, "maximum": 1000 },
+            "defaultChannel": { "type": ["integer", "null"] }
+          }
+        },
+        "addedAt": { "type": ["string", "null"] },
+        "folder": { "type": ["string", "null"] },
+        "tracks": { "type": "array", "items": { "$ref": "#/$defs/mediaId" } },
+        "crossfadeMs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

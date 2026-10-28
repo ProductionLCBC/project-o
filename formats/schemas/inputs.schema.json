@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/inputs.schema.json",
+  "title": "inputs.json",
+  "description": "Spec 1 §3 — Input: kind (sdi, ndi, camera, screen), device, format, deinterlace, colorRange, audioMap, bufferingMs, expected (for pre-flight).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "inputs"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "inputs" },
+    "inputs": { "type": "array", "items": { "$ref": "#/$defs/input" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "format": {
+      "type": "object",
+      "required": ["width", "height", "rate", "interlaced"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "rate": {
+          "type": "object",
+          "required": ["num", "den"],
+          "properties": { "num": { "type": "integer", "minimum": 1 }, "den": { "type": "integer", "minimum": 1 } },
+          "additionalProperties": false
+        },
+        "interlaced": { "type": "boolean" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "kind", "device", "format", "deinterlace", "colorRange", "audioMap", "bufferingMs", "expected"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "kind": { "enum": ["sdi", "ndi", "camera", "screen"] },
+        "device": { "type": "string" },
+        "format": { "$ref": "#/$defs/format" },
+        "deinterlace": { "type": "boolean" },
+        "colorRange": { "enum": ["full", "limited"] },
+        "audioMap": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "bufferingMs": { "type": "integer", "minimum": 0 },
+        "expected": { "type": "boolean" }
+      }
+    }
+  }
+}

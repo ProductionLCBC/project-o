@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/transitions.schema.json",
+  "title": "transitions.json",
+  "description": "Spec 1 §2 — Transition: type (cut, dissolve, fadeThroughColor), ms, easing, color (fade-through only), builtIn (1–3 ship built in).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "transitions"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "transitions" },
+    "transitions": { "type": "array", "items": { "$ref": "#/$defs/transition" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "color": {
+      "type": "object",
+      "required": ["r", "g", "b", "a"],
+      "properties": {
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "transition": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "type", "ms", "easing", "color", "builtIn"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "type": { "enum": ["cut", "dissolve", "fadeThroughColor"] },
+        "ms": { "type": "integer", "minimum": 0 },
+        "easing": { "enum": ["linear", "easeIn", "easeOut", "easeInOut"] },
+        "color": { "oneOf": [{ "$ref": "#/$defs/color" }, { "type": "null" }] },
+        "builtIn": { "type": "boolean" }
+      }
+    }
+  }
+}

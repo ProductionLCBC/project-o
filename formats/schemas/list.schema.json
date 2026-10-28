@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/list.schema.json",
+  "title": "lists/NNN-slug.json, lists-local/NNN-slug.json, versions/NNN/vNNNN.json",
+  "description": "Spec 1 §2 — List (a master): title, author, copyright, ccli, trackThrough, version, cues, timeline (reserved). A local copy adds provenance {masterUuid, masterVersion, detachedAt}. Cue: uuid, label, section, note, trigger, advanceAfterMs, commands (§6).",
+  "type": "object",
+  "required": ["schema", "app", "kind", "number", "uuid", "title", "author", "copyright", "ccli", "trackThrough", "version", "cues", "timeline"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 0 },
+    "app": { "type": "string" },
+    "kind": { "const": "list" },
+    "number": { "type": "integer", "minimum": 1 },
+    "uuid": { "$ref": "#/$defs/uuid" },
+    "title": { "type": "string" },
+    "author": { "type": "string" },
+    "copyright": { "type": "string" },
+    "ccli": { "type": "string" },
+    "trackThrough": { "type": "boolean" },
+    "version": { "type": "integer", "minimum": 0 },
+    "cues": { "type": "array", "items": { "$ref": "#/$defs/cue" } },
+    "timeline": { "type": ["object", "null"] },
+    "provenance": {
+      "type": "object",
+      "required": ["masterUuid", "masterVersion", "detachedAt"],
+      "properties": {
+        "masterUuid": { "$ref": "#/$defs/uuid" },
+        "masterVersion": { "type": "integer", "minimum": 0 },
+        "detachedAt": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "guard": {
+      "type": "object",
+      "required": ["var", "op"],
+      "properties": {
+        "var": { "type": "string" },
+        "op": { "enum": ["is", "is not", "greater than", "less than", "is empty", "is not empty"] },
+        "value": { "type": "string" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": ["cmd"],
+      "properties": {
+        "cmd": { "type": "string", "pattern": "^[a-z]+(\\.[a-zA-Z]+)?$" },
+        "when": { "$ref": "#/$defs/guard" }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["go", "time", "timecode"] },
+        "ms": { "type": "integer", "minimum": 0 },
+        "tc": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$" }
+      }
+    },
+    "cue": {
+      "type": "object",
+      "required": ["uuid", "label", "section", "note", "trigger", "advanceAfterMs", "commands"],
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "label": { "type": "string" },
+        "section": { "type": ["string", "null"] },
+        "note": { "type": "string" },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "advanceAfterMs": { "type": ["integer", "null"] },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/command" } }
+      }
+    }
+  }
+}

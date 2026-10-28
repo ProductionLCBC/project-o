@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/library.schema.json",
+  "title": "library.json",
+  "description": "Spec 1 §5 — the library root's own document: schema, library uuid, name.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "uuid", "name"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "library" },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "name": { "type": "string" }
+  }
+}

@@ -87,7 +87,7 @@ final class LocalFilesTests: XCTestCase {
         list.cues[0].label = "Verse 1 (edited)"
         let save = Writer.saveList(list, previous: original, currentPath: path)
 
-        XCTAssertThrowsError(try LocalFiles.execute(save.plan, in: root, crashAfterTemporaryWrite: true)) { error in
+        XCTAssertThrowsError(try LocalFiles.execute(save.plan, in: root, crashAfterTemporaryWriteOf: path)) { error in
             XCTAssertTrue(error is SimulatedCrash, "\(error)")
         }
         XCTAssertEqual(read(path, in: root), original, "the original is intact")

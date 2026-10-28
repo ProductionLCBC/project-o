@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/channels.schema.json",
+  "title": "channels.json",
+  "description": "Spec 1 §2 — Channel: number, label, uuid, defaultPreset, defaults, decoderCap, audioOutputs, renderSize, textThumbnail, usualContent.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "channels"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "channels" },
+    "channels": { "type": "array", "items": { "$ref": "#/$defs/channel" } }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "channel": {
+      "type": "object",
+      "required": ["number", "label", "uuid", "defaultPreset", "defaults", "decoderCap", "audioOutputs", "renderSize", "textThumbnail", "usualContent"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "defaultPreset": { "type": "integer", "minimum": 1 },
+        "defaults": {
+          "type": "object",
+          "required": ["transition", "audioTransition", "gain"],
+          "properties": {
+            "transition": { "type": "integer", "minimum": 1 },
+            "audioTransition": { "type": "integer", "minimum": 1 },
+            "gain": { "type": "number" }
+          }
+        },
+        "decoderCap": { "type": ["integer", "null"], "enum": [2, 3, null] },
+        "audioOutputs": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+        "renderSize": {
+          "oneOf": [
+            { "const": "largest" },
+            {
+              "type": "object",
+              "required": ["width", "height"],
+              "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 } },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "textThumbnail": { "enum": ["body", "firstLine"] },
+        "usualContent": { "enum": ["media", "text", "slide", "live", "any"] }
+      }
+    }
+  }
+}
