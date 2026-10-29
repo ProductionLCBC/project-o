@@ -105,10 +105,10 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         guard !running.exchange(true, ordering: .acquiringAndReleasing) else { return }
         let thread = Thread { [self] in
             while running.load(ordering: .relaxed) {
-                drain()
+                autoreleasepool { drain() }
                 Thread.sleep(forTimeInterval: 0.1)
             }
-            drain()
+            autoreleasepool { drain() }
         }
         thread.name = "o.engine.blackbox"
         thread.qualityOfService = .utility

@@ -166,7 +166,8 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
                 Thread.sleep(forTimeInterval: 0.002)
                 continue
             }
-            guard let sample = reader.session.nextVideoSample() else {
+            // Pools around the AVFoundation and VideoToolbox calls: a decode thread lives for the whole instance.
+            guard let sample = autoreleasepool(invoking: { reader.session.nextVideoSample() }) else {
                 // End of the reader: loop or end.
                 if loop, loopLength > 0 {
                     reader = switchReader(from: reader, standby: &standby, loopLength: loopLength)
@@ -189,7 +190,7 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
                     standby = Reader(session: second, offsetMs: reader.offsetMs + loopLength)
                 }
             }
-            let decoded = decode(sample, offsetMs: reader.offsetMs)
+            let decoded = autoreleasepool { decode(sample, offsetMs: reader.offsetMs) }
             for frame in decoded where frame.presentationMs - reader.offsetMs >= inMs - 0.001 {
                 pending.append(frame)
             }

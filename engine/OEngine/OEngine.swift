@@ -11,7 +11,9 @@
 //
 // Folders: Seams/ (the §14 protocols), Plan/ (the §4 frame plan and its
 // builder), Clock/ (§2), Render/ (§3, §4, the render loop), Control/ (§3, the
-// control thread), Metrics/ (§13, the watchdog of §12), Harness/ (§14, §16).
+// control thread), Sources/ (§6), Text/ (§8), Sinks/ (§10), Audio/ (§11),
+// Metrics/ (§13, the watchdog of §12), OSC/ (Spec 2 §6), Harness/ (§14, §16),
+// CommandLine/ (§15, the `oengine` process and the soak rig).
 
 import Foundation
 import OCore
@@ -26,28 +28,4 @@ public enum OEngine {
         return false
         #endif
     }
-}
-
-/// Spec 4 §15 — the `oengine` process. The subcommands are filled in with the
-/// engine; this is the argument dispatcher the executable calls.
-public enum OEngineCommandLine {
-    public static func run(arguments: [String]) -> Int32 {
-        guard let first = arguments.first else {
-            print(usage)
-            return 2
-        }
-        switch first {
-        case "version":
-            print("oengine \(OCore.appVersion)")
-            return 0
-        default:
-            FileHandle.standardError.write(Data(("oengine: unknown command \(first)\n" + usage + "\n").utf8))
-            return 2
-        }
-    }
-
-    static let usage = """
-    usage: oengine <command>
-      version                 print the engine version
-    """
 }

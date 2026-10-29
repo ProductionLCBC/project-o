@@ -51,6 +51,8 @@ public final class RenderLoop: @unchecked Sendable {
     private let repeats = Atomic<Int64>(0)
     private let gpuFailureFlag = Atomic<Bool>(false)
     private let gpuFailureCount = Atomic<Int64>(0)
+    private let lastDepths = Atomic<UInt64>(0)
+    private let lastDepthCount = Atomic<Int>(0)
 
     public init(backend: any RenderBackend, planRing: PlanRing, sources: SourceTable, sinks: [Int: any OutputSink],
                 metrics: MetricsRing, pacing: Pacing, maxChannelPasses: Int = 32) {
@@ -69,6 +71,16 @@ public final class RenderLoop: @unchecked Sendable {
     public var totalTicks: Int64 { ticksRun.load(ordering: .relaxed) }
     public var totalRepeats: Int64 { repeats.load(ordering: .relaxed) }
     public var gpuFailures: Int64 { gpuFailureCount.load(ordering: .relaxed) }
+
+    /// Spec 4 §12 — the last tick's decoder queue depths, one per live
+    /// instance in plan order, for the watchdog's reading. Two atomics, so the
+    /// watchdog thread never touches the control thread's tables.
+    public var lastQueueDepths: [Int] {
+        var record = TickRecord()
+        record.queueDepths = lastDepths.load(ordering: .acquiring)
+        record.instanceCount = UInt8(clamping: lastDepthCount.load(ordering: .relaxed))
+        return record.instanceQueueDepths
+    }
 
     /// Spec 4 §12 — "Failures are detected on the render thread and recovered
     /// on another": the control side takes the flag and rebuilds.
@@ -140,9 +152,16 @@ public final class RenderLoop: @unchecked Sendable {
         record.stackPasses = Int32(plan.stackPasses.count)
         record.auxPasses = Int32(options.skipAux ? 0 : plan.auxPasses.count)
         record.auxSkipped = Int32(options.skipAux ? plan.auxPasses.count : 0)
-        record.textLate = Int32(plan.stackPasses.reduce(0) { $0 + $1.boxes.filter { $0.binding.isText && $0.content.isEmpty && $0.transition == nil }.count })
+        // Counted with loops, not `filter`: the render thread allocates nothing (Spec 4 §3).
+        var late: Int32 = 0
+        for pass in plan.stackPasses {
+            for box in pass.boxes where box.binding.isText && box.content.isEmpty && box.transition == nil { late += 1 }
+        }
+        record.textLate = late
         record.cpuEncodeNs = MonotonicClock.now() - cpuStart
         metrics.write(record)
+        lastDepths.store(record.queueDepths, ordering: .releasing)
+        lastDepthCount.store(Int(record.instanceCount), ordering: .relaxed)
 
         previousReceipt = receipt
         lastPlan = plan

@@ -1,0 +1,83 @@
+{
+  "app": "0.1.0",
+  "builtIn": false,
+  "kind": "preset",
+  "label": "Lower third",
+  "layouts": {
+    "*": {
+      "boxes": [
+        {
+          "binding": { "kind": "field", "name": "title" },
+          "fallback": false,
+          "fit": { "maxLines": 2, "minSize": 18, "policy": "shrinkToFit" },
+          "frame": { "h": 0.12, "w": 0.9, "x": 0.05, "y": 0.78 },
+          "grade": 1,
+          "textStyle": {
+            "alignment": "left",
+            "allCaps": true,
+            "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+            "font": "HelveticaNeue-Medium",
+            "fromStyle": 2,
+            "letterSpacing": 0.5,
+            "lineSpacing": 1.2,
+            "outline": {
+              "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+              "width": 1
+            },
+            "shadow": {
+              "blur": 0,
+              "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+              "x": 0,
+              "y": 0
+            },
+            "size": { "unit": "percent", "value": 4.5 },
+            "variations": { "wdth": 110, "wght": 500 },
+            "weight": 500
+          },
+          "transition": { "ms": 300, "ref": 2 },
+          "transitionOnVariableChange": false
+        }
+      ],
+      "mask": null
+    },
+    "2": {
+      "boxes": [
+        {
+          "binding": { "kind": "field", "name": "body" },
+          "fallback": false,
+          "fit": { "maxLines": 2, "minSize": 16, "policy": "maxLines" },
+          "frame": { "h": 0.16, "w": 0.94, "x": 0.03, "y": 0.82 },
+          "grade": null,
+          "textStyle": {
+            "alignment": "left",
+            "allCaps": false,
+            "color": { "a": 1, "b": 0.8, "g": 0.8, "r": 0.8 },
+            "font": "HelveticaNeue-Bold",
+            "fromStyle": 1,
+            "letterSpacing": 0,
+            "lineSpacing": 1.1,
+            "outline": {
+              "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+              "width": 0
+            },
+            "shadow": {
+              "blur": 0,
+              "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+              "x": 0,
+              "y": 0
+            },
+            "size": { "unit": "pt", "value": 36 },
+            "variations": {},
+            "weight": 700
+          },
+          "transition": { "ms": null, "ref": 1 },
+          "transitionOnVariableChange": false
+        }
+      ],
+      "mask": null
+    }
+  },
+  "number": 3,
+  "schema": 1,
+  "uuid": "c0de0000-0000-4000-8000-000000000003"
+}

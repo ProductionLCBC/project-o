@@ -34,10 +34,14 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
     public let resources = ResourceTable(capacity: 4096)
     public var simulatedGPUMilliseconds: Double = 3
     public var failNextCompletion = false
+    /// Off, the backend keeps nothing per tick (no lock, no append): the mode of
+    /// the allocation test, which counts what a render tick does on its own.
+    public var recordsEncodes = true
     public private(set) var encoded: [EncodedTick] = []
     public private(set) var rebuilds = 0
     private var completions: [Int64: GPUCompletion] = [:]
     private var nextToken: Int64 = 1
+    private var fixedCompletion = GPUCompletion(channelNs: 0, stackNs: 0, sinkNs: 0)
     private let lock = NSLock()
 
     public init() {}
@@ -47,6 +51,10 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
     }
 
     public func encode(_ tick: TickTime, plan: FramePlan, picks: PickedFrames, options: EncodeOptions) -> EncodeReceipt {
+        guard recordsEncodes else {
+            fixedCompletion = GPUCompletion(channelNs: Int64(simulatedGPUMilliseconds * 1_000_000), stackNs: 0, sinkNs: 0)
+            return EncodeReceipt(tick: tick.tick, token: -1)
+        }
         lock.lock()
         defer { lock.unlock() }
         let token = nextToken
@@ -63,6 +71,7 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
     }
 
     public func completion(of receipt: EncodeReceipt) -> GPUCompletion? {
+        if receipt.token == -1 { return fixedCompletion }
         lock.lock()
         defer { lock.unlock() }
         return completions[receipt.token]

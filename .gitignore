@@ -22,6 +22,9 @@ vendor/DeckLinkSDK/
 tests/soak-output/
 *.golden-diff.png
 
+# Generated spike media (oengine make-fixtures); the index carries fixed ids
+tests/fixtures/spike/library/media/
+
 # macOS
 .DS_Store
 ._*

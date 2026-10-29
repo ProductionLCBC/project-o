@@ -5,5 +5,7 @@
 import Foundation
 import OEngine
 
+// Line-buffered output even into a pipe, so a captured soak log is complete up to the last line.
+setlinebuf(stdout)
 let status = OEngineCommandLine.run(arguments: Array(CommandLine.arguments.dropFirst()))
 exit(status)

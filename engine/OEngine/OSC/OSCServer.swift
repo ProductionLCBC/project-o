@@ -130,9 +130,11 @@ public final class OSCServer: @unchecked Sendable {
                 if !running.load(ordering: .relaxed) { break }
                 continue
             }
-            let data = Data(bytes: buffer, count: count)
-            let peer = OSCPeer(host: String(cString: inet_ntoa(from.sin_addr)), port: UInt16(bigEndian: from.sin_port))
-            handle(data, from: peer)
+            autoreleasepool {
+                let data = Data(bytes: buffer, count: count)
+                let peer = OSCPeer(host: String(cString: inet_ntoa(from.sin_addr)), port: UInt16(bigEndian: from.sin_port))
+                handle(data, from: peer)
+            }
         }
     }
 

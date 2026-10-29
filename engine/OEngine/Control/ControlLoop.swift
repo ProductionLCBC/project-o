@@ -102,6 +102,18 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 4 §12 — for the watchdog: when a plan was last built.
     public var lastBuilt: MonotonicTime { MonotonicTime(nanoseconds: builtAt.load(ordering: .acquiring)) }
 
+    private let stateLock = NSLock()
+    private var stateSnapshot = ShowState()
+
+    /// The state after the last build, for readers on other threads (the OSC
+    /// query reply, the process summary). `model.state` itself belongs to the
+    /// control thread.
+    public var publishedState: ShowState {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return stateSnapshot
+    }
+
     /// Spec 2 §8 — groups land on the next tick boundary.
     public func enqueue(_ group: CommandGroup) {
         queue.enqueue(group)
@@ -136,6 +148,9 @@ public final class ControlLoop: @unchecked Sendable {
         backend.prepare(plan)
         for channel in model.channels.keys { model.channels[channel]?.snapshotPending = false }
         lastPlan = plan
+        stateLock.lock()
+        stateSnapshot = model.state
+        stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
     }
@@ -747,6 +762,10 @@ public final class ControlLoop: @unchecked Sendable {
                 }
             } else if slot.offset > 0 {
                 content = lookaheadState(slot.offset, frame: frame, scratch: &scratch)?.channels[slot.channel]?.content
+                // Spec 4 §8 — the same rule for an offset slot: the text it will show after the next fire.
+                if let after = lookaheadState(slot.offset + 1, frame: frame, scratch: &scratch), case .text(let t)? = after.channels[slot.channel]?.content {
+                    prefetchText(stack: stack, slot: slot, fields: t.fields, size: size)
+                }
             } else {
                 content = nil   // negative offsets are v1.5
             }

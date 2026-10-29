@@ -77,16 +77,17 @@ public final class Watchdog: @unchecked Sendable {
 
     public static func check(_ r: LivenessReading) -> [WatchdogFinding] {
         var findings: [WatchdogFinding] = []
+        // A zero time stamp is "not yet": nothing has been missed before the first tick, build or present.
         let sinceRender = r.now - r.lastPlanConsumed
-        if sinceRender > r.tickNanoseconds + r.tickNanoseconds / 2 {
+        if r.lastPlanConsumed.nanoseconds > 0, sinceRender > r.tickNanoseconds + r.tickNanoseconds / 2 {
             findings.append(.renderThreadMissedTick(sinceNs: sinceRender, queues: r.queues))
         }
         let sinceBuild = r.now - r.lastPlanBuilt
-        if sinceBuild > controlStallNs {
+        if r.lastPlanBuilt.nanoseconds > 0, sinceBuild > controlStallNs {
             findings.append(.controlThreadStalled(sinceNs: sinceBuild))
         }
         for output in r.sinkLastPresent.keys.sorted() {
-            guard let last = r.sinkLastPresent[output] else { continue }
+            guard let last = r.sinkLastPresent[output], last.nanoseconds > 0 else { continue }
             let since = r.now - last
             if since > 2 * r.tickNanoseconds {
                 findings.append(.sinkStalled(output: output, sinceNs: since, queues: r.queues))
@@ -129,7 +130,7 @@ public final class Watchdog: @unchecked Sendable {
         guard !running.exchange(true, ordering: .acquiringAndReleasing) else { return }
         let thread = Thread { [weak self] in
             while let self, self.running.load(ordering: .relaxed) {
-                self.record(Watchdog.check(reading()))
+                autoreleasepool { self.record(Watchdog.check(reading())) }
                 Thread.sleep(forTimeInterval: Double(Watchdog.intervalNs) / 1_000_000_000)
             }
         }

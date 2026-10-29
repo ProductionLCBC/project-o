@@ -86,18 +86,75 @@ final class RecoveryTests: XCTestCase {
     /// "Display disconnected: Pause that sink, keep its ring; resume at the configured mode when it returns."
     func test_displaySinkStatePausesAndResumes() {
         var state = DisplaySinkState()
-        XCTAssertEqual(state.refresh(newestCompletedTick: 1), .skip, "stopped sinks do nothing")
+        let allComplete: (Int64) -> Bool = { _ in true }
+        XCTAssertEqual(state.refresh(newestPublished: 2, elapsedTicks: 1, isComplete: allComplete), .skip, "stopped sinks do nothing")
         state.phase = .running
-        XCTAssertEqual(state.refresh(newestCompletedTick: 1), .present)
-        XCTAssertEqual(state.refresh(newestCompletedTick: 1), .rePresent)
+        XCTAssertEqual(state.refresh(newestPublished: 2, elapsedTicks: 1, isComplete: allComplete), .present(1), "one frame behind the newest")
+        XCTAssertEqual(state.refresh(newestPublished: 2, elapsedTicks: 0, isComplete: allComplete), .rePresent, "no master time passed: the same frame again")
         state.screenChanged(available: false)
         XCTAssertEqual(state.phase, .paused)
-        XCTAssertEqual(state.refresh(newestCompletedTick: 2), .skip, "paused: the ring is kept, nothing is presented")
+        XCTAssertEqual(state.refresh(newestPublished: 3, elapsedTicks: 1, isComplete: allComplete), .skip, "paused: the ring is kept, nothing is presented")
         state.screenChanged(available: true)
         XCTAssertEqual(state.phase, .running)
-        XCTAssertEqual(state.refresh(newestCompletedTick: 2), .present)
+        XCTAssertEqual(state.refresh(newestPublished: 3, elapsedTicks: 1, isComplete: allComplete), .present(2))
         XCTAssertEqual(state.presented, 2)
         XCTAssertEqual(state.rePresented, 1)
+    }
+
+    /// Spec 4 §10 — "takes the newest completed frame from the output's ring":
+    /// one frame behind the master, so the race between the sink's vsync and
+    /// the render thread on the same vsync never decides what shows; a frame
+    /// still on the GPU falls back to the one before it; nothing new due is a
+    /// re-present (Spec 4 §13) on a matched screen and a hold on a faster one.
+    func test_displaySinkRefreshIsOneFrameBehindAndDeterministic() {
+        var state = DisplaySinkState()
+        state.phase = .running
+        // The render thread publishes tick k on vsync k; the GPU finishes a little later.
+        var inFlight: Int64 = -1
+        let complete: (Int64) -> Bool = { $0 != inFlight }
+        // Vsync 10, the master already ran: 10 is in flight, 9 is shown.
+        inFlight = 10
+        XCTAssertEqual(state.refresh(newestPublished: 10, elapsedTicks: 1, isComplete: complete), .present(9))
+        // Vsync 11, the sink's callback ran before the master's: newest is still 10, now complete; 10 is shown.
+        inFlight = -1
+        XCTAssertEqual(state.refresh(newestPublished: 10, elapsedTicks: 1, isComplete: complete), .present(10))
+        // Vsync 12, the master ran first and the GPU is slow: 12 in flight, 11 complete.
+        inFlight = 12
+        XCTAssertEqual(state.refresh(newestPublished: 12, elapsedTicks: 1, isComplete: complete), .present(11))
+        // Vsync 13: the frame due (12) is still on the GPU: the previous one stays, counted.
+        XCTAssertEqual(state.refresh(newestPublished: 13, elapsedTicks: 1, isComplete: complete), .rePresent)
+        XCTAssertEqual(state.rePresented, 1)
+        // Vsync 14: 12 finished; 13 is due and complete.
+        inFlight = 14
+        XCTAssertEqual(state.refresh(newestPublished: 14, elapsedTicks: 1, isComplete: complete), .present(13))
+        // The sink's thread was starved for three vsyncs: it catches up to one behind.
+        inFlight = -1
+        XCTAssertEqual(state.refresh(newestPublished: 20, elapsedTicks: 3, isComplete: complete), .present(19))
+        // Unlocked drift, the screen faster than the master: a vsync with no master time is a re-present.
+        XCTAssertEqual(state.refresh(newestPublished: 20, elapsedTicks: 0.4, isComplete: complete), .rePresent)
+        XCTAssertEqual(state.refresh(newestPublished: 21, elapsedTicks: 0.6, isComplete: complete), .present(20))
+        XCTAssertEqual(state.presented, 6)
+        XCTAssertEqual(state.rePresented, 2)
+
+        // A 30p output on a 60 Hz screen: every other refresh holds, uncounted.
+        var slow = DisplaySinkState()
+        slow.phase = .running
+        slow.ticksPerFrame = 2
+        slow.screenMatchesOutput = false
+        XCTAssertEqual(slow.refresh(newestPublished: 10, elapsedTicks: 1, isComplete: complete), .present(8))
+        XCTAssertEqual(slow.refresh(newestPublished: 10, elapsedTicks: 1, isComplete: complete), .hold)
+        XCTAssertEqual(slow.refresh(newestPublished: 12, elapsedTicks: 1, isComplete: complete), .present(10))
+        XCTAssertEqual(slow.refresh(newestPublished: 12, elapsedTicks: 1, isComplete: complete), .hold)
+        XCTAssertEqual(slow.rePresented, 0)
+    }
+
+    /// Spec 4 §12 — before the first tick, build or present there is nothing to have missed.
+    func test_watchdogIgnoresWhatHasNotStarted() {
+        let tick: Int64 = 16_666_667
+        let fresh = LivenessReading(now: MonotonicTime(nanoseconds: 1_000_000_000_000), tickNanoseconds: tick,
+                                    lastPlanConsumed: MonotonicTime(nanoseconds: 0), lastPlanBuilt: MonotonicTime(nanoseconds: 0),
+                                    sinkLastPresent: [1: MonotonicTime(nanoseconds: 0)], queues: [])
+        XCTAssertEqual(Watchdog.check(fresh), [])
     }
 
     /// "DeckLink card unplugged or mode unsupported: Pause that sink" — and with

@@ -1,0 +1,500 @@
+{
+  "app": "0.1.0",
+  "author": "John Newton; Reginald Heber; Mary E. Byrne and Eleanor H. Hull; Horatio G. Spafford; Robert Robinson",
+  "ccli": "",
+  "copyright": "Public domain",
+  "cues": [
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "in": 500, "kind": "media", "loop": true, "out": 11500, "ref": "sha256:f1e1d0a1f1e1d0a1f1e1d0a1f1e1d0a1f1e1d0a1f1e1d0a1f1e1d0a1f1e1d0a1" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Amazing grace! how sweet the sound,\nThat saved a wretch like me!" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 1",
+      "note": "Amazing Grace, John Newton, 1779 (CCLI 22025). The ProRes background loops between its trims.",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "I once was lost, but now am found,\nWas blind, but now I see." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 2",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "'Twas grace that taught my heart to fear,\nAnd grace my fears relieved;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 3",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "How precious did that grace appear\nThe hour I first believed!" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 4",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000004"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Through many dangers, toils, and snares,\nI have already come;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 5",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000005"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "'Tis grace hath brought me safe thus far,\nAnd grace will lead me home." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Amazing Grace 6",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000006"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" }
+      ],
+      "label": "Amazing Grace out",
+      "note": "",
+      "section": "Amazing Grace",
+      "trigger": { "type": "go" },
+      "uuid": "ab010000-0000-4000-8000-000000000007"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "audioTransition": { "ref": 2, "scope": "once" },
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "in": 1000, "kind": "media", "loop": false, "out": 11000, "ref": "sha256:5c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a02" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Holy, holy, holy! Lord God Almighty!\nEarly in the morning our song shall rise to Thee;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Holy, Holy, Holy 1",
+      "note": "Holy, Holy, Holy, Reginald Heber, 1826 (CCLI 1156). A video-to-video dissolve to the HEVC background with sound, trimmed, held at its end.",
+      "section": "Holy, Holy, Holy",
+      "trigger": { "type": "go" },
+      "uuid": "ab020000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Holy, holy, holy! merciful and mighty!\nGod in three Persons, blessed Trinity!" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Holy, Holy, Holy 2",
+      "note": "",
+      "section": "Holy, Holy, Holy",
+      "trigger": { "type": "go" },
+      "uuid": "ab020000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Holy, holy, holy! all the saints adore Thee,\nCasting down their golden crowns around the glassy sea;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Holy, Holy, Holy 3",
+      "note": "",
+      "section": "Holy, Holy, Holy",
+      "trigger": { "type": "go" },
+      "uuid": "ab020000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Cherubim and seraphim falling down before Thee,\nWhich wert, and art, and evermore shalt be." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Holy, Holy, Holy 4",
+      "note": "",
+      "section": "Holy, Holy, Holy",
+      "trigger": { "type": "go" },
+      "uuid": "ab020000-0000-4000-8000-000000000004"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" }
+      ],
+      "label": "Holy, Holy, Holy out",
+      "note": "",
+      "section": "Holy, Holy, Holy",
+      "trigger": { "type": "go" },
+      "uuid": "ab020000-0000-4000-8000-000000000005"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "audioTransition": { "ref": 2, "scope": "once" },
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "gain": -6, "kind": "media", "loop": true, "ref": "sha256:a11e00a3a11e00a3a11e00a3a11e00a3a11e00a3a11e00a3a11e00a3a11e00a3" },
+          "grade": { "ms": 2000, "ref": 1, "scope": "once" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Be Thou my Vision, O Lord of my heart;\nNaught be all else to me, save that Thou art." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Be Thou My Vision 1",
+      "note": "Be Thou My Vision, Irish, Mary E. Byrne 1905 and Eleanor H. Hull 1912 (CCLI 30639). The 10-bit HEVC background loops with its sound 6 dB down; the grade rides in over two seconds (Spec 4 §15).",
+      "section": "Be Thou My Vision",
+      "trigger": { "type": "go" },
+      "uuid": "ab030000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Thou my best Thought, by day or by night,\nWaking or sleeping, Thy presence my light." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Be Thou My Vision 2",
+      "note": "",
+      "section": "Be Thou My Vision",
+      "trigger": { "type": "go" },
+      "uuid": "ab030000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Be Thou my Wisdom, and Thou my true Word;\nI ever with Thee and Thou with me, Lord;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Be Thou My Vision 3",
+      "note": "",
+      "section": "Be Thou My Vision",
+      "trigger": { "type": "go" },
+      "uuid": "ab030000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Thou my great Father, I Thy true son;\nThou in me dwelling, and I with Thee one." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Be Thou My Vision 4",
+      "note": "",
+      "section": "Be Thou My Vision",
+      "trigger": { "type": "go" },
+      "uuid": "ab030000-0000-4000-8000-000000000004"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" },
+        { "channel": 1, "cmd": "channel.grade", "ms": 2000, "ref": 0 }
+      ],
+      "label": "Be Thou My Vision out",
+      "note": "The grade rides out over two seconds.",
+      "section": "Be Thou My Vision",
+      "trigger": { "type": "go" },
+      "uuid": "ab030000-0000-4000-8000-000000000005"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "media", "loop": false, "ref": "sha256:11a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a4" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "When peace, like a river, attendeth my way,\nWhen sorrows like sea billows roll;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "It Is Well 1",
+      "note": "It Is Well with My Soul, Horatio G. Spafford, 1873 (CCLI 25376). The ProRes 4444 background with alpha, held at its end.",
+      "section": "It Is Well with My Soul",
+      "trigger": { "type": "go" },
+      "uuid": "ab040000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Whatever my lot, Thou hast taught me to say,\nIt is well, it is well with my soul." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "It Is Well 2",
+      "note": "",
+      "section": "It Is Well with My Soul",
+      "trigger": { "type": "go" },
+      "uuid": "ab040000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "It is well with my soul,\nIt is well, it is well with my soul." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "It Is Well refrain",
+      "note": "",
+      "section": "It Is Well with My Soul",
+      "trigger": { "type": "go" },
+      "uuid": "ab040000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" }
+      ],
+      "label": "It Is Well out",
+      "note": "",
+      "section": "It Is Well with My Soul",
+      "trigger": { "type": "go" },
+      "uuid": "ab040000-0000-4000-8000-000000000004"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "media", "loop": false, "ref": "sha256:c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06" },
+          "transition": { "ms": 1000, "ref": 2, "scope": "once" }
+        },
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Come, Thou Fount of every blessing,\nTune my heart to sing Thy grace;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Come Thou Fount 1",
+      "note": "Come, Thou Fount of Every Blessing, Robert Robinson, 1758 (CCLI 108389). A dissolve from video to the still.",
+      "section": "Come, Thou Fount of Every Blessing",
+      "trigger": { "type": "go" },
+      "uuid": "ab050000-0000-4000-8000-000000000001"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Streams of mercy, never ceasing,\nCall for songs of loudest praise." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Come Thou Fount 2",
+      "note": "",
+      "section": "Come, Thou Fount of Every Blessing",
+      "trigger": { "type": "go" },
+      "uuid": "ab050000-0000-4000-8000-000000000002"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Teach me some melodious sonnet,\nSung by flaming tongues above;" },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Come Thou Fount 3",
+      "note": "",
+      "section": "Come, Thou Fount of Every Blessing",
+      "trigger": { "type": "go" },
+      "uuid": "ab050000-0000-4000-8000-000000000003"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "channel": 2,
+          "cmd": "channel.write",
+          "content": {
+            "fields": { "body": "Praise the mount! I'm fixed upon it,\nMount of Thy redeeming love." },
+            "kind": "text"
+          }
+        }
+      ],
+      "label": "Come Thou Fount 4",
+      "note": "",
+      "section": "Come, Thou Fount of Every Blessing",
+      "trigger": { "type": "go" },
+      "uuid": "ab050000-0000-4000-8000-000000000004"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        { "channel": 2, "cmd": "channel.clear" }
+      ],
+      "label": "Come Thou Fount out",
+      "note": "",
+      "section": "Come, Thou Fount of Every Blessing",
+      "trigger": { "type": "go" },
+      "uuid": "ab050000-0000-4000-8000-000000000005"
+    },
+    {
+      "advanceAfterMs": null,
+      "commands": [
+        {
+          "audioTransition": { "ref": 1, "scope": "once" },
+          "channel": 1,
+          "cmd": "channel.write",
+          "content": { "kind": "media", "loop": false, "ref": "sha256:c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71" },
+          "transition": { "ref": 1, "scope": "once" }
+        }
+      ],
+      "label": "Clapper",
+      "note": "Spec 4 §15: A/V sync within one frame on a clapper fixture, measured on the capture. The flash is frame 30 and the click is at one second; a cut, so the capture has a clean start.",
+      "section": "Sync check",
+      "trigger": { "type": "go" },
+      "uuid": "ab060000-0000-4000-8000-000000000001"
+    }
+  ],
+  "kind": "list",
+  "number": 1,
+  "schema": 1,
+  "timeline": null,
+  "title": "Spike hymns",
+  "trackThrough": false,
+  "uuid": "a9f00000-0000-4000-8000-000000000001",
+  "version": 1
+}

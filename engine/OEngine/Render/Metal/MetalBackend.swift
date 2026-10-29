@@ -146,6 +146,50 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         }
     }
 
+    /// Spec 4 §7 — "compiled at launch into a small pipeline cache, so the
+    /// per-tick work is a pipeline lookup": every channel variant the layouts
+    /// can need (each as incoming, each pair as a dissolve or a fade, with and
+    /// without a grade), the box variants, the linearize pass and the encodes.
+    /// Returns how many pipelines exist afterwards.
+    @discardableResult
+    public func warmUp(layouts: [SourceLayout] = [.nv12, .p010, .yuv422p10, .rgba16, .linearRGBA16]) -> Int {
+        var count = 0
+        func ensure(_ variant: ChannelVariant) {
+            do {
+                try pipelines.ensureChannel(variant)
+                count += 1
+            } catch {
+                log.error("warm-up: channel pipeline \(variant): \(error)")
+            }
+        }
+        for grade in [false, true] {
+            for incoming in layouts {
+                ensure(ChannelVariant(incoming: incoming, outgoing: nil, transition: .cut, grade: grade))
+                for outgoing in layouts {
+                    for transition in [TransitionVariant.dissolve, .fadeThroughColor] {
+                        ensure(ChannelVariant(incoming: incoming, outgoing: outgoing, transition: transition, grade: grade))
+                    }
+                }
+            }
+            for outgoing in layouts {
+                for transition in [TransitionVariant.dissolve, .fadeThroughColor] {
+                    ensure(ChannelVariant(incoming: nil, outgoing: outgoing, transition: transition, grade: grade))
+                }
+            }
+            ensure(ChannelVariant(incoming: nil, outgoing: nil, transition: .cut, grade: grade))
+        }
+        for grade in [false, true] {
+            for gammaBlend in [false, true] {
+                do { try pipelines.ensureBox(BoxVariant(grade: grade, gammaBlend: gammaBlend)) } catch { log.error("warm-up: box pipeline: \(error)") }
+            }
+        }
+        do { try pipelines.ensureLinearize() } catch { log.error("warm-up: linearize: \(error)") }
+        for kind in [EncodeKind.display10Bit, .v210, .capture] {
+            do { try pipelines.ensureEncode(kind) } catch { log.error("warm-up: encode \(kind.rawValue): \(error)") }
+        }
+        return count
+    }
+
     static func variant(for pass: ChannelPass) -> ChannelVariant {
         let transition: TransitionVariant = pass.transition.map { BuiltInTransition($0.type).variant } ?? .cut
         let incoming: SourceLayout? = pass.grade.blur > 0 ? .linearRGBA16 : (pass.incoming.source == .none ? nil : pass.incoming.layout)

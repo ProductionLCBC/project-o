@@ -29,7 +29,8 @@ public final class TimerClock: MasterClock, @unchecked Sendable {
                 RealtimeThread.sleep(until: next)
                 guard self.running.load(ordering: .relaxed) else { break }
                 let now = MonotonicClock.now()
-                handler(TickTime(tick: tick, reference: MonotonicTime(nanoseconds: next), wake: now))
+                // A pool per tick: the Metal command buffers and encoders a tick makes are autoreleased.
+                autoreleasepool { handler(TickTime(tick: tick, reference: MonotonicTime(nanoseconds: next), wake: now)) }
                 tick += 1
                 next += period
                 // Never try to catch up more than a tick: late is late.
@@ -136,12 +137,15 @@ public final class TickScheduler: @unchecked Sendable {
                     let reference = MonotonicTime(nanoseconds: mailboxReference.load(ordering: .acquiring))
                     lastReference = reference
                     lastReferenceAt = now
-                    onTick(TickTime(tick: tick, reference: reference, wake: now))
+                    // A pool per tick: the Metal command buffers and encoders a tick makes are autoreleased
+                    // and a thread's own pool drains only when the thread ends.
+                    autoreleasepool { onTick(TickTime(tick: tick, reference: reference, wake: now)) }
                 } else {
                     // Spec 4 §2 — free-run one tick on the last reference, phase advanced.
                     freeRuns.add(1, ordering: .relaxed)
                     lastReference = lastReference.advanced(by: period)
-                    onTick(TickTime(tick: tick, reference: lastReference, wake: now))
+                    let reference = lastReference
+                    autoreleasepool { onTick(TickTime(tick: tick, reference: reference, wake: now)) }
                     if now - lastReferenceAt > TickScheduler.fallbackAfterNs {
                         fallBack()
                         lastReferenceAt = now

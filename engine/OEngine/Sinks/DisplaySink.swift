@@ -18,6 +18,19 @@ public struct DisplaySinkState: Equatable, Sendable {
     public var rePresented: Int64 = 0
     public var drops: Int64 = 0
     public var lastPresentedTick: Int64 = -1
+    /// Spec 4 §10 — the master tick a refresh is one frame behind: latched one
+    /// frame behind the newest published frame at the first refresh, then
+    /// stepped by the master time between refreshes. The sink's vsync callback
+    /// and the render thread race on the same vsync; without this the race,
+    /// not the clock, would decide whether a frame shows once, twice or not at all.
+    public var expectedTick: Int64 = -1
+    public var tickPhase: Double = 0
+    /// Ticks per presented frame of this output (Spec 4 §2 pacing).
+    public var ticksPerFrame: Int = 1
+    /// True when the screen refreshes no faster than the output: then a
+    /// refresh with nothing new to show is a re-present (Spec 4 §13), not the
+    /// hold by design of a slower output on a faster screen.
+    public var screenMatchesOutput = true
 
     public init() {}
 
@@ -30,18 +43,51 @@ public struct DisplaySinkState: Equatable, Sendable {
         }
     }
 
-    /// What a refresh should do with the newest completed frame of tick `tick`.
-    public enum Action: Equatable, Sendable { case present, rePresent, skip }
+    /// What a refresh should do: present the frame of a tick, show the previous
+    /// one again (counted), hold it without counting, or nothing (not running).
+    public enum Action: Equatable, Sendable { case present(Int64), rePresent, hold, skip }
 
-    public mutating func refresh(newestCompletedTick: Int64?) -> Action {
+    /// One refresh. `newestPublished` is the ring's newest frame, maybe still
+    /// on the GPU; `elapsedTicks` the master ticks since the previous refresh;
+    /// `isComplete` whether the frame of a tick is in the ring and finished.
+    public mutating func refresh(newestPublished: Int64?, elapsedTicks: Double, isComplete: (Int64) -> Bool) -> Action {
         guard phase == .running else { return .skip }
-        guard let tick = newestCompletedTick, tick != lastPresentedTick else {
-            if lastPresentedTick >= 0 { rePresented += 1 }
-            return .rePresent
+        guard let newest = newestPublished, newest >= 0 else { return .hold }
+        let perFrame = Int64(max(1, ticksPerFrame))
+        if expectedTick < 0 && lastPresentedTick < 0 {
+            // The first refresh with a frame: latch one frame behind it, even if that is before the first tick.
+            expectedTick = newest - perFrame
+            tickPhase = 0
+        } else {
+            // Rounded to the nearest tick, so vsync timestamp jitter never loses or doubles a step.
+            tickPhase += max(0, elapsedTicks)
+            let steps = Int64(tickPhase.rounded(.toNearestOrAwayFromZero))
+            tickPhase -= Double(steps)
+            expectedTick += steps
         }
-        lastPresentedTick = tick
-        presented += 1
-        return .present
+        // The ring holds three frames: ahead of the master (unlocked drift, a missed
+        // tick) take what there is; far behind it (the sink's thread was starved) catch up.
+        if expectedTick > newest { expectedTick = newest }
+        if expectedTick < newest - 2 * perFrame { expectedTick = newest - perFrame }
+        let due = expectedTick >= 0 ? expectedTick - expectedTick % perFrame : -1
+        guard due > lastPresentedTick else {
+            if screenMatchesOutput {
+                if lastPresentedTick >= 0 { rePresented += 1 }
+                return .rePresent
+            }
+            return .hold
+        }
+        var tick = due
+        while tick > lastPresentedTick, tick > due - 3 * perFrame {
+            if isComplete(tick) {
+                lastPresentedTick = tick
+                presented += 1
+                return .present(tick)
+            }
+            tick -= perFrame
+        }
+        if lastPresentedTick >= 0 { rePresented += 1 }
+        return .rePresent
     }
 
     public mutating func dropped() {
@@ -72,6 +118,9 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     private let screenName: String
     private let screenFrame: CGRect
     private let screenScale: CGFloat
+    private let screenRefreshRate: Double
+    private var masterRate = FrameRate(num: 60)
+    private var lastRefreshTimestamp: CFTimeInterval = 0
     private let makeLink: @MainActor (DisplaySink) -> CADisplayLink
     private let lastPresentNs = Atomic<Int64>(0)
     private let lock = NSLock()
@@ -93,9 +142,21 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
         screenName = screen.localizedName
         screenFrame = screen.frame
         screenScale = screen.backingScaleFactor
+        screenRefreshRate = screen.maximumFramesPerSecond > 0 ? Double(screen.maximumFramesPerSecond) : 60
         makeLink = { sink in screen.displayLink(target: sink, selector: #selector(DisplaySink.refresh(_:))) }
         queue = backend.device.makeCommandQueue()
         super.init()
+    }
+
+    /// Spec 4 §2 — the master rate and this output's ticks per frame, from the
+    /// engine's pacing, so a refresh knows which tick it is one frame behind.
+    public func configure(masterRate: FrameRate, ticksPerFrame: Int) {
+        lock.lock()
+        self.masterRate = masterRate
+        state.ticksPerFrame = max(1, ticksPerFrame)
+        let outputRate = masterRate.perSecond / Double(max(1, ticksPerFrame))
+        state.screenMatchesOutput = screenRefreshRate <= outputRate * 1.01
+        lock.unlock()
     }
 
     public var lastPresent: MonotonicTime { MonotonicTime(nanoseconds: lastPresentNs.load(ordering: .acquiring)) }
@@ -202,26 +263,40 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     // MARK: - Refresh (the sink's own cadence)
 
     @objc func refresh(_ link: CADisplayLink) {
+        // The drawable and the command buffer are autoreleased: a pool per refresh.
+        autoreleasepool { refreshInPool(link) }
+    }
+
+    private func refreshInPool(_ link: CADisplayLink) {
         guard let layer, let queue else { return }
-        let newest = ring.newest
-        let completed = newest.flatMap { frame -> CompletedFrame? in
-            guard let completion = backend.completion(of: frame.receipt), !completion.failed else { return nil }
-            return frame
+        let ring = self.ring
+        let backend = self.backend
+        let isComplete: (Int64) -> Bool = { tick in
+            guard let frame = ring.frame(forTick: tick), let completion = backend.completion(of: frame.receipt) else { return false }
+            return !completion.failed
         }
         lock.lock()
-        let action = state.refresh(newestCompletedTick: completed?.tick)
+        let elapsedTicks = lastRefreshTimestamp > 0 ? (link.timestamp - lastRefreshTimestamp) * masterRate.perSecond : 1
+        lastRefreshTimestamp = link.timestamp
+        let action = state.refresh(newestPublished: ring.newest?.tick, elapsedTicks: elapsedTicks, isComplete: isComplete)
+        let lastTick = state.lastPresentedTick
         lock.unlock()
         let now = MonotonicClock.now()
         switch action {
         case .skip:
             return
-        case .rePresent:
-            // The previous drawable stays on screen; count it (Spec 4 §13).
-            presents.write(PresentRecord(output: output, frame: completed?.tick ?? -1, rePresented: true, latencyNs: 0, completion: nil,
-                                         dropsSinceStart: currentState.drops))
+        case .hold:
+            // Nothing new was due (a slower output on a faster screen): alive, not counted.
             lastPresentNs.store(now.nanoseconds, ordering: .releasing)
-        case .present:
-            guard let frame = completed, let drawable = layer.nextDrawable() else {
+        case .rePresent:
+            // The previous drawable stays on screen; count it (Spec 4 §13) once there is one.
+            if lastTick >= 0 {
+                presents.write(PresentRecord(output: output, frame: lastTick, rePresented: true, latencyNs: 0, completion: nil,
+                                             dropsSinceStart: currentState.drops))
+            }
+            lastPresentNs.store(now.nanoseconds, ordering: .releasing)
+        case .present(let tick):
+            guard let frame = ring.frame(forTick: tick), let drawable = layer.nextDrawable() else {
                 lock.lock()
                 state.dropped()
                 lock.unlock()

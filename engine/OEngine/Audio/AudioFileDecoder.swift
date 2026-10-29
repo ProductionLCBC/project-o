@@ -93,7 +93,7 @@ public final class AudioFileDecoder: @unchecked Sendable {
                     continue
                 }
             }
-            guard let sample = current.1.copyNextSampleBuffer() else {
+            guard let sample = autoreleasepool(invoking: { current.1.copyNextSampleBuffer() }) else {
                 if loop {
                     current.0.cancelReading()
                     do {
@@ -107,7 +107,7 @@ public final class AudioFileDecoder: @unchecked Sendable {
                 ring.markEnded()
                 break
             }
-            pending = AudioFileDecoder.samples(of: sample)
+            pending = autoreleasepool { AudioFileDecoder.samples(of: sample) }
             framesDecoded.add(Int64(pending.count / channels), ordering: .relaxed)
         }
         current.0.cancelReading()

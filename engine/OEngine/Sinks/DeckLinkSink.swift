@@ -73,7 +73,7 @@ public final class DeckLinkClock: MasterClock, @unchecked Sendable {
                 RealtimeThread.sleep(until: MonotonicClock.now().nanoseconds + offset)
                 guard running.load(ordering: .relaxed) else { break }
                 let reference = now()
-                handler(TickTime(tick: tick, reference: reference, wake: MonotonicClock.now()))
+                autoreleasepool { handler(TickTime(tick: tick, reference: reference, wake: MonotonicClock.now())) }
                 tick += 1
                 target += period
                 if reference.nanoseconds > target + period { target = reference.nanoseconds + period }

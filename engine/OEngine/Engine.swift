@@ -36,6 +36,9 @@ public final class Engine: @unchecked Sendable {
     public private(set) var recoveries: Int64 = 0
 
     public let audio: AudioGraph?
+    /// Called on the control thread after every plan is built: the process
+    /// derives OSC feedback from what ran (Spec 2 §6).
+    public var afterBuild: (@Sendable (ControlLoop) -> Void)?
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
@@ -49,7 +52,11 @@ public final class Engine: @unchecked Sendable {
         self.fallbackClocks = fallbackClocks
         self.log = log
         var byOutput: [Int: any OutputSink] = [:]
-        for sink in sinks { byOutput[sink.output] = sink }
+        for sink in sinks {
+            byOutput[sink.output] = sink
+            // Spec 4 §10 — a display sink refreshes one frame behind the master tick it can name.
+            (sink as? DisplaySink)?.configure(masterRate: pacing.masterRate, ticksPerFrame: pacing.ticksPerFrame(output: sink.output))
+        }
         self.sinks = byOutput
         let capacity = max(8, library.channels.count * 4)
         sources = SourceTable(capacity: capacity)
@@ -75,6 +82,7 @@ public final class Engine: @unchecked Sendable {
         if buildPlan {
             recoverIfNeeded()
             planRing.publish(control.build(for: time.tick, now: time.reference))
+            afterBuild?(control)
         }
         render.tick(time)
     }
@@ -111,8 +119,17 @@ public final class Engine: @unchecked Sendable {
                 controlSignal.wait()
                 guard running.load(ordering: .relaxed) else { break }
                 let frame = nextFrameToBuild.load(ordering: .acquiring)
-                recoverIfNeeded()
-                planRing.publish(control.build(for: frame, now: clock.now()))
+                autoreleasepool {
+                    recoverIfNeeded()
+                    let started = MonotonicClock.now()
+                    planRing.publish(control.build(for: frame, now: clock.now()))
+                    afterBuild?(control)
+                    let took = MonotonicClock.now() - started
+                    if took > pacing.tickNanoseconds {
+                        // Spec 4 §3 — a build past the tick means the render thread reused a plan; say which one.
+                        log.warning("control build for frame \(frame) took \(took / 1_000_000) ms")
+                    }
+                }
             }
         }
         controlThread.name = "o.engine.control"
@@ -146,9 +163,13 @@ public final class Engine: @unchecked Sendable {
             // Spec 4 §12 — the readback thread refreshes each output's CPU copy about once a second.
             let readback = Thread { [self] in
                 while running.load(ordering: .relaxed) {
-                    for (output, sink) in sinks {
-                        if let frame = sink.ring.newest, metal.completion(of: frame.receipt) != nil {
-                            metal.refreshLastGood(output: output, stack: frame.stack)
+                    // A pool per pass: the blit's command buffer and staging buffer are autoreleased
+                    // (without this the first three-minute soak grew by 1.7 GB a minute).
+                    autoreleasepool {
+                        for (output, sink) in sinks {
+                            if let frame = sink.ring.newest, metal.completion(of: frame.receipt) != nil {
+                                metal.refreshLastGood(output: output, stack: frame.stack)
+                            }
                         }
                     }
                     Thread.sleep(forTimeInterval: 1)
@@ -177,15 +198,13 @@ public final class Engine: @unchecked Sendable {
 
     public var isRunning: Bool { running.load(ordering: .relaxed) }
 
-    /// Spec 4 §12 — what the watchdog reads.
+    /// Spec 4 §12 — what the watchdog reads, on its own thread: atomics only,
+    /// never the control thread's tables (a dictionary read during a build
+    /// crashed the first three-minute soak).
     public func livenessReading(now: MonotonicTime) -> LivenessReading {
         var queues: [QueueReading] = []
-        for channel in library.channels {
-            for handle in control.handles(onChannel: channel.number) {
-                if let source = sources.source(handle) {
-                    queues.append(QueueReading(name: "decode:\(channel.number)", depth: source.queueDepth, capacity: 4))
-                }
-            }
+        for (index, depth) in render.lastQueueDepths.enumerated() {
+            queues.append(QueueReading(name: "decode:\(index + 1)", depth: depth, capacity: 4))
         }
         queues.append(QueueReading(name: "metrics", depth: Int(metrics.unread), capacity: metrics.capacity))
         // Spec 4 §12 — a paused or unavailable sink is not expected to present.

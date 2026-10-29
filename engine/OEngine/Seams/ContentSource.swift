@@ -2,6 +2,7 @@
 
 import Foundation
 import OCore
+import Synchronization
 
 /// Spec 4 §6 — "Every content kind is a `ContentSource`: something that, asked
 /// for tick N, returns the texture (or textures) to sample, or reports that it
@@ -130,13 +131,20 @@ public final class SourceTable: @unchecked Sendable {
         slots.deallocate()
     }
 
+    private let live = Atomic<Int>(0)
+
+    /// Spec 4 §13 — "decoder sessions alive", for the minute record.
+    public var liveCount: Int { live.load(ordering: .relaxed) }
+
     public func install(_ source: any ContentSource, at handle: InstanceHandle) {
         guard handle.rawValue >= 0, Int(handle.rawValue) < capacity else { return }
+        if slots[Int(handle.rawValue)] == nil { live.add(1, ordering: .relaxed) }
         slots[Int(handle.rawValue)] = source
     }
 
     public func remove(_ handle: InstanceHandle) {
         guard handle.rawValue >= 0, Int(handle.rawValue) < capacity else { return }
+        if slots[Int(handle.rawValue)] != nil { live.subtract(1, ordering: .relaxed) }
         slots[Int(handle.rawValue)] = nil
     }
 
