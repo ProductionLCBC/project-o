@@ -59,7 +59,7 @@ public final class HeadlessEngine: @unchecked Sendable {
             // The harness presents on the test's thread, so it can wait for the GPU here.
             sink.isComplete = { [metal] receipt in
                 metal.waitForCompletion(of: receipt)
-                return metal.completion(of: receipt) != nil
+                return metal.completion(of: receipt).map { !$0.failed } ?? false
             }
             sink.capture = { [metal] frame in
                 metal.readbackCapture(output: sink.output)
@@ -83,7 +83,8 @@ public final class HeadlessEngine: @unchecked Sendable {
                             variables: variables, log: EngineLog(category: "harness"))
         let backendRef = backend
         for sink in sinks.values {
-            sink.isComplete = { receipt in backendRef.completion(of: receipt) != nil }
+            // Spec 4 §12 — a frame whose GPU work failed is never presented; the previous one holds.
+            sink.isComplete = { receipt in backendRef.completion(of: receipt).map { !$0.failed } ?? false }
         }
         clock.start(rate: engine.pacing.masterRate) { [weak self] time in self?.handleTick(time) }
     }

@@ -48,10 +48,15 @@ public protocol RenderBackend: AnyObject, Sendable {
     /// Harness: planes of one source layout from raw bytes, as a decoder would
     /// hand them over, so the colour tests can feed known code values.
     func makePlanes(layout: SourceLayout, size: PixelSize, planes: [Data]) -> PickedFrame?
+
+    /// Spec 4 §12 — after a command buffer error: "rebuild pipelines and
+    /// heaps; resume". Control side, never the render thread.
+    func rebuild()
 }
 
 extension RenderBackend {
     public func prepare(_ plan: FramePlan) {}
+    public func rebuild() {}
     public func readback(_ handle: TextureHandle) -> CapturedFrame? { nil }
     public func makeStill(_ frame: CapturedFrame, label: String) -> TextureHandle {
         makeTexture(TextureDescriptor(role: .still, size: PixelSize(width: frame.width, height: frame.height), label: label))

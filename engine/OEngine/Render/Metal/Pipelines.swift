@@ -108,6 +108,34 @@ final class PipelineCache: @unchecked Sendable {
 
     // MARK: - Control side compiles
 
+    /// Spec 4 §12 — drop every pipeline so the next `prepare` recompiles them.
+    func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        for i in 0..<ChannelVariant.count { channel[i] = nil }
+        for i in 0..<BoxVariant.count { box[i] = nil }
+        blur = [nil, nil]
+        encode = [:]
+        linearize = nil
+        v210 = nil
+        try? compileBlurLocked()
+    }
+
+    private func compileBlurLocked() throws {
+        for vertical in [false, true] where blur[vertical ? 1 : 0] == nil {
+            let constants = MTLFunctionConstantValues()
+            var direction: Int32 = vertical ? 1 : 0
+            constants.setConstantValue(&direction, type: .int, index: 0)
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.label = vertical ? "blur vertical" : "blur horizontal"
+            descriptor.vertexFunction = try library.makeFunction(name: "blurVertex", constantValues: constants)
+            descriptor.fragmentFunction = try library.makeFunction(name: "blurFragment", constantValues: constants)
+            descriptor.colorAttachments[0].pixelFormat = .rgba16Float
+            blur[vertical ? 1 : 0] = try device.makeRenderPipelineState(descriptor: descriptor)
+            compiled += 1
+        }
+    }
+
     /// Make sure the channel variant exists; compiles on the caller's thread.
     func ensureChannel(_ variant: ChannelVariant) throws {
         if channel[variant.index] != nil { return }
@@ -135,18 +163,7 @@ final class PipelineCache: @unchecked Sendable {
     func ensureBlur() throws {
         lock.lock()
         defer { lock.unlock() }
-        for vertical in [false, true] where blur[vertical ? 1 : 0] == nil {
-            let constants = MTLFunctionConstantValues()
-            var direction: Int32 = vertical ? 1 : 0
-            constants.setConstantValue(&direction, type: .int, index: 0)
-            let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.label = vertical ? "blur vertical" : "blur horizontal"
-            descriptor.vertexFunction = try library.makeFunction(name: "blurVertex", constantValues: constants)
-            descriptor.fragmentFunction = try library.makeFunction(name: "blurFragment", constantValues: constants)
-            descriptor.colorAttachments[0].pixelFormat = .rgba16Float
-            blur[vertical ? 1 : 0] = try device.makeRenderPipelineState(descriptor: descriptor)
-            compiled += 1
-        }
+        try compileBlurLocked()
     }
 
     /// Spec 4 §9 — the box shader with premultiplied over-blending in linear light.

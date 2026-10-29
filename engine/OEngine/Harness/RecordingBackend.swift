@@ -35,6 +35,7 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
     public var simulatedGPUMilliseconds: Double = 3
     public var failNextCompletion = false
     public private(set) var encoded: [EncodedTick] = []
+    public private(set) var rebuilds = 0
     private var completions: [Int64: GPUCompletion] = [:]
     private var nextToken: Int64 = 1
     private let lock = NSLock()
@@ -70,6 +71,12 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
     public func reset() {
         lock.lock()
         encoded.removeAll()
+        lock.unlock()
+    }
+
+    public func rebuild() {
+        lock.lock()
+        rebuilds += 1
         lock.unlock()
     }
 }

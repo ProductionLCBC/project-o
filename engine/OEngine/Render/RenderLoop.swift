@@ -49,6 +49,8 @@ public final class RenderLoop: @unchecked Sendable {
     private let consumedAt = Atomic<Int64>(0)
     private let ticksRun = Atomic<Int64>(0)
     private let repeats = Atomic<Int64>(0)
+    private let gpuFailureFlag = Atomic<Bool>(false)
+    private let gpuFailureCount = Atomic<Int64>(0)
 
     public init(backend: any RenderBackend, planRing: PlanRing, sources: SourceTable, sinks: [Int: any OutputSink],
                 metrics: MetricsRing, pacing: Pacing, maxChannelPasses: Int = 32) {
@@ -66,6 +68,13 @@ public final class RenderLoop: @unchecked Sendable {
     public var lastConsumedTick: Int64 { consumedTick.load(ordering: .acquiring) }
     public var totalTicks: Int64 { ticksRun.load(ordering: .relaxed) }
     public var totalRepeats: Int64 { repeats.load(ordering: .relaxed) }
+    public var gpuFailures: Int64 { gpuFailureCount.load(ordering: .relaxed) }
+
+    /// Spec 4 §12 — "Failures are detected on the render thread and recovered
+    /// on another": the control side takes the flag and rebuilds.
+    public func takeGPUFailure() -> Bool {
+        gpuFailureFlag.exchange(false, ordering: .acquiringAndReleasing)
+    }
 
     /// Spec 4 §4 — one tick, in the spec's order.
     public func tick(_ time: TickTime) {
@@ -91,6 +100,11 @@ public final class RenderLoop: @unchecked Sendable {
         if let receipt = previousReceipt, let completion = backend.completion(of: receipt) {
             lastCompletion = completion
             pressure.observe(completion, budgetNs: pacing.gpuBudgetNanoseconds)
+            if completion.failed {
+                // Spec 4 §12 — detected here, recovered on the control thread.
+                gpuFailureFlag.store(true, ordering: .releasing)
+                gpuFailureCount.add(1, ordering: .relaxed)
+            }
         }
 
         // 2. Pick the decoded frame for this tick from each instance's queue.

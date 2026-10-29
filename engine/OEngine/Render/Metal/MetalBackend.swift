@@ -32,8 +32,11 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     /// Spec 4 §5 — a box samples a mip chain only on ticks it was generated.
     private let samplerWithMips: MTLSamplerState?
     private let samplerLevelZero: MTLSamplerState?
+    let v210Rings = V210Rings()
+    let lastGood = LastGoodFrames()
     public private(set) var missingPipelineCount = 0
     public private(set) var snapshotCount = 0
+    public internal(set) var rebuildCount = 0
 
     /// Whether a Metal device exists on this machine.
     public static var isAvailable: Bool { MTLCreateSystemDefaultDevice() != nil }
@@ -433,13 +436,19 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     }
 
     private func encodeSink(_ pass: SinkPass, into buffer: MTLCommandBuffer) {
-        // Spec 4 §10 — the display and DeckLink sinks encode on their own threads from the
-        // output's ring; the capture sink of the harness is served here by the encode pass
-        // into its capture texture (checkpoint 4 wires the hardware sinks).
-        guard pass.encode == .capture, let stack = texture(pass.stack),
-              let target = captureTargets.target(output: pass.output, size: PixelSize(width: stack.width, height: stack.height), device: device),
-              let pipeline = pipelines.encodePipeline(.capture) else { return }
-        encodeMix(pass, stack: stack, target: target, pipeline: pipeline, into: buffer)
+        switch pass.encode {
+        case .display10Bit:
+            // Spec 4 §10 — the display sink encodes into its drawable on its own thread.
+            break
+        case .v210:
+            // Spec 4 §10 — v210 into the DeckLink ring's shared buffer, scheduled by the sink's thread.
+            encodeV210(pass, into: buffer)
+        case .capture:
+            guard let stack = texture(pass.stack),
+                  let target = captureTargets.target(output: pass.output, size: PixelSize(width: stack.width, height: stack.height), device: device),
+                  let pipeline = pipelines.encodePipeline(.capture) else { return }
+            encodeMix(pass, stack: stack, target: target, pipeline: pipeline, into: buffer)
+        }
     }
 
     let captureTargets = CaptureTargets()
