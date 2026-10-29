@@ -48,9 +48,9 @@ public struct CompressedSample: @unchecked Sendable {
     public var presentationMs: Double
     public var durationMs: Double
     public var isKeyframe: Bool
-    public var payload: AnyObject
+    public var payload: Any
 
-    public init(presentationMs: Double, durationMs: Double, isKeyframe: Bool, payload: AnyObject) {
+    public init(presentationMs: Double, durationMs: Double, isKeyframe: Bool, payload: Any) {
         self.presentationMs = presentationMs
         self.durationMs = durationMs
         self.isKeyframe = isKeyframe

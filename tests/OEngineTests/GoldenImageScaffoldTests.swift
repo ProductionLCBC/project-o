@@ -19,12 +19,26 @@ final class GoldenImageScaffoldTests: XCTestCase {
     func test_pngRoundTripKeepsEveryPixelWithinEightBitPrecision() throws {
         let frame = gradient(width: 16, height: 8)
         let png = try GoldenImage.png(from: frame)
+        XCTAssertNil(try GoldenImage.alphaPNG(from: frame), "an opaque frame needs no alpha file")
         let back = try GoldenImage.frame(fromPNG: png)
         XCTAssertEqual(back.width, 16)
         XCTAssertEqual(back.height, 8)
         let diff = GoldenImage.compare(frame, back)
         XCTAssertLessThanOrEqual(diff.maxCodeDifference, 1)
         XCTAssertLessThanOrEqual(diff.meanCodeDifference, 0.5)
+    }
+
+    func test_semiTransparentFramesRoundTripThroughTheAlphaFile() throws {
+        var frame = gradient(width: 16, height: 8)
+        for i in 0..<frame.pixels.count {
+            let a: Float = 0.3
+            frame.pixels[i] = LinearPixel(r: frame.pixels[i].r * a, g: frame.pixels[i].g * a, b: frame.pixels[i].b * a, a: a)
+        }
+        let alpha = try XCTUnwrap(try GoldenImage.alphaPNG(from: frame))
+        let back = try GoldenImage.frame(fromPNG: try GoldenImage.png(from: frame), alpha: alpha)
+        let diff = GoldenImage.compare(frame, back)
+        XCTAssertLessThanOrEqual(diff.maxCodeDifference, 1, "no un-premultiply on the way through the file")
+        XCTAssertEqual(back[3, 3].a, 0.3, accuracy: 0.003)
     }
 
     func test_compareReportsTheWorstPixel() {

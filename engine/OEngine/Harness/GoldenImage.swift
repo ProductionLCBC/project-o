@@ -91,22 +91,36 @@ public enum GoldenImage {
 
     // MARK: - PNG
 
-    /// A frame as an 8-bit sRGB PNG with premultiplied alpha.
+    /// A frame's premultiplied colour as an opaque 8-bit sRGB PNG: the
+    /// picture as it would look over black. PNG stores straight alpha, and
+    /// un-premultiplying at low alpha amplifies rounding, so alpha travels in
+    /// its own grayscale PNG (`alphaPNG`) and the colour stays exact.
     public static func png(from frame: CapturedFrame) throws -> Data {
-        var bytes = [UInt8](repeating: 0, count: frame.width * frame.height * 4)
+        var bytes = [UInt8](repeating: 255, count: frame.width * frame.height * 4)
         for i in 0..<frame.pixels.count {
             let c = codes(frame.pixels[i])
             bytes[i * 4] = UInt8(c.0)
             bytes[i * 4 + 1] = UInt8(c.1)
             bytes[i * 4 + 2] = UInt8(c.2)
-            bytes[i * 4 + 3] = UInt8(c.3)
         }
+        return try encodePNG(bytes: bytes, width: frame.width, height: frame.height, bitsPerPixel: 32, bytesPerPixel: 4,
+                             space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue))
+    }
+
+    /// The frame's alpha as an 8-bit grayscale PNG, or nil when it is all opaque.
+    public static func alphaPNG(from frame: CapturedFrame) throws -> Data? {
+        guard frame.pixels.contains(where: { $0.a < 0.998 }) else { return nil }
+        let bytes = frame.pixels.map { UInt8(code($0.a)) }
+        return try encodePNG(bytes: bytes, width: frame.width, height: frame.height, bitsPerPixel: 8, bytesPerPixel: 1,
+                             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue))
+    }
+
+    static func encodePNG(bytes: [UInt8], width: Int, height: Int, bitsPerPixel: Int, bytesPerPixel: Int, space: CGColorSpace, bitmapInfo: CGBitmapInfo) throws -> Data {
         let data = Data(bytes)
         guard let provider = CGDataProvider(data: data as CFData),
-              let image = CGImage(width: frame.width, height: frame.height, bitsPerComponent: 8, bitsPerPixel: 32,
-                                  bytesPerRow: frame.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                                  provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: bitsPerPixel, bytesPerRow: width * bytesPerPixel,
+                                  space: space, bitmapInfo: bitmapInfo, provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
             throw GoldenError.encodeFailed
         }
         let out = NSMutableData()
@@ -118,24 +132,37 @@ public enum GoldenImage {
         return out as Data
     }
 
-    public static func frame(fromPNG data: Data) throws -> CapturedFrame {
+    static func decodePNG(_ data: Data, gray: Bool) throws -> (width: Int, height: Int, bytes: [UInt8]) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw GoldenError.decodeFailed }
         let width = image.width
         let height = image.height
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let bytesPerPixel = gray ? 1 : 4
+        var bytes = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
         let drawn = bytes.withUnsafeMutableBytes { raw -> Bool in
-            guard let context = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                          space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            let space = gray ? CGColorSpaceCreateDeviceGray() : (CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB())
+            let info = gray ? CGImageAlphaInfo.none.rawValue : CGImageAlphaInfo.noneSkipLast.rawValue
+            guard let context = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * bytesPerPixel,
+                                          space: space, bitmapInfo: info) else { return false }
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
         guard drawn else { throw GoldenError.decodeFailed }
-        var frame = CapturedFrame(width: width, height: height)
-        for i in 0..<(width * height) {
-            frame.pixels[i] = LinearPixel(r: srgbDecode(Float(bytes[i * 4]) / 255), g: srgbDecode(Float(bytes[i * 4 + 1]) / 255),
-                                          b: srgbDecode(Float(bytes[i * 4 + 2]) / 255), a: Float(bytes[i * 4 + 3]) / 255)
+        return (width, height, bytes)
+    }
+
+    /// A frame from its colour PNG and, when there is one, its alpha PNG.
+    public static func frame(fromPNG data: Data, alpha: Data? = nil) throws -> CapturedFrame {
+        let colour = try decodePNG(data, gray: false)
+        var frame = CapturedFrame(width: colour.width, height: colour.height)
+        for i in 0..<(colour.width * colour.height) {
+            frame.pixels[i] = LinearPixel(r: srgbDecode(Float(colour.bytes[i * 4]) / 255), g: srgbDecode(Float(colour.bytes[i * 4 + 1]) / 255),
+                                          b: srgbDecode(Float(colour.bytes[i * 4 + 2]) / 255), a: 1)
+        }
+        if let alpha {
+            let mask = try decodePNG(alpha, gray: true)
+            guard mask.width == colour.width, mask.height == colour.height else { throw GoldenError.decodeFailed }
+            for i in 0..<frame.pixels.count { frame.pixels[i].a = Float(mask.bytes[i]) / 255 }
         }
         return frame
     }
@@ -206,13 +233,19 @@ public struct GoldenStore: Sendable {
 
     public func check(_ name: String, _ frame: CapturedFrame, tolerance: GoldenTolerance? = nil) throws -> GoldenCheck {
         let url = folder.appendingPathComponent(name + ".png")
+        let alphaURL = folder.appendingPathComponent(name + ".alpha.png")
         if update {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try GoldenImage.png(from: frame).write(to: url)
+            if let alpha = try GoldenImage.alphaPNG(from: frame) {
+                try alpha.write(to: alphaURL)
+            } else {
+                try? FileManager.default.removeItem(at: alphaURL)
+            }
             return .written
         }
         guard let data = FileManager.default.contents(atPath: url.path) else { return .missing }
-        let golden = try GoldenImage.frame(fromPNG: data)
+        let golden = try GoldenImage.frame(fromPNG: data, alpha: FileManager.default.contents(atPath: alphaURL.path))
         let diff = GoldenImage.compare(golden, frame)
         if diff.isWithin(tolerance ?? self.tolerance) { return .matched }
         let diffURL = folder.appendingPathComponent(name + ".golden-diff.png")

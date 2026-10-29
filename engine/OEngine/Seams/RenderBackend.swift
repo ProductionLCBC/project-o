@@ -31,6 +31,32 @@ public protocol RenderBackend: AnyObject, Sendable {
     /// buffers completed; nil while they are in flight. Polled, never waited
     /// for (Spec 4 §3: the render thread never waits on anyone).
     func completion(of receipt: EncodeReceipt) -> GPUCompletion?
+
+    /// Spec 4 §7 — "compiled at launch into a small pipeline cache": the
+    /// control thread makes sure every variant a plan needs exists before the
+    /// plan is published, so the render thread never compiles.
+    func prepare(_ plan: FramePlan)
+
+    /// Harness and control side only: the pixels of a texture, after waiting
+    /// for the GPU. Nil when the backend has no pixels to give.
+    func readback(_ handle: TextureHandle) -> CapturedFrame?
+
+    /// Harness and control side: a texture holding premultiplied linear
+    /// pixels, as a still source or a golden input.
+    func makeStill(_ frame: CapturedFrame, label: String) -> TextureHandle
+
+    /// Harness: planes of one source layout from raw bytes, as a decoder would
+    /// hand them over, so the colour tests can feed known code values.
+    func makePlanes(layout: SourceLayout, size: PixelSize, planes: [Data]) -> PickedFrame?
+}
+
+extension RenderBackend {
+    public func prepare(_ plan: FramePlan) {}
+    public func readback(_ handle: TextureHandle) -> CapturedFrame? { nil }
+    public func makeStill(_ frame: CapturedFrame, label: String) -> TextureHandle {
+        makeTexture(TextureDescriptor(role: .still, size: PixelSize(width: frame.width, height: frame.height), label: label))
+    }
+    public func makePlanes(layout: SourceLayout, size: PixelSize, planes: [Data]) -> PickedFrame? { nil }
 }
 
 /// Spec 4 §5 — the roles a texture can have, each with the minimum usage

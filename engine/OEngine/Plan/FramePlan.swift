@@ -4,10 +4,11 @@ import Foundation
 import OCore
 
 /// Spec 4 §7 stage 1 — the source layouts the channel shader is specialised
-/// for: "NV12, P010, 4:2:2 10-bit, RGBA16, still". `linearRGBA16` is finished
-/// channel pixels (a snapshot, a still already converted): no stage 1 and no
-/// stage 2. `bgra8sRGB` is a poster or text texture the GPU linearizes on
-/// sample.
+/// for: "NV12, P010, 4:2:2 10-bit, RGBA16, still". `linearRGBA16` is a still
+/// already converted to premultiplied linear light (stage 2 still applies);
+/// `bgra8sRGB` is a poster or text texture the GPU linearizes on sample;
+/// `finished` is channel pixels as rendered (a snapshot): no stage 1, no
+/// stage 2.
 public enum SourceLayout: String, Codable, Sendable {
     case nv12
     case p010
@@ -15,13 +16,14 @@ public enum SourceLayout: String, Codable, Sendable {
     case rgba16
     case linearRGBA16
     case bgra8sRGB
+    case finished
 
     /// Spec 4 §7 — "For YCbCr sources: matrix ... range expansion ... then the
     /// transfer function."
     public var isYCbCr: Bool {
         switch self {
         case .nv12, .p010, .yuv422p10: return true
-        case .rgba16, .linearRGBA16, .bgra8sRGB: return false
+        case .rgba16, .linearRGBA16, .bgra8sRGB, .finished: return false
         }
     }
 }
@@ -160,11 +162,15 @@ public struct PixelQuad: Equatable, Codable, Sendable {
     public var texture: TextureHandle
     public var frame: PixelRect
     public var uv: UVRect
+    /// Spec 4 §5 — the texture's mip chain was generated this tick, so the
+    /// box may sample it; otherwise only level zero holds the picture.
+    public var mips: Bool
 
-    public init(texture: TextureHandle, frame: PixelRect, uv: UVRect) {
+    public init(texture: TextureHandle, frame: PixelRect, uv: UVRect, mips: Bool = false) {
         self.texture = texture
         self.frame = frame
         self.uv = uv
+        self.mips = mips
     }
 }
 

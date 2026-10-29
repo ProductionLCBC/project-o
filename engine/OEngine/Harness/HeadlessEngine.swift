@@ -6,14 +6,15 @@ import OCore
 /// Spec 4 §14 — "the engine is constructed with its backend, its clock and its
 /// sinks injected, so tests can run it headless with a software clock and a
 /// texture-capturing sink." The harness assembles an engine over the software
-/// clock, one capturing sink per output, and the fakes of `Fakes.swift`, and
-/// drives it one tick at a time on the test's thread.
+/// clock, one capturing sink per output, and either the fakes of `Fakes.swift`
+/// or the real providers over a Metal backend, and drives it one tick at a
+/// time on the test's thread.
 public final class HeadlessEngine: @unchecked Sendable {
     public let clock = SoftwareClock()
     public let backend: any RenderBackend
-    public let sourceFactory = FakeSourceFactory()
-    public let posters: FakePosterProvider
-    public let textProvider: FakeTextProvider
+    public let sourceFactory: any SourceFactory
+    public let posters: any PosterProvider
+    public let textProvider: any TextProvider
     public let variables: VariableProvider
     public let engine: Engine
     public let sinks: [Int: CapturingSink]
@@ -25,23 +26,60 @@ public final class HeadlessEngine: @unchecked Sendable {
     public var log: EngineLog { engine.log }
     /// The backend as the recording one, when the harness was built with it.
     public var recording: RecordingBackend? { backend as? RecordingBackend }
+    public var metal: MetalBackend? { backend as? MetalBackend }
+    /// The fakes, when the harness was built with them.
+    public var fakeSources: FakeSourceFactory? { sourceFactory as? FakeSourceFactory }
+    public var fakePosters: FakePosterProvider? { posters as? FakePosterProvider }
+    public var fakeText: FakeTextProvider? { textProvider as? FakeTextProvider }
+    public var textCache: TextCache? { textProvider as? TextCache }
 
     /// A fixed wall clock so `[Time]` resolves the same in every run.
     public static let fixedWallClock: @Sendable () -> Date = {
         Date(timeIntervalSince1970: 1_793_368_800)   // 2026-10-26, 10:00:00 America/New_York (14:00 UTC)
     }
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend = RecordingBackend(),
+    /// The harness over the recording backend and the fakes: no GPU, no decoder.
+    public convenience init(library: Library, machine: Machine, mediaRoot: URL?, backend: RecordingBackend = RecordingBackend(),
+                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
+        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, sourceFactory: FakeSourceFactory(),
+                      posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock)
+    }
+
+    /// The harness over a Metal backend with the real sources, posters and
+    /// text cache (rasterizing synchronously), so a tick renders for real and
+    /// the capturing sinks read the pixels back.
+    public convenience init(library: Library, machine: Machine, mediaRoot: URL, metal: MetalBackend,
+                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
+        let log = EngineLog(category: "harness")
+        let renderer = CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont)
+        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
+                      sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log),
+                      text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log), wallClock: wallClock)
+        for sink in sinks.values {
+            // The harness presents on the test's thread, so it can wait for the GPU here.
+            sink.isComplete = { [metal] receipt in
+                metal.waitForCompletion(of: receipt)
+                return metal.completion(of: receipt) != nil
+            }
+            sink.capture = { [metal] frame in
+                metal.readbackCapture(output: sink.output)
+            }
+        }
+    }
+
+    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, sourceFactory: any SourceFactory,
+                posters: any PosterProvider, text: any TextProvider,
                 wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
         self.backend = backend
-        posters = FakePosterProvider(backend: backend)
-        textProvider = FakeTextProvider(backend: backend)
+        self.sourceFactory = sourceFactory
+        self.posters = posters
+        self.textProvider = text
         variables = VariableProvider(settings: machine.settings, wallClock: wallClock)
         var sinks: [Int: CapturingSink] = [:]
         for output in machine.outputs { sinks[output.number] = CapturingSink(output: output.number) }
         self.sinks = sinks
         engine = try Engine(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, clock: clock,
-                            sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: textProvider,
+                            sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
                             variables: variables, log: EngineLog(category: "harness"))
         let backendRef = backend
         for sink in sinks.values {
@@ -51,11 +89,12 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     private func handleTick(_ time: TickTime) {
-        sourceFactory.advance()
+        fakeSources?.advance()
         let build = stallTicks == 0
         if !build { stallTicks -= 1 }
         engine.runTick(time, buildPlan: build)
         for sink in sinks.values { sink.present(now: time.wake) }
+        textCache?.sweep(consumedTick: time.tick)
         ticksRun += 1
     }
 
@@ -121,5 +160,10 @@ public final class HeadlessEngine: @unchecked Sendable {
 
     public func livenessReading() -> LivenessReading {
         engine.livenessReading(now: clock.now())
+    }
+
+    /// The last frame the capturing sink of `output` read back (Metal harness).
+    public func captured(output: Int) -> CapturedFrame? {
+        sinks[output]?.lastCaptured
     }
 }

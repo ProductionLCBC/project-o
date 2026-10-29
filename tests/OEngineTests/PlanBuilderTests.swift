@@ -378,7 +378,7 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertFalse(held.contains(first), "the stepped-on instance was cut out")
         XCTAssertLessThanOrEqual(held.count, 2, "the cap holds")
         let pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
-        XCTAssertEqual(pass.outgoing?.layout, .linearRGBA16, "the interrupted dissolve continues from a snapshot of the picture")
+        XCTAssertEqual(pass.outgoing?.layout, .finished, "the interrupted dissolve continues from a snapshot of the picture")
         XCTAssertTrue(pass.snapshotOutgoing)
         guard case .instance(let live, _) = pass.incoming.source else { return XCTFail("the new instance is live") }
         XCTAssertNotEqual(live, first)
@@ -394,7 +394,7 @@ final class PlanBuilderTests: XCTestCase {
     }
 
     func test_coldWriteShowsThePosterUntilTheFirstFrameThenStartsItsTransition() throws {
-        engine.sourceFactory.readyAfterTicks = 3
+        engine.fakeSources?.readyAfterTicks = 3
         engine.send("channel 1 write media \(EngineFixtures.cross)")
         engine.tick()
         engine.send("channel 1 write media \(EngineFixtures.dawn) transition 2 1.0 once")

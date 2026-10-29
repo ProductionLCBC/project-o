@@ -129,6 +129,7 @@ public final class ControlLoop: @unchecked Sendable {
         syncTransports(frame)
         reconcileGrades(frame)
         let plan = buildPlan(frame)
+        backend.prepare(plan)
         for channel in model.channels.keys { model.channels[channel]?.snapshotPending = false }
         lastPlan = plan
         builtAt.store(now.nanoseconds, ordering: .releasing)
@@ -157,6 +158,11 @@ public final class ControlLoop: @unchecked Sendable {
             if case .media(var m) = rt.live, !m.missing, !m.ready, let source = m.source, source.isReady {
                 m.ready = true
                 m.clock = MediaClock(anchorFrame: frame, anchorMs: m.inMs, playing: m.transport == .playing)
+                // The decoder knows the stream now: its layout and size replace the index's guess.
+                m.layout = source.layout
+                m.size = source.size.pixelCount > 0 ? source.size : m.size
+                m.matrix = (m.size.width <= 720 && m.size.height <= 576) ? .bt601 : .bt709
+                m.range = source.layout.isYCbCr ? .limited : .full
                 rt.live = .media(m)
                 if var t = rt.transition, t.startFrame == nil {
                     // Spec 4 §6 — "starts its transition when the first decoded frame arrives".
@@ -565,7 +571,7 @@ public final class ControlLoop: @unchecked Sendable {
             outgoing = binding(for: c, at: frame)
         case .snapshot?:
             if let snapshot = channelSnapshots[channel] {
-                outgoing = SourceBinding(source: .texture(snapshot), layout: .linearRGBA16, matrix: .bt709, range: .full, size: size)
+                outgoing = SourceBinding(source: .texture(snapshot), layout: .finished, matrix: .bt709, range: .full, size: size)
             }
         case nil:
             break
@@ -601,18 +607,19 @@ public final class ControlLoop: @unchecked Sendable {
     /// mode: `fit` letterboxes, `fill` crops to cover, `stretch` ignores aspect,
     /// `crop` centers at 1:1". The modes act on the content inside the texture
     /// (Area 4 reading), so a 4:3 clip with `fill` really fills.
-    static func fitQuad(texture: TextureHandle, content: UVRect, contentPixels: PixelSize, into frame: PixelRect, fit: PixelFit) -> PixelQuad {
+    static func fitQuad(texture: TextureHandle, content: UVRect, contentPixels: PixelSize, into frame: PixelRect, fit: PixelFit,
+                        mips: Bool = false) -> PixelQuad {
         let aspect = contentPixels.height > 0 ? Float(contentPixels.width) / Float(contentPixels.height) : 1
         let frameAspect = frame.height > 0 ? frame.width / frame.height : 1
         switch fit {
         case .stretch:
-            return PixelQuad(texture: texture, frame: frame, uv: content)
+            return PixelQuad(texture: texture, frame: frame, uv: content, mips: mips)
         case .fit:
             var w = frame.width
             var h = frame.height
             if aspect > frameAspect { h = frame.width / aspect } else { w = frame.height * aspect }
             let rect = PixelRect(x: frame.x + (frame.width - w) / 2, y: frame.y + (frame.height - h) / 2, width: w, height: h)
-            return PixelQuad(texture: texture, frame: rect, uv: content)
+            return PixelQuad(texture: texture, frame: rect, uv: content, mips: mips)
         case .fill:
             var uv = content
             if aspect > frameAspect {
@@ -622,7 +629,7 @@ public final class ControlLoop: @unchecked Sendable {
                 let keep = aspect / frameAspect
                 uv = UVRect(u: content.u, v: content.v + content.height * (1 - keep) / 2, width: content.width, height: content.height * keep)
             }
-            return PixelQuad(texture: texture, frame: frame, uv: uv)
+            return PixelQuad(texture: texture, frame: frame, uv: uv, mips: mips)
         case .crop:
             let cw = Float(contentPixels.width)
             let ch = Float(contentPixels.height)
@@ -631,7 +638,7 @@ public final class ControlLoop: @unchecked Sendable {
             let rect = PixelRect(x: frame.x + (frame.width - w) / 2, y: frame.y + (frame.height - h) / 2, width: w, height: h)
             let uv = UVRect(u: content.u + content.width * (cw - w) / (2 * max(1, cw)), v: content.v + content.height * (ch - h) / (2 * max(1, ch)),
                             width: content.width * w / max(1, cw), height: content.height * h / max(1, ch))
-            return PixelQuad(texture: texture, frame: rect, uv: uv)
+            return PixelQuad(texture: texture, frame: rect, uv: uv, mips: mips)
         }
     }
 
@@ -715,7 +722,8 @@ public final class ControlLoop: @unchecked Sendable {
                     if let pass = channelPass(slot.channel, frame: frame, scratch: &scratch) {
                         let bound = pass.incoming.source == .none ? (pass.outgoing ?? pass.incoming) : pass.incoming
                         let content = ControlLoop.contentRect(source: bound.size, channel: pass.size)
-                        let quad = ControlLoop.fitQuad(texture: pass.target, content: content, contentPixels: bound.size, into: frameRect, fit: fit)
+                        let quad = ControlLoop.fitQuad(texture: pass.target, content: content, contentPixels: bound.size, into: frameRect, fit: fit,
+                                                       mips: pass.generateMips)
                         resolved = ResolvedBox(channel: slot.channel, frame: frameRect, content: .pixels(quad), opacity: opacity,
                                                grade: boxGrade(box), offset: slot.offset, binding: box.binding)
                     }
