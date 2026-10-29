@@ -52,9 +52,15 @@ public final class HeadlessEngine: @unchecked Sendable {
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
         let log = EngineLog(category: "harness")
         let renderer = CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont)
+        // Spec 4 §11 — one graph per device: the software device stands in for the
+        // machine's `device` outputs; `sdiEmbedded` outputs belong to the DeckLink sink.
+        let device = SoftwareAudioDevice()
+        let outputs = machine.audioOutputs.filter { $0.kind == .device }
         try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
                       sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log),
-                      text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log), wallClock: wallClock)
+                      text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
+                      audio: AudioGraph(device: device, outputs: outputs, log: log), wallClock: wallClock)
+        try engine.audio?.start()
         for sink in sinks.values {
             // The harness presents on the test's thread, so it can wait for the GPU here.
             sink.isComplete = { [metal] receipt in
@@ -68,7 +74,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, sourceFactory: any SourceFactory,
-                posters: any PosterProvider, text: any TextProvider,
+                posters: any PosterProvider, text: any TextProvider, audio: AudioGraph? = nil,
                 wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
         self.backend = backend
         self.sourceFactory = sourceFactory
@@ -80,7 +86,7 @@ public final class HeadlessEngine: @unchecked Sendable {
         self.sinks = sinks
         engine = try Engine(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, clock: clock,
                             sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
-                            variables: variables, log: EngineLog(category: "harness"))
+                            variables: variables, audio: audio, log: EngineLog(category: "harness"))
         let backendRef = backend
         for sink in sinks.values {
             // Spec 4 §12 — a frame whose GPU work failed is never presented; the previous one holds.
@@ -166,5 +172,14 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// The last frame the capturing sink of `output` read back (Metal harness).
     public func captured(output: Int) -> CapturedFrame? {
         sinks[output]?.lastCaptured
+    }
+
+    /// The software audio device of the Metal harness, for pulling sound.
+    public var audioDevice: SoftwareAudioDevice? { engine.audio?.device as? SoftwareAudioDevice }
+
+    /// Pull `frames` frames of the device mix (Metal harness).
+    @discardableResult
+    public func pullAudio(frames: Int) -> [Float] {
+        audioDevice?.pull(frames: frames) ?? []
     }
 }

@@ -27,6 +27,8 @@ public final class ControlLoop: @unchecked Sendable {
     let posters: any PosterProvider
     let text: any TextProvider
     public let variables: VariableProvider
+    /// Spec 4 §11 — the mix graph for the machine's one device in the spike; nil runs silent.
+    public let audio: AudioGraph?
     let log: EngineLog
     let encodeKinds: [Int: EncodeKind]
     let mediaRoot: URL?
@@ -47,10 +49,11 @@ public final class ControlLoop: @unchecked Sendable {
     private let builtAt = Atomic<Int64>(0)
     private var pendingSnapshotWhenReady: Set<Int> = []
     private var slideWarned = false
+    private var mutedOutputs: Set<Int> = []
 
     public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
-                variables: VariableProvider, encodeKinds: [Int: EncodeKind], log: EngineLog) {
+                variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioGraph? = nil, log: EngineLog) {
         self.library = library
         self.machine = machine
         self.pacing = pacing
@@ -61,6 +64,7 @@ public final class ControlLoop: @unchecked Sendable {
         self.posters = posters
         self.text = text
         self.variables = variables
+        self.audio = audio
         self.encodeKinds = encodeKinds
         self.mediaRoot = mediaRoot
         self.log = log
@@ -264,7 +268,11 @@ public final class ControlLoop: @unchecked Sendable {
             case (.grade, .grade(let ref)):
                 startGrade(channel: channel, ref: ref, ms: ms, frame: frame)
             case (.gain, .gain(let db)):
+                // Spec 4 §11 — "the channel's tracked gain plus any override".
                 model.channels[channel, default: ChannelRuntime()].gainDb = db
+                if let audio, let m = model.channels[channel]?.live.media, let instance = m.audio {
+                    audio.setGain(db + (m.gainOverride ?? 0), for: instance)
+                }
             default:
                 break
             }
@@ -296,7 +304,26 @@ public final class ControlLoop: @unchecked Sendable {
                 log.warning("designed slides are v2; a slide write renders nothing")
             }
         case .passthrough(let command):
-            log.info("passthrough \(command.cmd) (handled outside the spike)")
+            if case .audioMute(let target, let switchState) = command, let audio {
+                // Spec 4 §11 — "audio all mute is one command over every device".
+                let numbers: [Int]
+                switch target {
+                case .number(let n): numbers = [n]
+                case .all: numbers = machine.audioOutputs.map(\.number)
+                }
+                for number in numbers {
+                    let muted: Bool
+                    switch switchState {
+                    case .on: muted = true
+                    case .off: muted = false
+                    case .toggle: muted = !mutedOutputs.contains(number)
+                    }
+                    if muted { mutedOutputs.insert(number) } else { mutedOutputs.remove(number) }
+                    audio.setMuted(muted, output: number)
+                }
+            } else {
+                log.info("passthrough \(command.cmd) (handled outside the spike)")
+            }
         case .mute, .variable, .boundary, .pointer, .blocked, .applied, .noop:
             break
         }
@@ -325,6 +352,13 @@ public final class ControlLoop: @unchecked Sendable {
         let incoming = makeRuntime(for: e.to, channel: e.channel, frame: frame)
         let cutLike = type == .cut || durationFrames <= 0
         let previousHasPicture = previous.hasPixels
+
+        // Spec 4 §11 — the audio transition "between the outgoing and incoming instance of a channel, with its offset".
+        if let audio, previous.media?.audio != nil || incoming.media?.audio != nil {
+            let object = library.audioTransition(e.audioTransition)
+            audio.startTransition(outgoing: previous.media?.audio, incoming: incoming.media?.audio, type: object?.type ?? .cut,
+                                  ms: e.audioMs, offsetMs: e.audioOffsetMs)
+        }
 
         if case .text = incoming {
             release(previous, frame: frame)
@@ -399,15 +433,22 @@ public final class ControlLoop: @unchecked Sendable {
                 switch instance.transport {
                 case .paused:
                     m.clock.pause(at: frame, millisecondsPerTick: pacing.millisecondsPerTick)
+                    if let a = m.audio { audio?.setPlaying(false, for: a) }
                 case .playing:
                     if m.transport == .stopped {
                         m.clock = MediaClock(anchorFrame: frame, anchorMs: m.inMs, playing: true)
                         m.clearIssued = false
+                        // Spec 4 §11 — after `stop`, play resumes from the in-point: a fresh decoder.
+                        releaseAudio(of: &m)
+                        attachAudio(to: &m, channel: channel, instance: instance)
                     } else {
                         m.clock.resume(at: frame)
+                        if let a = m.audio { audio?.setPlaying(true, for: a) }
                     }
                 case .stopped:
                     m.clock = MediaClock(anchorFrame: frame, anchorMs: m.inMs, playing: false)
+                    // Spec 4 §11 — "stop flushes the ring".
+                    releaseAudio(of: &m)
                 }
                 m.transport = instance.transport
             }
@@ -467,12 +508,47 @@ public final class ControlLoop: @unchecked Sendable {
             runtime.matrix = (runtime.size.width <= 720 && runtime.size.height <= 576) ? .bt601 : .bt709
             runtime.range = source.layout.isYCbCr ? .limited : .full
             runtime.ready = source.isReady
+            runtime.syncOffsetMs = m.syncOffsetMs ?? 0
+            runtime.gainOverride = m.gainOverride
+            attachAudio(to: &runtime, channel: channel, instance: m)
             return .media(runtime)
         }
     }
 
+    /// Spec 4 §11 — "Each channel's content may carry sound; the engine
+    /// decodes it, applies the channel's gain and audio transition, and routes
+    /// it to the numbered audio outputs the channel names."
+    private func attachAudio(to runtime: inout MediaRuntime, channel: Int, instance: MediaInstance) {
+        guard let audio, let entry = runtime.entry, entry.hasAudio, entry.kind != .image, let mediaRoot,
+              let resolved = MediaResolver.resolve(instance.ref, library: library, machine: machine) else { return }
+        let decoder = AudioFileDecoder(url: mediaRoot.appendingPathComponent(resolved.path), inMs: runtime.inMs,
+                                       outMs: runtime.outMs.isFinite ? runtime.outMs : nil, loop: instance.endBehavior == .loop, channels: 2, log: log)
+        decoder.start()
+        let outputs = library.channel(channel)?.audioOutputs ?? []
+        let audioInstance = AudioInstance(handle: runtime.handle, ring: decoder.ring, inMs: runtime.inMs, syncOffsetMs: instance.syncOffsetMs ?? 0,
+                                          routing: audio.routing(forAudioOutputs: outputs, instanceChannels: 2))
+        let gain = (model.channels[channel]?.gainDb ?? model.state.channels[channel]?.attributes.gain.value ?? 0) + (instance.gainOverride ?? 0)
+        guard audio.add(audioInstance, gainDb: gain) else {
+            decoder.stop()
+            return
+        }
+        audio.setPlaying(instance.transport == .playing, for: audioInstance)
+        runtime.audio = audioInstance
+        runtime.audioDecoder = decoder
+    }
+
+    private func releaseAudio(of runtime: inout MediaRuntime) {
+        if let instance = runtime.audio { audio?.remove(instance) }
+        runtime.audioDecoder?.stop()
+        runtime.audioDecoder?.ring.flush()
+        runtime.audio = nil
+        runtime.audioDecoder = nil
+    }
+
     private func release(_ content: ContentRuntime, frame: Int64) {
-        guard case .media(let m) = content, let source = m.source else { return }
+        guard case .media(var m) = content else { return }
+        releaseAudio(of: &m)
+        guard let source = m.source else { return }
         source.release()
         pendingSourceRemovals.append((m.handle, frame + 2))
     }
@@ -484,7 +560,12 @@ public final class ControlLoop: @unchecked Sendable {
     /// shows the poster.
     func mediaTime(_ m: MediaRuntime, at frame: Int64) -> Double {
         guard m.ready, m.transport != .stopped, !m.isStill else { return m.inMs }
-        let raw = m.clock.mediaTime(at: frame, millisecondsPerTick: pacing.millisecondsPerTick)
+        var raw = m.clock.mediaTime(at: frame, millisecondsPerTick: pacing.millisecondsPerTick)
+        if let audio, let instance = m.audio {
+            // Spec 4 §2 — "A/V sync is anchored to the audio device clock"; Spec 4 §11 — a
+            // negative sync offset "delays video ... by advancing the instance's media time reference".
+            raw = audio.mediaTimeMs(of: instance) + Double(min(0, m.syncOffsetMs))
+        }
         guard m.outMs.isFinite else { return raw }
         if m.loops {
             let length = m.outMs - m.inMs

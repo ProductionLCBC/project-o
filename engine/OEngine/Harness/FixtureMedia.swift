@@ -90,6 +90,8 @@ public enum FixtureMedia {
     }
 
     public static let barCount = 12
+    /// What `frameIndex` reads from a flash frame: every bar lit.
+    public static let flashIndex = (1 << barCount) - 1
     public static let sampleRate: Double = 48_000
 
     // MARK: - Writing

@@ -35,9 +35,12 @@ public final class Engine: @unchecked Sendable {
     private let running = Atomic<Bool>(false)
     public private(set) var recoveries: Int64 = 0
 
+    public let audio: AudioGraph?
+
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
-                text: any TextProvider, variables: VariableProvider, log: EngineLog = EngineLog(category: "engine")) throws {
+                text: any TextProvider, variables: VariableProvider, audio: AudioGraph? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
+        self.audio = audio
         self.library = library
         self.machine = machine
         self.pacing = try Pacing(machine: machine)
@@ -54,7 +57,7 @@ public final class Engine: @unchecked Sendable {
         watchdog = Watchdog(log: log)
         control = ControlLoop(library: library, machine: machine, pacing: pacing, mediaRoot: mediaRoot, backend: backend,
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
-                              encodeKinds: byOutput.mapValues(\.encode), log: log)
+                              encodeKinds: byOutput.mapValues(\.encode), audio: audio, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
     }
@@ -95,6 +98,9 @@ public final class Engine: @unchecked Sendable {
         guard !running.exchange(true, ordering: .acquiringAndReleasing) else { return }
         for output in sinks.keys.sorted() {
             do { try sinks[output]?.start() } catch { log.error("output \(output) did not start: \(error)") }
+        }
+        if let audio {
+            do { try audio.start() } catch { log.error("audio device \(audio.device.name) did not start: \(error); running silent") }
         }
         // The first plan, so the first tick has something to render.
         planRing.publish(control.build(for: 0, now: clock.now()))
@@ -162,6 +168,7 @@ public final class Engine: @unchecked Sendable {
         controlSignal.signal()
         watchdog.stop()
         recorder?.stop()
+        audio?.stop()
         for sink in sinks.values { sink.stop() }
         controlThread = nil
         readbackThread = nil
