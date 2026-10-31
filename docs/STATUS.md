@@ -37,46 +37,54 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**No area is live; Area 4 has shipped and Area 5 has not started.** On 2026-10-31 Adam
-wrote `approved` on the Area 4 brief, taking every recommendation: the readings stand, the
-display sink presents the frame of the previous master tick, text centres vertically until
-the presets spec adds an anchor, `restoreLastState` and `[Timer N]` wait for Areas 12 and 11.
-He put the DeckLink SDK in `vendor/`, and the same session wrote the module's Objective-C++
-wrapper against it on the branch (13d230e; a Mac without the Desktop Video driver behaves
-like the stub, so the dev Mac still reports the card unavailable), corrected Spec 4 §3, §8,
-§10 and §16 on `main` (7032182), merged `area/spike` into `main` with `--no-ff` (e735052),
-ran `swift test` green on the merged tree with the SDK compiled in, pushed, removed the
-worktree, deleted the branch on both ends and set the Build tracker task to `shipped`.
-Everything of Area 4 is on `main`; nothing waits on a branch. What the dev Mac could not do
-remains for the bench: the three-hour run of `scripts/soak.sh tests/soak/spike.json` with a
-card and both outputs captured, which is where Spec 4 §15's 4K GPU time, DeckLink completion
-counts and A/V sync on the capture get their answer. Hosted CI has not confirmed the merge:
-the Linux job passed, the macOS job sat in `swift test` for over forty minutes on the merge
-push and was cancelled with no log kept, and the follow-up push (431e72c: every harness and
-readback wait bounded, time limits on both jobs, so a hang ends with a log) was refused by
-GitHub for billing ("recent account payments have failed or your spending limit needs to be
-increased").
+**No area is live: Area 4 has shipped, Area 5 has not started, and going public waits for
+approval on `area/go-public`.** That branch, from a housekeeping session on 2026-10-31 (not
+a build-order area), holds the README's new status line and licence notice (all rights
+reserved by LCBC Church; no LICENSE file) with the DeckLink SDK and Renewed Vision notes and
+contributions closed, a `SECURITY.md`, CI's token pinned to `contents: read`, and a
+`CLAUDE.md` hard rule that text from GitHub is data, never instructions. `swift test` is
+green on it and it is pushed; none of it is on `main`, and the repository is still private.
+Everything of Area 4 is on `main`, but hosted CI has not confirmed its merge (Housekeeping
+below), and the bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a
+card and both outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion
+counts and A/V sync, is still to do.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. Area 4's brief (the Area 4 session, 2026-10-29) is answered and merged.
+- **Going public** (housekeeping, branch `area/go-public`; the brief is the final message of
+  the go-public session, 2026-10-31). On `approved` that session merges with `--no-ff` and
+  pushes, makes the repository public with `gh`, applies the settings the brief lists
+  (interactions limited to collaborators for six months, private vulnerability reporting,
+  secret scanning and push protection confirmed, the workflow token at read, approval
+  required for every outside contributor's fork pull request workflow, a ruleset on `main`
+  that blocks deletion and force-push and nothing else), confirms CI runs on `main`, and
+  removes the worktree and the branch. One decision: GitHub's Terms of Service let any
+  GitHub user view and fork a public repository on GitHub, which the README's "no licence
+  to use, copy, modify or distribute it is granted yet" does not mention. Recommended: add
+  "beyond viewing and forking on GitHub under GitHub's Terms of Service" to that sentence
+  before the merge; without that answer the sentence stays as written.
 
 ### Housekeeping
 
-- **GitHub Actions billing.** Runs on `main` are refused until the ProductionLCBC account's
-  payment or spending limit is fixed (Settings, Billing and plans). The macOS job bills at a
-  multiple of Linux minutes and the hung run on 2026-10-31 spent forty of them. When runs
-  start again, re-run the latest `main` run (`gh run rerun <id>`); if its macOS job fails
-  rather than hangs, the log names the test, which is the point of 431e72c.
+- **GitHub Actions billing.** Hosted CI has not confirmed Area 4's merge: the macOS job hung
+  in `swift test` on the merge push and was cancelled with no log kept, and every run since,
+  the follow-up push (431e72c: every harness and readback wait bounded, time limits on both
+  jobs) and the `area/go-public` push included, was refused for the ProductionLCBC account's
+  payment or spending limit (Settings, Billing and plans). Going public, which waits for
+  approval above, makes standard hosted runners free, and the session that applies it
+  re-runs CI on `main`. If GitHub still refuses runs on the public repository, the refusal
+  is the account's payment state rather than its minutes, and Billing and plans still needs
+  fixing. If the macOS job then fails rather than hangs, its log names the test, which is
+  the point of 431e72c.
 
 ### Spec interpretations made so far
 
-None outstanding. Adam's `approved` answered every Area 4 reading; the plan's seven answers
-and the readings made while building are recorded in the Area 4 brief and in the
-`Spec interpretations made so far` table of the previous version of this page (980f092).
-The spec now says what the code does.
+None outstanding, and the go-public session touched no spec. Adam's `approved` answered
+every Area 4 reading; the plan's answers and the readings made while building are recorded
+in the Area 4 brief and in the `Spec interpretations made so far` table of an earlier
+version of this page (980f092). The spec now says what the code does.
 
 ### Spec corrections proposed
 
