@@ -60,7 +60,7 @@ extension MetalBackend {
         guard let command = queue.makeCommandBuffer() else { return nil }
         encodeV210(SinkPass(output: -1, stack: stack, second: second, mix: mix, encode: .v210, destination: 0), into: command)
         command.commit()
-        command.waitUntilCompleted()
+        guard MetalBackend.waitBounded(command) else { return nil }
         let buffer = buffers.buffer(forSlot: 0)
         let count = buffers.rowBytes * height / 4
         let words = buffer.contents().bindMemory(to: UInt32.self, capacity: count)
@@ -77,7 +77,7 @@ extension MetalBackend {
         let frame = CompletedFrame(tick: 0, stack: stack, second: second, mix: mix, destination: 0, receipt: EncodeReceipt(tick: 0, token: 0))
         encodeDisplay(frame, into: target, command: command)
         command.commit()
-        command.waitUntilCompleted()
+        guard MetalBackend.waitBounded(command) else { return nil }
         var words = [UInt32](repeating: 0, count: source.width * source.height)
         words.withUnsafeMutableBytes { raw in
             target.getBytes(raw.baseAddress!, bytesPerRow: source.width * 4, from: MTLRegionMake2D(0, 0, source.width, source.height), mipmapLevel: 0)

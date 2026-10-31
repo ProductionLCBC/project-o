@@ -255,9 +255,22 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     /// Harness: block until the tick's work is done. Never on the render thread.
     public func waitForCompletion(of receipt: EncodeReceipt) {
         guard let slot = receipts.slot(for: receipt.token) else { return }
-        slot.channel?.waitUntilCompleted()
-        slot.stack?.waitUntilCompleted()
-        slot.sink?.waitUntilCompleted()
+        for command in [slot.channel, slot.stack, slot.sink].compactMap({ $0 }) {
+            if !MetalBackend.waitBounded(command) { log.error("GPU work of tick \(receipt.tick) did not complete within the bound") }
+        }
+    }
+
+    /// Harness and readback threads only, never the render thread: wait for a
+    /// command buffer, bounded, so a GPU that never answers fails a test
+    /// instead of hanging it. Polls the buffer's status.
+    @discardableResult
+    static func waitBounded(_ command: MTLCommandBuffer, seconds: Double = 30) -> Bool {
+        let deadline = MonotonicClock.now().nanoseconds + Int64(seconds * 1_000_000_000)
+        while command.status != .completed && command.status != .error {
+            if MonotonicClock.now().nanoseconds > deadline { return false }
+            usleep(200)
+        }
+        return command.status == .completed
     }
 
     // MARK: - The channel pass (Spec 4 §7)
@@ -554,7 +567,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
                   destinationBytesPerRow: bytesPerRow, destinationBytesPerImage: bytesPerRow * height)
         blit.endEncoding()
         command.commit()
-        command.waitUntilCompleted()
+        guard MetalBackend.waitBounded(command) else {
+            log.error("readback of \(texture.label ?? "a texture") did not complete within the bound")
+            return nil
+        }
         var frame = CapturedFrame(width: width, height: height)
         let halves = buffer.contents().bindMemory(to: Float16.self, capacity: width * height * 4)
         for i in 0..<(width * height) {
@@ -594,7 +610,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         blit.generateMipmaps(for: texture)
         blit.endEncoding()
         command.commit()
-        command.waitUntilCompleted()
+        MetalBackend.waitBounded(command)
     }
 
     /// A texture the decoder would hand over, from raw plane bytes.

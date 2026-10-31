@@ -236,7 +236,10 @@ public enum FixtureMedia {
         }
         let done = DispatchSemaphore(value: 0)
         writer.finishWriting { done.signal() }
-        done.wait()
+        guard done.wait(timeout: .now() + 120) == .success else {
+            writer.cancelWriting()
+            throw WriteError.failed("the writer did not finish in time")
+        }
         if writer.status != .completed {
             throw WriteError.failed(writer.error.map { "\($0)" } ?? "status \(writer.status.rawValue)")
         }
