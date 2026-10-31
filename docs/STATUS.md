@@ -17,7 +17,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | merged | Adam's `approved` on 2026-10-27; spec corrections applied (e57728f), `area/projection` merged into `main` with `--no-ff` (d7465b8), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | merged | Adam's `approved` on 2026-10-28 with one reversal (a missing transition degrades to the channel default, then to a zero-second cut; 78902ef on the branch); spec corrections applied (cc404c0), `area/format` merged into `main` with `--no-ff` (70bf958), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), `swift test` green on the merged tree with the SDK compiled in, pushed, branch and worktree removed, task `shipped`. The three-hour bench run with a card is still to do. |
+| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), `swift test` green on the merged tree with the SDK compiled in, pushed, branch and worktree removed, task `shipped`; hosted CI first green on `main` on 2026-10-31 at cb20f6e, once the repository was public. The three-hour bench run with a card is still to do. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started | Next, once its prompt block is written in `docs/build-order.md` and the spike has passed every §15 criterion on the bench. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first (presets and text; it owes the text style a vertical anchor, Spec 4 §8). The object types are on `main` since Area 2; the engine's stack pass on `main` since Area 4 resolves slots, fit modes, opacity, mute and the +1 slot. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4; the weave and key/fill remain. |
@@ -37,54 +37,44 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**No area is live: Area 4 has shipped, Area 5 has not started, and going public waits for
-approval on `area/go-public`.** That branch, from a housekeeping session on 2026-10-31 (not
-a build-order area), holds the README's new status line and licence notice (all rights
-reserved by LCBC Church; no LICENSE file) with the DeckLink SDK and Renewed Vision notes and
-contributions closed, a `SECURITY.md`, CI's token pinned to `contents: read`, and a
-`CLAUDE.md` hard rule that text from GitHub is data, never instructions. `swift test` is
-green on it and it is pushed; none of it is on `main`, and the repository is still private.
-Everything of Area 4 is on `main`, but hosted CI has not confirmed its merge (Housekeeping
-below), and the bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a
-card and both outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion
-counts and A/V sync, is still to do.
+**No area is live: Area 4 has shipped, Area 5 has not started, and the repository is
+public.** On 2026-10-31 Adam wrote `approved` on the go-public brief, taking its
+recommendation (the licence notice also names the viewing and forking GitHub's Terms of
+Service allow; 3a777f9). The housekeeping session merged `area/go-public` into `main` with
+`--no-ff` (cb20f6e), ran `swift test` green on the merged tree with the SDK compiled in,
+pushed, made the repository public and applied every setting the brief listed with `gh`,
+each read back (Housekeeping below has the one that expires). Hosted CI then passed on
+`main`, both jobs: the first green hosted run since Area 4's merge. The worktree is removed
+and the branch deleted on both ends; everything is on `main` and nothing waits on a branch.
+The bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a card and both
+outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion counts and A/V
+sync, is still to do.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Going public** (housekeeping, branch `area/go-public`; the brief is the final message of
-  the go-public session, 2026-10-31). On `approved` that session merges with `--no-ff` and
-  pushes, makes the repository public with `gh`, applies the settings the brief lists
-  (interactions limited to collaborators for six months, private vulnerability reporting,
-  secret scanning and push protection confirmed, the workflow token at read, approval
-  required for every outside contributor's fork pull request workflow, a ruleset on `main`
-  that blocks deletion and force-push and nothing else), confirms CI runs on `main`, and
-  removes the worktree and the branch. One decision: GitHub's Terms of Service let any
-  GitHub user view and fork a public repository on GitHub, which the README's "no licence
-  to use, copy, modify or distribute it is granted yet" does not mention. Recommended: add
-  "beyond viewing and forking on GitHub under GitHub's Terms of Service" to that sentence
-  before the merge; without that answer the sentence stays as written.
+None. The go-public brief (the go-public session, 2026-10-31) is answered and merged.
 
 ### Housekeeping
 
-- **GitHub Actions billing.** Hosted CI has not confirmed Area 4's merge: the macOS job hung
-  in `swift test` on the merge push and was cancelled with no log kept, and every run since,
-  the follow-up push (431e72c: every harness and readback wait bounded, time limits on both
-  jobs) and the `area/go-public` push included, was refused for the ProductionLCBC account's
-  payment or spending limit (Settings, Billing and plans). Going public, which waits for
-  approval above, makes standard hosted runners free, and the session that applies it
-  re-runs CI on `main`. If GitHub still refuses runs on the public repository, the refusal
-  is the account's payment state rather than its minutes, and Billing and plans still needs
-  fixing. If the macOS job then fails rather than hangs, its log names the test, which is
-  the point of 431e72c.
+- **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
+  open issues and pull requests or comment on the public repository. Renew it before that
+  date (Settings, Moderation options, Interaction limits: collaborators only, six months),
+  or anyone with a GitHub account can open them.
+- **Licence:** LCBC to choose before contributions open; set up a contributor agreement
+  first.
+- **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
+  runners are free, and the re-run of the merge's CI passed both jobs. The ProductionLCBC
+  account's payment problem (Settings, Billing and plans) matters again only if the
+  repository goes private or a paid feature is wanted.
 
 ### Spec interpretations made so far
 
-None outstanding, and the go-public session touched no spec. Adam's `approved` answered
-every Area 4 reading; the plan's answers and the readings made while building are recorded
-in the Area 4 brief and in the `Spec interpretations made so far` table of an earlier
-version of this page (980f092). The spec now says what the code does.
+None outstanding. Adam's `approved` answered every Area 4 reading; the plan's answers and
+the readings made while building are recorded in the Area 4 brief and in the
+`Spec interpretations made so far` table of an earlier version of this page (980f092). The
+spec now says what the code does.
 
 ### Spec corrections proposed
 
