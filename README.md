@@ -41,7 +41,7 @@ The project is early and not accepting contributions. Issues and pull requests a
 
 ## License
 
-Copyright (c) 2026 LCBC Church. All rights reserved. The source is public to read; no licence to use, copy, modify or distribute it is granted yet. An open-source licence will be chosen before contributions open.
+Copyright (c) 2026 LCBC Church. All rights reserved. The source is public to read; no licence to use, copy, modify or distribute it is granted yet, beyond viewing and forking on GitHub under GitHub's Terms of Service. An open-source licence will be chosen before contributions open.
 
 The Blackmagic DeckLink SDK is not included and stays under Blackmagic Design's own terms; `vendor/README.md` says how to get it. Without it the engine still builds, with SDI output unavailable.
 
