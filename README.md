@@ -1,8 +1,8 @@
 # Project O
 
-A Metal-native macOS presenter with DeckLink SDI output, built by LCBC Church as a ProPresenter replacement for a multi-campus church. Working name until the brand team names it. Private until after the pilot; intended to open as open source after that.
+A Metal-native macOS presenter with DeckLink SDI output, built by LCBC Church as a ProPresenter replacement for a multi-campus church. Working name until the brand team names it.
 
-**Status:** pre-spike. The four foundation specs are accepted; the first code (the projection in `OCore`) is next, then the engine spike. No UI exists yet.
+**Status:** early; no UI yet. Areas 1–4 of `docs/build-order.md` have shipped: in `OCore` and `formats/`, channel state and the projection, the object model and library format, and the command vocabulary; in `engine/`, the engine spike, a headless `OEngine` driven over OSC. Next is the spike's three-hour run on the test bench, then Area 5, the rest of the render pipeline. `docs/STATUS.md` is the current one-page view.
 
 ## Read first
 
@@ -35,6 +35,14 @@ docs/       specs/ (the authority), decisions/ (ADRs), ux-spec.md
 tests/      unit tests, golden images, soak scenarios, the fixture library
 ```
 
+## Contributions
+
+The project is early and not accepting contributions. Issues and pull requests are limited to collaborators.
+
 ## License
 
-To be chosen before the repository opens. Until then: all rights reserved, LCBC Church.
+Copyright (c) 2026 LCBC Church. All rights reserved. The source is public to read; no licence to use, copy, modify or distribute it is granted yet, beyond viewing and forking on GitHub under GitHub's Terms of Service. An open-source licence will be chosen before contributions open.
+
+The Blackmagic DeckLink SDK is not included and stays under Blackmagic Design's own terms; `vendor/README.md` says how to get it. Without it the engine still builds, with SDI output unavailable.
+
+Not affiliated with or endorsed by Renewed Vision. ProPresenter is a trademark of Renewed Vision.
