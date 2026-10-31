@@ -17,7 +17,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | merged | Adam's `approved` on 2026-10-27; spec corrections applied (e57728f), `area/projection` merged into `main` with `--no-ff` (d7465b8), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | merged | Adam's `approved` on 2026-10-28 with one reversal (a missing transition degrades to the channel default, then to a zero-second cut; 78902ef on the branch); spec corrections applied (cc404c0), `area/format` merged into `main` with `--no-ff` (70bf958), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), `swift test` green on the merged tree with the SDK compiled in, pushed, branch and worktree removed, task `shipped`; hosted CI first green on `main` on 2026-10-31 at cb20f6e, once the repository was public. The three-hour bench run with a card is still to do. |
+| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), `swift test` green on the merged tree with the SDK compiled in, pushed, branch and worktree removed, task `shipped`; hosted CI first green on `main` on 2026-10-31 at cb20f6e, once the repository was public, but the macOS job hung on the next push (Needs Adam). The three-hour bench run with a card is still to do. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started | Next, once its prompt block is written in `docs/build-order.md` and the spike has passed every §15 criterion on the bench. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first (presets and text; it owes the text style a vertical anchor, Spec 4 §8). The object types are on `main` since Area 2; the engine's stack pass on `main` since Area 4 resolves slots, fit modes, opacity, mute and the +1 slot. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4; the weave and key/fill remain. |
@@ -44,8 +44,10 @@ Service allow; 3a777f9). The housekeeping session merged `area/go-public` into `
 `--no-ff` (cb20f6e), ran `swift test` green on the merged tree with the SDK compiled in,
 pushed, made the repository public and applied every setting the brief listed with `gh`,
 each read back (Housekeeping below has the one that expires). Hosted CI then passed on
-`main`, both jobs: the first green hosted run since Area 4's merge. The worktree is removed
-and the branch deleted on both ends; everything is on `main` and nothing waits on a branch.
+`main` at cb20f6e, both jobs, the first green hosted run since Area 4's merge; on the next
+push (bd42b70, status documents only) the macOS job hung in `swift test` until its
+45-minute limit, with no log kept (Housekeeping below). The worktree is removed and the
+branch deleted on both ends; everything is on `main` and nothing waits on a branch.
 The bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a card and both
 outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion counts and A/V
 sync, is still to do.
@@ -64,10 +66,22 @@ None. The go-public brief (the go-public session, 2026-10-31) is answered and me
   or anyone with a GitHub account can open them.
 - **Licence:** LCBC to choose before contributions open; set up a contributor agreement
   first.
+- **The hosted macOS `swift test` hangs sometimes; the test is not yet named.** On bd42b70,
+  a push of status documents only, the macOS job built, then sat in `swift test` until the
+  job's 45-minute limit cancelled it (run 41217993196). GitHub kept no log of the job (the
+  job-logs API answers "BlobNotFound", `gh run view --log` "log not found"), so the test
+  that hung cannot be named. The Linux job passed. The same code passed both jobs on
+  cb20f6e in under three minutes (run 41217504317), and the Area 4 merge push hung the
+  same way, so the hang is intermittent and the bounded waits of 431e72c do not catch it.
+  A test that hangs only sometimes may be a race in the engine or only in the test
+  harness; until a log names it, which one is unknown. Not fixed in the go-public session,
+  as asked. Recommended: a tooling session gives the `swift test` step its own
+  `timeout-minutes`, below the job's, so a hang fails that step while the job itself ends
+  normally, which should keep the log that names the test. Watching a running job's live
+  log in the Actions tab may also show it.
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
-  runners are free, and the re-run of the merge's CI passed both jobs. The ProductionLCBC
-  account's payment problem (Settings, Billing and plans) matters again only if the
-  repository goes private or a paid feature is wanted.
+  runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
+  plans) matters again only if the repository goes private or a paid feature is wanted.
 
 ### Spec interpretations made so far
 
