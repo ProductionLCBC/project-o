@@ -1,0 +1,31 @@
+{
+  "app": "0.1.0",
+  "kind": "stacks",
+  "schema": 1,
+  "stacks": [
+    {
+      "base": "black",
+      "defaultPreset": null,
+      "gammaBlend": false,
+      "label": "Main",
+      "number": 1,
+      "slots": [
+        { "channel": 1, "mute": false, "offset": 0, "opacity": 1, "preset": null },
+        { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null }
+      ],
+      "uuid": "5e5e0000-0000-4000-8000-000000000001"
+    },
+    {
+      "base": "black",
+      "defaultPreset": 2,
+      "gammaBlend": false,
+      "label": "Confidence",
+      "number": 2,
+      "slots": [
+        { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null },
+        { "channel": 2, "mute": false, "offset": 1, "opacity": 1, "preset": 3 }
+      ],
+      "uuid": "6f6f0000-0000-4000-8000-000000000002"
+    }
+  ]
+}

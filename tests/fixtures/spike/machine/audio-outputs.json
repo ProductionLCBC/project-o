@@ -1,0 +1,17 @@
+{
+  "app": "0.1.0",
+  "audioOutputs": [
+    {
+      "channels": [0, 1],
+      "delayMs": 0,
+      "device": "",
+      "fallbackDevice": null,
+      "kind": "device",
+      "label": "System default",
+      "number": 1,
+      "uuid": "a0d00000-0000-4000-8000-000000000001"
+    }
+  ],
+  "kind": "audioOutputs",
+  "schema": 1
+}

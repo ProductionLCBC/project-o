@@ -1,0 +1,19 @@
+{
+  "app": "0.1.0",
+  "kind": "transitions",
+  "schema": 1,
+  "transitions": [
+    { "builtIn": true, "color": null, "easing": "linear", "label": "Cut", "ms": 0, "number": 1, "type": "cut", "uuid": "7a110000-0000-4000-8000-000000000001" },
+    { "builtIn": true, "color": null, "easing": "easeInOut", "label": "Dissolve", "ms": 500, "number": 2, "type": "dissolve", "uuid": "7a110000-0000-4000-8000-000000000002" },
+    {
+      "builtIn": true,
+      "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+      "easing": "easeInOut",
+      "label": "Fade through black",
+      "ms": 1000,
+      "number": 3,
+      "type": "fadeThroughColor",
+      "uuid": "7a110000-0000-4000-8000-000000000003"
+    }
+  ]
+}

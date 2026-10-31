@@ -1,0 +1,45 @@
+{
+  "app": "0.1.0",
+  "kind": "outputs",
+  "outputs": [
+    {
+      "colorRange": "full",
+      "defaultStack": 1,
+      "device": "display:main",
+      "format": {
+        "height": 1080,
+        "interlaced": false,
+        "rate": { "den": 1, "num": 60 },
+        "width": 1920
+      },
+      "genlock": null,
+      "keyFillPartner": null,
+      "keyMode": "shaped",
+      "kind": "display",
+      "label": "Main",
+      "number": 1,
+      "transitions": { "blackout": 3, "switch": 2 },
+      "uuid": "0d7d0000-0000-4000-8000-000000000001"
+    },
+    {
+      "colorRange": "full",
+      "defaultStack": 2,
+      "device": "display:confidence",
+      "format": {
+        "height": 1080,
+        "interlaced": false,
+        "rate": { "den": 1, "num": 60 },
+        "width": 1920
+      },
+      "genlock": null,
+      "keyFillPartner": null,
+      "keyMode": "shaped",
+      "kind": "display",
+      "label": "Confidence",
+      "number": 2,
+      "transitions": { "blackout": 2, "switch": 1 },
+      "uuid": "0d7d0000-0000-4000-8000-000000000002"
+    }
+  ],
+  "schema": 1
+}

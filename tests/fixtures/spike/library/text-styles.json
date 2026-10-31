@@ -1,0 +1,55 @@
+{
+  "app": "0.1.0",
+  "kind": "textStyles",
+  "schema": 1,
+  "textStyles": [
+    {
+      "alignment": "center",
+      "allCaps": false,
+      "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+      "font": "HelveticaNeue-Bold",
+      "label": "Body",
+      "letterSpacing": 0,
+      "lineSpacing": 1.1,
+      "number": 1,
+      "outline": {
+        "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+        "width": 0
+      },
+      "shadow": {
+        "blur": 8,
+        "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 },
+        "x": 0,
+        "y": 2
+      },
+      "size": { "unit": "pt", "value": 72 },
+      "uuid": "7e570000-0000-4000-8000-000000000001",
+      "variations": {},
+      "weight": 700
+    },
+    {
+      "alignment": "left",
+      "allCaps": true,
+      "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+      "font": "HelveticaNeue-Medium",
+      "label": "Caption",
+      "letterSpacing": 0.5,
+      "lineSpacing": 1.2,
+      "number": 2,
+      "outline": {
+        "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+        "width": 1
+      },
+      "shadow": {
+        "blur": 0,
+        "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+        "x": 0,
+        "y": 0
+      },
+      "size": { "unit": "percent", "value": 4.5 },
+      "uuid": "7e570000-0000-4000-8000-000000000002",
+      "variations": { "wdth": 110, "wght": 500 },
+      "weight": 500
+    }
+  ]
+}

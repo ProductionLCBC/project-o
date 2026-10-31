@@ -37,8 +37,21 @@ and the object's number at the end; media ids are the real SHA-256 of the files.
 cue's `trigger` was a bare string with its value beside it (`triggerMs`, `triggerTc`) and
 `trackThrough` did not exist.
 
-## Later
+## `spike/` — the engine spike's roots (Spec 4 §15)
 
-The engine spike adds a fixture list of public-domain hymn lyrics over ProRes and HEVC
-backgrounds, with trims and one loop, plus a clapper fixture for A/V sync (Spec 4 §15). Keep
-media small; large soak media stays on the test bench, referenced by hash.
+`spike/library/` is the library root the soak runs: the catalog documents and the three presets
+copied from `library-v1/`, one list (*Spike hymns*: Amazing Grace, Holy Holy Holy, Be Thou My
+Vision, It Is Well with My Soul and Come Thou Fount, all public domain, two lines a cue, a clear
+at the end of each hymn, and a last cue that cuts to the clapper) and `media-index.json` naming
+six synthetic items: a ProRes 422 Proxy background that loops between its trims, an HEVC
+background with a tone that is trimmed and holds at its end, a 10-bit HEVC background with a tone
+that loops, a ProRes 4444 background with alpha, the clapper (a flash on frame 30 and a click at
+one second) and a PNG still. The media itself is generated, not committed: `oengine
+make-fixtures tests/fixtures/spike/library/media` (which `scripts/soak.sh` runs when the files
+are missing) writes it with `FixtureMedia`, and the index carries fixed ids rather than content
+hashes so the lists resolve on any machine. `spike/machine/` is the bench machine root: two
+60p display outputs (the main one at 1920×1080 here; the bench edits it to 4096×2160 or an SDI
+output), the two stacks of `library-v1/` and one audio output on the default device.
+
+`../soak/spike.json` is the Spec 4 §15 script: the list on repeat with `next` every five seconds,
+a stack switch and a blackout every ten minutes. Large soak media stays on the test bench.

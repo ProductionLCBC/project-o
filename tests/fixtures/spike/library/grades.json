@@ -1,0 +1,19 @@
+{
+  "app": "0.1.0",
+  "grades": [
+    {
+      "blur": 0,
+      "brightness": -0.05,
+      "contrast": 1.1,
+      "hue": 8,
+      "label": "Warm",
+      "number": 1,
+      "opacity": 1,
+      "saturation": 1.15,
+      "tint": { "a": 0.12, "b": 0.6, "g": 0.85, "r": 1 },
+      "uuid": "6ade0000-0000-4000-8000-000000000001"
+    }
+  ],
+  "kind": "grades",
+  "schema": 1
+}

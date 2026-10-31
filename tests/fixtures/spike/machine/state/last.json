@@ -1,0 +1,51 @@
+{
+  "app": "0.1.0",
+  "kind": "state",
+  "schema": 1,
+  "state": {
+    "channels": {
+      "1": {
+        "attributes": {
+          "audioTransition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          },
+          "chase": { "origin": "default", "value": false },
+          "gain": { "origin": "default", "value": 0 },
+          "grade": { "origin": "default", "value": 0 },
+          "transition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          }
+        },
+        "content": { "kind": "empty" },
+        "lock": false,
+        "outgoing": []
+      },
+      "2": {
+        "attributes": {
+          "audioTransition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          },
+          "chase": { "origin": "default", "value": false },
+          "gain": { "origin": "default", "value": 0 },
+          "grade": { "origin": "default", "value": 0 },
+          "transition": {
+            "origin": "default",
+            "value": { "ref": 1 }
+          }
+        },
+        "content": { "kind": "empty" },
+        "lock": false,
+        "outgoing": []
+      }
+    },
+    "outputs": { "1": 1, "2": 2 },
+    "popups": {},
+    "stacks": {
+      "1": { "blackout": false, "muted": [] },
+      "2": { "blackout": false, "muted": [] }
+    }
+  }
+}
