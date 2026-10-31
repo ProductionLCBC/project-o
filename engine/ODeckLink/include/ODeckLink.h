@@ -67,7 +67,9 @@ typedef void (*odl_frame_completed_cb)(void *context, void *frame_context, odl_c
 /// Called when playback stops for a reason the sink did not ask for.
 typedef void (*odl_playback_stopped_cb)(void *context);
 
-/// True when the SDK was compiled in; false for the stub.
+/// True when the SDK was compiled in and the Desktop Video driver's framework
+/// loads (/Library/Frameworks/DeckLinkAPI.framework); false for the stub and
+/// on a Mac without the driver.
 bool odl_sdk_available(void);
 
 /// Opens the output of the card whose persistent id is `persistent_id`
@@ -79,7 +81,9 @@ void odl_close(odl_device_t *device);
 odl_status_t odl_set_callbacks(odl_device_t *device, odl_frame_completed_cb on_completed,
                                odl_playback_stopped_cb on_stopped, void *context);
 
-/// Enables the output in `mode` with `format` and optional embedded audio.
+/// Enables the output in `mode` with `format` and optional embedded audio. A
+/// card that refuses the audio keeps its video: the call succeeds and
+/// odl_schedule_audio then reports ODL_ERR_STATE.
 odl_status_t odl_enable_output(odl_device_t *device, odl_mode_t mode, odl_pixel_format_t format,
                                odl_audio_config_t audio);
 odl_status_t odl_disable_output(odl_device_t *device);
