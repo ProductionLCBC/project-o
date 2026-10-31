@@ -50,13 +50,26 @@ worktree, deleted the branch on both ends and set the Build tracker task to `shi
 Everything of Area 4 is on `main`; nothing waits on a branch. What the dev Mac could not do
 remains for the bench: the three-hour run of `scripts/soak.sh tests/soak/spike.json` with a
 card and both outputs captured, which is where Spec 4 §15's 4K GPU time, DeckLink completion
-counts and A/V sync on the capture get their answer.
+counts and A/V sync on the capture get their answer. Hosted CI has not confirmed the merge:
+the Linux job passed, the macOS job sat in `swift test` for over forty minutes on the merge
+push and was cancelled with no log kept, and the follow-up push (431e72c: every harness and
+readback wait bounded, time limits on both jobs, so a hang ends with a log) was refused by
+GitHub for billing ("recent account payments have failed or your spending limit needs to be
+increased").
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
 None. Area 4's brief (the Area 4 session, 2026-10-29) is answered and merged.
+
+### Housekeeping
+
+- **GitHub Actions billing.** Runs on `main` are refused until the ProductionLCBC account's
+  payment or spending limit is fixed (Settings, Billing and plans). The macOS job bills at a
+  multiple of Linux minutes and the hung run on 2026-10-31 spent forty of them. When runs
+  start again, re-run the latest `main` run (`gh run rerun <id>`); if its macOS job fails
+  rather than hangs, the log names the test, which is the point of 431e72c.
 
 ### Spec interpretations made so far
 
