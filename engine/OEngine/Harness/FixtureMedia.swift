@@ -97,7 +97,29 @@ public enum FixtureMedia {
     // MARK: - Writing
 
     /// Write the clip to `url` (a QuickTime file, so LPCM audio is allowed).
+    /// The work runs on a worker and the caller waits with a bound: the asset
+    /// writer's own calls are synchronous and can stall on a machine whose
+    /// media services are unwell, and a fixture must fail, never hang a suite.
     public static func write(_ clip: Clip, to url: URL) throws {
+        let outcome = WriteOutcome()
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try writeNow(clip, to: url)
+            } catch {
+                outcome.error = error
+            }
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + 300) == .success else { throw WriteError.failed("the writer did not come back in time") }
+        if let error = outcome.error { throw error }
+    }
+
+    private final class WriteOutcome: @unchecked Sendable {
+        var error: Error?
+    }
+
+    static func writeNow(_ clip: Clip, to url: URL) throws {
         try? FileManager.default.removeItem(at: url)
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         var settings: [String: Any] = [
