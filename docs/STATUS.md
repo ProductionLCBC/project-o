@@ -43,11 +43,13 @@ recommendation (the licence notice also names the viewing and forking GitHub's T
 Service allow; 3a777f9). The housekeeping session merged `area/go-public` into `main` with
 `--no-ff` (cb20f6e), ran `swift test` green on the merged tree with the SDK compiled in,
 pushed, made the repository public and applied every setting the brief listed with `gh`,
-each read back (Housekeeping below has the one that expires). Hosted CI then passed on
-`main` at cb20f6e, both jobs, the first green hosted run since Area 4's merge; on the next
-push (bd42b70, status documents only) the macOS job hung in `swift test` until its
-45-minute limit, with no log kept (Housekeeping below). The worktree is removed and the
-branch deleted on both ends; everything is on `main` and nothing waits on a branch.
+each read back (Housekeeping below has the one that expires). Hosted CI is green on `main`
+(962dd4b, 2026-11-01): the macOS job had stalled about one run in four inside the runner's
+virtual GPU or VideoToolbox, in a kernel call the runner could not kill (a step time limit
+and cancels did nothing; only GitHub's force-cancel ended the runs), so the hosted test
+step now sets `O_HOSTED_RUNNER` and the Metal and codec tests skip there while the
+self-hosted bench Mac runs the whole suite (Housekeeping below). The worktree is removed
+and the branch deleted on both ends; everything is on `main` and nothing waits on a branch.
 The bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a card and both
 outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion counts and A/V
 sync, is still to do.
@@ -66,19 +68,20 @@ None. The go-public brief (the go-public session, 2026-10-31) is answered and me
   or anyone with a GitHub account can open them.
 - **Licence:** LCBC to choose before contributions open; set up a contributor agreement
   first.
-- **The hosted macOS `swift test` hangs sometimes; the test is not yet named.** On bd42b70,
-  a push of status documents only, the macOS job built, then sat in `swift test` until the
-  job's 45-minute limit cancelled it (run 41217993196). GitHub kept no log of the job (the
-  job-logs API answers "BlobNotFound", `gh run view --log` "log not found"), so the test
-  that hung cannot be named. The Linux job passed. The same code passed both jobs on
-  cb20f6e in under three minutes (run 41217504317), and the Area 4 merge push hung the
-  same way, so the hang is intermittent and the bounded waits of 431e72c do not catch it.
-  A test that hangs only sometimes may be a race in the engine or only in the test
-  harness; until a log names it, which one is unknown. Not fixed in the go-public session,
-  as asked. Recommended: a tooling session gives the `swift test` step its own
-  `timeout-minutes`, below the job's, so a hang fails that step while the job itself ends
-  normally, which should keep the log that names the test. Watching a running job's live
-  log in the Actions tab may also show it.
+- **The bench Mac is the only place the hardware tests run.** The hosted macOS `swift test`
+  stalled about one run in four (the Area 4 merge push, bd42b70, and two runs on
+  2026-11-01) in a state the runner could not kill: a twelve-minute step limit did not fire,
+  `gh run cancel` did nothing, and only GitHub's force-cancel API ended the runs. XCTest
+  writes its progress to stdout, block-buffered into the runner's pipe, so the last
+  "started" line Adam read in a live log (the font-check test) was only the last line
+  flushed; what follows it is the video source suite over AVFoundation and VideoToolbox,
+  which, with the GPU, is where the runner's virtual hardware stalls. Since 962dd4b the
+  hosted test step sets `O_HOSTED_RUNNER`, which makes the Metal and codec tests skip with a
+  visible message (forty of the suite's tests); the rest runs on every push in about two
+  minutes. Every harness, readback and media-open wait is bounded too, and the step runs
+  unbuffered, so a future stall would fail a test and name it. A self-hosted runner on the
+  bench Mac, without the variable, is what should run the goldens, the decode tests and the
+  soak; until it exists, `swift test` on the bench by hand is the proof, as CLAUDE.md says.
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
