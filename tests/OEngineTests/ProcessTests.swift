@@ -192,6 +192,7 @@ final class ProcessTests: XCTestCase {
     // MARK: - The fixture media
 
     func test_makeFixturesWritesEveryItem() throws {
+        try MetalHarness.skipOnHostedRunner("the fixture media writer")
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-spike-media-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
         XCTAssertFalse(SpikeFixtures.exist(in: folder))

@@ -22,10 +22,14 @@ jobs:
       # its log, which names the last test that started. XCTest writes its
       # progress to stdout, block-buffered into a pipe, so without unbuffered
       # output the log lags the hang by a buffer's worth of tests.
+      # The runner's virtual GPU and media engine stall about one run in four in a
+      # state the runner cannot kill, so the tests that need Metal or a video
+      # encoder and decoder skip here and run on the self-hosted bench Mac.
       - run: swift test
         timeout-minutes: 12
         env:
           NSUnbufferedIO: "YES"
+          O_HOSTED_RUNNER: "1"
 
   # OCore must build and test with no Apple framework in it. A Linux toolchain
   # is the strongest proof: if anything Apple-only creeps in, this job fails.

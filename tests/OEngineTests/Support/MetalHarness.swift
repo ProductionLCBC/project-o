@@ -5,7 +5,19 @@ import OCore
 
 /// A Metal backend for the tests that need a GPU, or a skip where there is none.
 enum MetalHarness {
+    /// CLAUDE.md — "The self-hosted bench Mac runs golden-image tests and the
+    /// soak scenario". The hosted runner's virtual GPU and media engine stall
+    /// about one run in four in a state the runner cannot kill, so with
+    /// `O_HOSTED_RUNNER` set (the CI workflow sets it) the tests that need the
+    /// GPU or a video encoder and decoder skip, and the bench runs them.
+    static var hostedRunner: Bool { ProcessInfo.processInfo.environment["O_HOSTED_RUNNER"] != nil }
+
+    static func skipOnHostedRunner(_ what: String) throws {
+        if hostedRunner { throw XCTSkip("hosted runner: \(what) run on the bench Mac") }
+    }
+
     static func backend() throws -> MetalBackend {
+        try skipOnHostedRunner("Metal tests")
         guard MetalBackend.isAvailable else { throw XCTSkip("no Metal device on this machine") }
         return try MetalBackend(log: EngineLog(category: "test-metal"))
     }
@@ -89,6 +101,7 @@ enum ClipFixtures {
     private static let lock = NSLock()
 
     static func url(for clip: FixtureMedia.Clip) throws -> URL {
+        try MetalHarness.skipOnHostedRunner("video encode and decode tests")
         lock.lock()
         defer { lock.unlock() }
         if let result = written[clip.name] { return try result.get() }
