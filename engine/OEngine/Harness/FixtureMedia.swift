@@ -177,10 +177,14 @@ public enum FixtureMedia {
         // one input while waiting on the other deadlocks at the interleave boundary.
         let failure = WriteFailure()
         let group = DispatchGroup()
+        // The encoder asks for its first data within moments on a working machine; a
+        // machine whose encoder never asks fails the fixture in seconds, not minutes.
+        let started = DispatchSemaphore(value: 0)
         let videoQueue = DispatchQueue(label: "o.fixture.video")
         let frames = Counter()
         group.enter()
         videoInput.requestMediaDataWhenReady(on: videoQueue) {
+            started.signal()
             while videoInput.isReadyForMoreMediaData {
                 let frameIndex = frames.value
                 guard frameIndex < clip.frameCount else {
@@ -221,6 +225,7 @@ public enum FixtureMedia {
             let audioQueue = DispatchQueue(label: "o.fixture.audio")
             group.enter()
             audioInput.requestMediaDataWhenReady(on: audioQueue) {
+                started.signal()
                 while audioInput.isReadyForMoreMediaData {
                     let written = writtenFrames.value
                     guard written < audioFrames else {
@@ -248,6 +253,10 @@ public enum FixtureMedia {
             }
         }
 
+        guard started.wait(timeout: .now() + 15) == .success else {
+            writer.cancelWriting()
+            throw WriteError.cannotStart("the encoder did not ask for data within 15 s (\(clip.codec))")
+        }
         guard group.wait(timeout: .now() + 120) == .success else {
             writer.cancelWriting()
             throw WriteError.failed("the writer did not finish in time")
