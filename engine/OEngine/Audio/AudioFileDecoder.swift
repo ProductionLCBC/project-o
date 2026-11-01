@@ -53,7 +53,7 @@ public final class AudioFileDecoder: @unchecked Sendable {
     }
 
     private func openReader() throws -> (AVAssetReader, AVAssetReaderTrackOutput, Double) {
-        let asset = AVURLAsset(url: url)
+        let asset = try AssetLoading.loaded(url)
         guard let track = asset.tracks(withMediaType: .audio).first else { throw DemuxError.noVideoTrack }
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [

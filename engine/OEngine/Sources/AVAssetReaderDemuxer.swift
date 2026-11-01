@@ -10,6 +10,30 @@ public enum DemuxError: Error {
     case cannotStart(String)
 }
 
+/// Spec 4 §12 — a media open that never answers is a failure, not a wait:
+/// AVFoundation's synchronous property loads (`tracks`, `duration`) block
+/// until the media server answers, and on a machine whose media services are
+/// stalled that is forever. The asset is loaded asynchronously and waited on
+/// with a bound before any property is read.
+public enum AssetLoading {
+    public static func loaded(_ url: URL, timeout seconds: Double = 20) throws -> AVURLAsset {
+        let asset = AVURLAsset(url: url)
+        let keys = ["tracks", "duration"]
+        let done = DispatchSemaphore(value: 0)
+        asset.loadValuesAsynchronously(forKeys: keys) { done.signal() }
+        guard done.wait(timeout: .now() + seconds) == .success else {
+            throw DemuxError.cannotStart("\(url.lastPathComponent) did not load within \(Int(seconds)) s")
+        }
+        for key in keys {
+            var error: NSError?
+            if asset.statusOfValue(forKey: key, error: &error) != .loaded {
+                throw DemuxError.cannotStart("\(url.lastPathComponent): \(key) \(error?.localizedDescription ?? "not loaded")")
+            }
+        }
+        return asset
+    }
+}
+
 /// Spec 4 §6 — "Demux with AVFoundation's AVAssetReader in passthrough mode
 /// (compressed samples out) ... Using Apple's demuxer with a direct decoder
 /// session keeps the frame queue, the output pixel format and the seek
@@ -24,8 +48,31 @@ public final class AVAssetReaderDemuxer: Demuxer, @unchecked Sendable {
     /// decode thread drops frames until the in-point.
     public static let prerollMs: Double = 3000
 
+    /// Spec 4 §12 — opening runs on a worker the caller waits on with a
+    /// bound: the reader's own calls are synchronous and a stalled media
+    /// service must fail the open, never hang the decode thread or a test.
     public func open(_ url: URL, startMs: Double) throws -> any DemuxSession {
-        try AVAssetReaderSession(url: url, startMs: startMs)
+        let outcome = OpenOutcome()
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                outcome.session = try AVAssetReaderSession(url: url, startMs: startMs)
+            } catch {
+                outcome.error = error
+            }
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + 30) == .success else {
+            throw DemuxError.cannotStart("\(url.lastPathComponent) did not open within 30 s")
+        }
+        if let error = outcome.error { throw error }
+        guard let session = outcome.session else { throw DemuxError.cannotStart("no session") }
+        return session
+    }
+
+    private final class OpenOutcome: @unchecked Sendable {
+        var session: AVAssetReaderSession?
+        var error: Error?
     }
 }
 
@@ -37,7 +84,7 @@ final class AVAssetReaderSession: DemuxSession, @unchecked Sendable {
     private var finished = false
 
     init(url: URL, startMs: Double) throws {
-        let asset = AVURLAsset(url: url)
+        let asset = try AssetLoading.loaded(url)
         let tracks = asset.tracks(withMediaType: .video)
         guard let track = tracks.first else { throw DemuxError.noVideoTrack }
         reader = try AVAssetReader(asset: asset)

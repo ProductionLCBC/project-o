@@ -19,9 +19,13 @@ jobs:
       - run: swift --version
       - run: swift build
       # The suite takes about a minute here; a step killed at this limit keeps
-      # its log, which names the last test that started.
+      # its log, which names the last test that started. XCTest writes its
+      # progress to stdout, block-buffered into a pipe, so without unbuffered
+      # output the log lags the hang by a buffer's worth of tests.
       - run: swift test
         timeout-minutes: 12
+        env:
+          NSUnbufferedIO: "YES"
 
   # OCore must build and test with no Apple framework in it. A Linux toolchain
   # is the strongest proof: if anything Apple-only creeps in, this job fails.

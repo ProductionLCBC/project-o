@@ -231,7 +231,7 @@ final class MediaSourceFactoryTests: XCTestCase {
 final class FixtureMediaTests: XCTestCase {
     func test_clipHasTheRequestedShape() throws {
         let url = try ClipFixtures.url(for: ClipFixtures.clapper)
-        let asset = AVURLAsset(url: url)
+        let asset = try AssetLoading.loaded(url)
         XCTAssertEqual(asset.duration.seconds, 3, accuracy: 0.05)
         XCTAssertEqual(asset.tracks(withMediaType: .video).count, 1)
         XCTAssertEqual(asset.tracks(withMediaType: .audio).count, 1)
