@@ -37,8 +37,23 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**No area is live: Area 4 has shipped, Area 5 has not started, and the repository is
-public.** On 2026-10-31 Adam wrote `approved` on the go-public brief, taking its
+**The soak fixes are in review on `area/soak-fixes`** (pushed, tip 745b991, CI green). On
+2026-11-01 Adam ran the three-hour soak on the two displays (no card yet) and it held every
+display and GPU threshold, zero re-presents and zero drops, GPU p99 under a quarter of the
+tick, and failed two: memory grew by seventy per cent after minute ten and the audio
+graph counted 155k underrun frames. The minute records named four causes and the session
+fixed them on the branch with tests first: a still's texture was released "after forever"
+and leaked one texture a write (Spec 4 §5, §6), and the threaded engine never swept
+deferred releases at all (only the harness did); the `[Time]` box kept every minute's
+raster instead of replacing it (§8); an audio instance was pulled before its decoder had
+delivered a sample, counting the empty device buffers as underruns, and its clock read a
+real device's host time as time played (§11); the watchdog's sink rule tripped on display
+link jitter eighty times (§12) and the minute record carried cumulative watchdog counts
+(§13); the last-good readback reallocated 33 MB a second. A four-minute run of the fixed
+engine with audio on: zero underruns, zero watchdog events, memory flat at 248 MB. The
+three-hour run on the fixed engine is what approval should rest on. Area 4 has shipped,
+Area 5 has not started, and the repository is public. On 2026-10-31 Adam wrote `approved`
+on the go-public brief, taking its
 recommendation (the licence notice also names the viewing and forking GitHub's Terms of
 Service allow; 3a777f9). The housekeeping session merged `area/go-public` into `main` with
 `--no-ff` (cb20f6e), ran `swift test` green on the merged tree with the SDK compiled in,
@@ -58,7 +73,14 @@ sync, is still to do.
 
 ### Briefs waiting for approval
 
-None. The go-public brief (the go-public session, 2026-10-31) is answered and merged.
+- **The soak fixes** (`area/soak-fixes`, 745b991; the brief is the final message of the
+  Area 4 session on 2026-11-02). It asks Adam to: (1) run the three-hour soak again from
+  the branch's release build before approving, since the approval should rest on that
+  result (recommended: yes, the command is in the brief); (2) accept the Spec 4 §12
+  correction, half a tick of slack on the sink rule (recommended: yes); (3) accept the
+  readings: a 20 ms preroll before an instance plays, and a variable box's previous raster
+  released after its box transition (recommended: yes). On `approved` the session merges
+  with `--no-ff`, applies the §12 correction, and the bench run with the card is next.
 
 ### Housekeeping
 
@@ -95,18 +117,29 @@ spec now says what the code does.
 
 ### Spec corrections proposed
 
-None. Area 4's corrections were applied on `main` in 7032182 (Spec 4 §3, §8, §10, §16). The
-presets-and-text spec, when written, owes the text style a vertical anchor defaulting to
+- Spec 4 §12, the watchdog's sink rule: "within the last two frame intervals" reads
+  literally as a stall whenever a display link fires a millisecond late at the 250 ms
+  sampling instant (eighty such lines in the three-hour soak, none a recovery). The code
+  gives the rule half a tick of slack. Fix: say "within two frame intervals and half a
+  tick".
+- Spec 4 §11, audio start: the code starts an instance once its ring holds 20 ms of
+  samples or the clip has ended; until then it is silent, counts no underrun and its clock
+  holds at the in-point. Fix: say so, since §11 says the clock is "derived from the samples
+  that have reached the device" without saying when the first one may go.
+
+Area 4's earlier corrections were applied on `main` in 7032182 (Spec 4 §3, §8, §10, §16).
+The presets-and-text spec, when written, owes the text style a vertical anchor defaulting to
 centre (Spec 4 §8 says so).
 
 ## Next
 
-**The bench run first.** Spec 4 §15 gates everything after the spike on three hours on the
-test bench: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the main
-output at the LED wall's format, as a DeckLink output if the bench has 12G) and
-`scripts/soak.sh tests/soak/spike.json`, which writes the media if it is missing, runs the
-engine with the script over OSC and prints the §13 verdict. This can be run by Adam without
-a session.
+**The soak fixes first, then the bench run.** The three-hour run on the fixed engine
+(from the `area/soak-fixes` worktree, two displays, audio on) decides the fixes' approval
+and their merge. Then Spec 4 §15's run with the card: the bench machine root (a copy of
+`tests/fixtures/spike/machine/` with the main output at the LED wall's format, as a
+DeckLink output if the bench has 12G) and `scripts/soak.sh tests/soak/spike.json`, which
+writes the media if it is missing, runs the engine with the script over OSC and prints the
+§13 verdict. Both can be run by Adam without a session.
 
 **Area 5 — Render pipeline, the rest** (branch `area/render`) is next in `docs/build-order.md`;
 it has no prompt block there yet, only the row and the gate ("nothing in `app/` starts until
