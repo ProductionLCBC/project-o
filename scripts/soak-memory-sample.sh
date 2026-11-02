@@ -4,6 +4,7 @@
 #
 # Usage: scripts/soak-memory-sample.sh [--minutes N] [--at "5 10 20 30"] [--out <folder>]
 #                                      [--leaks] [--scenario <file>] [soak.sh args…]
+#        (--at takes minutes, fractions allowed: --minutes 1 --at "0.25 0.75" is a smoke run)
 #        scripts/soak-memory-sample.sh --report <folder>
 #
 # Runs one soak through scripts/soak.sh and, at each listed minute, samples the
@@ -48,7 +49,7 @@ done
 
 # The sample minutes a folder holds, in order.
 sampled_minutes() {
-  ls "$1" | sed -n 's/^footprint-\([0-9]*\)\.txt$/\1/p' | sort -n
+  ls "$1" | sed -n 's/^footprint-\([0-9.]*\)\.txt$/\1/p' | sort -n
 }
 
 # The report. footprint prints "<dirty> <unit> <clean> <unit> <reclaimable>
@@ -163,7 +164,7 @@ sample() {
 
 last=""
 for m in $at; do
-  target=$(( started + m * 60 ))
+  target=$(( started + $(awk -v m="$m" 'BEGIN { printf "%d", m * 60 }') ))
   while (( $(date +%s) < target )); do
     kill -0 "$soak" 2>/dev/null || break 2
     sleep 5
