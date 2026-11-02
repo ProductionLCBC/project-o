@@ -18,9 +18,11 @@
 #
 # Like any soak this takes the machine's displays and default audio device for
 # the whole run: run it only in a window set aside for it. Each sample suspends
-# the process for some milliseconds, which may show as a watchdog event or a
-# re-present in that minute; `--leaks` runs `leaks` at the last sample too,
-# which suspends it for seconds. The run is for attribution, not the §13 verdict.
+# the process for about two thirds of a second while vmmap walks its regions
+# (the one-minute smoke run of 2026-11-02 measured 650 ms), which the watchdog
+# logs and a display answers with a re-present; `--leaks` runs `leaks` at the
+# last sample too, which suspends it for seconds. The run is for attribution,
+# never the §13 verdict.
 #
 # Defaults: 35 minutes, samples at minutes 5, 10, 20 and 30, output under
 # tests/soak-output/memory-<timestamp>/ (footprint-<minute>.txt,
@@ -66,7 +68,7 @@ write_report() {
   done
   {
     echo "memory attribution: $folder"
-    grep -h -E '^(PASS|FAIL)' "$folder/soak.log" 2>/dev/null || true
+    grep -h -A4 -E '^(PASS|FAIL)' "$folder/soak.log" 2>/dev/null || true
     echo
     echo "black box, resident MB per minute record:"
     if ls "$folder"/blackbox/blackbox-*.jsonl >/dev/null 2>&1; then
