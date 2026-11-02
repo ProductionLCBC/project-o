@@ -101,7 +101,6 @@ public final class HeadlessEngine: @unchecked Sendable {
         if !build { stallTicks -= 1 }
         engine.runTick(time, buildPlan: build)
         for sink in sinks.values { sink.present(now: time.wake) }
-        textCache?.sweep(consumedTick: time.tick)
         ticksRun += 1
     }
 

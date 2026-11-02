@@ -556,27 +556,44 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     }
 
     func readback(texture: MTLTexture) -> CapturedFrame? {
-        guard texture.pixelFormat == .rgba16Float else { return nil }
+        var frame = CapturedFrame(width: 0, height: 0)
+        var staging: MTLBuffer?
+        return readback(texture: texture, into: &frame, staging: &staging) ? frame : nil
+    }
+
+    /// Read a texture back into `frame`, reusing its pixel storage and the
+    /// `staging` buffer when the sizes still fit, so a caller that reads back
+    /// every second (the last-good copies, Spec 4 §12) allocates nothing after
+    /// its first pass. The spike's soak swung by 30 MB a second without this.
+    func readback(texture: MTLTexture, into frame: inout CapturedFrame, staging: inout MTLBuffer?) -> Bool {
+        guard texture.pixelFormat == .rgba16Float else { return false }
         let width = texture.width
         let height = texture.height
         let bytesPerRow = width * 8
-        guard let buffer = device.makeBuffer(length: bytesPerRow * height, options: .storageModeShared),
-              let command = queue.makeCommandBuffer(), let blit = command.makeBlitCommandEncoder() else { return nil }
+        let length = bytesPerRow * height
+        if staging == nil || staging?.length != length {
+            staging = device.makeBuffer(length: length, options: .storageModeShared)
+        }
+        guard let buffer = staging, let command = queue.makeCommandBuffer(), let blit = command.makeBlitCommandEncoder() else { return false }
         blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
                   sourceSize: MTLSize(width: width, height: height, depth: 1), to: buffer, destinationOffset: 0,
-                  destinationBytesPerRow: bytesPerRow, destinationBytesPerImage: bytesPerRow * height)
+                  destinationBytesPerRow: bytesPerRow, destinationBytesPerImage: length)
         blit.endEncoding()
         command.commit()
         guard MetalBackend.waitBounded(command) else {
             log.error("readback of \(texture.label ?? "a texture") did not complete within the bound")
-            return nil
+            return false
         }
-        var frame = CapturedFrame(width: width, height: height)
+        if frame.width != width || frame.height != height {
+            frame = CapturedFrame(width: width, height: height)
+        }
         let halves = buffer.contents().bindMemory(to: Float16.self, capacity: width * height * 4)
-        for i in 0..<(width * height) {
-            frame.pixels[i] = LinearPixel(r: Float(halves[i * 4]), g: Float(halves[i * 4 + 1]), b: Float(halves[i * 4 + 2]), a: Float(halves[i * 4 + 3]))
+        frame.pixels.withUnsafeMutableBufferPointer { pixels in
+            for i in 0..<(width * height) {
+                pixels[i] = LinearPixel(r: Float(halves[i * 4]), g: Float(halves[i * 4 + 1]), b: Float(halves[i * 4 + 2]), a: Float(halves[i * 4 + 3]))
+            }
         }
-        return frame
+        return true
     }
 
     public func makeStill(_ frame: CapturedFrame, label: String) -> TextureHandle {

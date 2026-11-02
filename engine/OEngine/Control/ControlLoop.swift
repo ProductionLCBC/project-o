@@ -844,7 +844,15 @@ public final class ControlLoop: @unchecked Sendable {
                 }
             case .static(let raw):
                 let value = variables.resolve(raw, state: model.state)
-                transitionAllowed = box.transitionOnVariableChange || !VariableProvider.containsVariables(raw)
+                let hasVariables = VariableProvider.containsVariables(raw)
+                transitionAllowed = box.transitionOnVariableChange || !hasVariables
+                // Spec 4 §8 — "the result replaces the cache entry": the previous value's raster goes,
+                // its textures freed once any box transition between the two has run its course.
+                if hasVariables, let previous = model.boxRuns[key]?.previousText, !previous.isEmpty, previous != value {
+                    let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+                    text.release(textJob(previous, box: box, frame: frameRect, outputHeight: size.height).key,
+                                 afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+                }
                 if !value.isEmpty {
                     resolved = textBox(value, box: box, frame: frameRect, size: size, slot: slot, opacity: opacity, scratch: &scratch)
                 }

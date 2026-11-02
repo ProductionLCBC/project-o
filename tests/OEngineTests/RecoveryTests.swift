@@ -56,8 +56,9 @@ final class RecoveryTests: XCTestCase {
         let late = engine.livenessReading()
         XCTAssertEqual(Watchdog.check(late), [])
         var reading = late
-        reading.now = reading.now.advanced(by: 3 * reading.tickNanoseconds)
-        XCTAssertEqual(Watchdog.check(reading).count, 3, "a render thread silent for three ticks is reported, and both sinks that waited on it")
+        // Sink 1 refreshed 16 ms after the tick, so four ticks on it is past the two-and-a-half-tick sink rule too.
+        reading.now = reading.now.advanced(by: 4 * reading.tickNanoseconds)
+        XCTAssertEqual(Watchdog.check(reading).count, 3, "a render thread silent for four ticks is reported, and both sinks that waited on it")
     }
 
     /// "Metal device lost or command buffer error: Hold last frames on every

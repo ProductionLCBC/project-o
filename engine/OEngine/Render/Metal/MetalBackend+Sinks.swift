@@ -93,11 +93,14 @@ extension MetalBackend {
     /// refreshed about once a second by the readback thread when it has spare
     /// capacity ... so a GPU reset has something to show."
     public func refreshLastGood(output: Int, stack: TextureHandle) {
-        guard let frame = readback(stack) else { return }
-        lastGood.store(frame, output: output)
+        guard let texture = texture(stack) else { return }
+        lastGood.refresh(output: output) { frame, staging in readback(texture: texture, into: &frame, staging: &staging) }
     }
 
     public func lastGoodFrame(output: Int) -> CapturedFrame? { lastGood.frame(output: output) }
+
+    /// Harness: the staging buffers the last-good copies keep, one per output.
+    public var lastGoodStagingBuffers: Int { lastGood.stagingCount }
 
     // MARK: - Rebuild (Spec 4 §12)
 
@@ -134,6 +137,7 @@ final class V210Rings: @unchecked Sendable {
 final class LastGoodFrames: @unchecked Sendable {
     private let lock = NSLock()
     private var frames: [Int: CapturedFrame] = [:]
+    private var staging: [Int: MTLBuffer] = [:]
 
     func store(_ frame: CapturedFrame, output: Int) {
         lock.lock()
@@ -141,9 +145,28 @@ final class LastGoodFrames: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Read into the output's own frame and staging buffer, in place: the lock
+    /// is held through the readback so the frame's storage is uniquely
+    /// referenced and nothing is reallocated once the sizes have settled.
+    func refresh(output: Int, _ body: (inout CapturedFrame, inout MTLBuffer?) -> Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        var frame = frames.removeValue(forKey: output) ?? CapturedFrame(width: 0, height: 0)
+        var buffer = staging.removeValue(forKey: output)
+        let ok = body(&frame, &buffer)
+        if ok { frames[output] = frame }
+        if let buffer { staging[output] = buffer }
+    }
+
     func frame(output: Int) -> CapturedFrame? {
         lock.lock()
         defer { lock.unlock() }
         return frames[output]
+    }
+
+    var stagingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return staging.count
     }
 }

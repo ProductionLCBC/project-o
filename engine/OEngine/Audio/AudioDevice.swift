@@ -41,9 +41,11 @@ public final class SoftwareAudioDevice: AudioDevice, @unchecked Sendable {
     private var render: AudioRenderCallback?
     private var hostTimeNs: Int64 = 0
 
-    public init(sampleRate: Double = 48_000, channelCount: Int = 2) {
+    /// `hostTimeNs` is where the device's clock starts; a real device's is far from zero.
+    public init(sampleRate: Double = 48_000, channelCount: Int = 2, hostTimeNs: Int64 = 0) {
         self.sampleRate = sampleRate
         self.channelCount = channelCount
+        self.hostTimeNs = hostTimeNs
     }
 
     public func start(render: @escaping AudioRenderCallback) throws {
