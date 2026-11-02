@@ -17,7 +17,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | merged | Adam's `approved` on 2026-10-27; spec corrections applied (e57728f), `area/projection` merged into `main` with `--no-ff` (d7465b8), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | merged | Adam's `approved` on 2026-10-28 with one reversal (a missing transition degrades to the channel default, then to a zero-second cut; 78902ef on the branch); spec corrections applied (cc404c0), `area/format` merged into `main` with `--no-ff` (70bf958), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), `swift test` green on the merged tree with the SDK compiled in, pushed, branch and worktree removed, task `shipped`; hosted CI first green on `main` on 2026-10-31 at cb20f6e, once the repository was public, but the macOS job hung on the next push (Needs Adam). The three-hour bench run with a card is still to do. |
+| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), task `shipped`; hosted CI green on `main` since 962dd4b. The first three-hour soak on two displays (2026-11-01) found faults in the still source's release, the engine's sweep, the clock box's raster, the audio start and the watchdog's sink rule, fixed on `area/soak-fixes` and merged on Adam's `approved` (2074bd6, 2026-11-02) after a second three-hour run that was clean except for memory, the live item (Now). The bench run with a card is still to do. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started | Next, once its prompt block is written in `docs/build-order.md` and the spike has passed every §15 criterion on the bench. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first (presets and text; it owes the text style a vertical anchor, Spec 4 §8). The object types are on `main` since Area 2; the engine's stack pass on `main` since Area 4 resolves slots, fit modes, opacity, mute and the +1 slot. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4; the weave and key/fill remain. |
@@ -37,50 +37,71 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**The soak fixes are in review on `area/soak-fixes`** (pushed, tip 745b991, CI green). On
-2026-11-01 Adam ran the three-hour soak on the two displays (no card yet) and it held every
-display and GPU threshold, zero re-presents and zero drops, GPU p99 under a quarter of the
-tick, and failed two: memory grew by seventy per cent after minute ten and the audio
-graph counted 155k underrun frames. The minute records named four causes and the session
-fixed them on the branch with tests first: a still's texture was released "after forever"
-and leaked one texture a write (Spec 4 §5, §6), and the threaded engine never swept
-deferred releases at all (only the harness did); the `[Time]` box kept every minute's
-raster instead of replacing it (§8); an audio instance was pulled before its decoder had
-delivered a sample, counting the empty device buffers as underruns, and its clock read a
-real device's host time as time played (§11); the watchdog's sink rule tripped on display
-link jitter eighty times (§12) and the minute record carried cumulative watchdog counts
-(§13); the last-good readback reallocated 33 MB a second. A four-minute run of the fixed
-engine with audio on: zero underruns, zero watchdog events, memory flat at 248 MB. The
-three-hour run on the fixed engine is what approval should rest on. Area 4 has shipped,
-Area 5 has not started, and the repository is public. On 2026-10-31 Adam wrote `approved`
-on the go-public brief, taking its
-recommendation (the licence notice also names the viewing and forking GitHub's Terms of
-Service allow; 3a777f9). The housekeeping session merged `area/go-public` into `main` with
-`--no-ff` (cb20f6e), ran `swift test` green on the merged tree with the SDK compiled in,
-pushed, made the repository public and applied every setting the brief listed with `gh`,
-each read back (Housekeeping below has the one that expires). Hosted CI is green on `main`
-(962dd4b, 2026-11-01): the macOS job had stalled about one run in four inside the runner's
-virtual GPU or VideoToolbox, in a kernel call the runner could not kill (a step time limit
-and cancels did nothing; only GitHub's force-cancel ended the runs), so the hosted test
-step now sets `O_HOSTED_RUNNER` and the Metal and codec tests skip there while the
-self-hosted bench Mac runs the whole suite (Housekeeping below). The worktree is removed
-and the branch deleted on both ends; everything is on `main` and nothing waits on a branch.
-The bench's three-hour run of `scripts/soak.sh tests/soak/spike.json` with a card and both
-outputs captured, which answers Spec 4 §15's 4K GPU time, DeckLink completion counts and A/V
-sync, is still to do.
+**The soak fixes are merged; memory attribution is the live item, on `area/soak-memory`**
+(pushed, tip 5761d3a, tooling only so far; its Build tracker item is
+"Soak memory: attribute the growth after minute ten"). Adam ran the three-hour soak again
+on 2026-11-02 from the fixed engine (two displays, no card, audio on): zero audio underruns,
+a few one-off watchdog jitter events and no recovery, every display and GPU threshold held,
+and memory rose from 256 MB at minute ten to a peak of 319 MB, which fails Spec 4 §13 by its
+letter (flat after the first ten minutes). The shape changed, though: the first run grew in
+a straight line and never stopped; this one decelerated to flat by the second hour (256, 281,
+304, 314, 317, 314 and 315 MB at the half-hour marks from minute ten), the text cache held at
+50 MB throughout, and the minute record carries one total, so it cannot name the remaining
+growth. Adam decided in the session, in reply to the brief and that result: approve and merge
+the fixes now; attribute the memory before anything else changes, both routes with the
+sampling run first; and he names the window for the attended run, since the dev Mac is the
+bench Mac and a multi-use computer, so nothing runs on it before he says so.
+
+Done on that: Spec 4 §11 (the audio preroll) and §12 (half a tick of slack on the
+watchdog's sink rule) corrected on `main` (6e546f8); `area/soak-fixes` merged into `main`
+with `--no-ff` (2074bd6); `swift test` green on the merged tree; pushed; hosted CI green on
+both jobs for the merge push; the branch deleted on both ends and its worktree removed, with both
+three-hour black boxes kept under `tests/soak-output/` in the main checkout.
+`scripts/soak-memory-sample.sh` is on `area/soak-memory`: one soak through
+`scripts/soak.sh` with `footprint` and `vmmap` samples of the engine at minutes five, ten,
+twenty and thirty, then a report of every memory category at every sample, largest growth
+first, with the malloc zones' live bytes against their dirty bytes, and the black box's own
+minute totals beside them. The §13 per-minute breakdown in the minute record is planned and
+waits for Adam's OK (Needs Adam). Everything else is on `main`; nothing but the script waits
+on a branch. The bench's three-hour run with a card and both outputs captured (Spec 4 §15)
+comes after memory is settled.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **The soak fixes** (`area/soak-fixes`, 745b991; the brief is the final message of the
-  Area 4 session on 2026-11-02). It asks Adam to: (1) run the three-hour soak again from
-  the branch's release build before approving, since the approval should rest on that
-  result (recommended: yes, the command is in the brief); (2) accept the Spec 4 §12
-  correction, half a tick of slack on the sink rule (recommended: yes); (3) accept the
-  readings: a 20 ms preroll before an instance plays, and a variable box's previous raster
-  released after its box transition (recommended: yes). On `approved` the session merges
-  with `--no-ff`, applies the §12 correction, and the bench run with the card is next.
+None. The soak-fixes brief (the final message of the Area 4 session on 2026-11-02) was
+answered the same day: approved and merged (2074bd6), the §11 and §12 corrections applied.
+
+### Plans waiting for an OK
+
+- **The Spec 4 §13 per-minute breakdown** (engine, `area/soak-memory`, tests first). §13's
+  per-minute line names "memory in use (heaps, decoder pools, caches)"; the record carries
+  one total, the process's resident size. The plan: the minute record gains the process
+  footprint (the figure Apple's `footprint` reports, beside the resident size it has), the
+  malloc heap's bytes in use, the resource table's texture bytes summed from its live
+  descriptors, the decoder pools' bytes (per live session, its pool depth times its frame
+  size), the text cache's bytes, and the readback buffers' bytes; the black box writes them
+  with the other minute fields, the reader reads them with zeros for older files, and the
+  soak verdict names which part grew between minute ten and the peak. Every source is a
+  statistic the engine already keeps, read on the recorder's thread; nothing on the render
+  thread changes. Tests: the record round-trips through the black box and its reader, an
+  older record without the keys parses with zeros, the resource table's byte sum follows
+  allocate and release, the verdict names the largest grower. Recommended: yes, after the
+  sampling run, so the next three-hour run attributes itself.
+
+### The attended run
+
+- When the machine is free for about forty minutes, from
+  `~/Developer/project-o/.claude/worktrees/area-soak-memory`, run
+  `scripts/soak-memory-sample.sh`. It builds the engine in release, runs the spike scenario
+  for thirty-five minutes on the displays and the default audio device, samples at minutes
+  five, ten, twenty and thirty, and prints the report (also saved under
+  `tests/soak-output/memory-<timestamp>/report.txt` in that worktree); the spike media is
+  already there. Or say in the session that the machine is free and the session runs it and
+  reads the report. The report decides between a fix (our heap or textures growing) and a
+  correction to §13's warm-up window (system caches filling), the latter a spec correction
+  for Adam to accept.
 
 ### Housekeeping
 
@@ -90,56 +111,46 @@ sync, is still to do.
   or anyone with a GitHub account can open them.
 - **Licence:** LCBC to choose before contributions open; set up a contributor agreement
   first.
-- **The bench Mac is the only place the hardware tests run.** The hosted macOS `swift test`
-  stalled about one run in four (the Area 4 merge push, bd42b70, and two runs on
-  2026-11-01) in a state the runner could not kill: a twelve-minute step limit did not fire,
-  `gh run cancel` did nothing, and only GitHub's force-cancel API ended the runs. XCTest
-  writes its progress to stdout, block-buffered into the runner's pipe, so the last
-  "started" line Adam read in a live log (the font-check test) was only the last line
-  flushed; what follows it is the video source suite over AVFoundation and VideoToolbox,
-  which, with the GPU, is where the runner's virtual hardware stalls. Since 962dd4b the
-  hosted test step sets `O_HOSTED_RUNNER`, which makes the Metal and codec tests skip with a
-  visible message (forty of the suite's tests); the rest runs on every push in about two
-  minutes. Every harness, readback and media-open wait is bounded too, and the step runs
-  unbuffered, so a future stall would fail a test and name it. A self-hosted runner on the
-  bench Mac, without the variable, is what should run the goldens, the decode tests and the
-  soak; until it exists, `swift test` on the bench by hand is the proof, as CLAUDE.md says.
+- **The bench Mac is the only place the hardware tests run.** Since 962dd4b the hosted test
+  step sets `O_HOSTED_RUNNER`, which makes the Metal and codec tests skip there with a
+  visible message, because the runner's virtual GPU or VideoToolbox stalled some runs in a
+  kernel call nothing could kill (a step time limit and cancels did nothing; only GitHub's
+  force-cancel API ended them). Every harness, readback and media-open wait is bounded and
+  the step runs unbuffered, so a future stall would fail a test and name it. A self-hosted
+  runner on the bench Mac, without the variable, is what should run the goldens, the decode
+  tests and the soak; until it exists, `swift test` on the bench by hand is the proof, as
+  CLAUDE.md says.
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
 
 ### Spec interpretations made so far
 
-None outstanding. Adam's `approved` answered every Area 4 reading; the plan's answers and
-the readings made while building are recorded in the Area 4 brief and in the
-`Spec interpretations made so far` table of an earlier version of this page (980f092). The
-spec now says what the code does.
+None outstanding. The soak fixes' readings were approved on 2026-11-02: the audio preroll is
+now §11's text (6e546f8), and releasing a variable box's previous raster after its box
+transition is §8's "the result replaces the cache entry" applied. The memory rule is read by
+its letter, baseline at minute ten and no allowance for warm-up, which is why the second
+soak reads FAIL; whether that letter should change is the attribution's question, not a
+reading made.
 
 ### Spec corrections proposed
 
-- Spec 4 §12, the watchdog's sink rule: "within the last two frame intervals" reads
-  literally as a stall whenever a display link fires a millisecond late at the 250 ms
-  sampling instant (eighty such lines in the three-hour soak, none a recovery). The code
-  gives the rule half a tick of slack. Fix: say "within two frame intervals and half a
-  tick".
-- Spec 4 §11, audio start: the code starts an instance once its ring holds 20 ms of
-  samples or the clip has ended; until then it is silent, counts no underrun and its clock
-  holds at the in-point. Fix: say so, since §11 says the clock is "derived from the samples
-  that have reached the device" without saying when the first one may go.
-
-Area 4's earlier corrections were applied on `main` in 7032182 (Spec 4 §3, §8, §10, §16).
-The presets-and-text spec, when written, owes the text style a vertical anchor defaulting to
-centre (Spec 4 §8 says so).
+None outstanding: §11 and §12 applied in 6e546f8, Area 4's earlier ones in 7032182. One may
+follow the attribution: §13's warm-up window, only if the growth proves to be system caches
+saturating. The presets-and-text spec, when written, owes the text style a vertical anchor
+defaulting to centre (Spec 4 §8 says so).
 
 ## Next
 
-**The soak fixes first, then the bench run.** The three-hour run on the fixed engine
-(from the `area/soak-fixes` worktree, two displays, audio on) decides the fixes' approval
-and their merge. Then Spec 4 §15's run with the card: the bench machine root (a copy of
+**The attended sampling run, then the breakdown, then the bench run.** The sampling run
+(The attended run, above) names the growth; the breakdown (Plans waiting for an OK) makes
+every later run name it; what they show decides between a fix on `area/soak-memory` and a
+§13 correction. Then Spec 4 §15's run with the card: the bench machine root (a copy of
 `tests/fixtures/spike/machine/` with the main output at the LED wall's format, as a
 DeckLink output if the bench has 12G) and `scripts/soak.sh tests/soak/spike.json`, which
 writes the media if it is missing, runs the engine with the script over OSC and prints the
-§13 verdict. Both can be run by Adam without a session.
+§13 verdict. Both runs take the displays and the audio device, so they happen in a window
+Adam sets aside; he can run either without a session.
 
 **Area 5 — Render pipeline, the rest** (branch `area/render`) is next in `docs/build-order.md`;
 it has no prompt block there yet, only the row and the gate ("nothing in `app/` starts until
