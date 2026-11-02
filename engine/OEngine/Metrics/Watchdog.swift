@@ -89,7 +89,10 @@ public final class Watchdog: @unchecked Sendable {
         for output in r.sinkLastPresent.keys.sorted() {
             guard let last = r.sinkLastPresent[output], last.nanoseconds > 0 else { continue }
             let since = r.now - last
-            if since > 2 * r.tickNanoseconds {
+            // Spec 4 §12 — "within the last two frame intervals", with half a tick of slack: a display
+            // link that fires a millisecond late at the sampling instant is not a stall (the spike's
+            // soak logged eighty of those in three hours).
+            if since > 2 * r.tickNanoseconds + r.tickNanoseconds / 2 {
                 findings.append(.sinkStalled(output: output, sinceNs: since, queues: r.queues))
             }
         }

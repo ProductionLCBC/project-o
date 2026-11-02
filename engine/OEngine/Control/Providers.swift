@@ -68,6 +68,17 @@ public protocol TextProvider: AnyObject, Sendable {
     func entry(for job: TextJob) -> TextEntry?
     /// Ask for a rasterization; returns at once.
     func request(_ job: TextJob)
+    /// Spec 4 §8 — "the result replaces the cache entry": a raster that will not
+    /// be asked for again goes, its textures freed after `afterTick`.
+    func release(_ key: TextKey, afterTick: Int64)
+    /// Spec 4 §3 — the render thread consumed this tick; what was released
+    /// earlier may be freed.
+    func sweep(consumedTick: Int64)
+}
+
+public extension TextProvider {
+    func release(_ key: TextKey, afterTick: Int64) {}
+    func sweep(consumedTick: Int64) {}
 }
 
 extension TextKey {

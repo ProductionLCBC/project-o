@@ -20,6 +20,10 @@ public final class AudioInstance: @unchecked Sendable {
     var held = 0
     var envelope = Envelope.flat(1)
     let playing = Atomic<Bool>(true)
+    /// Spec 4 §11 — set by the callback once the ring holds a preroll (or has
+    /// ended); until then the instance is silent by design, counts no underrun
+    /// and its clock holds at the in-point.
+    let started = Atomic<Bool>(false)
     let delivered = Atomic<Int64>(0)
     let deliveredAtHostNs = Atomic<Int64>(0)
     let underrunCount = Atomic<Int64>(0)
@@ -37,6 +41,7 @@ public final class AudioInstance: @unchecked Sendable {
     /// it that have reached the device": the ms of media delivered, plus the
     /// time since the device took them.
     public func mediaTimeMs(nowNs: Int64) -> Double {
+        guard started.load(ordering: .acquiring) else { return inMs }
         let frames = delivered.load(ordering: .acquiring)
         let since = playing.load(ordering: .relaxed) ? max(0, nowNs - deliveredAtHostNs.load(ordering: .relaxed)) : 0
         return inMs + Double(frames) / 48 + Double(since) / 1_000_000
@@ -80,6 +85,8 @@ public final class AudioInstance: @unchecked Sendable {
 /// installed into free slots on the control side before being marked active.
 public final class AudioGraph: @unchecked Sendable {
     public static let maxInstances = 16
+    /// Spec 4 §11 — the samples an instance's ring holds before it starts: 20 ms at 48 kHz.
+    public static let prerollFrames = 960
     public static let gainRampFrames: Int64 = 2400     // 50 ms at 48 kHz
     public static let muteRampFrames: Int64 = 960      // 20 ms
 
@@ -228,6 +235,15 @@ public final class AudioGraph: @unchecked Sendable {
         // Mix every active instance into the device channels.
         for slot in 0..<AudioGraph.maxInstances {
             guard let instance = slots[slot], instance.active.load(ordering: .acquiring) else { continue }
+            if !instance.started.load(ordering: .relaxed) {
+                // Spec 4 §11 — "A/V sync is anchored to the audio device clock": the clock starts with the
+                // first samples, and the first samples wait for a preroll so a decoder still filling the
+                // ring is not an underrun. The spike's three-hour soak counted a device buffer or three
+                // of silence at every instance start as underruns.
+                guard instance.ring.framesAvailable >= AudioGraph.prerollFrames || instance.ring.isEnded else { continue }
+                instance.deliveredAtHostNs.store(hostTimeNs, ordering: .releasing)
+                instance.started.store(true, ordering: .releasing)
+            }
             let playing = instance.playing.load(ordering: .relaxed)
             let target = instance.gainTarget.load(ordering: .relaxed)
             var gain = instance.gainCurrent

@@ -28,6 +28,7 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         public var failed: Int = 0
         public var bytes: Int = 0
         public var pending: Int = 0
+        public var entries: Int = 0
 
         public var hitRate: Double { hits + misses > 0 ? Double(hits) / Double(hits + misses) : 1 }
     }
@@ -130,6 +131,7 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         stats.rasterized += 1
         stats.bytes += bytes
         stats.pending = pending.count
+        stats.entries = entries.count
         if let substituted = raster.substitutedFont { substitutions.insert(job.style.values.font + " -> " + substituted) }
         evictIfNeeded()
         lock.unlock()
@@ -148,6 +150,24 @@ public final class TextCache: TextProvider, @unchecked Sendable {
             stats.evicted += 1
             for line in entry.lines { backend.resources.release(line.texture, afterTick: releaseAfterTick) }
         }
+        stats.entries = entries.count
+    }
+
+    /// Spec 4 §8 — "the result replaces the cache entry": the previous raster of
+    /// a variable box goes now; its textures are freed after `afterTick`, which
+    /// the control loop sets past any box transition still showing them. The
+    /// soak kept every minute's clock raster without this.
+    public func release(_ key: TextKey, afterTick: Int64) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let entry = entries.removeValue(forKey: key) else { return }
+        stats.bytes -= entry.bytes
+        stats.entries = entries.count
+        for line in entry.lines { backend.resources.release(line.texture, afterTick: max(afterTick, releaseAfterTick)) }
+    }
+
+    public func release(_ key: TextKey) {
+        release(key, afterTick: releaseAfterTick)
     }
 
     // MARK: - Reading

@@ -83,8 +83,20 @@ public final class Engine: @unchecked Sendable {
             recoverIfNeeded()
             planRing.publish(control.build(for: time.tick, now: time.reference))
             afterBuild?(control)
+            sweepReleases()
         }
         render.tick(time)
+    }
+
+    /// Spec 4 §3 — "A released handle is not reused until the control side says
+    /// the last plan that named it has been consumed": once a build, on the
+    /// control side, the text cache and the resource table free what was
+    /// released the ring's depth ago. The threaded engine did not do this before
+    /// the first soak, so nothing deferred was ever freed.
+    func sweepReleases() {
+        let consumed = render.lastConsumedTick
+        control.text.sweep(consumedTick: consumed)
+        backend.resources.sweep(consumedTick: consumed)
     }
 
     /// Spec 4 §12 — "Metal device lost or command buffer error ... rebuild
@@ -124,6 +136,7 @@ public final class Engine: @unchecked Sendable {
                     let started = MonotonicClock.now()
                     planRing.publish(control.build(for: frame, now: clock.now()))
                     afterBuild?(control)
+                    sweepReleases()
                     let took = MonotonicClock.now() - started
                     if took > pacing.tickNanoseconds {
                         // Spec 4 §3 — a build past the tick means the render thread reused a plan; say which one.

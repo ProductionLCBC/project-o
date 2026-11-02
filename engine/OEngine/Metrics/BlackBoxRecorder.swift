@@ -39,6 +39,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
     private var minute = 0
     private var lastMinuteAt = MonotonicClock.now()
     private var lastUnderruns = 0
+    private var lastEvents = 0
+    private var lastRecoveries = 0
 
     public init(box: BlackBox, ticks: MetricsRing, presents: [PresentRing], tickNanoseconds: Int64, sources: MinuteSources, log: EngineLog) {
         self.box = box
@@ -81,11 +83,16 @@ public final class BlackBoxRecorder: @unchecked Sendable {
 
     /// Spec 4 §13 — the per-minute record.
     public func writeMinute(now: Date = Date()) {
+        // Spec 4 §13 — a minute record carries what happened in that minute; the sources count since start.
         let underruns = sources.audioUnderruns()
+        let events = sources.watchdogEvents()
+        let recoveries = sources.watchdogRecoveries()
         let record = MinuteRecord(minute: minute, memoryBytes: BlackBoxRecorder.residentMemoryBytes(), decoderSessions: sources.decoderSessions(),
                                   textCacheHitRate: sources.textCacheHitRate(), audioUnderruns: max(0, underruns - lastUnderruns),
-                                  watchdogEvents: sources.watchdogEvents(), watchdogRecoveries: sources.watchdogRecoveries())
+                                  watchdogEvents: max(0, events - lastEvents), watchdogRecoveries: max(0, recoveries - lastRecoveries))
         lastUnderruns = underruns
+        lastEvents = events
+        lastRecoveries = recoveries
         minute += 1
         do { try box.append(record, at: now) } catch { log.error("black box: \(error)") }
     }

@@ -51,7 +51,8 @@ public final class StillSource: ContentSource, @unchecked Sendable {
 
     public func release() {
         releasedFlag.store(true, ordering: .releasing)
-        backend.resources.release(handle, afterTick: Int64.max)
+        // Spec 4 §5, §6 — the texture goes back once every plan that could name it was consumed.
+        backend.resources.release(handle)
     }
 
     /// Decode and convert, on the calling (decode) thread.

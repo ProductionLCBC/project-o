@@ -34,6 +34,8 @@ final class AVSyncTests: XCTestCase {
         XCTAssertNotNil(media.audio, "the clip's sound is on the graph")
 
         // The device takes one second of audio, 10 ms at a time, as a HAL device would.
+        // Spec 4 §11 — the instance plays once its preroll is there; wait for that first.
+        XCTAssertTrue(waitUntil(5) { ring.framesAvailable >= AudioGraph.prerollFrames })
         var mix: [Float] = []
         for _ in 0..<100 {
             XCTAssertTrue(waitUntil(5) { ring.framesAvailable >= 480 || ring.isEnded })

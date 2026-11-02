@@ -17,6 +17,7 @@ public final class ResourceTable: @unchecked Sendable {
     private var free: [Int32]
     private var deferred: [(handle: TextureHandle, afterTick: Int64)] = []
     private let allocatedCount = Atomic<Int>(0)
+    private let lastConsumed = Atomic<Int64>(-1)
 
     public init(capacity: Int) {
         self.capacity = max(1, capacity)
@@ -65,8 +66,19 @@ public final class ResourceTable: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Spec 4 §3 — the tick the render thread had consumed at the last sweep.
+    public var lastConsumedTick: Int64 { lastConsumed.load(ordering: .acquiring) }
+
+    /// Control side: release a handle as soon as that is safe, which is the plan
+    /// ring's depth of ticks after the last one the render thread consumed. The
+    /// spike's still source released "after forever" and leaked a texture a write.
+    public func release(_ handle: TextureHandle) {
+        release(handle, afterTick: lastConsumedTick + Int64(PlanRing.depth))
+    }
+
     /// Control side: free the deferred handles whose tick has passed.
     public func sweep(consumedTick: Int64) {
+        lastConsumed.store(consumedTick, ordering: .releasing)
         lock.lock()
         defer { lock.unlock() }
         var keep: [(handle: TextureHandle, afterTick: Int64)] = []
