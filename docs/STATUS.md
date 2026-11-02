@@ -61,8 +61,15 @@ three-hour black boxes kept under `tests/soak-output/` in the main checkout.
 `scripts/soak.sh` with `footprint` and `vmmap` samples of the engine at minutes five, ten,
 twenty and thirty, then a report of every memory category at every sample, largest growth
 first, with the malloc zones' live bytes against their dirty bytes, and the black box's own
-minute totals beside them. The §13 per-minute breakdown in the minute record is planned and
-waits for Adam's OK (Needs Adam). Everything else is on `main`; nothing but the script waits
+minute totals beside them. Adam's one-minute smoke run on 2026-11-02 proved it end to end
+(report under `tests/soak-output/memory-2026-11-02-142807/` in that worktree) and gave the
+first finding: the minute record's resident figure misses the GPU-owned part of the
+engine's footprint (about 520 MB of footprint against about 206 MB resident at the start),
+so the §13 rule as coded judges less than half of the engine's memory; and each `vmmap`
+sample freezes the engine for about two thirds of a second, which the watchdog logs and a
+display answers with a re-present, so the attribution run is never the §13 verdict run.
+The §13 per-minute breakdown in the minute record is planned, with the footprint as its
+first field, and waits for Adam's OK (Needs Adam). Everything else is on `main`; nothing but the script waits
 on a branch. The bench's three-hour run with a card and both outputs captured (Spec 4 §15)
 comes after memory is settled.
 
