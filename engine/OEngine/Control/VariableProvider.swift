@@ -52,6 +52,15 @@ public final class VariableProvider: @unchecked Sendable {
         return cachedDate
     }
 
+    /// Spec 4 §8 — "no more than once a second": the wall-clock second the
+    /// provider is on, which the control loop's variable gate counts by.
+    public var currentSecond: Int64 {
+        refresh()
+        lock.lock()
+        defer { lock.unlock() }
+        return cachedSecond
+    }
+
     private func refresh() {
         let now = wallClock()
         let second = Int64(now.timeIntervalSinceReferenceDate.rounded(.down))

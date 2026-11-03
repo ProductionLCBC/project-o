@@ -843,16 +843,12 @@ public final class ControlLoop: @unchecked Sendable {
                     resolved = textBox(value, box: box, frame: frameRect, size: size, slot: slot, opacity: opacity, scratch: &scratch)
                 }
             case .static(let raw):
-                let value = variables.resolve(raw, state: model.state)
                 let hasVariables = VariableProvider.containsVariables(raw)
-                transitionAllowed = box.transitionOnVariableChange || !hasVariables
-                // Spec 4 §8 — "the result replaces the cache entry": the previous value's raster goes,
-                // its textures freed once any box transition between the two has run its course.
-                if hasVariables, let previous = model.boxRuns[key]?.previousText, !previous.isEmpty, previous != value {
-                    let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-                    text.release(textJob(previous, box: box, frame: frameRect, outputHeight: size.height).key,
-                                 afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
-                }
+                let resolvedNow = variables.resolve(raw, state: model.state)
+                let value = hasVariables
+                    ? adoptedVariableValue(key, resolved: resolvedNow, box: box, frame: frame, frameRect: frameRect, size: size)
+                    : resolvedNow
+                transitionAllowed = ControlLoop.transitionAllowed(for: box)
                 if !value.isEmpty {
                     resolved = textBox(value, box: box, frame: frameRect, size: size, slot: slot, opacity: opacity, scratch: &scratch)
                 }
@@ -866,6 +862,44 @@ public final class ControlLoop: @unchecked Sendable {
                                               allowed: transitionAllowed, frame: frame)
             boxes.append(result)
         }
+    }
+
+    /// Spec 4 §8 — "Boxes with `transitionOnVariableChange` run their box
+    /// transition between the old and new textures; the rest swap." A box
+    /// without variables always transitions.
+    static func transitionAllowed(for box: Box) -> Bool {
+        guard case .static(let raw) = box.binding.kind, VariableProvider.containsVariables(raw) else { return true }
+        return box.transitionOnVariableChange
+    }
+
+    /// Spec 4 §8 — "A box whose text contains variables is re-laid-out only
+    /// when its resolved text changes, and no more than once a second; the
+    /// result replaces the cache entry." The box keeps the value it adopted
+    /// until the resolved text differs and the wall-clock second has moved on
+    /// (Area 5 reading, approved 2026-11-03: the second is the one the variable
+    /// provider reads for `[Time]`, so a seconds clock never skips a value on a
+    /// fractional master rate). A first value and a clear are not re-layouts
+    /// and show at once. The previous raster goes when a value is adopted, its
+    /// textures freed once any box transition between the two has run.
+    private func adoptedVariableValue(_ key: BoxKey, resolved: String, box: Box, frame: Int64, frameRect: PixelRect, size: PixelSize) -> String {
+        var run = model.boxRuns[key] ?? BoxRun()
+        defer { model.boxRuns[key] = run }
+        let second = variables.currentSecond
+        guard let adopted = run.adoptedText else {
+            run.adoptedText = resolved
+            run.adoptedSecond = second
+            return resolved
+        }
+        guard adopted != resolved else { return adopted }
+        if !adopted.isEmpty, !resolved.isEmpty, second == run.adoptedSecond { return adopted }
+        if !adopted.isEmpty {
+            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+            text.release(textJob(adopted, box: box, frame: frameRect, outputHeight: size.height).key,
+                         afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+        }
+        run.adoptedText = resolved
+        run.adoptedSecond = second
+        return resolved
     }
 
     private func boxGrade(_ box: Box) -> GradeParameters? {
@@ -934,7 +968,7 @@ public final class ControlLoop: @unchecked Sendable {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: slot.offset == 0, frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, allowed: slot.offset == 0 && ControlLoop.transitionAllowed(for: box), frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }

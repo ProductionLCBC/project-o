@@ -136,6 +136,6 @@ final class TextRasterizerTests: XCTestCase {
         var style = TextStyleValues()
         style.font = "NoSuchFont-Bold"
         cache.request(job("Amen", style: style))
-        XCTAssertEqual(cache.fontSubstitutions, ["NoSuchFont-Bold -> HelveticaNeue"])
+        XCTAssertEqual(cache.fontSubstitutions, [FontSubstitution(requested: "NoSuchFont-Bold", actual: "HelveticaNeue", count: 1)])
     }
 }

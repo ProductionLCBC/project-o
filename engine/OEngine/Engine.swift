@@ -26,6 +26,10 @@ public final class Engine: @unchecked Sendable {
     public let metrics: MetricsRing
     public let log: EngineLog
     public let watchdog: Watchdog
+    /// Spec 4 §12 — memory pressure shrinks the caches that registered here;
+    /// the thermal state is logged on change. Both off the render thread.
+    public let pressure: MemoryPressureMonitor
+    public let thermal: ThermalMonitor
     public private(set) var scheduler: TickScheduler?
     public private(set) var recorder: BlackBoxRecorder?
     private var controlThread: Thread?
@@ -62,6 +66,8 @@ public final class Engine: @unchecked Sendable {
         sources = SourceTable(capacity: capacity)
         metrics = MetricsRing(capacity: 4096)
         watchdog = Watchdog(log: log)
+        pressure = MemoryPressureMonitor(caches: [text as? ShrinkableCache].compactMap { $0 }, log: log)
+        thermal = ThermalMonitor(log: log)
         control = ControlLoop(library: library, machine: machine, pacing: pacing, mediaRoot: mediaRoot, backend: backend,
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, log: log)
@@ -161,6 +167,9 @@ public final class Engine: @unchecked Sendable {
         scheduler.start()
 
         watchdog.start { [self] in livenessReading(now: MonotonicClock.now()) }
+        // Spec 4 §12 — memory pressure and the thermal state, "detected elsewhere and never on the render thread".
+        pressure.start()
+        thermal.start()
 
         if let blackBox {
             let presentRings = sinks.values.compactMap { sink -> PresentRing? in
@@ -201,6 +210,8 @@ public final class Engine: @unchecked Sendable {
         scheduler?.stop()
         controlSignal.signal()
         watchdog.stop()
+        pressure.stop()
+        thermal.stop()
         recorder?.stop()
         audio?.stop()
         for sink in sinks.values { sink.stop() }

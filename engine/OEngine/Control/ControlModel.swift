@@ -216,6 +216,11 @@ public struct BoxKey: Hashable, Sendable {
 public struct BoxRun: Sendable {
     public var previousContent: BoxContent?
     public var previousText: String?
+    /// Spec 4 §8 — the resolved value a variable box last adopted, and the
+    /// wall-clock second it adopted it in: "re-laid-out only when its resolved
+    /// text changes, and no more than once a second".
+    public var adoptedText: String?
+    public var adoptedSecond: Int64 = .min
     public var type: TransitionType = .cut
     public var easing: Easing = .linear
     public var startFrame: Int64 = 0

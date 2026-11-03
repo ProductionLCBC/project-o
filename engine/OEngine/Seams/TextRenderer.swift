@@ -11,8 +11,27 @@ import OCore
 /// animation."
 public protocol TextRenderer: AnyObject, Sendable {
     var name: String { get }
+    /// Spec 4 §8 — "the machine's fallback font": what stands in for a font
+    /// that is missing, and what a failed raster is retried with (Spec 4 §12).
+    var fallbackFont: String { get }
     /// Spec 4 §8 — layout, fit and raster one job. Off the render thread.
     func rasterize(_ job: TextJob) throws -> TextRaster
+}
+
+/// Spec 4 §8 — "recording the substitution for pre-flight": one font that
+/// stood in for another, and how many rasters it did so for.
+public struct FontSubstitution: Equatable, Sendable, CustomStringConvertible {
+    public var requested: String
+    public var actual: String
+    public var count: Int
+
+    public init(requested: String, actual: String, count: Int) {
+        self.requested = requested
+        self.actual = actual
+        self.count = count
+    }
+
+    public var description: String { "\(requested) -> \(actual) (\(count))" }
 }
 
 /// Spec 4 §8 — the result of one rasterization: one bitmap per line, the

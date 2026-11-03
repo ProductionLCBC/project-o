@@ -276,7 +276,8 @@ public final class EngineProcess: @unchecked Sendable {
         }
         lines.append("watchdog: events \(engine.watchdog.events), recoveries \(engine.watchdog.recoveries + Int(engine.recoveries)); clock fallbacks \(engine.scheduler?.fallbacks ?? 0), free-run ticks \(engine.scheduler?.freeRunTicks ?? 0)")
         let text = textCache.statistics
-        lines.append("text cache: hit rate \(String(format: "%.3f", text.hitRate)), rasterized \(text.rasterized), evicted \(text.evicted), failed \(text.failed), \(text.bytes / 1_048_576) MB" + (textCache.fontSubstitutions.isEmpty ? "" : "; font substitutions: \(textCache.fontSubstitutions.joined(separator: ", "))"))
+        lines.append("text cache: hit rate \(String(format: "%.3f", text.hitRate)), rasterized \(text.rasterized), evicted \(text.evicted), failed \(text.failed), shrunk \(text.shrinks) times, \(text.bytes / 1_048_576) MB" + (textCache.fontSubstitutions.isEmpty ? "" : "; font substitutions: \(textCache.fontSubstitutions.map(\.description).joined(separator: ", "))"))
+        lines.append("pressure: memory \(engine.pressure.level.rawValue) (\(engine.pressure.changes) changes), thermal \(engine.thermal.level.rawValue) (\(engine.thermal.changes) changes)")
         if let osc {
             lines.append("osc: port \(osc.boundPort), received \(osc.received), rejected \(osc.rejected), sent \(osc.sent)")
         }
