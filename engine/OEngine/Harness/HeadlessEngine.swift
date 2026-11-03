@@ -52,20 +52,20 @@ public final class HeadlessEngine: @unchecked Sendable {
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, thumbnailFolder: URL? = nil) throws {
         let log = EngineLog(category: "harness")
         let renderer = CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont)
-        // Spec 4 §11 — one graph per device: the software device stands in for the
-        // machine's `device` outputs; `sdiEmbedded` outputs belong to the DeckLink sink.
-        let device = SoftwareAudioDevice()
-        let outputs = machine.audioOutputs.filter { $0.kind == .device }
+        // Spec 4 §11 — one graph per device: the software factory hands out a pullable
+        // device per key; an `sdiEmbedded` output's feed has no card here and consumes silently.
+        let factory = SoftwareAudioDeviceFactory()
         let posters = ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log)
         try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
                       sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: posters,
                       text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
-                      audio: AudioGraph(device: device, outputs: outputs, log: log), wallClock: wallClock)
+                      audio: AudioSystem(outputs: machine.audioOutputs, factory: factory, log: log), wallClock: wallClock, log: log)
+        audioFactory = factory
         // Spec 4 §10 — the thumbnail job over the same posters and variables, its cache in a folder of the test's choosing.
         let folder = thumbnailFolder ?? FileManager.default.temporaryDirectory.appendingPathComponent("oengine-thumbnails-\(UUID().uuidString)")
         engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal, posters: posters,
                                                  variables: variables, cacheFolder: folder, log: log)
-        try engine.audio?.start()
+        engine.audio?.start()
         for sink in sinks.values {
             // The harness presents on the test's thread, so it can wait for the GPU here.
             sink.isComplete = { [metal] receipt in
@@ -79,8 +79,8 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, sourceFactory: any SourceFactory,
-                posters: any PosterProvider, text: any TextProvider, audio: AudioGraph? = nil,
-                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
+                posters: any PosterProvider, text: any TextProvider, audio: AudioSystem? = nil,
+                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, log: EngineLog = EngineLog(category: "harness")) throws {
         self.backend = backend
         self.sourceFactory = sourceFactory
         self.posters = posters
@@ -91,7 +91,7 @@ public final class HeadlessEngine: @unchecked Sendable {
         self.sinks = sinks
         engine = try Engine(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, clock: clock,
                             sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
-                            variables: variables, audio: audio, log: EngineLog(category: "harness"))
+                            variables: variables, audio: audio, log: log)
         let backendRef = backend
         for sink in sinks.values {
             // Spec 4 §12 — a frame whose GPU work failed is never presented; the previous one holds.
@@ -178,7 +178,11 @@ public final class HeadlessEngine: @unchecked Sendable {
         sinks[output]?.lastCaptured
     }
 
-    /// The software audio device of the Metal harness, for pulling sound.
+    /// The software device factory of the Metal harness: every device by key,
+    /// and the keys a test marks absent (Spec 4 §12).
+    public private(set) var audioFactory: SoftwareAudioDeviceFactory?
+
+    /// The software audio device of the first graph of the Metal harness, for pulling sound.
     public var audioDevice: SoftwareAudioDevice? { engine.audio?.device as? SoftwareAudioDevice }
 
     /// Pull `frames` frames of the device mix (Metal harness).

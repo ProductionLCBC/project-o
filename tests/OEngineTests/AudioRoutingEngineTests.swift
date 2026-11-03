@@ -46,25 +46,23 @@ final class AudioRoutingEngineTests: XCTestCase {
         let ringB = attachment.members[1].instance.ring
         XCTAssertTrue(waitUntil(5) { ringA.framesAvailable >= AudioGraph.prerollFrames && ringB.framesAvailable >= AudioGraph.prerollFrames })
 
-        // Device A takes a second of audio, device B a tenth: the picture follows A.
+        // Both devices consume, as two devices would; B runs a tenth fast, as a device on its own
+        // clock might, so after a second A has delivered one second and B one and a tenth.
         var mixA: [Float] = []
+        var mixB: [Float] = []
         for _ in 0..<100 {
-            XCTAssertTrue(waitUntil(5) { ringA.framesAvailable >= 480 || ringA.isEnded })
+            XCTAssertTrue(waitUntil(5) { (ringA.framesAvailable >= 480 && ringB.framesAvailable >= 528) || ringA.isEnded })
             mixA += a.pull(frames: 480)
+            mixB += b.pull(frames: 528)
         }
-        XCTAssertTrue(waitUntil(5) { ringB.framesAvailable >= 4800 || ringB.isEnded })
-        let mixB = b.pull(frames: 4800)
         XCTAssertLessThan(mixA.map(abs).max() ?? 1, 0.01, "silence before the click on A")
-        XCTAssertLessThan(mixB.map(abs).max() ?? 1, 0.01)
+        XCTAssertGreaterThan(mixB.map(abs).max() ?? 0, 0.5, "B is past the click already")
         XCTAssertEqual(system.underruns, 0)
         engine.tick()
         guard case .instance(_, let afterSecond)? = engine.lastPlan?.channelPasses.first?.incoming.source else { return XCTFail() }
-        XCTAssertEqual(afterSecond, 1000, accuracy: 1000.0 / 30, "media time follows device A, within one frame")
-        XCTAssertTrue(waitUntil(5) { ringA.framesAvailable >= 48 && ringB.framesAvailable >= 48 })
-        XCTAssertGreaterThan(a.pull(frames: 48).map(abs).max() ?? 0, 0.5, "the click reaches A")
-        XCTAssertTrue(waitUntil(5) { ringB.framesAvailable >= 43_200 || ringB.isEnded })
-        _ = b.pull(frames: 43_200)
-        XCTAssertGreaterThan(b.pull(frames: 48).map(abs).max() ?? 0, 0.5, "and B, a second into B's own delivery")
+        XCTAssertEqual(afterSecond, 1000, accuracy: 1000.0 / 30, "media time follows device A, within one frame, not B's 1100")
+        XCTAssertTrue(waitUntil(5) { ringA.framesAvailable >= 48 })
+        XCTAssertGreaterThan(a.pull(frames: 48).map(abs).max() ?? 0, 0.5, "the click reaches A at its second")
 
         // Spec 4 §12 — device A vanishes with no fallback: output 1 is silent, the clock and the picture go on.
         factory.clock.nowNs = 9_000_000_000

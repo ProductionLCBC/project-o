@@ -58,8 +58,9 @@ public struct MediaRuntime: Sendable {
     /// The transport and end behaviour last seen in ShowState.
     public var transport: Transport
     public var endBehavior: EndBehavior
-    /// Spec 4 §11 — the instance's sound, when the file has a track and a graph exists.
-    public var audio: AudioInstance?
+    /// Spec 4 §11 — the instance's sound on every device its channel's
+    /// outputs reach, when the file has a track and a graph exists.
+    public var audio: AudioAttachment?
     public var audioDecoder: AudioFileDecoder?
     public var syncOffsetMs: Int = 0
     public var gainOverride: Double?

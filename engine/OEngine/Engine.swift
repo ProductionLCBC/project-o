@@ -39,7 +39,8 @@ public final class Engine: @unchecked Sendable {
     private let running = Atomic<Bool>(false)
     public private(set) var recoveries: Int64 = 0
 
-    public let audio: AudioGraph?
+    /// Spec 4 §11 — the audio system, one mix graph per device; nil runs silent.
+    public let audio: AudioSystem?
     /// Called on the control thread after every plan is built: the process
     /// derives OSC feedback from what ran (Spec 2 §6).
     public var afterBuild: (@Sendable (ControlLoop) -> Void)?
@@ -58,7 +59,7 @@ public final class Engine: @unchecked Sendable {
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
-                text: any TextProvider, variables: VariableProvider, audio: AudioGraph? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
+                text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
         self.library = library
         self.machine = machine
@@ -82,6 +83,8 @@ public final class Engine: @unchecked Sendable {
         sources = SourceTable(capacity: capacity)
         metrics = MetricsRing(capacity: 4096)
         watchdog = Watchdog(log: log)
+        // Spec 4 §12 — an audio device lost while running is a recovery the soak counts (Spec 4 §13).
+        audio?.onRecovery = { [watchdog] recovery in watchdog.recordRecovery(recovery) }
         pressure = MemoryPressureMonitor(caches: [text as? ShrinkableCache].compactMap { $0 }, log: log)
         thermal = ThermalMonitor(log: log)
         control = ControlLoop(library: library, machine: machine, pacing: pacing, mediaRoot: mediaRoot, backend: backend,
@@ -160,9 +163,8 @@ public final class Engine: @unchecked Sendable {
         for output in sinks.keys.sorted() {
             do { try sinks[output]?.start() } catch { log.error("output \(output) did not start: \(error)") }
         }
-        if let audio {
-            do { try audio.start() } catch { log.error("audio device \(audio.device.name) did not start: \(error); running silent") }
-        }
+        // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each.
+        audio?.start()
         // The first plan, so the first tick has something to render.
         planRing.publish(control.build(for: 0, now: clock.now()))
         nextFrameToBuild.store(1, ordering: .releasing)

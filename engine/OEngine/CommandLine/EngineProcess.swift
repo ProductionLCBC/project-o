@@ -69,7 +69,7 @@ public final class EngineProcess: @unchecked Sendable {
     public let osc: OSCServer?
     public let blackBox: BlackBox?
     public let textCache: TextCache
-    public let audio: AudioGraph?
+    public let audio: AudioSystem?
     public let displaySinks: [DisplaySink]
     public let deckLinkSinks: [DeckLinkSink]
     private let startedAt = MonotonicClock.now()
@@ -105,9 +105,10 @@ public final class EngineProcess: @unchecked Sendable {
                 log.info("output \(output.number) (\(output.label)) on screen \(screen.localizedName)")
             case .sdi:
                 let id = output.device.hasPrefix("decklink:") ? String(output.device.dropFirst("decklink:".count)) : output.device
-                let embedded = machine.audioOutputs.first { $0.kind == .sdiEmbedded && $0.device == .sdiOutput(output.number) }
-                let sink = DeckLinkSink(output: output.number, persistentID: id, format: output.format, audioChannels: embedded?.channels.count ?? 2,
-                                        backend: backend, log: log)
+                // Spec 4 §10 — the card's embedded channel count from the Audio Outputs on this SDI output.
+                let embedded = machine.audioOutputs.filter { $0.device == .sdiOutput(output.number) }.flatMap(\.channels)
+                let sink = DeckLinkSink(output: output.number, persistentID: id, format: output.format,
+                                        audioChannels: DeckLinkSink.embeddedChannelCount(for: embedded.isEmpty ? [0, 1] : embedded), backend: backend, log: log)
                 deckLinks.append(sink)
                 sinks.append(sink)
             case .ndi, .multiviewer:
@@ -140,25 +141,19 @@ public final class EngineProcess: @unchecked Sendable {
         textCache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont), backend: backend, log: log)
         let variables = VariableProvider(settings: machine.settings)
 
-        // Audio (Spec 4 §11): one graph on the first `device` output's device; the SDI-embedded outputs belong to the DeckLink sinks.
-        var graph: AudioGraph?
-        let deviceOutputs = machine.audioOutputs.filter { $0.kind == .device }
-        if options.audio, let first = deviceOutputs.first {
-            var uid: String?
-            if case .uid(let named) = first.device, !named.isEmpty { uid = named }
-            if let wanted = uid, HALOutputDevice.deviceID(forUID: wanted) == nil {
-                // Spec 4 §12 — "Switch to the Audio Output's configured fallback device if one is set".
-                let fallback = first.fallbackDevice.flatMap { HALOutputDevice.deviceID(forUID: $0) == nil ? nil : $0 }
-                log.warning("audio output \(first.number): device \(wanted) not found; using \(fallback ?? "the default device")")
-                uid = fallback
-            }
-            graph = AudioGraph(device: HALOutputDevice(uid: uid), outputs: deviceOutputs, log: log)
+        // Audio (Spec 4 §11): one graph per distinct device over the HAL factory, and one per SDI-embedded
+        // output over its DeckLink sink; a device absent at launch gets its fallback or silence (Spec 4 §12).
+        var system: AudioSystem?
+        if options.audio, !machine.audioOutputs.isEmpty {
+            var destinations: [Int: any StreamAudioDestination] = [:]
+            for sink in deckLinks { destinations[sink.output] = sink }
+            system = AudioSystem(outputs: machine.audioOutputs, factory: HALAudioDeviceFactory(log: log), destinations: destinations, log: log)
         }
-        audio = graph
+        audio = system
 
         engine = try Engine(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
-                            variables: variables, audio: graph, log: log)
+                            variables: variables, audio: system, log: log)
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
             engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,
@@ -227,7 +222,10 @@ public final class EngineProcess: @unchecked Sendable {
             thumbnailCacheHitRate: { engine.thumbnails?.statistics.hitRate ?? 1 },
             fontSubstitutions: { textCache.statistics.substitutedFonts },
             thermalState: { engine.thermal.level },
-            memoryPressure: { engine.pressure.level })
+            memoryPressure: { engine.pressure.level },
+            // Spec 4 §13 (Area 16) — "audio underruns per device" and the devices' standings (Spec 4 §12).
+            audioUnderrunsByDevice: { audio?.underrunsByDevice.mapValues { Int($0) } ?? [:] },
+            audioDevices: { audio?.deviceStates ?? [] })
         engine.start(blackBox: blackBox, minuteSources: sources)
     }
 
@@ -294,7 +292,11 @@ public final class EngineProcess: @unchecked Sendable {
             lines.append("DeckLink output \(sink.output) (\(sink.persistentID)): \(sink.currentPhase)")
         }
         if let audio {
-            lines.append("audio: \(audio.device.name), underruns \(audio.underruns)")
+            for state in audio.deviceStates {
+                let standing = state.standing == .primary ? "" : (state.standIn.map { " on fallback \($0)" } ?? " silent")
+                lines.append("audio device \(state.device) (outputs \(state.outputs.map(String.init).joined(separator: ", "))): \(state.standing.rawValue)\(standing), underruns \(state.underruns)")
+            }
+            if audio.deviceStates.isEmpty { lines.append("audio: no outputs") }
         } else {
             lines.append("audio: off")
         }
