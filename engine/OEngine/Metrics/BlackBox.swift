@@ -68,14 +68,25 @@ public final class BlackBox: @unchecked Sendable {
         return json(fields)
     }
 
+    /// Spec 4 §13 — the minute record with its memory breakdown; a reader of
+    /// an older file finds the breakdown keys missing and reads zeros.
     public static func line(for record: MinuteRecord) -> String {
         json([
             ("audioUnderruns", String(record.audioUnderruns)),
+            ("decoderPoolBytes", String(record.decoderPoolBytes)),
             ("decoderSessions", String(record.decoderSessions)),
+            ("footprintBytes", String(record.footprintBytes)),
+            ("graphicsFootprintBytes", String(record.graphicsFootprintBytes)),
+            ("heapAllocatedBytes", String(record.heapAllocatedBytes)),
+            ("heapLiveBytes", String(record.heapLiveBytes)),
             ("kind", "\"minute\""),
             ("memoryBytes", String(record.memoryBytes)),
             ("minute", String(record.minute)),
+            ("purgeableLiveBytes", String(record.purgeableLiveBytes)),
+            ("readbackBytes", String(record.readbackBytes)),
+            ("textCacheBytes", String(record.textCacheBytes)),
             ("textCacheHitRate", String(format: "%.4f", record.textCacheHitRate)),
+            ("textureBytes", String(record.textureBytes)),
             ("watchdogEvents", String(record.watchdogEvents)),
             ("watchdogRecoveries", String(record.watchdogRecoveries)),
         ])

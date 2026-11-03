@@ -203,12 +203,19 @@ public final class EngineProcess: @unchecked Sendable {
         let engine = self.engine
         let textCache = self.textCache
         let audio = self.audio
+        let deckLinks = deckLinkSinks
+        // Spec 4 §13 — the minute record's breakdown: "the resource table's texture bytes, the decoder pools' bytes,
+        // the text cache's bytes and the readback buffers' bytes".
         let sources = BlackBoxRecorder.MinuteSources(
             decoderSessions: { engine.sources.liveCount },
             textCacheHitRate: { textCache.statistics.hitRate },
             audioUnderruns: { Int(audio?.underruns ?? 0) },
             watchdogEvents: { engine.watchdog.events },
-            watchdogRecoveries: { engine.watchdog.recoveries })
+            watchdogRecoveries: { engine.watchdog.recoveries },
+            textureBytes: { Int(engine.backend.resources.allocatedBytes) },
+            decoderPoolBytes: { engine.sources.poolBytes },
+            textCacheBytes: { textCache.statistics.bytes },
+            readbackBytes: { ((engine.backend as? MetalBackend)?.lastGoodStagingBytes ?? 0) + deckLinks.reduce(0) { $0 + $1.readbackBytes } })
         engine.start(blackBox: blackBox, minuteSources: sources)
     }
 

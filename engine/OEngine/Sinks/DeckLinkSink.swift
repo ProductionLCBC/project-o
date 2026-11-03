@@ -121,6 +121,15 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     private var thread: Thread?
     private let running = Atomic<Bool>(false)
     public private(set) var buffers: V210Buffers?
+
+    /// Spec 4 §13 — "the readback buffers' bytes": the v210 ring the card
+    /// reads, once the output is running; zero before.
+    public var readbackBytes: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return buffers?.buffers.reduce(0) { $0 + $1.length } ?? 0
+    }
+
     private var scheduledTick: Int64 = -1
     private var streamTime: Int64 = 0
     private var dropsSinceStart: Int64 = 0

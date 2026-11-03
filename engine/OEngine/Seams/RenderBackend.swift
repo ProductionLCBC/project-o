@@ -95,6 +95,20 @@ public struct TextureDescriptor: Equatable, Sendable {
         self.mipmapped = mipmapped
         self.label = label
     }
+
+    /// Spec 4 §5 — the bytes the texture takes: RGBA16Float for channel, stack,
+    /// still and blur scratch textures ("70.8 MB at 4096×2160"), BGRA8 for text
+    /// lines, posters and previews, and a third more for a mip chain. Spec 4
+    /// §13 sums these for "the resource table's texture bytes".
+    public var bytes: Int64 {
+        let perPixel: Int64
+        switch role {
+        case .channel, .stack, .still, .blurScratch: perPixel = 8
+        case .textLine, .poster, .preview: perPixel = 4
+        }
+        let base = Int64(max(0, size.width)) * Int64(max(0, size.height)) * perPixel
+        return mipmapped ? base + base / 3 : base
+    }
 }
 
 /// Spec 4 §4 step 5 and §12 — what the render loop decided for this tick:

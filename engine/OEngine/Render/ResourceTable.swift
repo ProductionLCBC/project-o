@@ -17,6 +17,7 @@ public final class ResourceTable: @unchecked Sendable {
     private var free: [Int32]
     private var deferred: [(handle: TextureHandle, afterTick: Int64)] = []
     private let allocatedCount = Atomic<Int>(0)
+    private let allocatedByteCount = Atomic<Int64>(0)
     private let lastConsumed = Atomic<Int64>(-1)
 
     public init(capacity: Int) {
@@ -43,6 +44,7 @@ public final class ResourceTable: @unchecked Sendable {
         objects[Int(index)] = object
         descriptors[Int(index)] = descriptor
         allocatedCount.add(1, ordering: .relaxed)
+        allocatedByteCount.add(descriptor.bytes, ordering: .relaxed)
         return TextureHandle(rawValue: index)
     }
 
@@ -86,6 +88,7 @@ public final class ResourceTable: @unchecked Sendable {
             if entry.afterTick <= consumedTick {
                 let index = Int(entry.handle.rawValue)
                 guard index >= 0, index < capacity else { continue }
+                if let descriptor = descriptors[index] { allocatedByteCount.subtract(descriptor.bytes, ordering: .relaxed) }
                 objects[index] = nil
                 descriptors[index] = nil
                 free.append(entry.handle.rawValue)
@@ -98,6 +101,11 @@ public final class ResourceTable: @unchecked Sendable {
     }
 
     public var allocated: Int { allocatedCount.load(ordering: .relaxed) }
+
+    /// Spec 4 §13 — "the resource table's texture bytes": every live handle's
+    /// texture summed by its descriptor, deferred releases included until
+    /// they are swept. An atomic, so the recorder reads it without the lock.
+    public var allocatedBytes: Int64 { allocatedByteCount.load(ordering: .relaxed) }
     public var pendingRelease: Int {
         lock.lock()
         defer { lock.unlock() }

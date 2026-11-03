@@ -102,6 +102,10 @@ extension MetalBackend {
     /// Harness: the staging buffers the last-good copies keep, one per output.
     public var lastGoodStagingBuffers: Int { lastGood.stagingCount }
 
+    /// Spec 4 §13 — "the readback buffers' bytes": the last-good staging
+    /// buffers; the DeckLink sinks add their v210 rings.
+    public var lastGoodStagingBytes: Int { lastGood.stagingBytes }
+
     // MARK: - Rebuild (Spec 4 §12)
 
     /// Spec 4 §12 — "Metal device lost or command buffer error: ... rebuild
@@ -168,5 +172,11 @@ final class LastGoodFrames: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return staging.count
+    }
+
+    var stagingBytes: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return staging.values.reduce(0) { $0 + $1.length }
     }
 }

@@ -61,6 +61,7 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
     private let layoutValue = Atomic<Int32>(0)
     private let widthValue = Atomic<Int32>(0)
     private let heightValue = Atomic<Int32>(0)
+    private let poolBytesValue = Atomic<Int>(0)
     private let failed = Atomic<Bool>(false)
     private let errorsTotal = Atomic<Int64>(0)
     private let framesDecoded = Atomic<Int64>(0)
@@ -68,6 +69,27 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
     private var textureCache: CVMetalTextureCache?
     private var session: VTDecompressionSession?
     private var consecutiveErrors = 0
+
+    /// Spec 4 §5 — "Decoder pool of 8 per session: 4 queued, 1 on screen,
+    /// headroom for the outgoing instance".
+    public static let poolDepth = 8
+
+    /// Spec 4 §13 — "the decoder pools' bytes": the pool VideoToolbox keeps
+    /// for a session, as §5 sizes it, from the output format the session was
+    /// created with (NV12 a byte and a half per pixel, P010 three, 4:2:2
+    /// 10-bit four, 16-bit RGBA eight).
+    public static func poolBytes(pixelFormat: OSType, width: Int, height: Int) -> Int {
+        let pixels = max(0, width) * max(0, height)
+        let frame: Int
+        switch pixelFormat {
+        case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange: frame = pixels * 3 / 2
+        case kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange, kCVPixelFormatType_420YpCbCr10BiPlanarFullRange: frame = pixels * 3
+        case kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange, kCVPixelFormatType_422YpCbCr10BiPlanarFullRange: frame = pixels * 4
+        case kCVPixelFormatType_64RGBAHalf: frame = pixels * 8
+        default: frame = pixels * 4
+        }
+        return frame * poolDepth
+    }
 
     public init(url: URL, inMs: Double, outMs: Double?, loop: Bool, device: MTLDevice?, demuxer: any Demuxer = AVAssetReaderDemuxer(),
                 queueCapacity: Int = 6, log: EngineLog? = nil) {
@@ -103,6 +125,8 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
 
     public var isReady: Bool { queue.hasFrame }
     public var queueDepth: Int { queue.depth }
+    /// Spec 4 §13 — the session's pool, once the session exists; zero before.
+    public var poolBytes: Int { poolBytesValue.load(ordering: .relaxed) }
     public var isFailed: Bool { failed.load(ordering: .acquiring) }
     public var decodeErrors: Int64 { errorsTotal.load(ordering: .relaxed) }
     public var decodedFrames: Int64 { framesDecoded.load(ordering: .relaxed) }
@@ -275,6 +299,8 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
         let dimensions = CMVideoFormatDescriptionGetDimensions(format)
         widthValue.store(dimensions.width, ordering: .releasing)
         heightValue.store(dimensions.height, ordering: .releasing)
+        poolBytesValue.store(VideoFileSource.poolBytes(pixelFormat: pixelFormat, width: Int(dimensions.width), height: Int(dimensions.height)),
+                             ordering: .relaxed)
         let attributes: [CFString: Any] = [
             kCVPixelBufferPixelFormatTypeKey: pixelFormat,
             kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
