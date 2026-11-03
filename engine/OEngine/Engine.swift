@@ -43,6 +43,18 @@ public final class Engine: @unchecked Sendable {
     /// Called on the control thread after every plan is built: the process
     /// derives OSC feedback from what ran (Spec 2 §6).
     public var afterBuild: (@Sendable (ControlLoop) -> Void)?
+    /// Spec 4 §10 — the thumbnail job, when the process or the harness built
+    /// one over the Metal backend: it answers to memory pressure and waits on
+    /// the render thread's pressure reading; the live list warms it.
+    public var thumbnails: ThumbnailService? {
+        didSet {
+            guard let thumbnails else { return }
+            pressure.add(thumbnails)
+            let render = self.render
+            thumbnails.auxBlocked = { render.isSkippingAux }
+        }
+    }
+    private var lastLiveList: UUID?
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
@@ -90,8 +102,27 @@ public final class Engine: @unchecked Sendable {
             planRing.publish(control.build(for: time.tick, now: time.reference))
             afterBuild?(control)
             sweepReleases()
+            warmThumbnailsIfTheListChanged()
         }
         render.tick(time)
+    }
+
+    /// Spec 4 §10 and the Area 5 reading approved on 2026-11-03: "when the
+    /// live list changes, the engine queues that list's cues for the
+    /// thumbnail stack". Control side, after a build.
+    func warmThumbnailsIfTheListChanged() {
+        let uuid = control.model.state.pointer?.listUuid
+        guard uuid != lastLiveList else { return }
+        lastLiveList = uuid
+        guard let thumbnails, let uuid, let list = library.list(uuid: uuid) ?? machine.localList(uuid: uuid) else { return }
+        thumbnails.warm(list: list)
+    }
+
+    /// Spec 4 §10 — "those IOSurfaces are shared with it over a local Mach
+    /// connection": the surface behind each stack's preview, by stack number.
+    public var previewSurfaces: [Int: UInt32] {
+        guard let metal = backend as? MetalBackend else { return [:] }
+        return control.previewTargets.compactMapValues { metal.surfaceID(of: $0) }
     }
 
     /// Spec 4 §3 — "A released handle is not reused until the control side says
@@ -143,6 +174,7 @@ public final class Engine: @unchecked Sendable {
                     planRing.publish(control.build(for: frame, now: clock.now()))
                     afterBuild?(control)
                     sweepReleases()
+                    warmThumbnailsIfTheListChanged()
                     let took = MonotonicClock.now() - started
                     if took > pacing.tickNanoseconds {
                         // Spec 4 §3 — a build past the tick means the render thread reused a plan; say which one.

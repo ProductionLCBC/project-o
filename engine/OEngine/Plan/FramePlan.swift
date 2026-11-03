@@ -127,10 +127,14 @@ public struct ChannelPass: Equatable, Codable, Sendable {
     /// the channel texture as it was: on this tick the render thread copies it
     /// into the channel's snapshot texture before rendering (Area 4 reading).
     public var snapshotOutgoing: Bool
+    /// Spec 4 §4 step 5 — only stacks that render for their preview sample
+    /// this channel on this tick, so the pass is aux work, "skipped first under
+    /// pressure" (Area 5 reading).
+    public var auxOnly: Bool
 
     public init(channel: Int, target: TextureHandle, size: PixelSize, incoming: SourceBinding, outgoing: SourceBinding? = nil,
                 transition: TransitionState? = nil, grade: GradeParameters = .identity, generateMips: Bool = false,
-                snapshotOutgoing: Bool = false) {
+                snapshotOutgoing: Bool = false, auxOnly: Bool = false) {
         self.channel = channel
         self.target = target
         self.size = size
@@ -140,6 +144,7 @@ public struct ChannelPass: Equatable, Codable, Sendable {
         self.grade = grade
         self.generateMips = generateMips
         self.snapshotOutgoing = snapshotOutgoing
+        self.auxOnly = auxOnly
     }
 }
 
@@ -271,14 +276,20 @@ public struct StackPass: Equatable, Codable, Sendable {
     public var base: StackBase
     public var gammaBlend: Bool
     public var boxes: [ResolvedBox]
+    /// Spec 4 §2 and §10 — a stack no output feeds renders on preview ticks
+    /// for its preview alone (Area 5 reading: "the preview counts as a
+    /// consumer at the preview rate"), as aux work the render thread skips
+    /// first under pressure (Spec 4 §4 step 5).
+    public var auxOnly: Bool
 
-    public init(stack: Int, target: TextureHandle, size: PixelSize, base: StackBase, gammaBlend: Bool, boxes: [ResolvedBox]) {
+    public init(stack: Int, target: TextureHandle, size: PixelSize, base: StackBase, gammaBlend: Bool, boxes: [ResolvedBox], auxOnly: Bool = false) {
         self.stack = stack
         self.target = target
         self.size = size
         self.base = base
         self.gammaBlend = gammaBlend
         self.boxes = boxes
+        self.auxOnly = auxOnly
     }
 
     /// The boxes the pass draws: alpha above zero with something to show.
@@ -381,14 +392,20 @@ public enum AuxKind: String, Codable, Sendable {
     case thumbnail
 }
 
+/// Spec 4 §10 — "Aux passes downscale the stack textures into small BGRA8
+/// sRGB textures": the stack texture rendered this tick (`source`) into the
+/// stack's preview texture (`target`, IOSurface-backed, a quarter of the
+/// output size per Spec 4 §5).
 public struct AuxPass: Equatable, Codable, Sendable {
     public var kind: AuxKind
     public var stack: Int
+    public var source: TextureHandle
     public var target: TextureHandle
 
-    public init(kind: AuxKind, stack: Int, target: TextureHandle) {
+    public init(kind: AuxKind, stack: Int, source: TextureHandle, target: TextureHandle) {
         self.kind = kind
         self.stack = stack
+        self.source = source
         self.target = target
     }
 }

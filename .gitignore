@@ -21,6 +21,10 @@ vendor/DeckLinkSDK/
 # Test bench output
 tests/soak-output/
 *.golden-diff.png
+*.actual.png
+
+# Thumbnails the engine writes under a fixture machine root (Spec 4 §10)
+tests/fixtures/*/machine/thumbnails/
 
 # Generated spike media (oengine make-fixtures); the index carries fixed ids
 tests/fixtures/spike/library/media/

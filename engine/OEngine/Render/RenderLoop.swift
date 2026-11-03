@@ -53,6 +53,7 @@ public final class RenderLoop: @unchecked Sendable {
     private let gpuFailureCount = Atomic<Int64>(0)
     private let lastDepths = Atomic<UInt64>(0)
     private let lastDepthCount = Atomic<Int>(0)
+    private let skippingAux = Atomic<Bool>(false)
 
     public init(backend: any RenderBackend, planRing: PlanRing, sources: SourceTable, sinks: [Int: any OutputSink],
                 metrics: MetricsRing, pacing: Pacing, maxChannelPasses: Int = 32) {
@@ -87,6 +88,10 @@ public final class RenderLoop: @unchecked Sendable {
     public func takeGPUFailure() -> Bool {
         gpuFailureFlag.exchange(false, ordering: .acquiringAndReleasing)
     }
+
+    /// Spec 4 §4 step 5 — whether the last tick skipped its aux passes, for
+    /// the threads whose work is aux work too (the thumbnail job, Spec 4 §10).
+    public var isSkippingAux: Bool { skippingAux.load(ordering: .relaxed) }
 
     /// Spec 4 §4 — one tick, in the spec's order.
     public func tick(_ time: TickTime) {
@@ -134,6 +139,7 @@ public final class RenderLoop: @unchecked Sendable {
 
         // 3. Encode and commit; 5. aux only with headroom.
         let options = EncodeOptions(skipAux: pressure.skipAux, dropExtras: pressure.droppingExtras)
+        skippingAux.store(options.skipAux, ordering: .relaxed)
         let receipt = backend.encode(time, plan: plan, picks: picks, options: options)
 
         // 4. Publish each due output's frame into its ring; the sink presents on its own cadence.
@@ -148,11 +154,21 @@ public final class RenderLoop: @unchecked Sendable {
         record.gpuStackNs = completion.stackNs
         record.gpuSinkNs = completion.sinkNs
         record.gpuFailed = completion.failed
-        record.channelPasses = Int32(plan.channelPasses.count)
-        record.stackPasses = Int32(plan.stackPasses.count)
-        record.auxPasses = Int32(options.skipAux ? 0 : plan.auxPasses.count)
-        record.auxSkipped = Int32(options.skipAux ? plan.auxPasses.count : 0)
         // Counted with loops, not `filter`: the render thread allocates nothing (Spec 4 §3).
+        // Spec 4 §4 step 5 — aux-only stack and channel passes skipped under pressure count as skipped aux work.
+        var channelsRun: Int32 = 0
+        var stacksRun: Int32 = 0
+        var skipped: Int32 = options.skipAux ? Int32(plan.auxPasses.count) : 0
+        for pass in plan.channelPasses {
+            if options.skipAux && pass.auxOnly { skipped += 1 } else { channelsRun += 1 }
+        }
+        for pass in plan.stackPasses {
+            if options.skipAux && pass.auxOnly { skipped += 1 } else { stacksRun += 1 }
+        }
+        record.channelPasses = channelsRun
+        record.stackPasses = stacksRun
+        record.auxPasses = Int32(options.skipAux ? 0 : plan.auxPasses.count)
+        record.auxSkipped = skipped
         var late: Int32 = 0
         for pass in plan.stackPasses {
             for box in pass.boxes where box.binding.isText && box.content.isEmpty && box.transition == nil { late += 1 }

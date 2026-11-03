@@ -50,6 +50,11 @@ struct StackUniforms {
     }
 }
 
+/// `DownscaleUniforms` in Downscale.metal.
+struct DownscaleUniforms {
+    var taps: SIMD4<Float>       // taps across, taps down, source texel width, source texel height
+}
+
 /// `EncodeUniforms` in Encode.metal.
 struct EncodeUniforms {
     var mix: SIMD4<Float>        // amount of the second texture, hasSecond (0/1), secondIsBlack (0/1), unused

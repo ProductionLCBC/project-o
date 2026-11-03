@@ -159,6 +159,13 @@ public final class EngineProcess: @unchecked Sendable {
         engine = try Engine(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
                             variables: variables, audio: graph, log: log)
+        // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
+        do {
+            engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,
+                                                     variables: variables, cacheFolder: roots.machineRoot.appendingPathComponent("thumbnails"), log: log)
+        } catch {
+            log.error("thumbnails are off: \(error)")
+        }
 
         // OSC (Spec 2 §6) and the black box (Spec 4 §13).
         let port = options.oscPort ?? machine.settings.network.oscInPort
@@ -278,6 +285,10 @@ public final class EngineProcess: @unchecked Sendable {
         let text = textCache.statistics
         lines.append("text cache: hit rate \(String(format: "%.3f", text.hitRate)), rasterized \(text.rasterized), evicted \(text.evicted), failed \(text.failed), shrunk \(text.shrinks) times, \(text.bytes / 1_048_576) MB" + (textCache.fontSubstitutions.isEmpty ? "" : "; font substitutions: \(textCache.fontSubstitutions.map(\.description).joined(separator: ", "))"))
         lines.append("pressure: memory \(engine.pressure.level.rawValue) (\(engine.pressure.changes) changes), thermal \(engine.thermal.level.rawValue) (\(engine.thermal.changes) changes)")
+        if let thumbnails = engine.thumbnails {
+            let t = thumbnails.statistics
+            lines.append("thumbnails: rendered \(t.rendered), served \(t.hits) from memory and \(t.diskHits) from disk, failed \(t.failed), \(thumbnails.bytesInUse / 1_048_576) MB in memory")
+        }
         if let osc {
             lines.append("osc: port \(osc.boundPort), received \(osc.received), rejected \(osc.rejected), sent \(osc.sent)")
         }

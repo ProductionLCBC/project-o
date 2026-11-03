@@ -54,6 +54,7 @@ final class PipelineCache: @unchecked Sendable {
     private var blur: [MTLRenderPipelineState?] = [nil, nil]
     private var encode: [EncodeKind: MTLRenderPipelineState] = [:]
     private var linearize: MTLRenderPipelineState?
+    private var downscale: MTLRenderPipelineState?
     private var v210: MTLComputePipelineState?
     private let lock = NSLock()
     private(set) var compiled = 0
@@ -100,6 +101,13 @@ final class PipelineCache: @unchecked Sendable {
         return linearize
     }
 
+    /// Spec 4 §10 — the aux pass's downscale into a BGRA8 sRGB target.
+    var downscalePipeline: MTLRenderPipelineState? {
+        lock.lock()
+        defer { lock.unlock() }
+        return downscale
+    }
+
     var v210Pipeline: MTLComputePipelineState? {
         lock.lock()
         defer { lock.unlock() }
@@ -117,8 +125,24 @@ final class PipelineCache: @unchecked Sendable {
         blur = [nil, nil]
         encode = [:]
         linearize = nil
+        downscale = nil
         v210 = nil
         try? compileBlurLocked()
+    }
+
+    /// Spec 4 §10 — "Aux passes downscale the stack textures into small BGRA8
+    /// sRGB textures": the box-filter pass, one pipeline, its target sRGB-typed.
+    func ensureDownscale() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard downscale == nil else { return }
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "downscale"
+        descriptor.vertexFunction = try library.makeFunction(name: "downscaleVertex", constantValues: MTLFunctionConstantValues())
+        descriptor.fragmentFunction = try library.makeFunction(name: "downscaleFragment", constantValues: MTLFunctionConstantValues())
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb
+        downscale = try device.makeRenderPipelineState(descriptor: descriptor)
+        compiled += 1
     }
 
     private func compileBlurLocked() throws {

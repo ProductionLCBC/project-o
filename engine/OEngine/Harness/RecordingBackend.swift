@@ -59,10 +59,14 @@ public final class RecordingBackend: RenderBackend, @unchecked Sendable {
         defer { lock.unlock() }
         let token = nextToken
         nextToken += 1
+        // Spec 4 §4 step 5 — under pressure the aux passes and the aux-only stack and channel passes are skipped and counted.
+        let channels = plan.channelPasses.filter { !(options.skipAux && $0.auxOnly) }
+        let stacks = plan.stackPasses.filter { !(options.skipAux && $0.auxOnly) }
+        let skippedPasses = options.skipAux ? plan.auxPasses.count + (plan.channelPasses.count - channels.count) + (plan.stackPasses.count - stacks.count) : 0
         encoded.append(EncodedTick(
-            tick: tick.tick, channelPasses: plan.channelPasses.count, stackPasses: plan.stackPasses.map(\.stack),
+            tick: tick.tick, channelPasses: channels.count, stackPasses: stacks.map(\.stack),
             sinkOutputs: plan.sinkPasses.map(\.output), auxPasses: options.skipAux ? 0 : plan.auxPasses.count,
-            auxSkipped: options.skipAux ? plan.auxPasses.count : 0, dropExtras: options.dropExtras,
+            auxSkipped: skippedPasses, dropExtras: options.dropExtras,
             snapshots: plan.channelPasses.filter(\.snapshotOutgoing).map(\.channel)))
         let ns = Int64(simulatedGPUMilliseconds * 1_000_000)
         completions[token] = GPUCompletion(channelNs: ns, stackNs: 0, sinkNs: 0, failed: failNextCompletion)

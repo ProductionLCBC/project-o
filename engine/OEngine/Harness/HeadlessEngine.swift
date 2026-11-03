@@ -49,17 +49,22 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// text cache (rasterizing synchronously), so a tick renders for real and
     /// the capturing sinks read the pixels back.
     public convenience init(library: Library, machine: Machine, mediaRoot: URL, metal: MetalBackend,
-                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
+                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, thumbnailFolder: URL? = nil) throws {
         let log = EngineLog(category: "harness")
         let renderer = CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont)
         // Spec 4 §11 — one graph per device: the software device stands in for the
         // machine's `device` outputs; `sdiEmbedded` outputs belong to the DeckLink sink.
         let device = SoftwareAudioDevice()
         let outputs = machine.audioOutputs.filter { $0.kind == .device }
+        let posters = ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log)
         try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
-                      sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log),
+                      sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: posters,
                       text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
                       audio: AudioGraph(device: device, outputs: outputs, log: log), wallClock: wallClock)
+        // Spec 4 §10 — the thumbnail job over the same posters and variables, its cache in a folder of the test's choosing.
+        let folder = thumbnailFolder ?? FileManager.default.temporaryDirectory.appendingPathComponent("oengine-thumbnails-\(UUID().uuidString)")
+        engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal, posters: posters,
+                                                 variables: variables, cacheFolder: folder, log: log)
         try engine.audio?.start()
         for sink in sinks.values {
             // The harness presents on the test's thread, so it can wait for the GPU here.
