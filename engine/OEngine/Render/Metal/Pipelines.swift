@@ -52,10 +52,11 @@ final class PipelineCache: @unchecked Sendable {
     private let channel: UnsafeMutablePointer<MTLRenderPipelineState?>
     private let box: UnsafeMutablePointer<MTLRenderPipelineState?>
     private var blur: [MTLRenderPipelineState?] = [nil, nil]
-    private var encode: [EncodeKind: MTLRenderPipelineState] = [:]
+    private var encode: [EncodeVariant: MTLRenderPipelineState] = [:]
     private var linearize: MTLRenderPipelineState?
     private var downscale: MTLRenderPipelineState?
-    private var v210: MTLComputePipelineState?
+    /// Spec 4 §10 — the v210 kernel, plain and with the weave.
+    private var v210: [Bool: MTLComputePipelineState] = [:]
     private let lock = NSLock()
     private(set) var compiled = 0
 
@@ -89,10 +90,10 @@ final class PipelineCache: @unchecked Sendable {
         blur[vertical ? 1 : 0]
     }
 
-    func encodePipeline(_ kind: EncodeKind) -> MTLRenderPipelineState? {
+    func encodePipeline(_ kind: EncodeKind, weave: Bool = false) -> MTLRenderPipelineState? {
         lock.lock()
         defer { lock.unlock() }
-        return encode[kind]
+        return encode[EncodeVariant(kind: kind, weave: weave)]
     }
 
     var linearizePipeline: MTLRenderPipelineState? {
@@ -108,10 +109,10 @@ final class PipelineCache: @unchecked Sendable {
         return downscale
     }
 
-    var v210Pipeline: MTLComputePipelineState? {
+    func v210Pipeline(weave: Bool) -> MTLComputePipelineState? {
         lock.lock()
         defer { lock.unlock() }
-        return v210
+        return v210[weave]
     }
 
     // MARK: - Control side compiles
@@ -126,7 +127,7 @@ final class PipelineCache: @unchecked Sendable {
         encode = [:]
         linearize = nil
         downscale = nil
-        v210 = nil
+        v210 = [:]
         try? compileBlurLocked()
     }
 
@@ -232,26 +233,43 @@ final class PipelineCache: @unchecked Sendable {
         compiled += 1
     }
 
-    /// Spec 4 §10 — the encode pass for one sink kind.
-    func ensureEncode(_ kind: EncodeKind) throws {
+    /// Spec 4 §10 — the encode pass for one sink kind, plain or with the
+    /// weave ("v210 with or without weave"; the harness's capture weaves too,
+    /// so a woven frame can be compared as pixels).
+    func ensureEncode(_ kind: EncodeKind, weave: Bool = false) throws {
         lock.lock()
         defer { lock.unlock() }
-        guard encode[kind] == nil else { return }
         let constants = MTLFunctionConstantValues()
         switch kind {
         case .display10Bit, .capture:
+            let variant = EncodeVariant(kind: kind, weave: weave)
+            guard encode[variant] == nil else { return }
             var toDisplay = kind == .display10Bit
+            var weaving = weave
             constants.setConstantValue(&toDisplay, type: .bool, index: 0)
+            constants.setConstantValue(&weaving, type: .bool, index: 1)
             let descriptor = MTLRenderPipelineDescriptor()
-            descriptor.label = "encode \(kind.rawValue)"
+            descriptor.label = "encode \(kind.rawValue)\(weave ? " weave" : "")"
             descriptor.vertexFunction = try library.makeFunction(name: "encodeVertex", constantValues: constants)
             descriptor.fragmentFunction = try library.makeFunction(name: "encodeFragment", constantValues: constants)
             descriptor.colorAttachments[0].pixelFormat = kind == .display10Bit ? .bgr10a2Unorm : .rgba16Float
-            encode[kind] = try device.makeRenderPipelineState(descriptor: descriptor)
-        case .v210:
+            encode[variant] = try device.makeRenderPipelineState(descriptor: descriptor)
+        case .v210, .v210Interlaced:
+            let weaving = kind == .v210Interlaced || weave
+            guard v210[weaving] == nil else { return }
+            var toDisplay = false
+            var weaveConstant = weaving
+            constants.setConstantValue(&toDisplay, type: .bool, index: 0)
+            constants.setConstantValue(&weaveConstant, type: .bool, index: 1)
             let function = try library.makeFunction(name: "encodeV210", constantValues: constants)
-            v210 = try device.makeComputePipelineState(function: function)
+            v210[weaving] = try device.makeComputePipelineState(function: function)
         }
         compiled += 1
     }
+}
+
+/// One compiled encode pass: the sink's kind, plain or weaving.
+struct EncodeVariant: Hashable, Sendable {
+    var kind: EncodeKind
+    var weave: Bool
 }

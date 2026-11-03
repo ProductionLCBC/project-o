@@ -106,7 +106,8 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     public enum Phase: Equatable, Sendable { case stopped, unavailable, running, paused }
 
     public let output: Int
-    public let encode: EncodeKind = .v210
+    /// Spec 4 §10 — v210, woven when the mode is interlaced.
+    public var encode: EncodeKind { format.interlaced ? .v210Interlaced : .v210 }
     public let ring = FrameRing()
     public let presents = PresentRing()
     public let persistentID: String
@@ -198,7 +199,7 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
             return
         }
         self.buffers = buffers
-        backend.registerV210(output: output, buffers: buffers)
+        backend.registerV210(output: output, buffers: buffers, encode: encode)
         let context = Unmanaged.passUnretained(self).toOpaque()
         odl_set_callbacks(opened, { context, frameContext, result in
             guard let context else { return }

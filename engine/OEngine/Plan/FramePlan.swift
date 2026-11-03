@@ -330,9 +330,24 @@ extension SecondTexture: Codable {
     }
 }
 
+/// Spec 4 §10 — the first field of a woven frame: "the first tick's" stack
+/// texture and, during an output transition, its own second texture (the old
+/// stack's texture of that tick, or black).
+public struct FieldSources: Equatable, Codable, Sendable {
+    public var stack: TextureHandle
+    public var second: SecondTexture
+
+    public init(stack: TextureHandle, second: SecondTexture) {
+        self.stack = stack
+        self.second = second
+    }
+}
+
 /// Spec 4 §4 — "SinkPass names the output, the stack texture to take, the
 /// encode (display 10-bit, DeckLink v210 with or without weave, NDI BGRA) and
-/// the destination (a drawable, a shared buffer slot)."
+/// the destination (a drawable, a shared buffer slot)." Spec 4 §10 — an
+/// interlaced output's pass also names the previous tick's stack texture as
+/// the first field; `stack` and `second` are then the second field's.
 public struct SinkPass: Equatable, Codable, Sendable {
     public var output: Int
     public var stack: TextureHandle
@@ -341,15 +356,21 @@ public struct SinkPass: Equatable, Codable, Sendable {
     public var encode: EncodeKind
     /// The slot in the output's ring of three (Spec 4 §2).
     public var destination: Int
+    public var firstField: FieldSources?
 
-    public init(output: Int, stack: TextureHandle, second: SecondTexture, mix: Float, encode: EncodeKind, destination: Int) {
+    public init(output: Int, stack: TextureHandle, second: SecondTexture, mix: Float, encode: EncodeKind, destination: Int,
+                firstField: FieldSources? = nil) {
         self.output = output
         self.stack = stack
         self.second = second
         self.mix = mix
         self.encode = encode
         self.destination = destination
+        self.firstField = firstField
     }
+
+    /// Spec 4 §10 — whether this pass weaves two stack frames into one.
+    public var weaves: Bool { firstField != nil }
 }
 
 /// Spec 4 §8 — the cache key: "a hash of (field text, text style value, box

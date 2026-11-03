@@ -1,13 +1,18 @@
 // OEngine — Spec 4 §10, the encode pass every sink shares: "mix the stack
 // texture with a second texture when an output transition is running (the
 // previous stack for a switch, black for blackout ...), apply the output's
-// transfer function, and write the output's pixel format."
+// transfer function, and write the output's pixel format." The weave is a
+// variant: "the encode pass takes two consecutive stack frames and writes a
+// single frame whose first field is the first tick's even lines and second
+// field the next tick's odd lines, top field first as 1080i SDI expects."
 
 #include <metal_stdlib>
 using namespace metal;
 
 // true: the display sink writes 10-bit encoded values; false: the capture sink keeps linear light.
 constant bool kToDisplay [[function_constant(0)]];
+// true: even rows come from the first field's textures (2 and 3), odd rows from this tick's (0 and 1).
+constant bool kWeave [[function_constant(1)]];
 
 struct EncodeUniforms {
     float4 mix;    // amount of the second texture, hasSecond, secondIsBlack, unused
@@ -34,7 +39,7 @@ static inline float3 srgbEncode(float3 v) {
     return select(high, low, x <= 0.0031308);
 }
 
-/// The mixed linear pixel at uv.
+/// The mixed linear pixel at uv from one field's pair of textures.
 static inline float4 mixed(float2 uv, texture2d<float> stack, texture2d<float> second, constant EncodeUniforms &u) {
     constexpr sampler s(filter::linear, address::clamp_to_edge, coord::normalized);
     float4 a = stack.sample(s, uv);
@@ -43,11 +48,22 @@ static inline float4 mixed(float2 uv, texture2d<float> stack, texture2d<float> s
     return mix(a, b, u.mix.x);
 }
 
+/// Spec 4 §10 — the weave: even rows from the first field's textures, odd rows from the second's.
+static inline float4 woven(float2 uv, uint row,
+                           texture2d<float> stack, texture2d<float> second,
+                           texture2d<float> firstStack, texture2d<float> firstSecond, constant EncodeUniforms &u) {
+    if (kWeave && (row % 2) == 0) return mixed(uv, firstStack, firstSecond, u);
+    return mixed(uv, stack, second, u);
+}
+
 fragment float4 encodeFragment(VertexOut in [[stage_in]],
                                texture2d<float> stack [[texture(0)]],
                                texture2d<float> second [[texture(1)]],
+                               texture2d<float> firstStack [[texture(2)]],
+                               texture2d<float> firstSecond [[texture(3)]],
                                constant EncodeUniforms &u [[buffer(0)]]) {
-    float4 c = mixed(in.uv, stack, second, u);
+    uint row = uint(in.uv.y * u.size.y);
+    float4 c = woven(in.uv, row, stack, second, firstStack, firstSecond, u);
     if (kToDisplay) {
         // Spec 4 §10 — "pixel format bgr10a2Unorm (10-bit) ... colour space sRGB/Rec.709".
         return float4(srgbEncode(c.rgb), c.a);
@@ -60,6 +76,8 @@ fragment float4 encodeFragment(VertexOut in [[stage_in]],
 /// 10-bit 4:2:2 per four 32-bit words, chroma from the mean of each pair.
 kernel void encodeV210(texture2d<float> stack [[texture(0)]],
                        texture2d<float> second [[texture(1)]],
+                       texture2d<float> firstStack [[texture(2)]],
+                       texture2d<float> firstSecond [[texture(3)]],
                        device uint *out [[buffer(0)]],
                        constant EncodeUniforms &u [[buffer(1)]],
                        uint2 gid [[thread_position_in_grid]]) {
@@ -74,7 +92,7 @@ kernel void encodeV210(texture2d<float> stack [[texture(0)]],
     for (uint i = 0; i < 6; i++) {
         uint x = min(width - 1, gid.x * 6 + i);
         float2 uv = (float2(x, gid.y) + 0.5) / float2(width, height);
-        float4 c = mixed(uv, stack, second, u);
+        float4 c = woven(uv, gid.y, stack, second, firstStack, firstSecond, u);
         float3 e = srgbEncode(c.rgb);
         float luma = 0.2126 * e.r + 0.7152 * e.g + 0.0722 * e.b;
         y[i] = luma;

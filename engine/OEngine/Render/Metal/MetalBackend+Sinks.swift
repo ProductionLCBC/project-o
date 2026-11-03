@@ -17,31 +17,48 @@ extension MetalBackend {
         encodeMix(pass, stack: stack, target: drawable, pipeline: pipeline, into: command)
     }
 
-    /// Spec 4 §10 — a sink registers the v210 ring the render thread writes.
-    public func registerV210(output: Int, buffers: V210Buffers) {
+    /// Spec 4 §10 — a sink registers the v210 ring the render thread writes,
+    /// plain or woven for an interlaced mode.
+    public func registerV210(output: Int, buffers: V210Buffers, encode kind: EncodeKind = .v210) {
         v210Rings.register(output: output, buffers: buffers)
-        try? pipelines.ensureEncode(.v210)
+        try? pipelines.ensureEncode(kind)
     }
 
-    /// Spec 4 §10 — "The encode pass is a compute shader that writes v210
-    /// directly into an MTLBuffer with shared storage".
-    func encodeV210(_ pass: SinkPass, into buffer: MTLCommandBuffer) {
-        guard let stack = texture(pass.stack), let ring = v210Rings.buffers(output: pass.output),
-              let pipeline = pipelines.v210Pipeline, let encoder = buffer.makeComputeCommandEncoder() else { return }
-        encoder.label = "v210 output \(pass.output)"
-        encoder.setComputePipelineState(pipeline)
-        encoder.setTexture(stack, index: 0)
-        var uniforms = EncodeUniforms(mix: SIMD4(pass.mix, 0, 0, 0), size: SIMD4(Float(ring.width), Float(ring.height), 0, 0))
-        switch pass.second {
+    /// Spec 4 §10 — the second texture of one field's mix: black, the old
+    /// stack, or the stack itself when there is none.
+    private func bindSecond(_ second: SecondTexture, stack: MTLTexture, uniforms: inout EncodeUniforms, index: Int, setTexture: (MTLTexture, Int) -> Void) {
+        switch second {
         case .none:
-            encoder.setTexture(stack, index: 1)
+            setTexture(stack, index)
         case .black:
             uniforms.mix.y = 1
             uniforms.mix.z = 1
-            encoder.setTexture(stack, index: 1)
+            setTexture(stack, index)
         case .stack(let handle):
             uniforms.mix.y = 1
-            encoder.setTexture(texture(handle) ?? stack, index: 1)
+            setTexture(texture(handle) ?? stack, index)
+        }
+    }
+
+    /// Spec 4 §10 — "The encode pass is a compute shader that writes v210
+    /// directly into an MTLBuffer with shared storage"; "Interlaced modes weave
+    /// on the GPU": with a first field the woven kernel takes both ticks'
+    /// textures and writes one frame, top field first.
+    func encodeV210(_ pass: SinkPass, into buffer: MTLCommandBuffer) {
+        let weave = pass.weaves
+        guard let stack = texture(pass.stack), let ring = v210Rings.buffers(output: pass.output),
+              let pipeline = pipelines.v210Pipeline(weave: weave), let encoder = buffer.makeComputeCommandEncoder() else { return }
+        encoder.label = "v210 output \(pass.output)\(weave ? " woven" : "")"
+        encoder.setComputePipelineState(pipeline)
+        encoder.setTexture(stack, index: 0)
+        var uniforms = EncodeUniforms(mix: SIMD4(pass.mix, 0, 0, 0), size: SIMD4(Float(ring.width), Float(ring.height), 0, 0))
+        bindSecond(pass.second, stack: stack, uniforms: &uniforms, index: 1) { encoder.setTexture($0, index: $1) }
+        if let first = pass.firstField, let firstStack = texture(first.stack) {
+            encoder.setTexture(firstStack, index: 2)
+            bindSecond(first.second, stack: firstStack, uniforms: &uniforms, index: 3) { encoder.setTexture($0, index: $1) }
+        } else {
+            encoder.setTexture(stack, index: 2)
+            encoder.setTexture(stack, index: 3)
         }
         encoder.setBuffer(ring.buffer(forSlot: pass.destination), offset: 0, index: 0)
         encoder.setBytes(&uniforms, length: MemoryLayout<EncodeUniforms>.stride, index: 1)
@@ -52,13 +69,16 @@ extension MetalBackend {
         encoder.endEncoding()
     }
 
-    /// Harness: run the v210 encode for a stack texture and hand back the words.
-    public func v210Words(stack: TextureHandle, second: SecondTexture = .none, mix: Float = 0, width: Int, height: Int) -> [UInt32]? {
+    /// Harness: run the v210 encode for a stack texture, woven with a first
+    /// field when given one, and hand back the words.
+    public func v210Words(stack: TextureHandle, second: SecondTexture = .none, mix: Float = 0, firstField: FieldSources? = nil,
+                          width: Int, height: Int) -> [UInt32]? {
         guard let buffers = V210Buffers(device: device, width: width, height: height) else { return nil }
         v210Rings.register(output: -1, buffers: buffers)
-        try? pipelines.ensureEncode(.v210)
+        let kind: EncodeKind = firstField == nil ? .v210 : .v210Interlaced
+        try? pipelines.ensureEncode(kind)
         guard let command = queue.makeCommandBuffer() else { return nil }
-        encodeV210(SinkPass(output: -1, stack: stack, second: second, mix: mix, encode: .v210, destination: 0), into: command)
+        encodeV210(SinkPass(output: -1, stack: stack, second: second, mix: mix, encode: kind, destination: 0, firstField: firstField), into: command)
         command.commit()
         guard MetalBackend.waitBounded(command) else { return nil }
         let buffer = buffers.buffer(forSlot: 0)

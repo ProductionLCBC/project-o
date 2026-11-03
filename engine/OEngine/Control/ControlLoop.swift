@@ -937,24 +937,34 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 4 §10 — the sink pass with its output transition: "the previous
-    /// stack for a switch, black for blackout".
+    /// stack for a switch, black for blackout". An interlaced output's pass
+    /// also names the previous tick's stack texture as the first field (and
+    /// the old stack's texture of that tick during a switch), with this
+    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03).
     private func sinkPass(_ output: Output, frame: Int64) -> SinkPass? {
         let live = model.state.outputs[output.number] ?? output.defaultStack
         guard let ring = stackRings[live] else { return nil }
         let slot = Int(frame % Int64(FrameRing.depth))
+        let previousSlot = Int((frame + Int64(FrameRing.depth) - 1) % Int64(FrameRing.depth))
         var second: SecondTexture = .none
+        var firstFieldSecond: SecondTexture = .none
         var mix: Float = 0
         let ort = model.outputs[output.number] ?? OutputRuntime()
         if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack] {
             second = .stack(oldRing[slot])
+            firstFieldSecond = .stack(oldRing[previousSlot])
             mix = run.oldMix(at: frame)
         }
         let black = ort.blackout.map { $0.mix(at: frame) } ?? ort.blackoutMix
         if black > 0 {
             second = .black
+            firstFieldSecond = .black
             mix = black
         }
-        let encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
-        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot)
+        let interlaced = pacing.isInterlaced(output: output.number)
+        var encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
+        if interlaced, encode == .v210 { encode = .v210Interlaced }
+        let firstField = interlaced && frame > 0 ? FieldSources(stack: ring[previousSlot], second: firstFieldSecond) : nil
+        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField)
     }
 }

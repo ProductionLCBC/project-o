@@ -181,7 +181,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             }
         }
         for pass in plan.sinkPasses {
-            do { try pipelines.ensureEncode(pass.encode) } catch { log.error("encode pipeline \(pass.encode.rawValue): \(error)") }
+            do { try pipelines.ensureEncode(pass.encode, weave: pass.weaves) } catch { log.error("encode pipeline \(pass.encode.rawValue): \(error)") }
         }
         if !plan.auxPasses.isEmpty {
             do { try pipelines.ensureDownscale() } catch { log.error("downscale pipeline: \(error)") }
@@ -227,9 +227,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         }
         do { try pipelines.ensureLinearize() } catch { log.error("warm-up: linearize: \(error)") }
         do { try pipelines.ensureDownscale() } catch { log.error("warm-up: downscale: \(error)") }
-        for kind in [EncodeKind.display10Bit, .v210, .capture] {
+        for kind in [EncodeKind.display10Bit, .v210, .v210Interlaced, .capture] {
             do { try pipelines.ensureEncode(kind) } catch { log.error("warm-up: encode \(kind.rawValue): \(error)") }
         }
+        do { try pipelines.ensureEncode(.capture, weave: true) } catch { log.error("warm-up: encode capture weave: \(error)") }
         return count
     }
 
@@ -542,13 +543,13 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         case .display10Bit:
             // Spec 4 §10 — the display sink encodes into its drawable on its own thread.
             break
-        case .v210:
-            // Spec 4 §10 — v210 into the DeckLink ring's shared buffer, scheduled by the sink's thread.
+        case .v210, .v210Interlaced:
+            // Spec 4 §10 — v210 into the DeckLink ring's shared buffer, scheduled by the sink's thread; woven when interlaced.
             encodeV210(pass, into: buffer)
         case .capture:
             guard let stack = texture(pass.stack),
                   let target = captureTargets.target(output: pass.output, size: PixelSize(width: stack.width, height: stack.height), device: device),
-                  let pipeline = pipelines.encodePipeline(.capture) else { return }
+                  let pipeline = pipelines.encodePipeline(.capture, weave: pass.weaves) else { return }
             encodeMix(pass, stack: stack, target: target, pipeline: pipeline, into: buffer)
         }
     }
@@ -562,20 +563,31 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         descriptor.colorAttachments[0].loadAction = .dontCare
         descriptor.colorAttachments[0].storeAction = .store
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        encoder.label = "encode output \(pass.output)"
+        encoder.label = "encode output \(pass.output)\(pass.weaves ? " woven" : "")"
         encoder.setRenderPipelineState(pipeline)
         encoder.setFragmentTexture(stack, index: 0)
         var uniforms = EncodeUniforms(mix: SIMD4(pass.mix, 0, 0, 0), size: SIMD4(Float(target.width), Float(target.height), 0, 0))
-        switch pass.second {
-        case .none:
-            encoder.setFragmentTexture(stack, index: 1)
-        case .black:
-            uniforms.mix.y = 1
-            uniforms.mix.z = 1
-            encoder.setFragmentTexture(stack, index: 1)
-        case .stack(let handle):
-            uniforms.mix.y = 1
-            encoder.setFragmentTexture(texture(handle) ?? stack, index: 1)
+        func bind(_ second: SecondTexture, stack: MTLTexture, index: Int) {
+            switch second {
+            case .none:
+                encoder.setFragmentTexture(stack, index: index)
+            case .black:
+                uniforms.mix.y = 1
+                uniforms.mix.z = 1
+                encoder.setFragmentTexture(stack, index: index)
+            case .stack(let handle):
+                uniforms.mix.y = 1
+                encoder.setFragmentTexture(texture(handle) ?? stack, index: index)
+            }
+        }
+        bind(pass.second, stack: stack, index: 1)
+        // Spec 4 §10 — the weave's first field, when there is one; otherwise the same textures again.
+        if let first = pass.firstField, let firstStack = texture(first.stack) {
+            encoder.setFragmentTexture(firstStack, index: 2)
+            bind(first.second, stack: firstStack, index: 3)
+        } else {
+            encoder.setFragmentTexture(stack, index: 2)
+            encoder.setFragmentTexture(stack, index: 3)
         }
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<EncodeUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
