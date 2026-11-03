@@ -17,7 +17,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | merged | Adam's `approved` on 2026-10-27; spec corrections applied (e57728f), `area/projection` merged into `main` with `--no-ff` (d7465b8), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | merged | Adam's `approved` on 2026-10-28 with one reversal (a missing transition degrades to the channel default, then to a zero-second cut; 78902ef on the branch); spec corrections applied (cc404c0), `area/format` merged into `main` with `--no-ff` (70bf958), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), task `shipped`; hosted CI green on `main` since 962dd4b. The first three-hour soak on two displays (2026-11-01) found faults in the still source's release, the engine's sweep, the clock box's raster, the audio start and the watchdog's sink rule, fixed on `area/soak-fixes` and merged on Adam's `approved` (2074bd6, 2026-11-02) after a second three-hour run that was clean except for memory, the live item (Now). The bench run with a card is still to do. |
+| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), task `shipped`; hosted CI green on `main` since 962dd4b. The first three-hour soak on two displays (2026-11-01) found faults in the still source's release, the engine's sweep, the clock box's raster, the audio start and the watchdog's sink rule, fixed on `area/soak-fixes` and merged on Adam's `approved` (2074bd6, 2026-11-02) after a second three-hour run that was clean except for memory; the memory question was answered by the attribution run and the §13 breakdown now waits for approval on `area/soak-memory` (Now). The bench run with a card is still to do. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started | Next, once its prompt block is written in `docs/build-order.md` and the spike has passed every §15 criterion on the bench. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first (presets and text; it owes the text style a vertical anchor, Spec 4 §8). The object types are on `main` since Area 2; the engine's stack pass on `main` since Area 4 resolves slots, fit modes, opacity, mute and the +1 slot. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4; the weave and key/fill remain. |
@@ -37,87 +37,58 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**The soak fixes are merged; memory attribution is the live item, on `area/soak-memory`**
-(pushed, tip 5761d3a, tooling only so far; its Build tracker item is
-"Soak memory: attribute the growth after minute ten"). Adam ran the three-hour soak again
-on 2026-11-02 from the fixed engine (two displays, no card, audio on): zero audio underruns,
-a few one-off watchdog jitter events and no recovery, every display and GPU threshold held,
-and memory rose from 256 MB at minute ten to a peak of 319 MB, which fails Spec 4 §13 by its
-letter (flat after the first ten minutes). The shape changed, though: the first run grew in
-a straight line and never stopped; this one decelerated to flat by the second hour (256, 281,
-304, 314, 317, 314 and 315 MB at the half-hour marks from minute ten), the text cache held at
-50 MB throughout, and the minute record carries one total, so it cannot name the remaining
-growth. Adam decided in the session, in reply to the brief and that result: approve and merge
-the fixes now; attribute the memory before anything else changes, both routes with the
-sampling run first; and he names the window for the attended run, since the dev Mac is the
-bench Mac and a multi-use computer, so nothing runs on it before he says so.
-
-Done on that: Spec 4 §11 (the audio preroll) and §12 (half a tick of slack on the
-watchdog's sink rule) corrected on `main` (6e546f8); `area/soak-fixes` merged into `main`
-with `--no-ff` (2074bd6); `swift test` green on the merged tree; pushed; hosted CI green on
-both jobs for the merge push; the branch deleted on both ends and its worktree removed, with both
-three-hour black boxes kept under `tests/soak-output/` in the main checkout.
-`scripts/soak-memory-sample.sh` is on `area/soak-memory`: one soak through
-`scripts/soak.sh` with `footprint` and `vmmap` samples of the engine at minutes five, ten,
-twenty and thirty, then a report of every memory category at every sample, largest growth
-first, with the malloc zones' live bytes against their dirty bytes, and the black box's own
-minute totals beside them. Adam gave the machine on 2026-11-02 and the thirty-five-minute
-run happened (report under `tests/soak-output/memory-2026-11-02-163230/` in that worktree,
-copied into the main checkout's `tests/soak-output/`). It named the growth. Resident size
-rose from 255 MB at minute ten to 275 MB at the end, the same slope as the three-hour run's
-first hour, and it is made of two things: the purgeable malloc zone, whose live bytes grew
-from 7 MB at minute ten to 21 MB at minute thirty in a straight line (system cache memory,
-most likely CoreGraphics and CoreText glyph and image caches from text rasterization, which
-the kernel discards under pressure and which Apple's footprint figure leaves out), and the
-small malloc zone's dirty pages, up 4 MB while its live bytes stayed flat (allocator
-fragmentation, not objects). Everything the engine owns held still after minute ten: the
-heap's live bytes at 75 MB, Metal textures and heaps at 117 MB, IOSurfaces at 157 MB, the
-large malloc zone at 67 MB, the text cache at 50 MB. The GPU-owned part of the footprint
-swings between about 173 MB and 213 MB from sample to sample, so the footprint total
-oscillates while the CPU-side dirty memory moved by about 3 MB in twenty minutes. No leak
-was found. Two more facts from the run: the minute record's resident figure counts the
-purgeable cache and misses the GPU-owned memory, so it is the wrong figure for §13's rule in
-both directions; and each `vmmap` sample freezes the engine for about two thirds of a
-second, which the watchdog logs and a display answers with re-presents, so the attribution
-run is never the §13 verdict run. The §13 per-minute breakdown in the minute record is
-planned, with the footprint and the malloc zones among its fields, and waits for Adam's OK
-(Needs Adam); the §13 rule itself has a correction proposed below. Everything else is on `main`; nothing but the script waits
-on a branch. The bench's three-hour run with a card and both outputs captured (Spec 4 §15)
-comes after memory is settled.
+**The §13 memory breakdown is in review on `area/soak-memory`** (pushed, tip 374d76d;
+hosted CI green on both jobs; its Build tracker item "Soak memory: attribute the growth after
+minute ten, then a fix or a Spec 4 §13 correction" is `in review`). On 2026-11-02 the
+thirty-five-minute attribution run on Adam's machine named the growth the three-hour soaks
+had failed on: resident size climbed after minute ten because the purgeable malloc zone
+(system cache memory, most likely CoreGraphics and CoreText glyph caches from text
+rasterization, which the kernel discards under pressure) grew in a straight line and the
+small malloc zone fragmented, while everything the engine owns held still (the heap's live
+bytes, the Metal textures and heaps, the IOSurfaces, the text cache); no leak was found, and
+the GPU-owned part of the footprint swings by tens of megabytes between samples as the
+driver's pools come and go. On 2026-11-03 Adam gave his OK to the breakdown, accepted the
+§13 correction (the sliding median), deferred the bench run until the breakdown is in, and
+agreed Instruments is wanted only if the purgeable zone does not cap. The spec was corrected
+on `main` first (74de762): §13's per-minute line now names the footprint and its parts, and
+its threshold judges the footprint less its graphics-tagged part and the heap's live bytes
+as sliding per-minute medians against the first window after minute ten, resident size
+only for records without the footprint. Then, tests first, the engine followed the spec
+(db0d118): the minute record carries the footprint, its graphics-tagged part, the malloc
+zones' live and allocated bytes with the purgeable zone on its own, the resource table's
+texture bytes, the decoder pools' bytes, the text cache's bytes and the readback buffers'
+bytes, beside the resident size it had; the black box writes them, the reader reads older
+files with zeros, the verdict applies the corrected rule and the report names the largest
+grower between minute ten and the end. The rasterizer no longer creates a spare font
+object per line (374d76d, §8, no golden changes). `swift test` is green on the branch. On
+`main`: the spec correction, the soak fixes, the sampling script's branch is not merged.
+The bench's three-hour run with a card and both outputs captured (Spec 4 §15) comes after
+the merge, in a window Adam sets aside.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. The soak-fixes brief (the final message of the Area 4 session on 2026-11-02) was
-answered the same day: approved and merged (2074bd6), the §11 and §12 corrections applied.
-
-### Plans waiting for an OK
-
-- **The Spec 4 §13 per-minute breakdown** (engine, `area/soak-memory`, tests first). §13's
-  per-minute line names "memory in use (heaps, decoder pools, caches)"; the record carries
-  one total, the process's resident size. The plan: the minute record gains the process
-  footprint (the figure Apple's `footprint` reports, beside the resident size it has), the
-  malloc zones' live and dirty bytes with the purgeable zone on its own (so cache growth and
-  fragmentation show as themselves), the resource table's texture bytes summed from its live
-  descriptors, the decoder pools' bytes (per live session, its pool depth times its frame
-  size), the text cache's bytes, and the readback buffers' bytes; the black box writes them
-  with the other minute fields, the reader reads them with zeros for older files, and the
-  soak verdict names which part grew between minute ten and the peak. Every source is a
-  statistic the engine or libmalloc already keeps, read on the recorder's thread; nothing on
-  the render thread changes. Tests: the record round-trips through the black box and its
-  reader, an older record without the keys parses with zeros, the resource table's byte sum
-  follows allocate and release, the verdict names the largest grower. Recommended: yes, now,
-  so the bench's three-hour run attributes itself minute by minute, with no sampling freezes,
-  and gives the §13 correction below its evidence.
+- **The §13 memory breakdown** (`area/soak-memory`, 374d76d; the brief is the final
+  message of the Area 4 session on 2026-11-03). It asks Adam to: (1) approve the breakdown
+  and the corrected verdict as built (recommended: yes); (2) confirm the refinement to what
+  he accepted, that the rule judges the footprint less its graphics-tagged part, since the
+  driver's pools swing by tens of megabytes and the whole footprint's medians would fail
+  flat runs at random (recommended: yes; the spec sentence on `main` already says so);
+  (3) confirm the heap's live bytes as a second threshold under the same rule (recommended:
+  yes, it is where a Swift-side leak shows first and it has no GPU noise); (4) say whether
+  GPU-side growth should get its own rule later, since the texture bytes are recorded but
+  not judged because stills and stack changes move them legitimately (recommended: not yet;
+  a cap at the §5 pre-flight budget is the candidate, decided after the bench record). On
+  `approved` the session merges with `--no-ff`, the bench run follows, then Area 5.
 
 ### The attended run
 
-- Done on 2026-11-02 (Now). A second attended run is wanted only if the purgeable growth
-  needs naming beyond its zone: about ten minutes of the engine under Instruments'
-  Allocations (`xctrace`, the purgeable category by call stack), in a window Adam sets
-  aside. The script stays the quick check: `scripts/soak-memory-sample.sh` from the
-  `area/soak-memory` worktree, with `--minutes 1 --at "0.25 0.75"` for a smoke run.
+- Done on 2026-11-02 (Now). A second attended run is wanted only if the first bench record
+  with the breakdown shows the purgeable zone not capping: about ten minutes of the engine
+  under Instruments' Allocations (`xctrace`, the purgeable category by call stack), in a
+  window Adam sets aside. The script stays the quick check: `scripts/soak-memory-sample.sh`
+  from the `area/soak-memory` worktree, with `--minutes 1 --at "0.25 0.75"` for a smoke run.
 
 ### Housekeeping
 
@@ -135,49 +106,46 @@ answered the same day: approved and merged (2074bd6), the §11 and §12 correcti
   the step runs unbuffered, so a future stall would fail a test and name it. A self-hosted
   runner on the bench Mac, without the variable, is what should run the goldens, the decode
   tests and the soak; until it exists, `swift test` on the bench by hand is the proof, as
-  CLAUDE.md says.
+  CLAUDE.md says. GitHub's macOS runner queue cancels a job after fifteen minutes of
+  waiting when several pushes land together; `gh run rerun <id> --failed` is the remedy.
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
 
 ### Spec interpretations made so far
 
-None outstanding. The soak fixes' readings were approved on 2026-11-02: the audio preroll is
-now §11's text (6e546f8), and releasing a variable box's previous raster after its box
-transition is §8's "the result replaces the cache entry" applied. The memory rule is read by
-its letter, baseline at minute ten and no allowance for warm-up, which is why the second
-soak reads FAIL; whether that letter should change is the attribution's question, not a
-reading made.
+| Spec | Left open | Chosen | Alternative |
+| --- | --- | --- | --- |
+| 4 §13, the memory threshold | Adam accepted "the footprint's sliding median"; the attribution run showed the GPU-owned part swinging by tens of megabytes between samples | The rule judges the footprint less its graphics-tagged part (the kernel's graphics ledger), recorded beside the footprint; the spec sentence on `main` says so (74de762) | The whole footprint, which would need a longer window or a wider allowance and would still fail flat runs when the driver's pools sit high |
+| 4 §13, "the same rule on the heap's live bytes" | Whether the heap gets its own threshold or only a figure in the record | A second threshold: the malloc zones' live bytes, purgeable zone excluded, as sliding medians under the same allowance | The footprint rule alone |
+| 4 §13, "the decoder pools' bytes" | VideoToolbox owns the pool and does not report its size | Each live session's pool is sized by §5's depth of eight times the frame its output format takes (NV12, P010, 4:2:2 10-bit, 16-bit RGBA) | Count the IOSurfaces the frame queue holds, which misses the pool's headroom |
+| 4 §13, the median window | "a five-minute window until the first three-hour record with the breakdown sets it" | Five minutes, a named constant; a run with fewer settled minutes than the window is one window and cannot fail on memory | Fix the window now from the four samples of the attribution run, which cannot show the swing's period |
+| 4 §13, GPU-side growth | Whether the resource table's texture bytes are judged | Recorded and reported, not judged: stills and stack or output changes move them legitimately (§5), and the text cache fills until the show's text has been seen | A cap at the §5 pre-flight budget, or flatness outside the text cache; a question in the brief |
+| 4 §5, texture bytes | How a mip chain counts | A third more than the base level, the sum of the chain's series rounded down; formats by role as the §5 table gives them | The exact per-level sum, which differs by less than a kilobyte per texture |
+| 4 §13, "the malloc zones' live and allocated bytes" | Which allocator figures stand for "heaps" | libmalloc's statistics: bytes in use and bytes allocated to the zone, summed over every zone but the purgeable one | The kernel's dirty pages per region as `vmmap` shows them, which needs a region walk and freezes the engine |
+
+The soak fixes' readings were approved on 2026-11-02 and are in §11 and §8's text or
+application; Area 4's readings in its brief and 7032182.
 
 ### Spec corrections proposed
 
-- Spec 4 §13, the memory threshold and the per-minute record: "memory in use" is recorded
-  as the process's resident size, which counts purgeable cache memory the kernel reclaims at
-  will and leaves out the GPU-owned textures and heaps. The attribution run showed the
-  resident growth after minute ten to be exactly that purgeable memory plus allocator
-  fragmentation, with everything the engine owns flat. Fix: judge the rule on the process
-  footprint (`phys_footprint`, which excludes purgeable memory and includes GPU-owned
-  memory), recorded per minute beside the breakdown, keeping the ten-minute baseline; and
-  because the GPU-owned part swings by tens of megabytes between samples, judge the
-  footprint's per-minute median over a sliding window rather than its raw peak, the window
-  chosen from the first three-hour record that carries the breakdown. Until Adam accepts
-  this the verdict keeps reading FAIL on the resident figure, and this page says why.
-
-§11 and §12 were applied in 6e546f8, Area 4's earlier ones in 7032182. The presets-and-text
-spec, when written, owes the text style a vertical anchor defaulting to centre (Spec 4 §8
-says so).
+None outstanding. §13 and §15 were corrected on `main` on Adam's acceptance of 2026-11-03
+(74de762), with the refinement the table above names, which the brief asks him to confirm;
+§11 and §12 in 6e546f8; Area 4's earlier ones in 7032182. The presets-and-text spec, when
+written, owes the text style a vertical anchor defaulting to centre (Spec 4 §8 says so).
 
 ## Next
 
-**The breakdown on Adam's OK, the §13 correction on his word, then the bench run.** The
-sampling run named the growth (Now); the breakdown (Plans waiting for an OK) makes every
-later run name it without sampling; the §13 correction (Spec corrections proposed) makes
-the verdict judge the right figure. Then Spec 4 §15's run with the card: the bench machine root (a copy of
+**Adam's `approved` on the breakdown brief, the merge, then the bench run.** On `approved`
+the session merges `area/soak-memory` into `main` with `--no-ff`, runs `swift test` on the
+merged tree, pushes, removes the worktree and the branch, and marks the tracker item
+`shipped`. Then Spec 4 §15's run with the card: the bench machine root (a copy of
 `tests/fixtures/spike/machine/` with the main output at the LED wall's format, as a
 DeckLink output if the bench has 12G) and `scripts/soak.sh tests/soak/spike.json`, which
 writes the media if it is missing, runs the engine with the script over OSC and prints the
-§13 verdict. Both runs take the displays and the audio device, so they happen in a window
-Adam sets aside; he can run either without a session.
+§13 verdict, now with the breakdown in every minute record and the corrected rule. The run
+takes the displays and the audio device, so it happens in a window Adam sets aside; he can
+run it without a session, and its minute records set the median window.
 
 **Area 5 — Render pipeline, the rest** (branch `area/render`) is next in `docs/build-order.md`;
 it has no prompt block there yet, only the row and the gate ("nothing in `app/` starts until
