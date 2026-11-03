@@ -141,4 +141,28 @@ and the weave. Stop for review at each of: the text cache, the aux passes, the
 measurement, the weave. Nothing here runs unattended.
 ```
 
+**Area 16 — Audio, basic** (branch `area/audio`)
+
+```
+Area: 16, audio, basic. Spec: docs/specs/4-render-pipeline.md §11 is the rule, with the
+audio row of §12 and the audio line of §16; Spec 1 §3 for the Audio Output object (kind
+device or sdiEmbedded, device, channels, delayMs, fallbackDevice). The mix graph for one
+device is on main since Area 4: routing to numbered outputs, gain with its ramp, the
+three audio transitions, the delay line, mute, the clock from delivered samples, the
+preroll. Build what §11 still wants: one graph per distinct device, each with its own
+render callback, the first-numbered device the clock when a channel is routed to more
+than one; device loss while running per §12 (the fallback device if one is configured,
+otherwise silence with a badge and a log line, and the device taken back when it
+reappears, never a guess); the SDI-embedded feed (an Audio Output whose device is a
+DeckLink output: the same graph on a timer thread, scheduled against the card's stream
+time through the sink's scheduleAudio, so embedded audio and the picture share one
+clock); audio underruns per device in the minute record (§13). Tests first from §16's
+audio line, on the software device: sample-exact crossfades, ramps and the delay line
+stay green; device loss simulated and recovered with the documented response and log
+line; the embedded feed's samples landing on the right stream time against a fake
+card. Keep §3's thread rules: nothing on the render thread, nothing blocking in a
+render callback. Nothing here runs unattended; the dev Mac has BlackHole for a silent
+device and no card, so the hardware path waits for the bench.
+```
+
 **Areas marked `spec needed`**: open Cowork with this repo folder connected and ask for the spec first; it is written in `docs/specs/` and reviewed before its prompt is added here.

@@ -28,8 +28,8 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | not started | Spec needed first. The atomic write, the write plan and the versions folder are on `main` since Area 2; the Spec 2 §9 entry and its one-line form since Area 3; debouncing, the log file, snapshots and `restoreLastState` remain. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec needed first; nothing in `app/` starts before the spike passes on the bench. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack, ids exposed) and of thumbnails (PNGs by cue, stack and library version) is on `main` since Area 5; the Mach hand-off of the surfaces and the API's `metrics` and `preview` topics belong with the app and the API. |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first; in `app/`, so after the bench run. |
-| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | Next. It needs no new spec; the runner's macro expansion, the depth cap and the cycle check are on `main`. Its prompt block is proposed under Needs Adam and goes into `docs/build-order.md` on his word. |
-| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | not started | The mix graph for one device, routing, gain ramps, audio transitions, the delay line and mute are on `main` since Area 4; device loss while running and the SDI-embedded feed remain. |
+| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | It needs no new spec; the runner's macro expansion, the depth cap and the cycle check are on `main`. A prompt block is proposed under Needs Adam, for after Area 16. |
+| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | not started | Next, chosen by Adam on 2026-11-03; its prompt block is in `docs/build-order.md`. The mix graph for one device, routing, gain ramps, audio transitions, the delay line, mute, the clock and the preroll are on `main` since Area 4; one graph per device, device loss while running, the SDI-embedded feed and per-device underruns remain. |
 | 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | not started | Spec needed first. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | not started | Spec needed first. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
@@ -52,6 +52,11 @@ The bench's three-hour run with a card and both outputs captured is deferred to 
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, and it checks the weave on the capture rig (§16).
 
+Adam chose Area 16, audio (basic), as the next area on 2026-11-03. Its prompt block is in
+`docs/build-order.md` and under Next below; the next session starts from it in its own
+worktree, as the build order says: Fable in Plan mode at max effort for the plan, then
+Accept edits at high effort for the build.
+
 ## Needs Adam
 
 ### Briefs waiting for approval
@@ -61,11 +66,10 @@ the same day: approved with every recommendation, merged (5b3f6ed).
 
 ### Decisions
 
-- **The Area 15 prompt block.** The next area that needs no new spec is Area 15, macros
-  (basic). `docs/build-order.md` has its row and no block. The block below is proposed in
+- **The Area 15 prompt block.** Area 15, macros (basic), needs no new spec and can follow
+  Area 16. `docs/build-order.md` has its row and no block. The block below is proposed in
   the shape of the earlier ones; on Adam's word it goes into `docs/build-order.md` under the
-  common preamble, and the next session starts with it. Area 16 (audio, basic) is the other
-  candidate; its engine side is mostly on `main`.
+  common preamble.
 
   ```
   Area: 15, macros, basic. Spec: docs/specs/2-commands.md §3 (the macro row), §5 (groups
@@ -136,9 +140,8 @@ defaulting to centre (Spec 4 §8 says so).
 
 ## Next
 
-**Area 15 — Macros, basic** (branch `area/macros`), in its own session, once Adam has put
-its prompt block into `docs/build-order.md` (the proposal is under Needs Adam). The common
-preamble, verbatim:
+**Area 16 — Audio, basic** (branch `area/audio`), in its own session, from the prompt in
+`docs/build-order.md`: the common preamble, then the area's own block, both verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -154,9 +157,32 @@ message under the four headings in CLAUDE.md. Then stop. Merge only when I write
 "approved".
 ```
 
-The bench run with the card happens whenever Adam sets a window; it does not block Area 15
-or 16, and it must pass before anything in `app/` starts (Areas 13 and 14) and before Area
-7 (output sinks). Area 16 (audio, basic) has most of its engine side on `main`. The specs
+```
+Area: 16, audio, basic. Spec: docs/specs/4-render-pipeline.md §11 is the rule, with the
+audio row of §12 and the audio line of §16; Spec 1 §3 for the Audio Output object (kind
+device or sdiEmbedded, device, channels, delayMs, fallbackDevice). The mix graph for one
+device is on main since Area 4: routing to numbered outputs, gain with its ramp, the
+three audio transitions, the delay line, mute, the clock from delivered samples, the
+preroll. Build what §11 still wants: one graph per distinct device, each with its own
+render callback, the first-numbered device the clock when a channel is routed to more
+than one; device loss while running per §12 (the fallback device if one is configured,
+otherwise silence with a badge and a log line, and the device taken back when it
+reappears, never a guess); the SDI-embedded feed (an Audio Output whose device is a
+DeckLink output: the same graph on a timer thread, scheduled against the card's stream
+time through the sink's scheduleAudio, so embedded audio and the picture share one
+clock); audio underruns per device in the minute record (§13). Tests first from §16's
+audio line, on the software device: sample-exact crossfades, ramps and the delay line
+stay green; device loss simulated and recovered with the documented response and log
+line; the embedded feed's samples landing on the right stream time against a fake
+card. Keep §3's thread rules: nothing on the render thread, nothing blocking in a
+render callback. Nothing here runs unattended; the dev Mac has BlackHole for a silent
+device and no card, so the hardware path waits for the bench.
+```
+
+The bench run with the card happens whenever Adam sets a window; it does not block Area 16
+or 15, and it must pass before anything in `app/` starts (Areas 13 and 14) and before Area
+7 (output sinks). Area 15 (macros, basic) can follow Area 16 once its block is in
+`docs/build-order.md` (the proposal is under Needs Adam). The specs
 for the areas marked "Spec needed first" above can be written in Cowork at any time; each
 already has its task in the Build tracker, marked `spec needed`. The presets-and-text spec
 can take the engine's stack pass and the shared slot resolver as given and decide the
