@@ -47,10 +47,17 @@ public final class DeckLinkClock: MasterClock, @unchecked Sendable {
     }
 
     public func now() -> MonotonicTime {
+        guard let time = hardwareNow() else { return MonotonicClock.now() }
+        return MonotonicTime(nanoseconds: time)
+    }
+
+    /// The card's hardware reference time in nanoseconds, or nil when the
+    /// card does not answer; the stream time embedded audio is scheduled on.
+    public func hardwareNow() -> Int64? {
         var time: Int64 = 0
         var ticksPerFrame: Int64 = 0
-        guard let device, odl_hardware_time(device, DeckLinkClock.timeScale, &time, &ticksPerFrame) == ODL_OK else { return MonotonicClock.now() }
-        return MonotonicTime(nanoseconds: time)
+        guard let device, odl_hardware_time(device, DeckLinkClock.timeScale, &time, &ticksPerFrame) == ODL_OK else { return nil }
+        return time
     }
 
     /// Spec 4 §10 — "Reference lock status is read from the card and reported".
@@ -238,8 +245,26 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
 
     private func setPhase(_ new: Phase) {
         lock.lock()
+        let wasRunning = phase == .running
         phase = new
+        let observers = streamObservers
         lock.unlock()
+        // Spec 4 §11 — the embedded feed joins or leaves the card's stream time with the sink.
+        if wasRunning != (new == .running) {
+            for observer in observers { observer() }
+        }
+    }
+
+    private var streamObservers: [@Sendable () -> Void] = []
+
+    /// Spec 4 §10 — "Embedded audio ... 24-bit in 32-bit words": the card
+    /// takes 2, 8 or 16 channels; the Audio Output's channel indices (Spec 1
+    /// §3) say how many it must take.
+    public static func embeddedChannelCount(for channels: [Int]) -> Int {
+        let needed = (channels.max() ?? 1) + 1
+        if needed <= 2 { return 2 }
+        if needed <= 8 { return 8 }
+        return 16
     }
 
     static func describe(_ status: odl_status_t) -> String {
@@ -338,11 +363,37 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     /// 24-bit in 32-bit words, scheduled against the same stream time as the
     /// video." Returns how many frames the card took.
     public func scheduleAudio(_ samples: [Int32], frames: Int, streamTime: Int64) -> Int {
+        samples.withUnsafeBufferPointer { scheduleAudio($0, frames: frames, streamTime: streamTime) }
+    }
+}
+
+/// Spec 4 §11 — "SDI embedded audio ... scheduled against the DeckLink stream
+/// time as section 10 describes, so embedded audio and the picture share one
+/// clock": the sink as the paced device's destination.
+extension DeckLinkSink: StreamAudioDestination {
+    /// The card's stream time while the sink is running; nil otherwise, and
+    /// the feed consumes on the machine clock instead.
+    public var streamTimeNowNs: Int64? {
+        guard currentPhase == .running else { return nil }
+        return clock?.hardwareNow()
+    }
+
+    /// Three video frames: the depth the sink schedules video ahead, so the
+    /// sound reaches the card with the same lead as the picture.
+    public var audioLeadNs: Int64 {
+        3 * format.rate.nanosecondsPerFrame * (format.interlaced ? 2 : 1)
+    }
+
+    public func scheduleAudio(_ samples: UnsafeBufferPointer<Int32>, frames: Int, streamTime: Int64) -> Int {
         guard let device, currentPhase == .running else { return 0 }
         var written: UInt32 = 0
-        let status = samples.withUnsafeBufferPointer { pointer in
-            odl_schedule_audio(device, pointer.baseAddress, UInt32(frames), streamTime, DeckLinkClock.timeScale, &written)
-        }
+        let status = odl_schedule_audio(device, samples.baseAddress, UInt32(frames), streamTime, DeckLinkClock.timeScale, &written)
         return status == ODL_OK ? Int(written) : 0
+    }
+
+    public func observeStream(_ handler: @escaping @Sendable () -> Void) {
+        lock.lock()
+        streamObservers.append(handler)
+        lock.unlock()
     }
 }
