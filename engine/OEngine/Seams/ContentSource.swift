@@ -31,9 +31,17 @@ public protocol ContentSource: AnyObject, Sendable {
     /// metrics and the watchdog.
     var queueDepth: Int { get }
 
+    /// Spec 4 §13 — "the decoder pools' bytes": what the source's decoder pool
+    /// holds, for the minute record; zero for a source without a pool.
+    var poolBytes: Int { get }
+
     /// Control side — the source will not be sampled again; its decoder and
     /// pool go back on the decode thread. Never on the render thread.
     func release()
+}
+
+extension ContentSource {
+    public var poolBytes: Int { 0 }
 }
 
 /// Spec 4 §6 — what a pick found.
@@ -132,20 +140,38 @@ public final class SourceTable: @unchecked Sendable {
     }
 
     private let live = Atomic<Int>(0)
+    /// The control side's own copy of the live sources, under a lock, so the
+    /// recorder's thread sums their pools without touching the render thread's
+    /// slots (Spec 4 §13).
+    private let mirrorLock = NSLock()
+    private var mirror: [Int32: any ContentSource] = [:]
 
     /// Spec 4 §13 — "decoder sessions alive", for the minute record.
     public var liveCount: Int { live.load(ordering: .relaxed) }
+
+    /// Spec 4 §13 — "the decoder pools' bytes": the live sources' pools summed.
+    public var poolBytes: Int {
+        mirrorLock.lock()
+        defer { mirrorLock.unlock() }
+        return mirror.values.reduce(0) { $0 + $1.poolBytes }
+    }
 
     public func install(_ source: any ContentSource, at handle: InstanceHandle) {
         guard handle.rawValue >= 0, Int(handle.rawValue) < capacity else { return }
         if slots[Int(handle.rawValue)] == nil { live.add(1, ordering: .relaxed) }
         slots[Int(handle.rawValue)] = source
+        mirrorLock.lock()
+        mirror[handle.rawValue] = source
+        mirrorLock.unlock()
     }
 
     public func remove(_ handle: InstanceHandle) {
         guard handle.rawValue >= 0, Int(handle.rawValue) < capacity else { return }
         if slots[Int(handle.rawValue)] != nil { live.subtract(1, ordering: .relaxed) }
         slots[Int(handle.rawValue)] = nil
+        mirrorLock.lock()
+        mirror[handle.rawValue] = nil
+        mirrorLock.unlock()
     }
 
     /// Render thread: an array read, no allocation.

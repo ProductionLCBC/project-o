@@ -16,8 +16,17 @@ public enum SoakFailure: Equatable, Sendable {
     case textLateAfterFirstMinute(count: Int)
     /// "zero audio underruns"
     case audioUnderruns(count: Int)
-    /// "memory flat to within 5% after the first ten minutes"
+    /// "memory flat to within 5% after the first ten minutes", on the resident
+    /// size: "a record without the footprint is judged on resident size as
+    /// before" (the black boxes of 2026-11-01 and 2026-11-02).
     case memoryNotFlat(baselineBytes: Int64, peakBytes: Int64)
+    /// "judged on the footprint's sliding per-minute median ... against the
+    /// median of the first window after minute ten", the footprint less its
+    /// graphics-tagged part; the numbers are the two medians.
+    case footprintNotFlat(baselineBytes: Int64, peakBytes: Int64)
+    /// "and the same rule on the heap's live bytes, where a Swift-side leak
+    /// shows first"
+    case heapNotFlat(baselineBytes: Int64, peakBytes: Int64)
     /// "zero watchdog recoveries"
     case watchdogRecoveries(count: Int)
 }
@@ -86,9 +95,22 @@ public enum SoakThresholds {
         let underruns = run.minutes.reduce(0) { $0 + $1.audioUnderruns }
         if underruns > 0 { failures.append(.audioUnderruns(count: underruns)) }
 
-        // Memory flat within 5% after the first ten minutes.
-        let settled = run.minutes.filter { $0.minute >= 10 }
-        if let baseline = settled.first?.memoryBytes {
+        // Memory flat within 5% after the first ten minutes (§13 as corrected on 2026-11-03).
+        let settled = run.minutes.filter { $0.minute >= 10 }.sorted { $0.minute < $1.minute }
+        if hasFootprint(settled) {
+            // "judged on the footprint's sliding per-minute median ... against the median of the first window after minute ten"
+            if let medians = slidingMedians(settled.map(\.judgedFootprintBytes), window: medianWindowMinutes),
+               Double(medians.peak) > Double(medians.baseline) * 1.05 {
+                failures.append(.footprintNotFlat(baselineBytes: medians.baseline, peakBytes: medians.peak))
+            }
+            // "and the same rule on the heap's live bytes"
+            if settled.allSatisfy({ $0.heapLiveBytes > 0 }),
+               let medians = slidingMedians(settled.map(\.heapLiveBytes), window: medianWindowMinutes),
+               Double(medians.peak) > Double(medians.baseline) * 1.05 {
+                failures.append(.heapNotFlat(baselineBytes: medians.baseline, peakBytes: medians.peak))
+            }
+        } else if let baseline = settled.first?.memoryBytes {
+            // "a record without the footprint is judged on resident size as before"
             let peak = settled.map(\.memoryBytes).max() ?? baseline
             if Double(peak) > Double(baseline) * 1.05 { failures.append(.memoryNotFlat(baselineBytes: baseline, peakBytes: peak)) }
         }
@@ -98,5 +120,35 @@ public enum SoakThresholds {
         if recoveries > 0 { failures.append(.watchdogRecoveries(count: recoveries)) }
 
         return failures
+    }
+
+    /// Spec 4 §13 — "a five-minute window until the first three-hour record
+    /// with the breakdown sets it".
+    public static let medianWindowMinutes = 5
+
+    /// True when every settled minute carries the footprint, which the records
+    /// written before 2026-11-03 do not.
+    public static func hasFootprint(_ minutes: [MinuteRecord]) -> Bool {
+        !minutes.isEmpty && minutes.allSatisfy { $0.footprintBytes > 0 }
+    }
+
+    /// The sliding per-minute medians of a series: the baseline is the median
+    /// of the first window, the peak the highest median of any window. A
+    /// series shorter than the window is one window, so it cannot fail.
+    public static func slidingMedians(_ series: [Int64], window: Int) -> (baseline: Int64, peak: Int64)? {
+        guard !series.isEmpty else { return nil }
+        let width = max(1, min(window, series.count))
+        var medians: [Int64] = []
+        for end in (width - 1)..<series.count {
+            medians.append(median(Array(series[(end - width + 1)...end])))
+        }
+        guard let baseline = medians.first, let peak = medians.max() else { return nil }
+        return (baseline, peak)
+    }
+
+    static func median(_ values: [Int64]) -> Int64 {
+        let sorted = values.sorted()
+        let count = sorted.count
+        return count % 2 == 1 ? sorted[count / 2] : (sorted[count / 2 - 1] + sorted[count / 2]) / 2
     }
 }

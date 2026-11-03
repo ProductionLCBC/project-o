@@ -92,20 +92,40 @@ public struct PresentRecord: Equatable, Sendable {
     }
 }
 
-/// Spec 4 §13 — "Per minute: memory in use (heaps, decoder pools, caches),
-/// decoder sessions alive, cache hit rates, audio underruns per device,
-/// watchdog events."
+/// Spec 4 §13 — "Per minute: memory in use, as the process footprint (the
+/// kernel's `phys_footprint`, which counts the GPU-owned textures and heaps
+/// and leaves out purgeable cache memory) beside the resident size, and its
+/// parts: the malloc zones' live and allocated bytes with the purgeable zone
+/// on its own, the resource table's texture bytes, the decoder pools' bytes,
+/// the text cache's bytes and the readback buffers' bytes; decoder sessions
+/// alive, cache hit rates, audio underruns per device, watchdog events." The
+/// breakdown fields read as zero in records written before 2026-11-03.
 public struct MinuteRecord: Equatable, Sendable {
     public var minute: Int
+    /// The resident size: what the record carried first, kept for older
+    /// readers; §13 judges it only when the footprint is missing.
     public var memoryBytes: Int64
     public var decoderSessions: Int
     public var textCacheHitRate: Double
     public var audioUnderruns: Int
     public var watchdogEvents: Int
     public var watchdogRecoveries: Int
+    public var footprintBytes: Int64
+    /// The graphics-tagged part of the footprint (`ProcessMemory`).
+    public var graphicsFootprintBytes: Int64
+    public var heapLiveBytes: Int64
+    public var heapAllocatedBytes: Int64
+    public var purgeableLiveBytes: Int64
+    public var textureBytes: Int64
+    public var decoderPoolBytes: Int64
+    public var textCacheBytes: Int64
+    public var readbackBytes: Int64
 
     public init(minute: Int, memoryBytes: Int64, decoderSessions: Int, textCacheHitRate: Double, audioUnderruns: Int,
-                watchdogEvents: Int, watchdogRecoveries: Int) {
+                watchdogEvents: Int, watchdogRecoveries: Int,
+                footprintBytes: Int64 = 0, graphicsFootprintBytes: Int64 = 0, heapLiveBytes: Int64 = 0, heapAllocatedBytes: Int64 = 0,
+                purgeableLiveBytes: Int64 = 0, textureBytes: Int64 = 0, decoderPoolBytes: Int64 = 0, textCacheBytes: Int64 = 0,
+                readbackBytes: Int64 = 0) {
         self.minute = minute
         self.memoryBytes = memoryBytes
         self.decoderSessions = decoderSessions
@@ -113,5 +133,18 @@ public struct MinuteRecord: Equatable, Sendable {
         self.audioUnderruns = audioUnderruns
         self.watchdogEvents = watchdogEvents
         self.watchdogRecoveries = watchdogRecoveries
+        self.footprintBytes = footprintBytes
+        self.graphicsFootprintBytes = graphicsFootprintBytes
+        self.heapLiveBytes = heapLiveBytes
+        self.heapAllocatedBytes = heapAllocatedBytes
+        self.purgeableLiveBytes = purgeableLiveBytes
+        self.textureBytes = textureBytes
+        self.decoderPoolBytes = decoderPoolBytes
+        self.textCacheBytes = textCacheBytes
+        self.readbackBytes = readbackBytes
     }
+
+    /// Spec 4 §13 — the figure the memory threshold judges: the footprint less
+    /// its graphics-tagged part.
+    public var judgedFootprintBytes: Int64 { max(0, footprintBytes - graphicsFootprintBytes) }
 }

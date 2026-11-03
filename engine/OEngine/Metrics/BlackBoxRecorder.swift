@@ -9,21 +9,35 @@ import Synchronization
 /// summary; once a minute it writes the minute record (memory, decoder
 /// sessions, cache hit rate, audio underruns, watchdog events).
 public final class BlackBoxRecorder: @unchecked Sendable {
+    /// Spec 4 §13 — what the engine tells the minute record; the process-level
+    /// figures (`ProcessMemory`) the recorder reads itself. The byte sources
+    /// are "the resource table's texture bytes, the decoder pools' bytes, the
+    /// text cache's bytes and the readback buffers' bytes".
     public struct MinuteSources: Sendable {
         public var decoderSessions: @Sendable () -> Int
         public var textCacheHitRate: @Sendable () -> Double
         public var audioUnderruns: @Sendable () -> Int
         public var watchdogEvents: @Sendable () -> Int
         public var watchdogRecoveries: @Sendable () -> Int
+        public var textureBytes: @Sendable () -> Int
+        public var decoderPoolBytes: @Sendable () -> Int
+        public var textCacheBytes: @Sendable () -> Int
+        public var readbackBytes: @Sendable () -> Int
 
         public init(decoderSessions: @escaping @Sendable () -> Int = { 0 }, textCacheHitRate: @escaping @Sendable () -> Double = { 1 },
                     audioUnderruns: @escaping @Sendable () -> Int = { 0 }, watchdogEvents: @escaping @Sendable () -> Int = { 0 },
-                    watchdogRecoveries: @escaping @Sendable () -> Int = { 0 }) {
+                    watchdogRecoveries: @escaping @Sendable () -> Int = { 0 },
+                    textureBytes: @escaping @Sendable () -> Int = { 0 }, decoderPoolBytes: @escaping @Sendable () -> Int = { 0 },
+                    textCacheBytes: @escaping @Sendable () -> Int = { 0 }, readbackBytes: @escaping @Sendable () -> Int = { 0 }) {
             self.decoderSessions = decoderSessions
             self.textCacheHitRate = textCacheHitRate
             self.audioUnderruns = audioUnderruns
             self.watchdogEvents = watchdogEvents
             self.watchdogRecoveries = watchdogRecoveries
+            self.textureBytes = textureBytes
+            self.decoderPoolBytes = decoderPoolBytes
+            self.textCacheBytes = textCacheBytes
+            self.readbackBytes = readbackBytes
         }
     }
 
@@ -87,9 +101,16 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         let underruns = sources.audioUnderruns()
         let events = sources.watchdogEvents()
         let recoveries = sources.watchdogRecoveries()
-        let record = MinuteRecord(minute: minute, memoryBytes: BlackBoxRecorder.residentMemoryBytes(), decoderSessions: sources.decoderSessions(),
+        // Spec 4 §13 — "memory in use, as the process footprint ... beside the resident size, and its parts".
+        let memory = ProcessMemory.current()
+        let record = MinuteRecord(minute: minute, memoryBytes: memory.residentBytes, decoderSessions: sources.decoderSessions(),
                                   textCacheHitRate: sources.textCacheHitRate(), audioUnderruns: max(0, underruns - lastUnderruns),
-                                  watchdogEvents: max(0, events - lastEvents), watchdogRecoveries: max(0, recoveries - lastRecoveries))
+                                  watchdogEvents: max(0, events - lastEvents), watchdogRecoveries: max(0, recoveries - lastRecoveries),
+                                  footprintBytes: memory.footprintBytes, graphicsFootprintBytes: memory.graphicsFootprintBytes,
+                                  heapLiveBytes: memory.heapLiveBytes, heapAllocatedBytes: memory.heapAllocatedBytes,
+                                  purgeableLiveBytes: memory.purgeableLiveBytes, textureBytes: Int64(sources.textureBytes()),
+                                  decoderPoolBytes: Int64(sources.decoderPoolBytes()), textCacheBytes: Int64(sources.textCacheBytes()),
+                                  readbackBytes: Int64(sources.readbackBytes()))
         lastUnderruns = underruns
         lastEvents = events
         lastRecoveries = recoveries
@@ -97,16 +118,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         do { try box.append(record, at: now) } catch { log.error("black box: \(error)") }
     }
 
-    /// Spec 4 §13 — "memory in use": the process's resident size.
-    public static func residentMemoryBytes() -> Int64 {
-        var usage = rusage_info_current()
-        let result = withUnsafeMutablePointer(to: &usage) { pointer in
-            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rebound in
-                proc_pid_rusage(getpid(), RUSAGE_INFO_CURRENT, rebound)
-            }
-        }
-        return result == 0 ? Int64(usage.ri_resident_size) : 0
-    }
+    /// The process's resident size (`ProcessMemory.residentSize`).
+    public static func residentMemoryBytes() -> Int64 { ProcessMemory.residentSize() }
 
     public func start() {
         guard !running.exchange(true, ordering: .acquiringAndReleasing) else { return }

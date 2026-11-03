@@ -49,12 +49,19 @@ public enum BlackBoxReader {
                                   rePresented: object["rePresented"] as? Bool ?? false, latencyNs: int64(object["latencyNs"]),
                                   completion: completion, dropsSinceStart: int64(object["dropsSinceStart"])))
         case "minute":
+            // Spec 4 §13 — the breakdown keys are missing from files written before 2026-11-03 and read as zero.
             run.add(MinuteRecord(minute: Int(int64(object["minute"])), memoryBytes: int64(object["memoryBytes"]),
                                  decoderSessions: Int(int64(object["decoderSessions"])),
                                  textCacheHitRate: (object["textCacheHitRate"] as? NSNumber)?.doubleValue ?? 1,
                                  audioUnderruns: Int(int64(object["audioUnderruns"])),
                                  watchdogEvents: Int(int64(object["watchdogEvents"])),
-                                 watchdogRecoveries: Int(int64(object["watchdogRecoveries"]))))
+                                 watchdogRecoveries: Int(int64(object["watchdogRecoveries"])),
+                                 footprintBytes: int64(object["footprintBytes"]),
+                                 graphicsFootprintBytes: int64(object["graphicsFootprintBytes"]),
+                                 heapLiveBytes: int64(object["heapLiveBytes"]), heapAllocatedBytes: int64(object["heapAllocatedBytes"]),
+                                 purgeableLiveBytes: int64(object["purgeableLiveBytes"]), textureBytes: int64(object["textureBytes"]),
+                                 decoderPoolBytes: int64(object["decoderPoolBytes"]), textCacheBytes: int64(object["textCacheBytes"]),
+                                 readbackBytes: int64(object["readbackBytes"])))
         default:
             break
         }
@@ -89,10 +96,37 @@ public enum BlackBoxReader {
             let underruns = run.minutes.reduce(0) { $0 + $1.audioUnderruns }
             let recoveries = run.minutes.reduce(0) { $0 + $1.watchdogRecoveries }
             let events = run.minutes.reduce(0) { $0 + $1.watchdogEvents }
-            lines.append("minutes \(run.minutes.count): memory \(last.memoryBytes / 1_048_576) MB at the end, audio underruns \(underruns), watchdog events \(events), recoveries \(recoveries), decoder sessions \(last.decoderSessions), text cache hit rate \(String(format: "%.3f", last.textCacheHitRate))")
-            let settled = run.minutes.filter { $0.minute >= 10 }
-            if let baseline = settled.first?.memoryBytes, let peak = settled.map(\.memoryBytes).max() {
-                lines.append("memory after minute 10: baseline \(baseline / 1_048_576) MB, peak \(peak / 1_048_576) MB (\(String(format: "%+.1f", (Double(peak) / Double(max(1, baseline)) - 1) * 100))%)")
+            lines.append("minutes \(run.minutes.count): memory \(last.memoryBytes / 1_048_576) MB resident at the end, audio underruns \(underruns), watchdog events \(events), recoveries \(recoveries), decoder sessions \(last.decoderSessions), text cache hit rate \(String(format: "%.3f", last.textCacheHitRate))")
+            let settled = run.minutes.filter { $0.minute >= 10 }.sorted { $0.minute < $1.minute }
+            if SoakThresholds.hasFootprint(settled) {
+                // Spec 4 §13 as corrected on 2026-11-03: the footprint less its graphics-tagged part and the heap's live bytes, as sliding medians.
+                let window = SoakThresholds.medianWindowMinutes
+                if let medians = SoakThresholds.slidingMedians(settled.map(\.judgedFootprintBytes), window: window) {
+                    lines.append("footprint less graphics after minute 10 (\(window)-minute medians): baseline \(mb(medians.baseline)) MB, highest \(mb(medians.peak)) MB (\(percent(medians.peak, of: medians.baseline)))")
+                }
+                if let medians = SoakThresholds.slidingMedians(settled.map(\.heapLiveBytes), window: window) {
+                    lines.append("heap live after minute 10 (\(window)-minute medians): baseline \(mb(medians.baseline)) MB, highest \(mb(medians.peak)) MB (\(percent(medians.peak, of: medians.baseline)))")
+                }
+                if let first = settled.first, let end = settled.last {
+                    let parts: [(name: String, start: Int64, end: Int64)] = [
+                        ("graphics", first.graphicsFootprintBytes, end.graphicsFootprintBytes),
+                        ("heap live", first.heapLiveBytes, end.heapLiveBytes),
+                        ("heap allocated", first.heapAllocatedBytes, end.heapAllocatedBytes),
+                        ("purgeable", first.purgeableLiveBytes, end.purgeableLiveBytes),
+                        ("textures", first.textureBytes, end.textureBytes),
+                        ("decoder pools", first.decoderPoolBytes, end.decoderPoolBytes),
+                        ("text cache", first.textCacheBytes, end.textCacheBytes),
+                        ("readback", first.readbackBytes, end.readbackBytes),
+                    ]
+                    var line = "parts, minute 10 to minute \(end.minute): footprint \(mb(first.footprintBytes)) to \(mb(end.footprintBytes)) MB, "
+                    line += parts.map { "\($0.name) \(mb($0.start)) to \(mb($0.end)) MB" }.joined(separator: ", ")
+                    if let grower = parts.max(by: { ($0.end - $0.start) < ($1.end - $1.start) }), grower.end > grower.start {
+                        line += "; largest grower: \(grower.name) (+\(mb(grower.end - grower.start)) MB)"
+                    }
+                    lines.append(line)
+                }
+            } else if let baseline = settled.first?.memoryBytes, let peak = settled.map(\.memoryBytes).max() {
+                lines.append("memory after minute 10 (resident size; this record has no footprint): baseline \(mb(baseline)) MB, peak \(mb(peak)) MB (\(percent(peak, of: baseline)))")
             }
         }
         if failures.isEmpty {
@@ -105,14 +139,23 @@ public enum BlackBoxReader {
     }
 
     public static func describe(_ failure: SoakFailure) -> String {
+        let window = SoakThresholds.medianWindowMinutes
         switch failure {
         case .sdiDroppedOrLate(let output, let count): return "SDI output \(output): \(count) dropped or displayed late"
         case .displayRePresents(let output, let count, let allowed): return "display output \(output): \(count) re-presents, \(allowed) allowed"
         case .gpuP99OverBudget(let p99, let budget): return "GPU p99 \(String(format: "%.2f", Double(p99) / 1e6)) ms over the \(String(format: "%.2f", Double(budget) / 1e6)) ms budget"
         case .textLateAfterFirstMinute(let count): return "text late \(count) times after the first minute"
         case .audioUnderruns(let count): return "audio underruns \(count)"
-        case .memoryNotFlat(let baseline, let peak): return "memory grew from \(baseline / 1_048_576) MB to \(peak / 1_048_576) MB after minute 10"
+        case .memoryNotFlat(let baseline, let peak): return "memory (resident size) grew from \(mb(baseline)) MB to \(mb(peak)) MB after minute 10"
+        case .footprintNotFlat(let baseline, let peak): return "footprint less graphics grew from \(mb(baseline)) MB to \(mb(peak)) MB after minute 10 (\(window)-minute medians)"
+        case .heapNotFlat(let baseline, let peak): return "heap live bytes grew from \(mb(baseline)) MB to \(mb(peak)) MB after minute 10 (\(window)-minute medians)"
         case .watchdogRecoveries(let count): return "watchdog recoveries \(count)"
         }
+    }
+
+    static func mb(_ bytes: Int64) -> String { String(bytes / 1_048_576) }
+
+    static func percent(_ value: Int64, of baseline: Int64) -> String {
+        String(format: "%+.1f%%", (Double(value) / Double(max(1, baseline)) - 1) * 100)
     }
 }
