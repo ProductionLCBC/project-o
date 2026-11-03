@@ -256,7 +256,11 @@ final class PlanBuilderTests: XCTestCase {
         engine.tick(count: 15)
         sink = try XCTUnwrap(engine.lastPlan?.sinkPasses.first { $0.output == 1 })
         XCTAssertEqual(sink.second, .none)
-        XCTAssertEqual(engine.lastPlan?.stackPasses.map(\.stack), [2], "stack 1 is no longer due once the switch ends")
+        XCTAssertEqual(engine.lastPlan?.stackPasses.filter { !$0.auxOnly }.map(\.stack), [2], "stack 1 is no longer due once the switch ends")
+        // Area 5 reading — no output feeds stack 1 now, so it renders for its preview alone on preview ticks (frame 30 is one).
+        XCTAssertEqual(engine.lastPlan?.stackPasses.filter(\.auxOnly).map(\.stack), [1])
+        engine.tick()
+        XCTAssertEqual(engine.lastPlan?.stackPasses.map(\.stack), [2], "and not at all on the ticks between previews")
     }
 
     func test_blackoutMixesToBlackAtTheSink() throws {

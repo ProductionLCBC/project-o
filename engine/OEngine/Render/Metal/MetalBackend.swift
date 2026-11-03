@@ -1,6 +1,7 @@
 // OEngine — Spec 4 §14, the `RenderBackend` seam's v1 implementation: Metal.
 
 import Foundation
+import IOSurface
 import Metal
 import simd
 
@@ -21,6 +22,9 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     public let name = "metal"
     public let device: MTLDevice
     let queue: MTLCommandQueue
+    /// Spec 4 §3 — the thumbnail job's own queue, so its work never queues
+    /// behind or ahead of a tick's command buffers on the render queue.
+    let auxQueue: MTLCommandQueue
     let library: MTLLibrary
     public let resources = ResourceTable(capacity: 4096)
     let pipelines: PipelineCache
@@ -43,9 +47,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
 
     public init(device: MTLDevice? = MTLCreateSystemDefaultDevice(), log: EngineLog = EngineLog(category: "metal")) throws {
         guard let device else { throw MetalBackendError.noDevice }
-        guard let queue = device.makeCommandQueue() else { throw MetalBackendError.noCommandQueue }
+        guard let queue = device.makeCommandQueue(), let auxQueue = device.makeCommandQueue() else { throw MetalBackendError.noCommandQueue }
         self.device = device
         self.queue = queue
+        self.auxQueue = auxQueue
         self.log = log
         // Spec 4 §14 — the shaders compiled by the MetalCompiler plugin into the module's bundle.
         guard let url = Bundle.module.url(forResource: "default", withExtension: "metallib") else {
@@ -74,18 +79,51 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         samplerDescriptor.mipFilter = .notMipmapped
         samplerLevelZero = device.makeSamplerState(descriptor: samplerDescriptor)
         try pipelines.ensureBlur()
+        try pipelines.ensureDownscale()
         queue.label = "o.engine.render"
+        auxQueue.label = "o.engine.aux"
     }
 
     // MARK: - Resources (Spec 4 §5)
 
     public func makeTexture(_ descriptor: TextureDescriptor) -> TextureHandle {
-        guard let texture = device.makeTexture(descriptor: MetalBackend.metalDescriptor(for: descriptor)) else {
+        let made: MTLTexture?
+        switch descriptor.role {
+        case .preview, .thumbnail:
+            // Spec 4 §10 — "small BGRA8 sRGB textures ..., backed by IOSurfaces".
+            made = MetalBackend.makeSurfaceTexture(device: device, width: max(1, descriptor.size.width), height: max(1, descriptor.size.height))
+        default:
+            made = device.makeTexture(descriptor: MetalBackend.metalDescriptor(for: descriptor))
+        }
+        guard let texture = made else {
             log.error("could not allocate \(descriptor.role.rawValue) texture \(descriptor.size.width)x\(descriptor.size.height)")
             return .none
         }
         texture.label = descriptor.label
         return resources.allocate(texture, descriptor: descriptor)
+    }
+
+    /// Spec 4 §10 — a BGRA8 sRGB texture over an IOSurface the operator app
+    /// can map in its own process: "zero-copy, no encoding, no network".
+    static func makeSurfaceTexture(device: MTLDevice, width: Int, height: Int) -> MTLTexture? {
+        let properties: [IOSurfacePropertyKey: Any] = [
+            .width: width,
+            .height: height,
+            .bytesPerElement: 4,
+            .pixelFormat: UInt32(0x42475241),   // 'BGRA'
+        ]
+        guard let surface = IOSurface(properties: properties) else { return nil }
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
+        d.usage = [.renderTarget, .shaderRead]
+        d.storageMode = .shared
+        return device.makeTexture(descriptor: d, iosurface: surface, plane: 0)
+    }
+
+    /// Spec 4 §10 — the id of the IOSurface behind a preview or thumbnail
+    /// texture, which the app maps over the local Mach connection.
+    public func surfaceID(of handle: TextureHandle) -> UInt32? {
+        guard let surface = texture(handle)?.iosurface else { return nil }
+        return IOSurfaceGetID(surface)
     }
 
     static func metalDescriptor(for descriptor: TextureDescriptor) -> MTLTextureDescriptor {
@@ -102,9 +140,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             d.pixelFormat = .bgra8Unorm_srgb
             d.storageMode = .shared
             d.usage = [.shaderRead]
-        case .preview:
+        case .preview, .thumbnail:
+            // Made over an IOSurface in `makeTexture`; this descriptor is the plain fallback.
             d.pixelFormat = .bgra8Unorm_srgb
-            d.storageMode = .private
+            d.storageMode = .shared
             d.usage = [.renderTarget, .shaderRead]
         }
         if descriptor.mipmapped {
@@ -142,7 +181,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             }
         }
         for pass in plan.sinkPasses {
-            do { try pipelines.ensureEncode(pass.encode) } catch { log.error("encode pipeline \(pass.encode.rawValue): \(error)") }
+            do { try pipelines.ensureEncode(pass.encode, weave: pass.weaves) } catch { log.error("encode pipeline \(pass.encode.rawValue): \(error)") }
+        }
+        if !plan.auxPasses.isEmpty {
+            do { try pipelines.ensureDownscale() } catch { log.error("downscale pipeline: \(error)") }
         }
     }
 
@@ -184,9 +226,11 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             }
         }
         do { try pipelines.ensureLinearize() } catch { log.error("warm-up: linearize: \(error)") }
-        for kind in [EncodeKind.display10Bit, .v210, .capture] {
+        do { try pipelines.ensureDownscale() } catch { log.error("warm-up: downscale: \(error)") }
+        for kind in [EncodeKind.display10Bit, .v210, .v210Interlaced, .capture] {
             do { try pipelines.ensureEncode(kind) } catch { log.error("warm-up: encode \(kind.rawValue): \(error)") }
         }
+        do { try pipelines.ensureEncode(.capture, weave: true) } catch { log.error("warm-up: encode capture weave: \(error)") }
         return count
     }
 
@@ -206,9 +250,11 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         nextToken += 1
         var slot = ReceiptSlot(token: token)
 
+        // Spec 4 §4 step 5 — under pressure the aux-only passes (a stack rendering for its preview alone, and the
+        // channels only it samples) are skipped with the aux passes.
         if !plan.channelPasses.isEmpty, let buffer = queue.makeCommandBuffer() {
             buffer.label = "channels \(tick.tick)"
-            for (index, pass) in plan.channelPasses.enumerated() where index * 2 + 1 < picks.capacity {
+            for (index, pass) in plan.channelPasses.enumerated() where index * 2 + 1 < picks.capacity && !(options.skipAux && pass.auxOnly) {
                 encodeChannel(pass, picks: picks, index: index, into: buffer, options: options)
             }
             buffer.commit()
@@ -216,7 +262,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         }
         if !plan.stackPasses.isEmpty, let buffer = queue.makeCommandBuffer() {
             buffer.label = "stacks \(tick.tick)"
-            for pass in plan.stackPasses { encodeStack(pass, into: buffer) }
+            for pass in plan.stackPasses where !(options.skipAux && pass.auxOnly) { encodeStack(pass, into: buffer) }
             buffer.commit()
             slot.stack = buffer
         }
@@ -497,13 +543,13 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         case .display10Bit:
             // Spec 4 §10 — the display sink encodes into its drawable on its own thread.
             break
-        case .v210:
-            // Spec 4 §10 — v210 into the DeckLink ring's shared buffer, scheduled by the sink's thread.
+        case .v210, .v210Interlaced:
+            // Spec 4 §10 — v210 into the DeckLink ring's shared buffer, scheduled by the sink's thread; woven when interlaced.
             encodeV210(pass, into: buffer)
         case .capture:
             guard let stack = texture(pass.stack),
                   let target = captureTargets.target(output: pass.output, size: PixelSize(width: stack.width, height: stack.height), device: device),
-                  let pipeline = pipelines.encodePipeline(.capture) else { return }
+                  let pipeline = pipelines.encodePipeline(.capture, weave: pass.weaves) else { return }
             encodeMix(pass, stack: stack, target: target, pipeline: pipeline, into: buffer)
         }
     }
@@ -517,28 +563,79 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         descriptor.colorAttachments[0].loadAction = .dontCare
         descriptor.colorAttachments[0].storeAction = .store
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        encoder.label = "encode output \(pass.output)"
+        encoder.label = "encode output \(pass.output)\(pass.weaves ? " woven" : "")"
         encoder.setRenderPipelineState(pipeline)
         encoder.setFragmentTexture(stack, index: 0)
         var uniforms = EncodeUniforms(mix: SIMD4(pass.mix, 0, 0, 0), size: SIMD4(Float(target.width), Float(target.height), 0, 0))
-        switch pass.second {
-        case .none:
-            encoder.setFragmentTexture(stack, index: 1)
-        case .black:
-            uniforms.mix.y = 1
-            uniforms.mix.z = 1
-            encoder.setFragmentTexture(stack, index: 1)
-        case .stack(let handle):
-            uniforms.mix.y = 1
-            encoder.setFragmentTexture(texture(handle) ?? stack, index: 1)
+        func bind(_ second: SecondTexture, stack: MTLTexture, index: Int) {
+            switch second {
+            case .none:
+                encoder.setFragmentTexture(stack, index: index)
+            case .black:
+                uniforms.mix.y = 1
+                uniforms.mix.z = 1
+                encoder.setFragmentTexture(stack, index: index)
+            case .stack(let handle):
+                uniforms.mix.y = 1
+                encoder.setFragmentTexture(texture(handle) ?? stack, index: index)
+            }
+        }
+        bind(pass.second, stack: stack, index: 1)
+        // Spec 4 §10 — the weave's first field, when there is one; otherwise the same textures again.
+        if let first = pass.firstField, let firstStack = texture(first.stack) {
+            encoder.setFragmentTexture(firstStack, index: 2)
+            bind(first.second, stack: firstStack, index: 3)
+        } else {
+            encoder.setFragmentTexture(stack, index: 2)
+            encoder.setFragmentTexture(stack, index: 3)
         }
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<EncodeUniforms>.stride, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         encoder.endEncoding()
     }
 
+    /// Spec 4 §10 — "Aux passes downscale the stack textures into small BGRA8
+    /// sRGB textures at most 30 times a second, backed by IOSurfaces."
     private func encodeAux(_ pass: AuxPass, into buffer: MTLCommandBuffer) {
-        // Spec 4 §10 — previews and the multiviewer are Area 5; the pass is counted, not drawn.
+        guard let source = texture(pass.source), let target = texture(pass.target) else { return }
+        encodeDownscale(source: source, target: target, into: buffer, label: "preview stack \(pass.stack)")
+    }
+
+    /// The box-filter downscale of `source` into `target`, at whatever ratio
+    /// the two sizes make (1:1 for a thumbnail landing in its texture).
+    func encodeDownscale(source: MTLTexture, target: MTLTexture, into buffer: MTLCommandBuffer, label: String) {
+        guard let pipeline = pipelines.downscalePipeline else {
+            missingPipelineCount += 1
+            return
+        }
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = target
+        descriptor.colorAttachments[0].loadAction = .dontCare
+        descriptor.colorAttachments[0].storeAction = .store
+        guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        encoder.label = label
+        encoder.setRenderPipelineState(pipeline)
+        encoder.setFragmentTexture(source, index: 0)
+        let across = max(1, (source.width + target.width - 1) / max(1, target.width))
+        let down = max(1, (source.height + target.height - 1) / max(1, target.height))
+        var uniforms = DownscaleUniforms(taps: SIMD4(Float(across), Float(down), 1 / Float(max(1, source.width)), 1 / Float(max(1, source.height))))
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<DownscaleUniforms>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        encoder.endEncoding()
+    }
+
+    /// Spec 4 §10 — the thumbnail job's render, off the render thread on the
+    /// aux queue: the stack pass into a scratch stack texture, then the pass
+    /// into the thumbnail's BGRA8 sRGB texture; waits, bounded. Returns false
+    /// when the GPU did not finish in time.
+    public func renderOffline(_ pass: StackPass, into target: TextureHandle) -> Bool {
+        prepare(FramePlan(frame: 0, stackPasses: [pass], auxPasses: [AuxPass(kind: .thumbnail, stack: pass.stack, source: pass.target, target: target)]))
+        guard let stack = texture(pass.target), let thumbnail = texture(target), let buffer = auxQueue.makeCommandBuffer() else { return false }
+        buffer.label = "thumbnail stack \(pass.stack)"
+        encodeStack(pass, into: buffer)
+        encodeDownscale(source: stack, target: thumbnail, into: buffer, label: "thumbnail")
+        buffer.commit()
+        return MetalBackend.waitBounded(buffer)
     }
 
     // MARK: - Harness and control side (Spec 4 §14, §16)
@@ -559,6 +656,48 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         var frame = CapturedFrame(width: 0, height: 0)
         var staging: MTLBuffer?
         return readback(texture: texture, into: &frame, staging: &staging) ? frame : nil
+    }
+
+    /// Harness and the thumbnail job: the bytes of a BGRA8 sRGB texture (a
+    /// preview, a thumbnail), top row first, after waiting for the GPU.
+    public func readbackBGRA8(_ handle: TextureHandle) -> (bytes: Data, width: Int, height: Int)? {
+        guard let texture = texture(handle), texture.pixelFormat == .bgra8Unorm_srgb || texture.pixelFormat == .bgra8Unorm else { return nil }
+        let width = texture.width
+        let height = texture.height
+        let bytesPerRow = width * 4
+        let length = bytesPerRow * height
+        guard let buffer = device.makeBuffer(length: length, options: .storageModeShared), let command = auxQueue.makeCommandBuffer(),
+              let blit = command.makeBlitCommandEncoder() else { return nil }
+        blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+                  sourceSize: MTLSize(width: width, height: height, depth: 1), to: buffer, destinationOffset: 0,
+                  destinationBytesPerRow: bytesPerRow, destinationBytesPerImage: length)
+        blit.endEncoding()
+        command.commit()
+        guard MetalBackend.waitBounded(command) else {
+            log.error("readback of \(texture.label ?? "a texture") did not complete within the bound")
+            return nil
+        }
+        return (Data(bytes: buffer.contents(), count: length), width, height)
+    }
+
+    /// Harness: a BGRA8 sRGB texture as premultiplied linear pixels, the way
+    /// the goldens compare.
+    public func readback8(_ handle: TextureHandle) -> CapturedFrame? {
+        guard let read = readbackBGRA8(handle) else { return nil }
+        return MetalBackend.linearFrame(bgra8: read.bytes, width: read.width, height: read.height)
+    }
+
+    /// A premultiplied BGRA8 sRGB bitmap as premultiplied linear pixels.
+    static func linearFrame(bgra8 bytes: Data, width: Int, height: Int) -> CapturedFrame {
+        var frame = CapturedFrame(width: width, height: height)
+        bytes.withUnsafeBytes { raw in
+            let p = raw.bindMemory(to: UInt8.self)
+            for i in 0..<min(width * height, p.count / 4) {
+                frame.pixels[i] = LinearPixel(r: ColorMath.srgbDecode(Float(p[i * 4 + 2]) / 255), g: ColorMath.srgbDecode(Float(p[i * 4 + 1]) / 255),
+                                              b: ColorMath.srgbDecode(Float(p[i * 4]) / 255), a: Float(p[i * 4 + 3]) / 255)
+            }
+        }
+        return frame
     }
 
     /// Read a texture back into `frame`, reusing its pixel storage and the

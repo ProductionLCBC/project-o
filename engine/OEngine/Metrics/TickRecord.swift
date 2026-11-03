@@ -120,12 +120,21 @@ public struct MinuteRecord: Equatable, Sendable {
     public var decoderPoolBytes: Int64
     public var textCacheBytes: Int64
     public var readbackBytes: Int64
+    /// Spec 4 §12 and §13 (Area 5 reading, approved 2026-11-03) — the
+    /// thermal state and the memory-pressure state in that minute, so "a
+    /// rising GPU time has an explanation", and the thumbnail cache's hit
+    /// rate beside the text cache's ("cache hit rates"). Records written
+    /// before 2026-11-03 read as unknown and as a cache nothing asked of.
+    public var thermalState: ThermalLevel = .unknown
+    public var memoryPressure: MemoryPressureLevel = .unknown
+    public var thumbnailCacheHitRate: Double = 1
 
     public init(minute: Int, memoryBytes: Int64, decoderSessions: Int, textCacheHitRate: Double, audioUnderruns: Int,
                 watchdogEvents: Int, watchdogRecoveries: Int,
                 footprintBytes: Int64 = 0, graphicsFootprintBytes: Int64 = 0, heapLiveBytes: Int64 = 0, heapAllocatedBytes: Int64 = 0,
                 purgeableLiveBytes: Int64 = 0, textureBytes: Int64 = 0, decoderPoolBytes: Int64 = 0, textCacheBytes: Int64 = 0,
-                readbackBytes: Int64 = 0) {
+                readbackBytes: Int64 = 0, thermalState: ThermalLevel = .unknown, memoryPressure: MemoryPressureLevel = .unknown,
+                thumbnailCacheHitRate: Double = 1) {
         self.minute = minute
         self.memoryBytes = memoryBytes
         self.decoderSessions = decoderSessions
@@ -142,6 +151,9 @@ public struct MinuteRecord: Equatable, Sendable {
         self.decoderPoolBytes = decoderPoolBytes
         self.textCacheBytes = textCacheBytes
         self.readbackBytes = readbackBytes
+        self.thermalState = thermalState
+        self.memoryPressure = memoryPressure
+        self.thumbnailCacheHitRate = thumbnailCacheHitRate
     }
 
     /// Spec 4 §13 — the figure the memory threshold judges: the footprint less

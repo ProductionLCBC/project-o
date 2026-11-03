@@ -29,7 +29,8 @@ final class TickPacingTests: XCTestCase {
         // Stack 1 feeds the 60p output and the interlaced output: due every tick. Stack 2 feeds the 30p output: every second tick.
         XCTAssertEqual(rows.map(\.stacks), [[1, 2], [1], [1, 2], [1]])
         XCTAssertEqual(rows.map(\.channels), [1, 1, 1, 1], "channel 1 is sampled by stack 1 every tick")
-        XCTAssertEqual(rows.map(\.sinks), [[1, 2, 3], [1], [1, 2, 3], [1]])
+        // The interlaced output's frame is woven on its second field's tick (Spec 4 §10; Area 5 reading).
+        XCTAssertEqual(rows.map(\.sinks), [[1, 2], [1, 3], [1, 2], [1, 3]])
     }
 
     func test_everyTickWritesOneMetricsRecord() throws {

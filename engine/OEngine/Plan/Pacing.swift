@@ -25,6 +25,7 @@ public struct Pacing: Equatable, Sendable {
     public let tickNanoseconds: Int64
     private let stackTicks: [Int: Int]
     private let sinkTicks: [Int: Int]
+    private let interlaced: Set<Int>
 
     public init(machine: Machine) throws {
         try self.init(outputs: machine.outputs)
@@ -45,6 +46,7 @@ public struct Pacing: Equatable, Sendable {
         }
         var stackTicks: [Int: Int] = [:]
         var sinkTicks: [Int: Int] = [:]
+        interlaced = Set(outputs.filter(\.format.interlaced).map(\.number))
         for output in outputs {
             let field = Pacing.fieldRate(of: output)
             let frame = output.format.rate.reduced
@@ -78,11 +80,18 @@ public struct Pacing: Equatable, Sendable {
         return tick % Int64(ticks) == 0
     }
 
-    /// Whether the output's sink encodes and presents or schedules on this tick.
+    /// Whether the output's sink encodes and presents or schedules on this
+    /// tick. Spec 4 §10 — an interlaced frame "takes two consecutive stack
+    /// frames", so its sink is due on the second field's tick, the earliest
+    /// tick at which both fields exist (Area 5 reading, approved 2026-11-03).
     public func isSinkDue(output: Int, tick: Int64) -> Bool {
         guard let ticks = sinkTicks[output] else { return false }
+        if interlaced.contains(output) { return tick % Int64(ticks) == Int64(ticks) - 1 }
         return tick % Int64(ticks) == 0
     }
+
+    /// Spec 4 §10 — whether the output weaves two stack frames into each of its frames.
+    public func isInterlaced(output: Int) -> Bool { interlaced.contains(output) }
 
     /// Ticks per presented frame of the output.
     public func ticksPerFrame(output: Int) -> Int { sinkTicks[output] ?? 0 }

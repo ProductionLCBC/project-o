@@ -248,6 +248,13 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Spec 4 §13 — "present latency (tick to vsync ...)": the vsync this
+    /// refresh targets minus the reference of the tick that rendered the frame,
+    /// both on the display link's clock.
+    public static func presentLatency(targetNs: Int64, referenceNs: Int64) -> Int64 {
+        max(0, targetNs - referenceNs)
+    }
+
     /// Spec 4 §12 — pause when the screen leaves, resume when it returns.
     @MainActor
     func screensChanged() {
@@ -308,8 +315,8 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
             buffer.present(drawable)
             buffer.commit()
             presents.write(PresentRecord(output: output, frame: frame.tick, rePresented: false,
-                                         latencyNs: max(0, Int64(link.targetTimestamp * 1_000_000_000) - now.nanoseconds), completion: .completed,
-                                         dropsSinceStart: currentState.drops))
+                                         latencyNs: DisplaySink.presentLatency(targetNs: Int64(link.targetTimestamp * 1_000_000_000), referenceNs: frame.referenceNs),
+                                         completion: .completed, dropsSinceStart: currentState.drops))
             lastPresentNs.store(now.nanoseconds, ordering: .releasing)
         }
     }

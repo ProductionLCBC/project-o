@@ -605,24 +605,46 @@ public final class ControlLoop: @unchecked Sendable {
 
     private struct BuildScratch {
         var channelPasses: [Int: ChannelPass?] = [:]
+        /// The channels a stack that is not aux-only asked a pass for (Spec 4 §4 step 5).
+        var liveChannels: Set<Int> = []
         var lookahead: [Int: ShowState?] = [:]
         var jobs: [TextJob] = []
         var dueStackSizes: [Int: [PixelSize]] = [:]
     }
 
-    /// Spec 4 §2 — "Render only what is due"; Spec 4 §4 — the plan.
+    /// Spec 4 §2 — "Render only what is due"; Spec 4 §4 — the plan; Spec 4
+    /// §10 — previews "at most 30 times a second". Area 5 reading, approved on
+    /// 2026-11-03: the preview is a consumer at the preview rate, so a stack
+    /// no output feeds renders on preview ticks as aux-only work, with the
+    /// channels only it samples, all of it skipped first under pressure
+    /// (Spec 4 §4 step 5).
     private func buildPlan(_ frame: Int64) -> FramePlan {
         textLateThisBuild = 0
         var scratch = BuildScratch()
         // Due outputs and the stacks they consume, including the old stack of a running switch.
         var dueStacks: Set<Int> = []
-        for output in machine.outputs where pacing.isStackDue(output: output.number, tick: frame) {
+        var assignedStacks: Set<Int> = []
+        for output in machine.outputs {
             let live = model.state.outputs[output.number] ?? output.defaultStack
+            assignedStacks.insert(live)
+            var switching: Int?
+            if let run = model.outputs[output.number]?.switchRun, !run.isComplete(at: frame) {
+                switching = run.oldStack
+                assignedStacks.insert(run.oldStack)
+            }
+            guard pacing.isStackDue(output: output.number, tick: frame) else { continue }
             dueStacks.insert(live)
-            if let run = model.outputs[output.number]?.switchRun, !run.isComplete(at: frame) { dueStacks.insert(run.oldStack) }
+            if let switching { dueStacks.insert(switching) }
         }
+        let previewEvery = max(1, Int64((pacing.masterRate.perSecond / 30).rounded()))
+        let previewTick = frame % previewEvery == 0
+        var auxOnlyStacks: Set<Int> = []
+        if previewTick {
+            for stack in machine.stacks where !assignedStacks.contains(stack.number) { auxOnlyStacks.insert(stack.number) }
+        }
+        let rendering = dueStacks.union(auxOnlyStacks)
         // Which stacks sample each channel, for mip generation below half scale.
-        for stack in machine.stacks where dueStacks.contains(stack.number) {
+        for stack in machine.stacks where rendering.contains(stack.number) {
             let size = geometry.stackSize(stack.number)
             for slot in stack.effectiveSlots(library: library) where slot.offset == 0 {
                 scratch.dueStackSizes[slot.channel, default: []].append(size)
@@ -630,27 +652,33 @@ public final class ControlLoop: @unchecked Sendable {
         }
 
         var plan = FramePlan(frame: frame)
-        for stack in machine.stacks where dueStacks.contains(stack.number) {
-            plan.stackPasses.append(stackPass(stack, frame: frame, scratch: &scratch))
+        for stack in machine.stacks where rendering.contains(stack.number) {
+            plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), scratch: &scratch))
         }
-        plan.channelPasses = scratch.channelPasses.keys.sorted().compactMap { scratch.channelPasses[$0] ?? nil }
+        plan.channelPasses = scratch.channelPasses.keys.sorted().compactMap { channel in
+            guard var pass = scratch.channelPasses[channel] ?? nil else { return nil }
+            pass.auxOnly = !scratch.liveChannels.contains(channel)
+            return pass
+        }
         plan.textJobs = scratch.jobs
         for output in machine.outputs where pacing.isSinkDue(output: output.number, tick: frame) {
             if let pass = sinkPass(output, frame: frame) { plan.sinkPasses.append(pass) }
         }
-        // Spec 4 §10 — previews "at most 30 times a second".
-        let previewEvery = max(1, Int64((pacing.masterRate.perSecond / 30).rounded()))
-        if frame % previewEvery == 0 {
-            for stack in machine.stacks where dueStacks.contains(stack.number) {
-                if let target = previewTargets[stack.number] { plan.auxPasses.append(AuxPass(kind: .preview, stack: stack.number, target: target)) }
+        // Spec 4 §10 — previews "at most 30 times a second": this tick's stack texture into the stack's preview texture.
+        if previewTick {
+            for stack in machine.stacks where rendering.contains(stack.number) {
+                guard let target = previewTargets[stack.number], let ring = stackRings[stack.number] else { continue }
+                plan.auxPasses.append(AuxPass(kind: .preview, stack: stack.number, source: ring[Int(frame % Int64(FrameRing.depth))], target: target))
             }
         }
         return plan
     }
 
     /// Spec 4 §7 — the channel pass, once per channel per tick, or nil when the
-    /// channel has nothing to draw (text, empty, missing media).
-    private func channelPass(_ channel: Int, frame: Int64, scratch: inout BuildScratch) -> ChannelPass? {
+    /// channel has nothing to draw (text, empty, missing media). A stack that
+    /// is not aux-only asking for it makes it live work.
+    private func channelPass(_ channel: Int, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> ChannelPass? {
+        if !auxOnly { scratch.liveChannels.insert(channel) }
         if let cached = scratch.channelPasses[channel] { return cached }
         let pass = makeChannelPass(channel, frame: frame, dueStackSizes: scratch.dueStackSizes[channel] ?? [])
         scratch.channelPasses[channel] = pass
@@ -747,10 +775,14 @@ public final class ControlLoop: @unchecked Sendable {
         return state
     }
 
-    /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top".
-    private func stackPass(_ stack: Stack, frame: Int64, scratch: inout BuildScratch) -> StackPass {
+    /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top". The
+    /// slots resolve through `SlotResolver`, shared with the thumbnail job;
+    /// the box transitions, the variable gate and the lookahead are the live
+    /// plan's own.
+    private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> StackPass {
         let size = geometry.stackSize(stack.number)
         let target = stackRings[stack.number]?[Int(frame % Int64(FrameRing.depth))] ?? .none
+        let inputs = SlotResolver.Inputs(library: library, stack: stack, size: size, muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
             let content: ContentInstance?
@@ -758,140 +790,97 @@ public final class ControlLoop: @unchecked Sendable {
                 content = model.state.channels[slot.channel]?.content
                 // Spec 4 §8 — "Lookahead pre-rasterizes the next cue's text for every due stack".
                 if let next = lookaheadState(1, frame: frame, scratch: &scratch), case .text(let t)? = next.channels[slot.channel]?.content {
-                    prefetchText(stack: stack, slot: slot, fields: t.fields, size: size)
+                    prefetchText(inputs: inputs, slot: slot, fields: t.fields)
                 }
             } else if slot.offset > 0 {
                 content = lookaheadState(slot.offset, frame: frame, scratch: &scratch)?.channels[slot.channel]?.content
                 // Spec 4 §8 — the same rule for an offset slot: the text it will show after the next fire.
                 if let after = lookaheadState(slot.offset + 1, frame: frame, scratch: &scratch), case .text(let t)? = after.channels[slot.channel]?.content {
-                    prefetchText(stack: stack, slot: slot, fields: t.fields, size: size)
+                    prefetchText(inputs: inputs, slot: slot, fields: t.fields)
                 }
             } else {
                 content = nil   // negative offsets are v1.5
             }
-            resolveSlot(stack: stack, slotIndex: slotIndex, slot: slot, content: content, size: size, frame: frame, into: &boxes, scratch: &scratch)
+            let results = SlotResolver.resolve(
+                inputs, slotIndex: slotIndex, slot: slot, content: content,
+                pixels: { slot, content in pixelSource(for: slot, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
+                staticText: { key, box, raw in
+                    let resolvedNow = variables.resolve(raw, state: model.state)
+                    guard VariableProvider.containsVariables(raw) else { return resolvedNow }
+                    return adoptedVariableValue(key, resolved: resolvedNow, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
+                },
+                onTextMiss: { job in
+                    scratch.jobs.append(job)
+                    textLateThisBuild += 1
+                })
+            for result in results {
+                guard var box = result.resolved else {
+                    endBox(result.key, frame: frame, box: result.box, slot: slot, inputs: inputs, into: &boxes)
+                    continue
+                }
+                box.transition = boxTransition(result.key, content: box.content, text: box.text, box: result.box, offset: slot.offset,
+                                               allowed: result.transitionAllowed, frame: frame)
+                boxes.append(box)
+            }
         }
-        return StackPass(stack: stack.number, target: target, size: size, base: stack.base, gammaBlend: stack.gammaBlend, boxes: boxes)
+        return StackPass(stack: stack.number, target: target, size: size, base: stack.base, gammaBlend: stack.gammaBlend, boxes: boxes, auxOnly: auxOnly)
     }
 
-    private func preset(for slot: StackSlot, stack: Stack) -> Preset {
-        // Spec 4 §9 — "the preset is the slot's, else the stack default, else the channel default, else Preset 1".
-        library.resolvedPreset(slot.preset ?? stack.defaultPreset ?? library.channel(slot.channel)?.defaultPreset)
+    /// Spec 4 §9 — what a pixel box draws: at offset 0 the channel texture
+    /// through its pass; for an offset slot "a pixel box points at the pool
+    /// item's poster frame texture".
+    private func pixelSource(for slot: StackSlot, content: ContentInstance?, frame: Int64, auxOnly: Bool,
+                             scratch: inout BuildScratch) -> SlotResolver.PixelSource? {
+        if slot.offset == 0 {
+            guard let pass = channelPass(slot.channel, frame: frame, auxOnly: auxOnly, scratch: &scratch) else { return nil }
+            let bound = pass.incoming.source == .none ? (pass.outgoing ?? pass.incoming) : pass.incoming
+            return SlotResolver.PixelSource(texture: pass.target, content: ControlLoop.contentRect(source: bound.size, channel: pass.size),
+                                            contentPixels: bound.size, mips: pass.generateMips)
+        }
+        guard let media = content?.media, !media.missing,
+              let entry = MediaResolver.resolve(media.ref, library: library, machine: machine)?.entry else { return nil }
+        let poster = posters.poster(for: entry)
+        guard !poster.isNone else { return nil }
+        return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))
     }
 
-    private func prefetchText(stack: Stack, slot: StackSlot, fields: [String: String], size: PixelSize) {
-        guard let layout = preset(for: slot, stack: stack).layout(for: stack.number) else { return }
+    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, fields: [String: String]) {
+        guard let layout = inputs.preset(for: slot).layout(for: inputs.stack.number) else { return }
         for box in layout.boxes {
             guard case .field(let name) = box.binding.kind, let value = fields[name], !value.isEmpty else { continue }
-            let job = textJob(value, box: box, frame: PixelRect(box.frame, in: size), outputHeight: size.height)
+            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height)
             if text.entry(for: job) == nil { text.request(job) }
         }
     }
 
-    private func textJob(_ value: String, box: Box, frame: PixelRect, outputHeight: Int) -> TextJob {
-        let style = box.textStyle ?? BoxTextStyle()
-        let fit = box.fit.textFit ?? TextFit()
-        let boxSize = PixelSize(width: Int(frame.width.rounded()), height: Int(frame.height.rounded()))
-        return TextJob(key: TextKey.make(text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight),
-                       text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight)
-    }
-
-    /// Spec 4 §9 — resolve one slot's boxes and bind each to its source;
-    /// "Fallback boxes draw only if no earlier box in the same channel's group
-    /// drew anything"; "A slot's effective opacity is its opacity times zero
-    /// when muted".
-    private func resolveSlot(stack: Stack, slotIndex: Int, slot: StackSlot, content: ContentInstance?, size: PixelSize, frame: Int64,
-                             into boxes: inout [ResolvedBox], scratch: inout BuildScratch) {
-        guard let layout = preset(for: slot, stack: stack).layout(for: stack.number) else { return }
-        let muted = model.state.stacks[stack.number]?.muted.contains(slot.channel) ?? false
-        let opacity = Float(slot.opacity) * (muted ? 0 : 1)
-        var drew = false
-        for (boxIndex, box) in layout.boxes.enumerated() {
-            let key = BoxKey(stack: stack.number, slot: slotIndex, box: boxIndex)
-            if box.fallback && drew {
-                endBox(key, frame: frame, box: box, opacity: opacity, slot: slot, size: size, into: &boxes)
-                continue
-            }
-            let frameRect = PixelRect(box.frame, in: size)
-            var resolved: ResolvedBox?
-            var transitionAllowed = true
-            switch box.binding.kind {
-            case .pixels:
-                let fit = box.fit.pixelFit ?? .fit
-                if slot.offset == 0 {
-                    if let pass = channelPass(slot.channel, frame: frame, scratch: &scratch) {
-                        let bound = pass.incoming.source == .none ? (pass.outgoing ?? pass.incoming) : pass.incoming
-                        let content = ControlLoop.contentRect(source: bound.size, channel: pass.size)
-                        let quad = ControlLoop.fitQuad(texture: pass.target, content: content, contentPixels: bound.size, into: frameRect, fit: fit,
-                                                       mips: pass.generateMips)
-                        resolved = ResolvedBox(channel: slot.channel, frame: frameRect, content: .pixels(quad), opacity: opacity,
-                                               grade: boxGrade(box), offset: slot.offset, binding: box.binding)
-                    }
-                } else if let media = content?.media, !media.missing,
-                          let entry = MediaResolver.resolve(media.ref, library: library, machine: machine)?.entry {
-                    // Spec 4 §9 — "a pixel box points at the pool item's poster frame texture".
-                    let poster = posters.poster(for: entry)
-                    if !poster.isNone {
-                        let pixels = PixelSize(width: entry.width ?? 16, height: entry.height ?? 9)
-                        let quad = ControlLoop.fitQuad(texture: poster, content: .full, contentPixels: pixels, into: frameRect, fit: fit)
-                        resolved = ResolvedBox(channel: slot.channel, frame: frameRect, content: .pixels(quad), opacity: opacity,
-                                               grade: boxGrade(box), offset: slot.offset, binding: box.binding)
-                    }
-                }
-            case .field(let name):
-                if case .text(let t)? = content, let value = t.fields[name], !value.isEmpty {
-                    resolved = textBox(value, box: box, frame: frameRect, size: size, slot: slot, opacity: opacity, scratch: &scratch)
-                }
-            case .static(let raw):
-                let value = variables.resolve(raw, state: model.state)
-                let hasVariables = VariableProvider.containsVariables(raw)
-                transitionAllowed = box.transitionOnVariableChange || !hasVariables
-                // Spec 4 §8 — "the result replaces the cache entry": the previous value's raster goes,
-                // its textures freed once any box transition between the two has run its course.
-                if hasVariables, let previous = model.boxRuns[key]?.previousText, !previous.isEmpty, previous != value {
-                    let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-                    text.release(textJob(previous, box: box, frame: frameRect, outputHeight: size.height).key,
-                                 afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
-                }
-                if !value.isEmpty {
-                    resolved = textBox(value, box: box, frame: frameRect, size: size, slot: slot, opacity: opacity, scratch: &scratch)
-                }
-            }
-            guard var result = resolved else {
-                endBox(key, frame: frame, box: box, opacity: opacity, slot: slot, size: size, into: &boxes)
-                continue
-            }
-            drew = true
-            result.transition = boxTransition(key, content: result.content, text: result.text, box: box, offset: slot.offset,
-                                              allowed: transitionAllowed, frame: frame)
-            boxes.append(result)
+    /// Spec 4 §8 — "A box whose text contains variables is re-laid-out only
+    /// when its resolved text changes, and no more than once a second; the
+    /// result replaces the cache entry." The box keeps the value it adopted
+    /// until the resolved text differs and the wall-clock second has moved on
+    /// (Area 5 reading, approved 2026-11-03: the second is the one the variable
+    /// provider reads for `[Time]`, so a seconds clock never skips a value on a
+    /// fractional master rate). A first value and a clear are not re-layouts
+    /// and show at once. The previous raster goes when a value is adopted, its
+    /// textures freed once any box transition between the two has run.
+    private func adoptedVariableValue(_ key: BoxKey, resolved: String, box: Box, frame: Int64, frameRect: PixelRect, size: PixelSize) -> String {
+        var run = model.boxRuns[key] ?? BoxRun()
+        defer { model.boxRuns[key] = run }
+        let second = variables.currentSecond
+        guard let adopted = run.adoptedText else {
+            run.adoptedText = resolved
+            run.adoptedSecond = second
+            return resolved
         }
-    }
-
-    private func boxGrade(_ box: Box) -> GradeParameters? {
-        guard let ref = box.grade, ref != 0, let grade = library.grade(ref) else { return nil }
-        let parameters = GradeParameters(grade)
-        return parameters.isIdentity ? nil : parameters
-    }
-
-    /// Spec 4 §9 — "field: The cached line textures ... a missing cache entry
-    /// draws nothing this tick and counts `textLate`".
-    private func textBox(_ value: String, box: Box, frame: PixelRect, size: PixelSize, slot: StackSlot, opacity: Float,
-                         scratch: inout BuildScratch) -> ResolvedBox {
-        let job = textJob(value, box: box, frame: frame, outputHeight: size.height)
-        var lines: [TextLine] = []
-        if let entry = text.entry(for: job) {
-            lines = entry.lines.map { line in
-                TextLine(texture: line.texture, frame: PixelRect(x: frame.x + line.frame.x, y: frame.y + line.frame.y,
-                                                                 width: line.frame.width, height: line.frame.height))
-            }
-        } else {
-            text.request(job)
-            scratch.jobs.append(job)
-            textLateThisBuild += 1
+        guard adopted != resolved else { return adopted }
+        if !adopted.isEmpty, !resolved.isEmpty, second == run.adoptedSecond { return adopted }
+        if !adopted.isEmpty {
+            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height).key,
+                         afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
         }
-        return ResolvedBox(channel: slot.channel, frame: frame, content: .lines(lines), opacity: opacity, grade: boxGrade(box),
-                           offset: slot.offset, binding: box.binding, text: value)
+        run.adoptedText = resolved
+        run.adoptedSecond = second
+        return resolved
     }
 
     /// Spec 4 §9 — box transitions; "Offset slots ... cut rather than transition".
@@ -929,40 +918,53 @@ public final class ControlLoop: @unchecked Sendable {
         }
     }
 
-    /// A box that no longer draws: if it drew before, its content transitions out.
-    private func endBox(_ key: BoxKey, frame: Int64, box: Box, opacity: Float, slot: StackSlot, size: PixelSize, into boxes: inout [ResolvedBox]) {
+    /// A box that no longer draws: if it drew before, its content transitions
+    /// out, unless it is a variable box without `transitionOnVariableChange`
+    /// (Spec 4 §8: "the rest swap").
+    private func endBox(_ key: BoxKey, frame: Int64, box: Box, slot: StackSlot, inputs: SlotResolver.Inputs, into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: slot.offset == 0, frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, allowed: slot.offset == 0 && SlotResolver.transitionAllowed(for: box), frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }
         if let state = run.state(at: frame) {
-            boxes.append(ResolvedBox(channel: slot.channel, frame: PixelRect(box.frame, in: size), content: .lines([]), opacity: opacity,
-                                     transition: state, grade: boxGrade(box), offset: slot.offset, binding: box.binding))
+            let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
+            boxes.append(ResolvedBox(channel: slot.channel, frame: PixelRect(box.frame, in: inputs.size), content: .lines([]), opacity: opacity,
+                                     transition: state, grade: SlotResolver.boxGrade(box, library: library), offset: slot.offset, binding: box.binding))
         }
     }
 
     /// Spec 4 §10 — the sink pass with its output transition: "the previous
-    /// stack for a switch, black for blackout".
+    /// stack for a switch, black for blackout". An interlaced output's pass
+    /// also names the previous tick's stack texture as the first field (and
+    /// the old stack's texture of that tick during a switch), with this
+    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03).
     private func sinkPass(_ output: Output, frame: Int64) -> SinkPass? {
         let live = model.state.outputs[output.number] ?? output.defaultStack
         guard let ring = stackRings[live] else { return nil }
         let slot = Int(frame % Int64(FrameRing.depth))
+        let previousSlot = Int((frame + Int64(FrameRing.depth) - 1) % Int64(FrameRing.depth))
         var second: SecondTexture = .none
+        var firstFieldSecond: SecondTexture = .none
         var mix: Float = 0
         let ort = model.outputs[output.number] ?? OutputRuntime()
         if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack] {
             second = .stack(oldRing[slot])
+            firstFieldSecond = .stack(oldRing[previousSlot])
             mix = run.oldMix(at: frame)
         }
         let black = ort.blackout.map { $0.mix(at: frame) } ?? ort.blackoutMix
         if black > 0 {
             second = .black
+            firstFieldSecond = .black
             mix = black
         }
-        let encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
-        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot)
+        let interlaced = pacing.isInterlaced(output: output.number)
+        var encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
+        if interlaced, encode == .v210 { encode = .v210Interlaced }
+        let firstField = interlaced && frame > 0 ? FieldSources(stack: ring[previousSlot], second: firstFieldSecond) : nil
+        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField)
     }
 }

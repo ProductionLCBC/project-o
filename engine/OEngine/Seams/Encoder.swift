@@ -13,6 +13,9 @@ public enum EncodeKind: String, Codable, Sendable {
     case display10Bit
     /// Spec 4 §10 — the DeckLink sink: v210, Rec.709 transfer, limited range.
     case v210
+    /// Spec 4 §10 — the DeckLink sink in an interlaced mode: v210 with the
+    /// weave, "two consecutive stack frames" into one frame, top field first.
+    case v210Interlaced
     /// Spec 4 §14 — the harness's capturing sink: linear RGBA16Float, no encode.
     case capture
 }

@@ -77,8 +77,10 @@ public enum TextureRole: String, Codable, Sendable {
     case textLine
     /// BGRA8Unorm sRGB, "half the channel render size".
     case poster
-    /// BGRA8Unorm sRGB, small.
+    /// BGRA8Unorm sRGB, "a quarter-size multiviewer", backed by an IOSurface (Spec 4 §10).
     case preview
+    /// BGRA8Unorm sRGB, "480 px wide thumbnails", backed by an IOSurface, from a fixed pool (Spec 4 §5, §10).
+    case thumbnail
     /// A half-resolution RGBA16Float scratch for the blur pass.
     case blurScratch
 }
@@ -104,7 +106,7 @@ public struct TextureDescriptor: Equatable, Sendable {
         let perPixel: Int64
         switch role {
         case .channel, .stack, .still, .blurScratch: perPixel = 8
-        case .textLine, .poster, .preview: perPixel = 4
+        case .textLine, .poster, .preview, .thumbnail: perPixel = 4
         }
         let base = Int64(max(0, size.width)) * Int64(max(0, size.height)) * perPixel
         return mipmapped ? base + base / 3 : base

@@ -35,14 +35,18 @@ public struct CompletedFrame: Equatable, Sendable {
     public var mix: Float
     public var destination: Int
     public var receipt: EncodeReceipt
+    /// Spec 4 §13 — the tick's master reference time, so a sink measures
+    /// "present latency (tick to vsync or to scheduled slot)" from it.
+    public var referenceNs: Int64
 
-    public init(tick: Int64, stack: TextureHandle, second: SecondTexture, mix: Float, destination: Int, receipt: EncodeReceipt) {
+    public init(tick: Int64, stack: TextureHandle, second: SecondTexture, mix: Float, destination: Int, receipt: EncodeReceipt, referenceNs: Int64 = 0) {
         self.tick = tick
         self.stack = stack
         self.second = second
         self.mix = mix
         self.destination = destination
         self.receipt = receipt
+        self.referenceNs = referenceNs
     }
 }
 

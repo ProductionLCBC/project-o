@@ -10,8 +10,10 @@ import OCore
 /// fire never waits on text; a cache miss on a fire draws nothing for that box
 /// on the first tick and the texture from the second". Spec 4 §3 — "Text
 /// raster: utility ... Core Text layout and Core Graphics raster ... Finished
-/// text textures into the cache."
-public final class TextCache: TextProvider, @unchecked Sendable {
+/// text textures into the cache." Spec 4 §12 — memory pressure shrinks it; a
+/// raster that fails is drawn with the fallback font and the substitution
+/// recorded.
+public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable {
     public struct Entry: Sendable {
         public var lines: [TextLine]
         public var bytes: Int
@@ -29,10 +31,15 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         public var bytes: Int = 0
         public var pending: Int = 0
         public var entries: Int = 0
+        /// Spec 4 §12 — how many times memory pressure shrank the cache.
+        public var shrinks: Int = 0
+        /// Spec 4 §8 — how many requested fonts another font stood in for.
+        public var substitutedFonts: Int = 0
 
         public var hitRate: Double { hits + misses > 0 ? Double(hits) / Double(hits + misses) : 1 }
     }
 
+    public let name = "text"
     private let renderer: any TextRenderer
     private let backend: any RenderBackend
     public let maximumBytes: Int
@@ -43,7 +50,9 @@ public final class TextCache: TextProvider, @unchecked Sendable {
     private var pending: Set<TextKey> = []
     private var clock: UInt64 = 0
     private var stats = Statistics()
-    private var substitutions: Set<String> = []
+    private var substitutions: [String: FontSubstitution] = [:]
+    /// Spec 4 §12 — the ceiling memory pressure holds the cache to; the cap otherwise.
+    private var ceiling: Int
     private let log: EngineLog?
     /// Handles to release once the render thread has moved past them (Spec 4 §3).
     private var releaseAfterTick: Int64 = 0
@@ -55,6 +64,7 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         self.renderer = renderer
         self.backend = backend
         self.maximumBytes = max(1, maximumBytes)
+        ceiling = self.maximumBytes
         self.synchronous = synchronous
         self.log = log
     }
@@ -101,18 +111,27 @@ public final class TextCache: TextProvider, @unchecked Sendable {
     // MARK: - Raster thread
 
     private func rasterize(_ job: TextJob) {
-        let raster: TextRaster
+        var raster: TextRaster
         do {
             raster = try renderer.rasterize(job)
         } catch {
-            // Spec 4 §12 — "Text raster fails (font missing, layout exception): Draw with the fallback font".
-            log?.error("text raster failed: \(error)")
-            lock.lock()
-            pending.remove(job.key)
-            stats.failed += 1
-            stats.pending = pending.count
-            lock.unlock()
-            return
+            // Spec 4 §12 — "Text raster fails (font missing, layout exception): Draw with the
+            // fallback font; record the substitution for pre-flight."
+            var retry = job
+            retry.style.values.font = renderer.fallbackFont
+            do {
+                raster = try renderer.rasterize(retry)
+                raster.substitutedFont = raster.substitutedFont ?? renderer.fallbackFont
+                log?.warning("text raster with \(job.style.values.font) failed (\(error)); drawn with the fallback font \(renderer.fallbackFont)")
+            } catch let second {
+                log?.error("text raster failed with \(job.style.values.font) and with the fallback font: \(second)")
+                lock.lock()
+                pending.remove(job.key)
+                stats.failed += 1
+                stats.pending = pending.count
+                lock.unlock()
+                return
+            }
         }
         var lines: [TextLine] = []
         var bytes = 0
@@ -132,17 +151,25 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         stats.bytes += bytes
         stats.pending = pending.count
         stats.entries = entries.count
-        if let substituted = raster.substitutedFont { substitutions.insert(job.style.values.font + " -> " + substituted) }
+        if let substituted = raster.substitutedFont {
+            let requested = job.style.values.font
+            var record = substitutions[requested] ?? FontSubstitution(requested: requested, actual: substituted, count: 0)
+            record.actual = substituted
+            record.count += 1
+            substitutions[requested] = record
+            stats.substitutedFonts = substitutions.count
+        }
         evictIfNeeded()
         lock.unlock()
     }
 
     /// Spec 4 §8 — "an LRU bounded by bytes": the least recently used entries
     /// go first, their textures released after the plans that may name them.
+    /// Under memory pressure the bound is the ceiling, not the cap (Spec 4 §12).
     private func evictIfNeeded() {
-        guard stats.bytes > maximumBytes else { return }
+        guard stats.bytes > ceiling else { return }
         let ordered = entries.sorted { $0.value.lastUsed < $1.value.lastUsed }
-        for (key, entry) in ordered where stats.bytes > maximumBytes {
+        for (key, entry) in ordered where stats.bytes > ceiling {
             // Keep what the last few plans used.
             if entry.lastUsed + 8 >= clock { continue }
             entries.removeValue(forKey: key)
@@ -170,6 +197,25 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         release(key, afterTick: releaseAfterTick)
     }
 
+    // MARK: - ShrinkableCache (Spec 4 §12)
+
+    /// Spec 4 §12 — "memory pressure ... shrinks the text and thumbnail
+    /// caches": evict down to `bytes` now and stay there; nil is the cap again.
+    public func setPressureCeiling(_ bytes: Int?) {
+        lock.lock()
+        defer { lock.unlock() }
+        let new = min(maximumBytes, max(1, bytes ?? maximumBytes))
+        if new < ceiling { stats.shrinks += 1 }
+        ceiling = new
+        evictIfNeeded()
+    }
+
+    public var pressureCeiling: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return ceiling
+    }
+
     // MARK: - Reading
 
     public var statistics: Statistics {
@@ -184,11 +230,12 @@ public final class TextCache: TextProvider, @unchecked Sendable {
         return entries[key]?.layout
     }
 
-    /// Spec 4 §8 — "recording the substitution for pre-flight".
-    public var fontSubstitutions: [String] {
+    /// Spec 4 §8 — "recording the substitution for pre-flight": one record per
+    /// requested font, in font order.
+    public var fontSubstitutions: [FontSubstitution] {
         lock.lock()
         defer { lock.unlock() }
-        return substitutions.sorted()
+        return substitutions.values.sorted { $0.requested < $1.requested }
     }
 
     /// Harness: block until the raster queue is idle.

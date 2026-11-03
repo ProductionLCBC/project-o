@@ -18,7 +18,7 @@ if [[ "${1:-}" == "--update" ]]; then
   update=1
 fi
 
-filter='OEngineTests.MetalChannelPassTests|OEngineTests.MetalStackPassTests|OEngineTests.MetalEncodeTests'
+filter='OEngineTests.MetalChannelPassTests|OEngineTests.MetalStackPassTests|OEngineTests.MetalEncodeTests|OEngineTests.PreviewPassTests|OEngineTests.ThumbnailTests|OEngineTests.WeaveTests'
 
 if [[ $update -eq 1 ]]; then
   echo "golden.sh: regenerating goldens under tests/goldens/"

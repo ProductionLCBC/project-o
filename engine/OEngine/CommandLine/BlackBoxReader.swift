@@ -61,7 +61,10 @@ public enum BlackBoxReader {
                                  heapLiveBytes: int64(object["heapLiveBytes"]), heapAllocatedBytes: int64(object["heapAllocatedBytes"]),
                                  purgeableLiveBytes: int64(object["purgeableLiveBytes"]), textureBytes: int64(object["textureBytes"]),
                                  decoderPoolBytes: int64(object["decoderPoolBytes"]), textCacheBytes: int64(object["textCacheBytes"]),
-                                 readbackBytes: int64(object["readbackBytes"])))
+                                 readbackBytes: int64(object["readbackBytes"]),
+                                 thermalState: (object["thermalState"] as? String).flatMap(ThermalLevel.init(rawValue:)) ?? .unknown,
+                                 memoryPressure: (object["memoryPressure"] as? String).flatMap(MemoryPressureLevel.init(rawValue:)) ?? .unknown,
+                                 thumbnailCacheHitRate: (object["thumbnailCacheHitRate"] as? NSNumber)?.doubleValue ?? 1))
         default:
             break
         }
@@ -90,13 +93,27 @@ public enum BlackBoxReader {
             let kind = run.sdiOutputs.contains(output) ? "SDI" : "display"
             let dropped = presents.filter { $0.completion == .dropped }.count
             let late = presents.filter { $0.completion == .displayedLate }.count
-            lines.append("output \(output) (\(kind)): presented \(presents.count), re-presented \(presents.filter(\.rePresented).count), dropped \(dropped), displayed late \(late)")
+            // Spec 4 §13 — "present latency (tick to vsync or to scheduled slot)", over the frames that were presented, not re-presented.
+            let latencies = presents.filter { !$0.rePresented && $0.completion != .dropped && $0.completion != .flushed }.map(\.latencyNs).sorted()
+            var latency = ""
+            if !latencies.isEmpty {
+                let p50 = latencies[min(latencies.count - 1, latencies.count / 2)]
+                let p99 = latencies[min(latencies.count - 1, Int(0.99 * Double(latencies.count)))]
+                latency = ", present latency p50 \(String(format: "%.2f", Double(p50) / 1e6)) ms, p99 \(String(format: "%.2f", Double(p99) / 1e6)) ms"
+            }
+            lines.append("output \(output) (\(kind)): presented \(presents.count), re-presented \(presents.filter(\.rePresented).count), dropped \(dropped), displayed late \(late)\(latency)")
         }
         if let last = run.minutes.last {
             let underruns = run.minutes.reduce(0) { $0 + $1.audioUnderruns }
             let recoveries = run.minutes.reduce(0) { $0 + $1.watchdogRecoveries }
             let events = run.minutes.reduce(0) { $0 + $1.watchdogEvents }
-            lines.append("minutes \(run.minutes.count): memory \(last.memoryBytes / 1_048_576) MB resident at the end, audio underruns \(underruns), watchdog events \(events), recoveries \(recoveries), decoder sessions \(last.decoderSessions), text cache hit rate \(String(format: "%.3f", last.textCacheHitRate))")
+            lines.append("minutes \(run.minutes.count): memory \(last.memoryBytes / 1_048_576) MB resident at the end, audio underruns \(underruns), watchdog events \(events), recoveries \(recoveries), decoder sessions \(last.decoderSessions), text cache hit rate \(String(format: "%.3f", last.textCacheHitRate)), thumbnail cache hit rate \(String(format: "%.3f", last.thumbnailCacheHitRate))")
+            // Spec 4 §12 — the notes that explain a rising GPU time or a shrunk cache.
+            let hot = run.minutes.filter { $0.thermalState != .nominal && $0.thermalState != .unknown }.count
+            let pressed = run.minutes.filter { $0.memoryPressure != .normal && $0.memoryPressure != .unknown }.count
+            if hot > 0 || pressed > 0 {
+                lines.append("notes: thermal state above nominal in \(hot) minute\(hot == 1 ? "" : "s"); memory pressure above normal in \(pressed) minute\(pressed == 1 ? "" : "s")")
+            }
             let settled = run.minutes.filter { $0.minute >= 10 }.sorted { $0.minute < $1.minute }
             if SoakThresholds.hasFootprint(settled) {
                 // Spec 4 §13 as corrected on 2026-11-03: the footprint less its graphics-tagged part and the heap's live bytes, as sliding medians.

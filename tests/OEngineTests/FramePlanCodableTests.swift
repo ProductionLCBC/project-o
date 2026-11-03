@@ -38,7 +38,7 @@ final class FramePlanCodableTests: XCTestCase {
                            style: BoxTextStyle(), box: PixelSize(width: 1728, height: 864),
                            fit: TextFit(policy: .maxLines, maxLines: 8, minSize: 20), outputHeight: 1080)
         return FramePlan(frame: 7, channelPasses: [channel], textJobs: [text], stackPasses: [stack], sinkPasses: [sink],
-                         auxPasses: [AuxPass(kind: .preview, stack: 1, target: TextureHandle(rawValue: 50))])
+                         auxPasses: [AuxPass(kind: .preview, stack: 1, source: TextureHandle(rawValue: 20), target: TextureHandle(rawValue: 50))])
     }
 
     func test_planRoundTripsThroughJSON() throws {

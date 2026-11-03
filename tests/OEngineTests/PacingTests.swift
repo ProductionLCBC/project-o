@@ -43,9 +43,12 @@ final class PacingTests: XCTestCase {
         XCTAssertTrue((0..<8).allSatisfy { pacing.isSinkDue(output: 1, tick: $0) })
         // Output 2 at 30p is due every second tick.
         XCTAssertEqual((0..<8).map { pacing.isSinkDue(output: 2, tick: $0) }, [true, false, true, false, true, false, true, false])
-        // Output 3 at 1080i30 consumes a stack frame every tick (one per field) and schedules a frame every second tick.
+        // Output 3 at 1080i30 consumes a stack frame every tick (one per field) and schedules a frame every second tick,
+        // on the second field's tick, when both fields exist to weave (Spec 4 §10; Area 5 reading).
         XCTAssertTrue((0..<8).allSatisfy { pacing.isStackDue(output: 3, tick: $0) })
-        XCTAssertEqual((0..<8).map { pacing.isSinkDue(output: 3, tick: $0) }, [true, false, true, false, true, false, true, false])
+        XCTAssertEqual((0..<8).map { pacing.isSinkDue(output: 3, tick: $0) }, [false, true, false, true, false, true, false, true])
+        XCTAssertTrue(pacing.isInterlaced(output: 3))
+        XCTAssertFalse(pacing.isInterlaced(output: 2))
         XCTAssertEqual(pacing.ticksPerFrame(output: 2), 2)
         XCTAssertEqual(pacing.ticksPerFrame(output: 3), 2)
         XCTAssertEqual(pacing.ticksPerStackFrame(output: 3), 1)
