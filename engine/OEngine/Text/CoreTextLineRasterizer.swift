@@ -234,7 +234,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             context.setAllowsAntialiasing(true)
             context.setShouldSmoothFonts(true)
             // Core Graphics draws with y up; the baseline sits ascent below the top of the line box.
-            let baselineY = Double(height) - pad - ascent - (lineHeight - (ascent + Double(CTFontGetDescent(CTFontCreateWithName("Helvetica" as CFString, 1, nil))))) * 0
+            let baselineY = Double(height) - pad - ascent
             context.textPosition = CGPoint(x: pad - left, y: baselineY)
             if values.shadow.color.a > 0 {
                 let shadowColor = CGColor(colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
