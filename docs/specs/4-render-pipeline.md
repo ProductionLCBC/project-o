@@ -289,9 +289,9 @@ Every tick writes one record into a preallocated ring; a utility thread drains t
 
 **Per output, per presented frame:** presented or re-presented, present latency (tick to vsync or to scheduled slot), DeckLink completion result, drop count since start.
 
-**Per minute:** memory in use (heaps, decoder pools, caches), decoder sessions alive, cache hit rates, audio underruns per device, watchdog events.
+**Per minute:** memory in use, as the process footprint (the kernel's `phys_footprint`, which counts the GPU-owned textures and heaps and leaves out purgeable cache memory) beside the resident size, and its parts: the malloc zones' live and allocated bytes with the purgeable zone on its own, the resource table's texture bytes, the decoder pools' bytes, the text cache's bytes and the readback buffers' bytes; decoder sessions alive, cache hit rates, audio underruns per device, watchdog events. Resident size alone counts purgeable cache memory the kernel reclaims at will and misses the GPU-owned memory; the attribution run of 2026-11-02 showed its growth to be exactly that cache plus allocator fragmentation, with everything the engine owns flat.
 
-**Soak thresholds** (a build fails on any): zero `dropped` or `displayedLate` on SDI over the run; display re-presents at or below the expected drift rate for unlocked vsync (about one per five minutes per display); p99 GPU time under 50% of the tick; zero `textLate` after the first minute; zero audio underruns; memory flat to within 5% after the first ten minutes; zero watchdog recoveries.
+**Soak thresholds** (a build fails on any): zero `dropped` or `displayedLate` on SDI over the run; display re-presents at or below the expected drift rate for unlocked vsync (about one per five minutes per display); p99 GPU time under 50% of the tick; zero `textLate` after the first minute; zero audio underruns; memory flat to within 5% after the first ten minutes, judged on the footprint less its graphics-tagged part (the GPU-owned textures, heaps and drawables, which swing by tens of megabytes between minutes as the driver's pools come and go; the part is recorded beside the footprint, and the resource table's texture bytes say what the engine itself holds) as a sliding per-minute median (a five-minute window until the first three-hour record with the breakdown sets it) against the median of the first window after minute ten, and the same rule on the heap's live bytes, where a Swift-side leak shows first; a record without the footprint is judged on resident size as before; zero watchdog recoveries.
 
 **The soak scenario** is a fixture playlist that exercises the paths that fail in practice: back-to-back 4K video dissolves (two decoders), a long loop, trims with in-points mid-GOP, lyric changes every few seconds, a timer box, a stack switch and a blackout every ten minutes, and a grade animation, running for three hours on the test bench with capture of every output. The first version of this scenario is the spike's acceptance test and it grows with each area that ships.
 
@@ -336,7 +336,7 @@ The spike is the smallest build that exercises every guarantee in section 1 on r
 - Zero `dropped` and zero `displayedLate` on the DeckLink output; display re-presents at or below the unlocked-vsync drift rate.
 - p99 GPU time under 8 ms at 60 Hz; CPU encode under 2 ms.
 - Zero `textLate` after the first minute; zero audio underruns; zero watchdog recoveries.
-- Memory flat within 5% after the first ten minutes.
+- Memory flat within 5% after the first ten minutes (section 13: the footprint's sliding median and the heap's live bytes).
 - The confidence stack's +1 slot is correct on every `next`, checked by the capture against the projected state.
 - A/V sync within one frame on a clapper fixture, measured on the capture.
 - The DeckLink output is frame-accurate against the capture; the 1080i weave, added right after the spike, is verified field-correct on a motion fixture the same way.
