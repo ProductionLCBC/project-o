@@ -12,7 +12,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | shipped |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | shipped |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | shipped |
-| 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | not started |
+| 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | in review |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | spec needed |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | spec needed |
@@ -118,6 +118,27 @@ Before any Metal code, write the headless harness tests and the golden-image
 scaffolding. The DeckLink SDK is in vendor/DeckLinkSDK (see vendor/README.md).
 Stop for review at each of: the tick and harness, the channel pass, the stack
 pass, each sink. Nothing here runs unattended.
+```
+
+**Area 5 — Render pipeline, the rest** (branch `area/render`)
+
+```
+Area: 5, the render pipeline, the rest. Spec: docs/specs/4-render-pipeline.md, §1–§13
+are the rules. The spike (Area 4) is on main and holds every display-side criterion of
+§15; the DeckLink criteria wait for the bench run with the card, which is deferred.
+Build the card-independent parts first and the weave last: what §8 still wants of the
+text cache (variables re-laid-out no more than once a second and the box transition on
+change, memory pressure shrinking the caches per §12, the substitution record for
+pre-flight); the thumbnail and multiviewer aux passes of §10 (IOSurface-backed, rate
+limited, the PNG thumbnail cache keyed by cue, stack and library version, skipped first
+under pressure per §4); the measurement of §13 the spike left out (the live summary
+under the metrics topic, per-output present latency, the thermal and memory-pressure
+notes of §12); then the 1080i weave of §10, field-correct on a motion fixture in the
+harness, verified on the capture rig when the card run happens (§16). Keep the five
+guarantees of §1 and the render thread rules of §3; a new pass is a plan pass type, not a
+change to the render loop (§4). Tests first from §16's list; goldens for the aux passes
+and the weave. Stop for review at each of: the text cache, the aux passes, the
+measurement, the weave. Nothing here runs unattended.
 ```
 
 **Areas marked `spec needed`**: open Cowork with this repo folder connected and ask for the spec first; it is written in `docs/specs/` and reviewed before its prompt is added here.
