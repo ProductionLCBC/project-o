@@ -143,6 +143,7 @@ machine/
   lists-local/              local copies of masters, with provenance
   state/last.json           channel state at last clean shutdown (restore-last-state)
   logs/  snapshots/         written by the app, read by nothing it depends on
+  thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10)
 ```
 
 File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it and renames the file to match on save. Every document starts with the same header.

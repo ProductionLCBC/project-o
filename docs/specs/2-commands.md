@@ -229,7 +229,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `/o/popup/N` | `s` | Set or cleared |
 | `/o/lock/N` | `i` | Channel lock changes |
 
-High-rate feedback is opt-in per address: a client sends /o/subscribe s:"/o/channel/2/remaining" to start receiving it and /o/unsubscribe with the same address to stop; subscriptions expire with the client's registration. Everything else in the table is sent to every target on change. Any client may ask for a current value with `/o/query` `s:"/o/channel/2/state"` and receives the feedback message once. Errors go back to the sender as `/o/error` `s:address` `s:reason`.
+High-rate feedback is opt-in per address: a client sends /o/subscribe s:"/o/channel/2/remaining" to start receiving it and /o/unsubscribe with the same address to stop; subscriptions expire with the client's registration. Everything else in the table is sent to every target on change. Any client may ask for a current value with `/o/query` `s:"/o/channel/2/state"` and receives the feedback message once; `/o/query` `s:"/o/metrics"` answers with the engine's live metrics summary (Spec 4 §13) as one string argument of JSON. Errors go back to the sender as `/o/error` `s:address` `s:reason`.
 
 **Ports** default to 8000 in; out targets carry their own host and port. The `/o` prefix is fixed so console maps written for one campus work at every campus.
 
