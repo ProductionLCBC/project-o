@@ -81,12 +81,15 @@ public final class BlackBox: @unchecked Sendable {
             ("heapLiveBytes", String(record.heapLiveBytes)),
             ("kind", "\"minute\""),
             ("memoryBytes", String(record.memoryBytes)),
+            ("memoryPressure", "\"\(record.memoryPressure.rawValue)\""),
             ("minute", String(record.minute)),
             ("purgeableLiveBytes", String(record.purgeableLiveBytes)),
             ("readbackBytes", String(record.readbackBytes)),
             ("textCacheBytes", String(record.textCacheBytes)),
             ("textCacheHitRate", String(format: "%.4f", record.textCacheHitRate)),
             ("textureBytes", String(record.textureBytes)),
+            ("thermalState", "\"\(record.thermalState.rawValue)\""),
+            ("thumbnailCacheHitRate", String(format: "%.4f", record.thumbnailCacheHitRate)),
             ("watchdogEvents", String(record.watchdogEvents)),
             ("watchdogRecoveries", String(record.watchdogRecoveries)),
         ])
@@ -149,8 +152,67 @@ public final class BlackBox: @unchecked Sendable {
     }
 }
 
+/// Spec 4 §13 — the per-output part of the live summary: "presented or
+/// re-presented, present latency (tick to vsync or to scheduled slot),
+/// DeckLink completion result, drop count since start", with the latency as
+/// p50 and p99 over the last minute of presents.
+public struct OutputSummary: Equatable, Sendable {
+    public let output: Int
+    public private(set) var presented: Int64 = 0
+    public private(set) var rePresented: Int64 = 0
+    public private(set) var completed: Int64 = 0
+    public private(set) var displayedLate: Int64 = 0
+    public private(set) var dropped: Int64 = 0
+    public private(set) var flushed: Int64 = 0
+    public private(set) var dropsSinceStart: Int64 = 0
+    private var window: [Int64] = []
+    private var windowIndex = 0
+    private let windowSize: Int
+
+    public init(output: Int, windowSize: Int = 3600) {
+        self.output = output
+        self.windowSize = max(1, windowSize)
+    }
+
+    public mutating func add(_ record: PresentRecord) {
+        dropsSinceStart = max(dropsSinceStart, record.dropsSinceStart)
+        if record.rePresented {
+            rePresented += 1
+            return
+        }
+        switch record.completion {
+        case .completed?: completed += 1
+        case .displayedLate?: displayedLate += 1
+        case .dropped?: dropped += 1
+        case .flushed?: flushed += 1
+        case nil: break
+        }
+        // A DeckLink completion arrives as its own record, after the schedule; only the schedule and a display's present count as presented.
+        guard record.completion != .dropped, record.completion != .flushed else { return }
+        if record.completion == nil || record.latencyNs > 0 || window.isEmpty {
+            presented += 1
+            if window.count < windowSize {
+                window.append(record.latencyNs)
+            } else {
+                window[windowIndex] = record.latencyNs
+                windowIndex = (windowIndex + 1) % windowSize
+            }
+        }
+    }
+
+    public var latencyP50Ns: Int64 { percentile(0.5) }
+    public var latencyP99Ns: Int64 { percentile(0.99) }
+
+    private func percentile(_ p: Double) -> Int64 {
+        guard !window.isEmpty else { return 0 }
+        let sorted = window.sorted()
+        return sorted[min(sorted.count - 1, Int(p * Double(sorted.count)))]
+    }
+}
+
 /// Spec 4 §13 — "a live summary the API exposes under the `metrics` topic":
-/// totals since start and the GPU p99 over the last minute of ticks.
+/// totals since start, the GPU and CPU p99 over the last minute of ticks,
+/// and each output's presentation figures.
 public struct MetricsSummary: Sendable {
     public let tickNanoseconds: Int64
     public private(set) var ticks: Int64 = 0
@@ -160,8 +222,10 @@ public struct MetricsSummary: Sendable {
     public private(set) var videoRepeats: Int64 = 0
     public private(set) var gpuFailures: Int64 = 0
     private var window: [Int64] = []
+    private var cpuWindow: [Int64] = []
     private var windowIndex = 0
     private let windowSize: Int
+    private var byOutput: [Int: OutputSummary] = [:]
 
     public init(tickNanoseconds: Int64, windowSize: Int = 3600) {
         self.tickNanoseconds = tickNanoseconds
@@ -177,17 +241,36 @@ public struct MetricsSummary: Sendable {
         if record.gpuFailed { gpuFailures += 1 }
         if window.count < windowSize {
             window.append(record.gpuTotalNs)
+            cpuWindow.append(record.cpuEncodeNs)
         } else {
             window[windowIndex] = record.gpuTotalNs
+            cpuWindow[windowIndex] = record.cpuEncodeNs
             windowIndex = (windowIndex + 1) % windowSize
         }
     }
 
+    /// Spec 4 §13 — "Per output, per presented frame".
+    public mutating func add(_ record: PresentRecord) {
+        var summary = byOutput[record.output] ?? OutputSummary(output: record.output, windowSize: windowSize)
+        summary.add(record)
+        byOutput[record.output] = summary
+    }
+
+    public func output(_ number: Int) -> OutputSummary? { byOutput[number] }
+
+    /// Every output seen, in number order.
+    public var outputs: [OutputSummary] { byOutput.keys.sorted().compactMap { byOutput[$0] } }
+
     /// The 99th percentile of GPU time over the window, as the soak rig
     /// measures it: the value at rank floor(0.99 × n), so it never flatters.
-    public var p99GPUNanoseconds: Int64 {
-        guard !window.isEmpty else { return 0 }
-        let sorted = window.sorted()
+    public var p99GPUNanoseconds: Int64 { MetricsSummary.p99(window) }
+
+    /// Spec 4 §2 — "CPU encode under 2 ms": its p99 over the same window.
+    public var cpuP99Nanoseconds: Int64 { MetricsSummary.p99(cpuWindow) }
+
+    static func p99(_ values: [Int64]) -> Int64 {
+        guard !values.isEmpty else { return 0 }
+        let sorted = values.sorted()
         return sorted[min(sorted.count - 1, Int(0.99 * Double(sorted.count)))]
     }
 

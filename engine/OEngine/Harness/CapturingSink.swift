@@ -41,8 +41,9 @@ public final class CapturingSink: OutputSink, @unchecked Sendable {
             presented.append(newest)
             lastPresentedTick = newest.tick
             if let capture { captured = capture(newest) }
+            // Spec 4 §13 — "present latency (tick to vsync ...)": the present time minus the tick's reference.
             presents.write(PresentRecord(output: output, frame: newest.tick, rePresented: false,
-                                         latencyNs: max(0, now.nanoseconds - newest.tick), completion: .completed, dropsSinceStart: rePresented))
+                                         latencyNs: max(0, now.nanoseconds - newest.referenceNs), completion: .completed, dropsSinceStart: rePresented))
         } else if lastPresentedTick >= 0 {
             rePresented += 1
             presents.write(PresentRecord(output: output, frame: lastPresentedTick, rePresented: true, latencyNs: 0,

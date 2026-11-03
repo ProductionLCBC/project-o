@@ -72,6 +72,10 @@ public final class Engine: @unchecked Sendable {
             byOutput[sink.output] = sink
             // Spec 4 §10 — a display sink refreshes one frame behind the master tick it can name.
             (sink as? DisplaySink)?.configure(masterRate: pacing.masterRate, ticksPerFrame: pacing.ticksPerFrame(output: sink.output))
+            // Spec 4 §13 — a DeckLink sink whose clock is the master measures its latency on stream time.
+            if let deckLink = sink as? DeckLinkSink, let sinkClock = deckLink.clock, sinkClock === (clock as AnyObject) {
+                deckLink.referenceIsStreamTime = true
+            }
         }
         self.sinks = byOutput
         let capacity = max(8, library.channels.count * 4)

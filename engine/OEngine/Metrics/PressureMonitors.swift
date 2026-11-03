@@ -14,6 +14,8 @@ public enum MemoryPressureLevel: String, Codable, Sendable {
     case normal
     case warning
     case critical
+    /// A record written before the state was recorded (Spec 4 §13).
+    case unknown
 }
 
 /// Spec 4 §12 — a cache memory pressure may shrink: it evicts down to a
@@ -33,7 +35,7 @@ public protocol ShrinkableCache: AnyObject, Sendable {
 public enum CachePressurePolicy {
     public static func ceilingFraction(for level: MemoryPressureLevel) -> Double? {
         switch level {
-        case .normal: return nil
+        case .normal, .unknown: return nil
         case .warning: return 0.5
         case .critical: return 0.25
         }
@@ -107,7 +109,7 @@ public final class MemoryPressureMonitor: @unchecked Sendable {
         }
         let names = caches.map(\.name).joined(separator: ", ")
         switch level {
-        case .normal:
+        case .normal, .unknown:
             log.info("memory pressure \(previous.rawValue) -> normal; caches restored to their caps (\(names))")
         case .warning, .critical:
             log.warning("memory pressure \(previous.rawValue) -> \(level.rawValue); caches shrunk (\(names)); decoder pools untouched")

@@ -145,7 +145,7 @@ public final class RenderLoop: @unchecked Sendable {
         // 4. Publish each due output's frame into its ring; the sink presents on its own cadence.
         for sink in plan.sinkPasses {
             sinks[sink.output]?.ring.publish(CompletedFrame(tick: time.tick, stack: sink.stack, second: sink.second, mix: sink.mix,
-                                                             destination: sink.destination, receipt: receipt))
+                                                             destination: sink.destination, receipt: receipt, referenceNs: time.reference.nanoseconds))
         }
 
         // 6. Write the tick's metrics into the ring.

@@ -222,8 +222,19 @@ public final class EngineProcess: @unchecked Sendable {
             textureBytes: { Int(engine.backend.resources.allocatedBytes) },
             decoderPoolBytes: { engine.sources.poolBytes },
             textCacheBytes: { textCache.statistics.bytes },
-            readbackBytes: { ((engine.backend as? MetalBackend)?.lastGoodStagingBytes ?? 0) + deckLinks.reduce(0) { $0 + $1.readbackBytes } })
+            readbackBytes: { ((engine.backend as? MetalBackend)?.lastGoodStagingBytes ?? 0) + deckLinks.reduce(0) { $0 + $1.readbackBytes } },
+            // Spec 4 §12, §13 (Area 5) — the thumbnail cache's hit rate, the substitutions, the thermal and memory-pressure states.
+            thumbnailCacheHitRate: { engine.thumbnails?.statistics.hitRate ?? 1 },
+            fontSubstitutions: { textCache.statistics.substitutedFonts },
+            thermalState: { engine.thermal.level },
+            memoryPressure: { engine.pressure.level })
         engine.start(blackBox: blackBox, minuteSources: sources)
+    }
+
+    /// Spec 4 §13 — the live summary, now; empty before the black box starts.
+    public func metricsSnapshot() -> MetricsSnapshot {
+        let uptime = Int((MonotonicClock.now().nanoseconds - startedAt.nanoseconds) / 1_000_000_000)
+        return engine.recorder?.snapshot(uptimeSeconds: uptime) ?? MetricsSnapshot(tickNanoseconds: engine.pacing.tickNanoseconds)
     }
 
     public func stop() {
@@ -231,8 +242,11 @@ public final class EngineProcess: @unchecked Sendable {
         osc?.stop()
     }
 
-    /// Spec 2 §6 — "/o/query with an address": the current value of a feedback address.
+    /// Spec 2 §6 — "/o/query with an address": the current value of a feedback
+    /// address; Spec 4 §13 — the `metrics` summary at `/o/metrics` (Area 5
+    /// reading) until the API carries the topic.
     func answer(query address: String) -> OSCMessage? {
+        if address == MetricsQuery.address { return MetricsQuery.answer(address, snapshot: metricsSnapshot()) }
         let state = engine.control.publishedState
         let parts = address.split(separator: "/").map(String.init)
         guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
@@ -265,7 +279,10 @@ public final class EngineProcess: @unchecked Sendable {
         lines.append("ran \(String(format: "%.0f", seconds)) s on the \(engine.scheduler?.activeClock.name ?? engine.clock.name) clock at \(rate.num)/\(rate.den)")
         if let recorder = engine.recorder {
             let s = recorder.liveSummary
-            lines.append("ticks \(s.ticks), plan reused \(s.planReused), text late \(s.textLate), aux skipped \(s.auxSkipped), video repeats \(s.videoRepeats), GPU failures \(s.gpuFailures), GPU p99 \(String(format: "%.2f", Double(s.p99GPUNanoseconds) / 1e6)) ms (\(String(format: "%.0f", s.p99Fraction * 100))% of the tick)")
+            lines.append("ticks \(s.ticks), plan reused \(s.planReused), text late \(s.textLate), aux skipped \(s.auxSkipped), video repeats \(s.videoRepeats), GPU failures \(s.gpuFailures), GPU p99 \(String(format: "%.2f", Double(s.p99GPUNanoseconds) / 1e6)) ms (\(String(format: "%.0f", s.p99Fraction * 100))% of the tick), CPU encode p99 \(String(format: "%.2f", Double(s.cpuP99Nanoseconds) / 1e6)) ms")
+            for output in s.outputs {
+                lines.append("output \(output.output): presented \(output.presented), re-presented \(output.rePresented), dropped \(output.dropped), displayed late \(output.displayedLate), present latency p50 \(String(format: "%.2f", Double(output.latencyP50Ns) / 1e6)) ms, p99 \(String(format: "%.2f", Double(output.latencyP99Ns) / 1e6)) ms")
+            }
         } else {
             lines.append("ticks \(engine.render.totalTicks), video repeats \(engine.render.totalRepeats), GPU failures \(engine.render.gpuFailures)")
         }

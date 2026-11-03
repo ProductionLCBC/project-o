@@ -135,6 +135,21 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     private var dropsSinceStart: Int64 = 0
     public private(set) var clock: DeckLinkClock?
     private var lastScheduledSlot: Int?
+    /// Spec 4 §13 — set by the engine when this card's clock is the master:
+    /// the tick's reference is then stream time, and the present latency is
+    /// the scheduled slot minus it.
+    public var referenceIsStreamTime: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return referenceOnStream }
+        set { lock.lock(); referenceOnStream = newValue; lock.unlock() }
+    }
+    private var referenceOnStream = false
+
+    /// Spec 4 §13 — "present latency (... to scheduled slot)": the slot minus
+    /// the tick's reference when both are on the card's clock, else the time
+    /// from now to the slot. Never negative.
+    public static func presentLatency(scheduledNs: Int64, referenceNs: Int64, nowNs: Int64, referenceIsStreamTime: Bool) -> Int64 {
+        max(0, scheduledNs - (referenceIsStreamTime ? referenceNs : nowNs))
+    }
 
     public init(output: Int, persistentID: String, format: VideoFormat, audioChannels: Int, backend: MetalBackend, log: EngineLog) {
         self.output = output
@@ -242,6 +257,8 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
 
     /// Spec 4 §10 — scheduled two ahead on stream time; the previous frame
     /// re-scheduled when the render thread misses a tick.
+    private var lastReferenceNs: Int64 = 0
+
     private func scheduleLoop() {
         let period = format.rate.nanosecondsPerFrame * (format.interlaced ? 2 : 1)
         var nextDue = streamTime
@@ -261,13 +278,17 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
             let slot: Int
             let tick: Int64
             var rePresented = false
+            var referenceNs: Int64 = 0
             if let ready, ready.tick != scheduledTick {
                 slot = ready.destination
                 tick = ready.tick
                 scheduledTick = ready.tick
+                referenceNs = ready.referenceNs
+                lastReferenceNs = referenceNs
             } else if let last = lastScheduledSlot {
                 slot = last
                 tick = scheduledTick
+                referenceNs = lastReferenceNs
                 rePresented = true
                 dropsSinceStart += 1
             } else {
@@ -283,8 +304,10 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
                 break
             }
             lastScheduledSlot = slot
+            let latency = DeckLinkSink.presentLatency(scheduledNs: nextDue, referenceNs: referenceNs, nowNs: clock?.now().nanoseconds ?? nextDue,
+                                                      referenceIsStreamTime: referenceIsStreamTime)
             nextDue += period
-            presents.write(PresentRecord(output: output, frame: tick, rePresented: rePresented, latencyNs: nextDue - (clock?.now().nanoseconds ?? nextDue),
+            presents.write(PresentRecord(output: output, frame: tick, rePresented: rePresented, latencyNs: latency,
                                          completion: nil, dropsSinceStart: dropsSinceStart))
             lastPresentNs.store(MonotonicClock.now().nanoseconds, ordering: .releasing)
         }

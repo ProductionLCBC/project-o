@@ -23,12 +23,21 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         public var decoderPoolBytes: @Sendable () -> Int
         public var textCacheBytes: @Sendable () -> Int
         public var readbackBytes: @Sendable () -> Int
+        /// Spec 4 §12 and §13 (Area 5) — the thumbnail cache's hit rate, the
+        /// font substitutions, the thermal and memory-pressure states.
+        public var thumbnailCacheHitRate: @Sendable () -> Double
+        public var fontSubstitutions: @Sendable () -> Int
+        public var thermalState: @Sendable () -> ThermalLevel
+        public var memoryPressure: @Sendable () -> MemoryPressureLevel
 
         public init(decoderSessions: @escaping @Sendable () -> Int = { 0 }, textCacheHitRate: @escaping @Sendable () -> Double = { 1 },
                     audioUnderruns: @escaping @Sendable () -> Int = { 0 }, watchdogEvents: @escaping @Sendable () -> Int = { 0 },
                     watchdogRecoveries: @escaping @Sendable () -> Int = { 0 },
                     textureBytes: @escaping @Sendable () -> Int = { 0 }, decoderPoolBytes: @escaping @Sendable () -> Int = { 0 },
-                    textCacheBytes: @escaping @Sendable () -> Int = { 0 }, readbackBytes: @escaping @Sendable () -> Int = { 0 }) {
+                    textCacheBytes: @escaping @Sendable () -> Int = { 0 }, readbackBytes: @escaping @Sendable () -> Int = { 0 },
+                    thumbnailCacheHitRate: @escaping @Sendable () -> Double = { 1 }, fontSubstitutions: @escaping @Sendable () -> Int = { 0 },
+                    thermalState: @escaping @Sendable () -> ThermalLevel = { .unknown },
+                    memoryPressure: @escaping @Sendable () -> MemoryPressureLevel = { .unknown }) {
             self.decoderSessions = decoderSessions
             self.textCacheHitRate = textCacheHitRate
             self.audioUnderruns = audioUnderruns
@@ -38,6 +47,10 @@ public final class BlackBoxRecorder: @unchecked Sendable {
             self.decoderPoolBytes = decoderPoolBytes
             self.textCacheBytes = textCacheBytes
             self.readbackBytes = readbackBytes
+            self.thumbnailCacheHitRate = thumbnailCacheHitRate
+            self.fontSubstitutions = fontSubstitutions
+            self.thermalState = thermalState
+            self.memoryPressure = memoryPressure
         }
     }
 
@@ -55,6 +68,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
     private var lastUnderruns = 0
     private var lastEvents = 0
     private var lastRecoveries = 0
+    private var lastMinute: MinuteRecord?
+    private var totalUnderruns = 0
 
     public init(box: BlackBox, ticks: MetricsRing, presents: [PresentRing], tickNanoseconds: Int64, sources: MinuteSources, log: EngineLog) {
         self.box = box
@@ -76,15 +91,21 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         var lines: [String] = []
         var records: [TickRecord] = []
         ticks.drain { records.append($0) }
+        var presented: [PresentRecord] = []
+        for ring in presents {
+            ring.drain { presented.append($0) }
+        }
         lock.lock()
         for record in records {
             summary.add(record)
             lines.append(BlackBox.line(for: record))
         }
-        lock.unlock()
-        for ring in presents {
-            ring.drain { lines.append(BlackBox.line(for: $0)) }
+        // Spec 4 §13 — "Per output, per presented frame" into the live summary too.
+        for record in presented {
+            summary.add(record)
+            lines.append(BlackBox.line(for: record))
         }
+        lock.unlock()
         for line in lines {
             do { try box.append(line: line, at: now) } catch { log.error("black box: \(error)") }
         }
@@ -110,12 +131,53 @@ public final class BlackBoxRecorder: @unchecked Sendable {
                                   heapLiveBytes: memory.heapLiveBytes, heapAllocatedBytes: memory.heapAllocatedBytes,
                                   purgeableLiveBytes: memory.purgeableLiveBytes, textureBytes: Int64(sources.textureBytes()),
                                   decoderPoolBytes: Int64(sources.decoderPoolBytes()), textCacheBytes: Int64(sources.textCacheBytes()),
-                                  readbackBytes: Int64(sources.readbackBytes()))
+                                  readbackBytes: Int64(sources.readbackBytes()),
+                                  // Spec 4 §12, §13 — the notes: the states in this minute and the thumbnail cache's hit rate.
+                                  thermalState: sources.thermalState(), memoryPressure: sources.memoryPressure(),
+                                  thumbnailCacheHitRate: sources.thumbnailCacheHitRate())
         lastUnderruns = underruns
         lastEvents = events
         lastRecoveries = recoveries
         minute += 1
+        lock.lock()
+        lastMinute = record
+        totalUnderruns = underruns
+        lock.unlock()
         do { try box.append(record, at: now) } catch { log.error("black box: \(error)") }
+    }
+
+    /// Spec 4 §13 — "a live summary the API exposes under the `metrics`
+    /// topic": the snapshot of everything the recorder knows now.
+    public func snapshot(uptimeSeconds: Int) -> MetricsSnapshot {
+        lock.lock()
+        let summary = self.summary
+        let minute = lastMinute
+        lock.unlock()
+        var snapshot = MetricsSnapshot(tickNanoseconds: summary.tickNanoseconds)
+        snapshot.uptimeSeconds = uptimeSeconds
+        snapshot.ticks = summary.ticks
+        snapshot.planReused = summary.planReused
+        snapshot.textLate = summary.textLate
+        snapshot.auxSkipped = summary.auxSkipped
+        snapshot.videoRepeats = summary.videoRepeats
+        snapshot.gpuFailures = summary.gpuFailures
+        snapshot.gpuP99Ns = summary.p99GPUNanoseconds
+        snapshot.cpuP99Ns = summary.cpuP99Nanoseconds
+        snapshot.outputs = summary.outputs.map {
+            MetricsSnapshot.OutputSnapshot(output: $0.output, presented: $0.presented, rePresented: $0.rePresented, dropped: $0.dropped,
+                                           displayedLate: $0.displayedLate, latencyP50Ns: $0.latencyP50Ns, latencyP99Ns: $0.latencyP99Ns)
+        }
+        snapshot.memory = minute.map(MetricsSnapshot.MemorySnapshot.init)
+        snapshot.decoderSessions = sources.decoderSessions()
+        snapshot.textCacheHitRate = sources.textCacheHitRate()
+        snapshot.thumbnailCacheHitRate = sources.thumbnailCacheHitRate()
+        snapshot.fontSubstitutions = sources.fontSubstitutions()
+        snapshot.thermalState = sources.thermalState()
+        snapshot.memoryPressure = sources.memoryPressure()
+        snapshot.watchdogEvents = sources.watchdogEvents()
+        snapshot.watchdogRecoveries = sources.watchdogRecoveries()
+        snapshot.audioUnderruns = sources.audioUnderruns()
+        return snapshot
     }
 
     /// The process's resident size (`ProcessMemory.residentSize`).
