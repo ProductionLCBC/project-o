@@ -53,6 +53,9 @@ public enum WatchdogRecovery: Equatable, Sendable {
     case decoderRecreated(channel: Int)
     case pipelinesRebuilt
     case clockFallback(String)
+    /// Spec 4 §12 — an audio device lost while running: its graph moved to a
+    /// fallback or to silence (Area 16).
+    case audioDeviceLost(String)
 }
 
 /// Spec 4 §12 — "A utility thread checks every 250 ms that each active sink

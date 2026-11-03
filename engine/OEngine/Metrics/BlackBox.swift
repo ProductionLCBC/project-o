@@ -73,6 +73,8 @@ public final class BlackBox: @unchecked Sendable {
     public static func line(for record: MinuteRecord) -> String {
         json([
             ("audioUnderruns", String(record.audioUnderruns)),
+            // Spec 4 §13 — "audio underruns per device" (Area 16), an object with sorted keys.
+            ("audioUnderrunsByDevice", "{" + record.audioUnderrunsByDevice.keys.sorted().map { "\"\($0)\":\(record.audioUnderrunsByDevice[$0] ?? 0)" }.joined(separator: ",") + "}"),
             ("decoderPoolBytes", String(record.decoderPoolBytes)),
             ("decoderSessions", String(record.decoderSessions)),
             ("footprintBytes", String(record.footprintBytes)),

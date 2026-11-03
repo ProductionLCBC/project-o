@@ -50,7 +50,9 @@ public enum BlackBoxReader {
                                   completion: completion, dropsSinceStart: int64(object["dropsSinceStart"])))
         case "minute":
             // Spec 4 §13 — the breakdown keys are missing from files written before 2026-11-03 and read as zero.
-            run.add(MinuteRecord(minute: Int(int64(object["minute"])), memoryBytes: int64(object["memoryBytes"]),
+            var byDevice: [String: Int] = [:]
+            for (device, count) in object["audioUnderrunsByDevice"] as? [String: Any] ?? [:] { byDevice[device] = Int(int64(count)) }
+            var record = MinuteRecord(minute: Int(int64(object["minute"])), memoryBytes: int64(object["memoryBytes"]),
                                  decoderSessions: Int(int64(object["decoderSessions"])),
                                  textCacheHitRate: (object["textCacheHitRate"] as? NSNumber)?.doubleValue ?? 1,
                                  audioUnderruns: Int(int64(object["audioUnderruns"])),
@@ -64,7 +66,9 @@ public enum BlackBoxReader {
                                  readbackBytes: int64(object["readbackBytes"]),
                                  thermalState: (object["thermalState"] as? String).flatMap(ThermalLevel.init(rawValue:)) ?? .unknown,
                                  memoryPressure: (object["memoryPressure"] as? String).flatMap(MemoryPressureLevel.init(rawValue:)) ?? .unknown,
-                                 thumbnailCacheHitRate: (object["thumbnailCacheHitRate"] as? NSNumber)?.doubleValue ?? 1))
+                                 thumbnailCacheHitRate: (object["thumbnailCacheHitRate"] as? NSNumber)?.doubleValue ?? 1)
+            record.audioUnderrunsByDevice = byDevice
+            run.add(record)
         default:
             break
         }

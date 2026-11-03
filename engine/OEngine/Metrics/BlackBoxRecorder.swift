@@ -29,6 +29,10 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         public var fontSubstitutions: @Sendable () -> Int
         public var thermalState: @Sendable () -> ThermalLevel
         public var memoryPressure: @Sendable () -> MemoryPressureLevel
+        /// Spec 4 §13 (Area 16) — "audio underruns per device", since start,
+        /// and Spec 4 §12 — the audio devices' standings for the snapshot.
+        public var audioUnderrunsByDevice: @Sendable () -> [String: Int]
+        public var audioDevices: @Sendable () -> [AudioDeviceSnapshot]
 
         public init(decoderSessions: @escaping @Sendable () -> Int = { 0 }, textCacheHitRate: @escaping @Sendable () -> Double = { 1 },
                     audioUnderruns: @escaping @Sendable () -> Int = { 0 }, watchdogEvents: @escaping @Sendable () -> Int = { 0 },
@@ -37,7 +41,9 @@ public final class BlackBoxRecorder: @unchecked Sendable {
                     textCacheBytes: @escaping @Sendable () -> Int = { 0 }, readbackBytes: @escaping @Sendable () -> Int = { 0 },
                     thumbnailCacheHitRate: @escaping @Sendable () -> Double = { 1 }, fontSubstitutions: @escaping @Sendable () -> Int = { 0 },
                     thermalState: @escaping @Sendable () -> ThermalLevel = { .unknown },
-                    memoryPressure: @escaping @Sendable () -> MemoryPressureLevel = { .unknown }) {
+                    memoryPressure: @escaping @Sendable () -> MemoryPressureLevel = { .unknown },
+                    audioUnderrunsByDevice: @escaping @Sendable () -> [String: Int] = { [:] },
+                    audioDevices: @escaping @Sendable () -> [AudioDeviceSnapshot] = { [] }) {
             self.decoderSessions = decoderSessions
             self.textCacheHitRate = textCacheHitRate
             self.audioUnderruns = audioUnderruns
@@ -51,6 +57,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
             self.fontSubstitutions = fontSubstitutions
             self.thermalState = thermalState
             self.memoryPressure = memoryPressure
+            self.audioUnderrunsByDevice = audioUnderrunsByDevice
+            self.audioDevices = audioDevices
         }
     }
 
@@ -66,6 +74,7 @@ public final class BlackBoxRecorder: @unchecked Sendable {
     private var minute = 0
     private var lastMinuteAt = MonotonicClock.now()
     private var lastUnderruns = 0
+    private var lastUnderrunsByDevice: [String: Int] = [:]
     private var lastEvents = 0
     private var lastRecoveries = 0
     private var lastMinute: MinuteRecord?
@@ -120,11 +129,12 @@ public final class BlackBoxRecorder: @unchecked Sendable {
     public func writeMinute(now: Date = Date()) {
         // Spec 4 §13 — a minute record carries what happened in that minute; the sources count since start.
         let underruns = sources.audioUnderruns()
+        let underrunsByDevice = sources.audioUnderrunsByDevice()
         let events = sources.watchdogEvents()
         let recoveries = sources.watchdogRecoveries()
         // Spec 4 §13 — "memory in use, as the process footprint ... beside the resident size, and its parts".
         let memory = ProcessMemory.current()
-        let record = MinuteRecord(minute: minute, memoryBytes: memory.residentBytes, decoderSessions: sources.decoderSessions(),
+        var record = MinuteRecord(minute: minute, memoryBytes: memory.residentBytes, decoderSessions: sources.decoderSessions(),
                                   textCacheHitRate: sources.textCacheHitRate(), audioUnderruns: max(0, underruns - lastUnderruns),
                                   watchdogEvents: max(0, events - lastEvents), watchdogRecoveries: max(0, recoveries - lastRecoveries),
                                   footprintBytes: memory.footprintBytes, graphicsFootprintBytes: memory.graphicsFootprintBytes,
@@ -135,7 +145,12 @@ public final class BlackBoxRecorder: @unchecked Sendable {
                                   // Spec 4 §12, §13 — the notes: the states in this minute and the thumbnail cache's hit rate.
                                   thermalState: sources.thermalState(), memoryPressure: sources.memoryPressure(),
                                   thumbnailCacheHitRate: sources.thumbnailCacheHitRate())
+        // Spec 4 §13 — "audio underruns per device": what happened in that minute, per device.
+        record.audioUnderrunsByDevice = underrunsByDevice.mapValues { $0 }.reduce(into: [:]) { out, pair in
+            out[pair.key] = max(0, pair.value - (lastUnderrunsByDevice[pair.key] ?? 0))
+        }
         lastUnderruns = underruns
+        lastUnderrunsByDevice = underrunsByDevice
         lastEvents = events
         lastRecoveries = recoveries
         minute += 1
@@ -177,6 +192,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         snapshot.watchdogEvents = sources.watchdogEvents()
         snapshot.watchdogRecoveries = sources.watchdogRecoveries()
         snapshot.audioUnderruns = sources.audioUnderruns()
+        snapshot.audioUnderrunsByDevice = sources.audioUnderrunsByDevice()
+        snapshot.audioDevices = sources.audioDevices()
         return snapshot
     }
 

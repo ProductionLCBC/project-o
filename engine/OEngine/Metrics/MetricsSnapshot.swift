@@ -4,6 +4,32 @@
 import Foundation
 import OCore
 
+/// Spec 4 §12 — where an audio device's graph is playing: on its own device,
+/// on an output's fallback device, or silent on the stand-in (Area 16).
+public enum AudioDeviceStanding: String, Codable, Equatable, Sendable {
+    case primary, fallback, silent
+}
+
+/// Spec 4 §12 and §13 (Area 16) — one audio device in the live summary: the
+/// badge for a lost device until the app exists. `device` is the graph's
+/// primary device key (a UID, `default`, `sdi:N`); `standIn` the fallback in
+/// use; `underruns` since start.
+public struct AudioDeviceSnapshot: Codable, Equatable, Sendable {
+    public var device: String
+    public var outputs: [Int]
+    public var standing: AudioDeviceStanding
+    public var standIn: String?
+    public var underruns: Int
+
+    public init(device: String, outputs: [Int], standing: AudioDeviceStanding, standIn: String?, underruns: Int) {
+        self.device = device
+        self.outputs = outputs
+        self.standing = standing
+        self.standIn = standIn
+        self.underruns = underruns
+    }
+}
+
 /// Spec 4 §13 — the live summary as one value: the tick totals and the GPU
 /// and CPU p99 over the last minute, each output's presentation counts with
 /// its present latency, the latest minute's memory figures, decoder
@@ -89,6 +115,10 @@ public struct MetricsSnapshot: Codable, Equatable, Sendable {
     public var watchdogEvents: Int = 0
     public var watchdogRecoveries: Int = 0
     public var audioUnderruns: Int = 0
+    /// Spec 4 §13 — "audio underruns per device", since start (Area 16).
+    public var audioUnderrunsByDevice: [String: Int] = [:]
+    /// Spec 4 §12 — the audio devices' standings: the badge (Area 16).
+    public var audioDevices: [AudioDeviceSnapshot] = []
 
     public init(tickNanoseconds: Int64) {
         self.tickNanoseconds = tickNanoseconds

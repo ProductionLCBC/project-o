@@ -128,6 +128,9 @@ public struct MinuteRecord: Equatable, Sendable {
     public var thermalState: ThermalLevel = .unknown
     public var memoryPressure: MemoryPressureLevel = .unknown
     public var thumbnailCacheHitRate: Double = 1
+    /// Spec 4 §13 — "audio underruns per device" in that minute, keyed by the
+    /// graph's primary device (Area 16); records written before read as empty.
+    public var audioUnderrunsByDevice: [String: Int] = [:]
 
     public init(minute: Int, memoryBytes: Int64, decoderSessions: Int, textCacheHitRate: Double, audioUnderruns: Int,
                 watchdogEvents: Int, watchdogRecoveries: Int,
