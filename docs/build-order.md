@@ -23,7 +23,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | spec needed |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | spec needed |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started |
-| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | in review |
+| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | shipped |
 | 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | spec needed |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | spec needed |
 

@@ -20,16 +20,16 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), task `shipped`; hosted CI green on `main` since 962dd4b. The first three-hour soak on two displays (2026-11-01) found faults fixed on `area/soak-fixes` and merged on Adam's `approved` (2074bd6, 2026-11-02); the second run's memory growth was attributed on 2026-11-02 to purgeable cache memory and allocator fragmentation, no leak; the §13 memory breakdown and the corrected threshold merged on Adam's `approved` (87011b2, 2026-11-03). Every display-side criterion of §15 holds; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first (presets and text; it owes the text style a vertical anchor, Spec 4 §8). The object types are on `main` since Area 2; the engine's stack pass resolves slots, fit modes, opacity, mute and the +1 slot since Area 4, through the one shared `SlotResolver` since Area 5. |
-| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the 1080i weave since Area 5; key and fill remain. The DeckLink sink is the embedded audio feed's destination on `area/audio`. |
+| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the 1080i weave since Area 5, the DeckLink sink as the embedded audio feed's destination since Area 16; key and fill remain. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | not started | Spec needed first. The index, the resolver, SHA-256 identity and the missing state are on `main` since Area 2; the rebuild walk, import by copy and poster extraction remain. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | cues-lists-playlists spec | not started | Spec needed first. The runner on `main` logs a fired cue as its own group with `fire`; the engine's control loop fires armed Time triggers and `next` as engine groups; the thumbnail job projects a list from its top (Area 5). |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec needed first. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | presets-and-text spec | not started | Spec needed first. `popup N set` over OSC is on `main` since Area 3; the engine resolves `[Time]`, `[Date]` and `[Popup N]` and, since Area 5, adopts a variable box's new value at most once per wall-clock second; not yet `[Timer N]` or the per-second `remaining` and `timer` feedback. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | not started | Spec needed first. The atomic write, the write plan and the versions folder are on `main` since Area 2; the Spec 2 §9 entry and its one-line form since Area 3; debouncing, the log file, snapshots and `restoreLastState` remain. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec needed first; nothing in `app/` starts before the spike passes on the bench. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack, ids exposed) and of thumbnails (PNGs by cue, stack and library version) is on `main` since Area 5; the Mach hand-off of the surfaces and the API's `metrics` and `preview` topics belong with the app and the API. The audio device badge is the snapshot's `audioDevices` list on `area/audio`. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec needed first; nothing in `app/` starts before the spike passes on the bench. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack, ids exposed) and of thumbnails (PNGs by cue, stack and library version) is on `main` since Area 5; the Mach hand-off of the surfaces and the API's `metrics` and `preview` topics belong with the app and the API. The audio device badge is the snapshot's `audioDevices` list since Area 16. |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first; in `app/`, so after the bench run. |
-| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | It needs no new spec and can follow Area 16. The runner's macro expansion, the depth cap and the cycle check are on `main`. A prompt block is proposed under Needs Adam. |
-| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | brief waiting for approval | Built on `area/audio` (pushed, 4465ab0) on 2026-11-03 after Adam's OK of the plan with every recommendation: one mix graph per distinct device and one per SDI-embedded output, routing to every named output on a device, the lowest-numbered output's device as the clock, device loss to the fallback or to a silence stand-in that keeps the clock and the picture moving, the return, the same rule at launch, the embedded feed on the card's stream time through the sink, underruns per device in the minute record and the snapshot. `swift test` green on the branch; the brief is the session's final message. The hardware path waits for the bench. |
+| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | Next. It needs no new spec; the runner's macro expansion, the depth cap and the cycle check are on `main`. Its prompt block is proposed under Needs Adam and goes into `docs/build-order.md` on Adam's word. |
+| 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. One mix graph per distinct device and one per SDI-embedded output, the lowest-numbered output's device as the clock, device loss to the fallback or a silence stand-in and the return, the embedded feed on the card's stream time, underruns per device. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | not started | Spec needed first. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | not started | Spec needed first. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
@@ -37,30 +37,32 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 16, audio (basic), is in review on `area/audio`** (pushed, 4465ab0; the Build tracker
-task `in review`, `docs/build-order.md` `in review`). On 2026-11-03 Adam wrote `OK` on the
-plan with every recommendation taken, and the area was built tests first: the §11, §12 and
-§13 tests (8f6733c), then the graph per device with routing as pairs and a swappable device,
-the decoder's ring per device, the paced device and the stream-destination seam (4807202),
-the per-device underruns and the device-state badge in the records (6294630), the audio
-system with the loss-and-return rule (bd4e31b), the DeckLink sink as the embedded feed's
-destination (5c7d28c), and the control loop, engine, harness and process on the system
-(4465ab0). `swift test` is green on the branch. The brief is the final message of the Area
-16 session. Nothing of Area 16 is on `main` but these status documents; the code waits for
-Adam's `approved`.
+**Nothing is in review; everything is on `main`.** On 2026-11-04 Adam wrote `approved` on
+the Area 16 brief with every reading as built. `area/audio` was merged into `main` with
+`--no-ff` (89641e9), `swift test` ran green on the merged tree, the merge was pushed, the
+branch was deleted on both ends, its worktree removed, and the Build tracker task "Area 16 —
+Audio, basic" set to `shipped`. The engine now runs one mix graph per distinct audio device
+and one per SDI-embedded output, follows the lowest-numbered output's device as the clock,
+survives a device loss on the fallback or a silence stand-in that keeps the clock and the
+picture moving, takes the device back when it returns, schedules embedded audio on the
+card's stream time through the DeckLink sink, and records audio underruns per device with
+the devices' standings as the badge.
 
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
-window and show the thumbnail job's cost, and it checks the weave on the capture rig (§16).
-With Area 16 it also proves the embedded audio feed against a real card and the clapper.
+window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
+it now also proves the embedded audio feed against the clapper and a real device loss.
+
+Area 15, macros (basic), is next; its prompt block is proposed under Needs Adam and goes
+into `docs/build-order.md` on Adam's word, then the session starts from it in its own
+worktree.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 16 — Audio, basic** (the final message of the Area 16 session, 2026-11-03). It
-  asks him to confirm the six readings below, all built as recommended, and to write
-  `approved`. Recommended answer: approve as built.
+None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) was answered
+on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
 
@@ -120,8 +122,8 @@ With Area 16 it also proves the embedded audio feed against a real card and the 
 
 ### Spec interpretations made so far
 
-Area 16's readings, approved in the plan on 2026-11-03 ("OK on recs") and built as
-recommended; they stand until Adam's `approved` on the brief confirms them as built.
+None outstanding. Area 16's readings were approved as built on 2026-11-04 and are recorded
+here and in the brief:
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
@@ -145,9 +147,9 @@ written, owes the text style a vertical anchor defaulting to centre (Spec 4 §8 
 
 ## Next
 
-**Area 15 — Macros, basic** (branch `area/macros`), once Adam has approved Area 16 and
-given his word on its prompt block (proposed under Needs Adam); it runs in its own session
-from the common preamble in `docs/build-order.md`, verbatim:
+**Area 15 — Macros, basic** (branch `area/macros`), once Adam has given his word on its
+prompt block (proposed under Needs Adam); it runs in its own session from the common
+preamble in `docs/build-order.md`, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
