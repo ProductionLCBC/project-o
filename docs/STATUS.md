@@ -60,6 +60,11 @@ an independent review, and accepted by Adam the same day, with T-2 taking the al
 `docs/specs/6-presets-and-text.md`, its corrections to Specs 1–5 and `ARCHITECTURE.md` are
 applied, and the prompt blocks for Areas 6 and 11 are in `docs/build-order.md`.
 
+Spec 7, Cues, lists and playlists (Area 9), was then drafted the same way and revised
+after two independent reviews. The first found its live pointer unsound, so the draft now
+works out where the pointer stands each time it reads it, and edits never move it. Its
+twelve choices, Q-1 to Q-12, wait for Adam's answers in the specs doc.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
@@ -76,6 +81,13 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
+
+- **Spec 7, Cues, lists and playlists, for review.** Drafted in Cowork as a tab of the
+  Project O specs doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope
+  gaps doc's answers (L1–L7) and revised after two independent reviews. Twelve choices,
+  Q-1 to Q-12, wait for his answers in its §11. On acceptance it is exported to
+  `docs/specs/7-cues-lists-and-playlists.md` with its corrections to Specs 1, 2, 3, 5 and
+  6, and Area 9 gets its prompt block.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -193,13 +205,14 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 
 After Area 15, Areas 6 and 11 are ready, in that order, from their blocks in
 `docs/build-order.md`; both are engine-side and need no bench run. Spec 7, cues, lists and
-playlists (Area 9), is drafted next in Cowork, then the others in the scope gaps doc's
-order: media pool; log and saving; the show-mode UI with its settings section and the
-operator lock; edit mode. Each is reviewed before it is exported to `docs/specs/` and its
-area's prompt is added to `docs/build-order.md`, when its Build tracker task moves from
-`spec needed` to `not started`. The bench run with the card happens whenever Adam sets a
-window; it does not block Area 15 or the engine-side areas, and it must pass before
-anything in `app/` starts (Areas 13 and 14) and before Area 7's bench verification.
+playlists (Area 9), is drafted and waits for Adam's answers; the others follow in the
+scope gaps doc's order: media pool; log and saving; the show-mode UI with its settings
+section and the operator lock; edit mode. Each is reviewed before it is exported to
+`docs/specs/` and its area's prompt is added to `docs/build-order.md`, when its Build
+tracker task moves from `spec needed` to `not started`. The bench run with the card
+happens whenever Adam sets a window; it does not block Area 15 or the engine-side areas,
+and it must pass before anything in `app/` starts (Areas 13 and 14) and before Area 7's
+bench verification.
 
 Spec 5 has no area of its own. Following the scope gaps doc, its engine side lands with
 Area 9, which applies the list, cue and playlist edits (L1) and so builds the edit path
