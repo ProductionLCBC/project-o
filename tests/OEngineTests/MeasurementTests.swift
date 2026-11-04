@@ -117,13 +117,14 @@ final class MetricsSnapshotTests: XCTestCase {
         let snapshot = sample()
         let data = try snapshot.json()
         let text = String(decoding: data, as: UTF8.self)
-        XCTAssertTrue(text.hasPrefix("{\"audioUnderruns\":0,\"auxSkipped\":3,\"cpuP99Ns\":900000,"), String(text.prefix(60)))
+        // Area 16 — the audio device list and the per-device underruns sort in beside the total.
+        XCTAssertTrue(text.hasPrefix("{\"audioDevices\":[],\"audioUnderruns\":0,\"audioUnderrunsByDevice\":{},\"auxSkipped\":3,\"cpuP99Ns\":900000,"), String(text.prefix(100)))
         XCTAssertFalse(text.contains("\n"), "one line, for an OSC string")
         XCTAssertTrue(text.contains("\"thermalState\":\"fair\""))
         XCTAssertTrue(text.contains("\"memoryPressure\":\"warning\""))
         XCTAssertTrue(text.contains("\"outputs\":[{"))
         let keys = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]).keys.sorted()
-        XCTAssertEqual(keys.first, "audioUnderruns")
+        XCTAssertEqual(keys.first, "audioDevices")
         XCTAssertEqual(try MetricsSnapshot.decode(data), snapshot)
     }
 

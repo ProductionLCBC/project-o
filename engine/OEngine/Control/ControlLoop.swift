@@ -27,8 +27,8 @@ public final class ControlLoop: @unchecked Sendable {
     let posters: any PosterProvider
     let text: any TextProvider
     public let variables: VariableProvider
-    /// Spec 4 §11 — the mix graph for the machine's one device in the spike; nil runs silent.
-    public let audio: AudioGraph?
+    /// Spec 4 §11 — the audio system, one mix graph per device; nil runs silent.
+    public let audio: AudioSystem?
     let log: EngineLog
     let encodeKinds: [Int: EncodeKind]
     let mediaRoot: URL?
@@ -53,7 +53,7 @@ public final class ControlLoop: @unchecked Sendable {
 
     public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
-                variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioGraph? = nil, log: EngineLog) {
+                variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioSystem? = nil, log: EngineLog) {
         self.library = library
         self.machine = machine
         self.pacing = pacing
@@ -285,8 +285,8 @@ public final class ControlLoop: @unchecked Sendable {
             case (.gain, .gain(let db)):
                 // Spec 4 §11 — "the channel's tracked gain plus any override".
                 model.channels[channel, default: ChannelRuntime()].gainDb = db
-                if let audio, let m = model.channels[channel]?.live.media, let instance = m.audio {
-                    audio.setGain(db + (m.gainOverride ?? 0), for: instance)
+                if let audio, let m = model.channels[channel]?.live.media, let attachment = m.audio {
+                    audio.setGain(db + (m.gainOverride ?? 0), for: attachment)
                 }
             default:
                 break
@@ -532,30 +532,34 @@ public final class ControlLoop: @unchecked Sendable {
 
     /// Spec 4 §11 — "Each channel's content may carry sound; the engine
     /// decodes it, applies the channel's gain and audio transition, and routes
-    /// it to the numbered audio outputs the channel names."
+    /// it to the numbered audio outputs the channel names." One ring per
+    /// device those outputs reach; a channel naming no output on this machine
+    /// gets no decoder.
     private func attachAudio(to runtime: inout MediaRuntime, channel: Int, instance: MediaInstance) {
         guard let audio, let entry = runtime.entry, entry.hasAudio, entry.kind != .image, let mediaRoot,
               let resolved = MediaResolver.resolve(instance.ref, library: library, machine: machine) else { return }
-        let decoder = AudioFileDecoder(url: mediaRoot.appendingPathComponent(resolved.path), inMs: runtime.inMs,
-                                       outMs: runtime.outMs.isFinite ? runtime.outMs : nil, loop: instance.endBehavior == .loop, channels: 2, log: log)
-        decoder.start()
         let outputs = library.channel(channel)?.audioOutputs ?? []
-        let audioInstance = AudioInstance(handle: runtime.handle, ring: decoder.ring, inMs: runtime.inMs, syncOffsetMs: instance.syncOffsetMs ?? 0,
-                                          routing: audio.routing(forAudioOutputs: outputs, instanceChannels: 2))
+        let rings = audio.ringCount(forOutputs: outputs)
+        guard rings > 0 else { return }
+        let decoder = AudioFileDecoder(url: mediaRoot.appendingPathComponent(resolved.path), inMs: runtime.inMs,
+                                       outMs: runtime.outMs.isFinite ? runtime.outMs : nil, loop: instance.endBehavior == .loop, channels: 2,
+                                       ringCount: rings, log: log)
+        decoder.start()
         let gain = (model.channels[channel]?.gainDb ?? model.state.channels[channel]?.attributes.gain.value ?? 0) + (instance.gainOverride ?? 0)
-        guard audio.add(audioInstance, gainDb: gain) else {
+        guard let attachment = audio.attach(handle: runtime.handle, rings: decoder.rings, outputs: outputs, inMs: runtime.inMs,
+                                            syncOffsetMs: instance.syncOffsetMs ?? 0, gainDb: gain, playing: instance.transport == .playing,
+                                            channel: channel) else {
             decoder.stop()
             return
         }
-        audio.setPlaying(instance.transport == .playing, for: audioInstance)
-        runtime.audio = audioInstance
+        runtime.audio = attachment
         runtime.audioDecoder = decoder
     }
 
     private func releaseAudio(of runtime: inout MediaRuntime) {
-        if let instance = runtime.audio { audio?.remove(instance) }
+        if let attachment = runtime.audio { audio?.detach(attachment) }
         runtime.audioDecoder?.stop()
-        runtime.audioDecoder?.ring.flush()
+        for ring in runtime.audioDecoder?.rings ?? [] { ring.flush() }
         runtime.audio = nil
         runtime.audioDecoder = nil
     }
@@ -576,10 +580,10 @@ public final class ControlLoop: @unchecked Sendable {
     func mediaTime(_ m: MediaRuntime, at frame: Int64) -> Double {
         guard m.ready, m.transport != .stopped, !m.isStill else { return m.inMs }
         var raw = m.clock.mediaTime(at: frame, millisecondsPerTick: pacing.millisecondsPerTick)
-        if let audio, let instance = m.audio {
+        if let audio, let attachment = m.audio {
             // Spec 4 §2 — "A/V sync is anchored to the audio device clock"; Spec 4 §11 — a
             // negative sync offset "delays video ... by advancing the instance's media time reference".
-            raw = audio.mediaTimeMs(of: instance) + Double(min(0, m.syncOffsetMs))
+            raw = audio.mediaTimeMs(of: attachment) + Double(min(0, m.syncOffsetMs))
         }
         guard m.outMs.isFinite else { return raw }
         if m.loops {

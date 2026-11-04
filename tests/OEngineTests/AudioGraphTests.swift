@@ -143,13 +143,22 @@ final class AudioGraphTests: XCTestCase {
         XCTAssertEqual(graph.mediaTimeMs(of: a), 1000.0 / 48, accuracy: 0.01, "the clock ran through the hold, so the picture leads the sound by the offset")
     }
 
+    /// Spec 1 §3 — an Audio Output's `channels` are "device channel indices";
+    /// Spec 4 §11 — the mix is written "to the device channels the Audio
+    /// Output object maps", every named output on the device at once.
     func test_routingFollowsTheAudioOutputChannelMap() {
         let device = SoftwareAudioDevice(channelCount: 4)
         let right = AudioOutput(number: 2, label: "pair 2", device: .uid("software"), channels: [2, 3])
         let graph = AudioGraph(device: device, outputs: [output(), right])
-        XCTAssertEqual(graph.routing(forAudioOutputs: [2], instanceChannels: 2), [2, 3])
-        XCTAssertEqual(graph.routing(forAudioOutputs: [2], instanceChannels: 1), [2, 3], "mono goes to both channels of the pair")
-        XCTAssertEqual(graph.routing(forAudioOutputs: [1], instanceChannels: 2), [0, 1])
+        func pairs(_ list: [(Int, Int)]) -> [AudioRouting.Pair] { list.map { AudioRouting.Pair(source: $0.0, target: $0.1) } }
+        XCTAssertEqual(graph.routing(forAudioOutputs: [2], instanceChannels: 2).pairs, pairs([(0, 2), (1, 3)]))
+        XCTAssertEqual(graph.routing(forAudioOutputs: [2], instanceChannels: 1).pairs, pairs([(0, 2), (0, 3)]), "mono goes to both channels of the pair")
+        XCTAssertEqual(graph.routing(forAudioOutputs: [1], instanceChannels: 2).pairs, pairs([(0, 0), (1, 1)]))
+        XCTAssertEqual(graph.routing(forAudioOutputs: [2, 1], instanceChannels: 2).pairs, pairs([(0, 0), (1, 1), (0, 2), (1, 3)]),
+                       "two outputs on one device: both pairs, in output order")
+        XCTAssertEqual(graph.routing(forAudioOutputs: [7], instanceChannels: 2).pairs, [], "an output not on this device reaches nothing")
+        let narrow = AudioGraph(device: SoftwareAudioDevice(channelCount: 2), outputs: [output(), right])
+        XCTAssertEqual(narrow.routing(forAudioOutputs: [2], instanceChannels: 2).pairs, [], "a channel the device does not have is dropped, not folded")
     }
 
     func test_ringIsSingleProducerSingleConsumer() {

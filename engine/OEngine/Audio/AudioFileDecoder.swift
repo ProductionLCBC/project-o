@@ -13,12 +13,18 @@ import Synchronization
 /// audio track beside the video demuxer's reader (Area 4 reading); the ring
 /// and the timing are as the spec says. Loops reopen at the in-point before
 /// the ring runs dry, so they are gapless (Spec 4 §11, "Transport").
+///
+/// One ring per device the instance reaches (Area 16): each device's
+/// callback consumes its own ring, every ring gets every sample, and the
+/// decoder is paced by the slowest of them. Devices on different clocks
+/// drift apart by their clock error, as Spec 4 §11 accepts.
 public final class AudioFileDecoder: @unchecked Sendable {
     public let url: URL
     public let inMs: Double
     public let outMs: Double?
     public let loop: Bool
-    public let ring: AudioRing
+    /// One ring per device, in the order the audio system asked for them.
+    public let rings: [AudioRing]
     public let channels: Int
     private var thread: Thread?
     private let running = Atomic<Bool>(false)
@@ -26,15 +32,19 @@ public final class AudioFileDecoder: @unchecked Sendable {
     private let framesDecoded = Atomic<Int64>(0)
     private let log: EngineLog?
 
-    public init(url: URL, inMs: Double, outMs: Double?, loop: Bool, channels: Int = 2, log: EngineLog? = nil) {
+    public init(url: URL, inMs: Double, outMs: Double?, loop: Bool, channels: Int = 2, ringCount: Int = 1, log: EngineLog? = nil) {
         self.url = url
         self.inMs = max(0, inMs)
         self.outMs = outMs
         self.loop = loop
-        self.channels = max(1, min(2, channels))
+        let channels = max(1, min(2, channels))
+        self.channels = channels
         self.log = log
-        ring = AudioRing(channels: self.channels)
+        rings = (0..<max(1, ringCount)).map { _ in AudioRing(channels: channels) }
     }
+
+    /// The first ring: the clock device's.
+    public var ring: AudioRing { rings[0] }
 
     public var isFailed: Bool { failed.load(ordering: .acquiring) }
     public var decoded: Int64 { framesDecoded.load(ordering: .relaxed) }
@@ -80,18 +90,29 @@ public final class AudioFileDecoder: @unchecked Sendable {
         } catch {
             log?.error("audio: cannot open \(url.lastPathComponent): \(error)")
             failed.store(true, ordering: .releasing)
-            ring.markEnded()
+            for ring in rings { ring.markEnded() }
             return
         }
         var pending: [Float] = []
+        // Frames of `pending` each ring has taken.
+        var cursors = [Int](repeating: 0, count: rings.count)
         while running.load(ordering: .relaxed) {
             if !pending.isEmpty {
-                let written = ring.write(pending)
-                pending.removeFirst(written * channels)
-                if !pending.isEmpty {
+                let total = pending.count / channels
+                var allDone = true
+                for (i, ring) in rings.enumerated() where cursors[i] < total {
+                    let written = pending.withUnsafeBufferPointer { buffer in
+                        ring.write(UnsafeBufferPointer(rebasing: buffer[(cursors[i] * channels)...]))
+                    }
+                    cursors[i] += written
+                    if cursors[i] < total { allDone = false }
+                }
+                if !allDone {
                     Thread.sleep(forTimeInterval: 0.005)
                     continue
                 }
+                pending = []
+                for i in cursors.indices { cursors[i] = 0 }
             }
             guard let sample = autoreleasepool(invoking: { current.1.copyNextSampleBuffer() }) else {
                 if loop {
@@ -104,7 +125,7 @@ public final class AudioFileDecoder: @unchecked Sendable {
                         failed.store(true, ordering: .releasing)
                     }
                 }
-                ring.markEnded()
+                for ring in rings { ring.markEnded() }
                 break
             }
             pending = autoreleasepool { AudioFileDecoder.samples(of: sample) }
