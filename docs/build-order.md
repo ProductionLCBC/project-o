@@ -13,12 +13,12 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | shipped |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | shipped |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | shipped |
-| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | spec needed |
+| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | spec needed |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | spec needed |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | cues-lists-playlists spec | spec needed |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | presets-and-text spec | spec needed |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | spec needed |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | spec needed |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | spec needed |
@@ -139,6 +139,49 @@ guarantees of §1 and the render thread rules of §3; a new pass is a plan pass 
 change to the render loop (§4). Tests first from §16's list; goldens for the aux passes
 and the weave. Stop for review at each of: the text cache, the aux passes, the
 measurement, the weave. Nothing here runs unattended.
+```
+
+**Area 6 — Stacks and presets** (branch `area/presets`)
+
+```
+Area: 6, stacks and presets. Spec: docs/specs/6-presets-and-text.md §2–§4 and §9, with
+§11's Area 6 tests; Spec 1 §2 and §3, Spec 3 §2, §4 and §7 and Spec 4 §8 and §9 as it
+corrected them. On main: the stack pass with fit modes, opacity and mute, the shared
+SlotResolver, the +1 slot with its text rasterized a cue ahead, Preset 1 built in. Build
+the core changes first: the slot loses its offset and the box gains one (written on
+every box), a later slot for a channel is ignored and reported, and the provenance
+records the cue's list, with an identical text write from another cue or list updating
+it (Spec 3 §2 and §4). Then the engine: offset boxes, with fallback per offset and the
+fold within the list in thumbnails; field boxes falling back to the list's title,
+author, copyright and ccli; static boxes on an empty channel; the text style's
+verticalAlignment, the units with the shadow padding scaled, whole-line overflow with
+the ellipsis, tabular digits with the flag in the cache key; DM Sans bundled and
+registered in the engine at launch, an installed copy winning a name clash. Last,
+Preset 1's "2" layout, the Clock preset, and the fixtures and JSON Schemas of §9
+(library-v1 and spike; no schema bump, §2). Tests first from §11's Area 6 list, with
+goldens for the anchor, the overflow and the confidence stack. Stop for review after the
+core changes and again after the fixtures. Nothing in app/.
+```
+
+**Area 11 — Variables** (branch `area/variables`)
+
+```
+Area: 11, variables. Spec: docs/specs/6-presets-and-text.md §5–§8, with §11's Area 11
+tests; Spec 1 §3 (the playlist's serviceTime) and Spec 2 §3 and §6 as it corrected them.
+Starts after Area 6 is merged: its context values read the provenance Area 6 adds. On
+main: [Time], [Date] and [Popup N] in static boxes behind the once-a-second gate, and
+popup N set over OSC. Build the core changes first: `timer N set DURATION up` in the
+grammar, parser, printer and OSC form, and the playlist's serviceTime with its schema.
+Then the variable language (names in any case, the fixed formats, overrun, doubled
+brackets, other bracketed text printed as written, numbers above the slot count
+resolving empty); variables in text content and, one level deep, in a popup's text; the
+v1 set, with the six context values read from the state being drawn and [Service In]
+from the live playlist's serviceTime; the adoption pacing (context values at once,
+popups at most every 100 ms, the clock and timers once a wall-clock second); timers on
+the monotonic clock, counting down and up, with overrun and the noop cases; clearafter
+logged from source engine; the /o/timer/N and timers-topic feedback and
+/o/channel/N/remaining. Tests first from §11's Area 11 list. Stop for review after the
+core changes and again after the adoption pacing. Nothing in app/.
 ```
 
 **Area 15 — Macros, basic** (branch `area/macros`)

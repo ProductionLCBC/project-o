@@ -21,12 +21,12 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31 with every recommendation taken; the DeckLink SDK put in `vendor/` and the module's wrapper written against it (13d230e); Spec 4 §3, §8, §10, §16 corrected (7032182); `area/spike` merged into `main` with `--no-ff` (e735052), task `shipped`; hosted CI green on `main` since 962dd4b. The first three-hour soak on two displays (2026-11-01) found faults fixed on `area/soak-fixes` and merged on Adam's `approved` (2074bd6, 2026-11-02); the second run's memory growth was attributed on 2026-11-02 to purgeable cache memory and allocator fragmentation, no leak; the §13 memory breakdown and the corrected threshold merged on Adam's `approved` (87011b2, 2026-11-03). Every display-side criterion of §15 holds; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
-| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/1-objects-and-format.md` + presets-and-text spec | not started | Spec needed first: the presets-and-text spec, settled 2026-11-04 in the scope gaps doc (the +1 offset moves from the slot to the box, Preset 1 carries the confidence stack's layout, the text style gains a vertical anchor defaulting to centre). The object types are on `main` since Area 2; the engine's stack pass resolves slots, fit modes, opacity, mute and the +1 slot since Area 4, through the one shared `SlotResolver` since Area 5. |
+| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`: the offset on the box, Preset 1's confidence layout and the Clock preset, field boxes over the list's metadata with the provenance's list in `core/`, the text style's anchor, units and overflow, tabular digits, the bundled fonts, the fixtures and schemas. The object types are on `main` since Area 2; the stack pass, the +1 slot and the one shared `SlotResolver` since Areas 4 and 5. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: key and fill stays v1.5, and the area becomes bench verification and fixes, its block written from the run's findings; its `docs/build-order.md` row and Build tracker task change together in a Nimbalyst session. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the 1080i weave since Area 5, the DeckLink sink as the embedded audio feed's destination since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | not started | Spec needed first: the media-pool spec, settled 2026-11-04 (the engine imports, rebuilds and replaces as commands, a poster is the in-point frame, a known hash is not copied again). The index, the resolver, SHA-256 identity and the missing state are on `main` since Area 2; the rebuild walk, import by copy and poster extraction remain. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | cues-lists-playlists spec | not started | Spec needed first: the cues-lists-playlists spec, settled 2026-11-04 (the area takes the list and playlist edits of Spec 5, a playlist's title is its identity with the date optional, playlist items gain a uuid, lists live in real subfolders). The runner on `main` logs a fired cue as its own group with `fire`; the engine's control loop fires armed Time triggers and `next` as engine groups; the thumbnail job projects a list from its top (Area 5). |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (one channel at a time, each chunk bound to its cue's uuid, an empty chunk clears). |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | presets-and-text spec | not started | Spec needed first: the presets-and-text spec, settled 2026-11-04 (the context values and `[Service In]` join v1, popups adopt a new value at once, a timer stops at zero and can count up). `popup N set` over OSC is on `main` since Area 3; the engine resolves `[Time]`, `[Date]` and `[Popup N]` and, since Area 5, adopts a variable box's new value at most once per wall-clock second; not yet `[Timer N]` or the per-second `remaining` and `timer` feedback. |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance): the variable language and the v1 set with the context values and `[Service In]`, the adoption pacing, timers counting down and up, popups resolving their variables one level deep, the timer and remaining-time feedback. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes, behind the once-a-second gate, since Area 5. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | not started | Spec needed first: the log-and-saving spec, settled 2026-11-04 (snapshots zip both roots' JSON, `state/last.json` follows every runtime group, edit undo and the restore commands join v1). The atomic write, the write plan and the versions folder are on `main` since Area 2; the Spec 2 §9 entry and its one-line form since Area 3; debouncing, the log file, snapshots and `restoreLastState` remain. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec needed first: the show-mode-ui spec, settled 2026-11-04 (AppKit with SwiftUI for settings and simple panels, an app-and-engine section, Shift-Escape as the clear-all key); nothing in `app/` starts before the spike passes on the bench. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack, ids exposed) and of thumbnails (PNGs by cue, stack and library version) is on `main` since Area 5; the Mach hand-off of the surfaces and the API's `metrics` and `preview` topics belong with the app and the API. The audio device badge is the snapshot's `audioDevices` list since Area 16. |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (it also takes the small editors for grades, transition timing and macros); in `app/`, so after the bench run. |
@@ -54,9 +54,11 @@ every source can hold an edit, with three rules for edits held by cues; the rest
 drafted). It is in `docs/specs/5-editing.md`, and its corrections to Specs 1–4 are
 applied.
 
-Spec 6, Presets and text (Areas 6 and 11), was then drafted the same way and revised after
-an independent review. Its twelve choices, T-1 to T-12, wait for Adam's answers in the
-specs doc.
+Spec 6, Presets and text (Areas 6 and 11), followed the same way: drafted, revised after
+an independent review, and accepted by Adam the same day, with T-2 taking the alternative
+(a popup's text resolves its variables one level deep). It is in
+`docs/specs/6-presets-and-text.md`, its corrections to Specs 1–5 and `ARCHITECTURE.md` are
+applied, and the prompt blocks for Areas 6 and 11 are in `docs/build-order.md`.
 
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
@@ -74,13 +76,6 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
-
-- **Spec 6, Presets and text, for review.** Drafted in Cowork as a tab of the Project O
-  specs doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
-  answers (P1–P14, R3, R4) and revised after an independent review. Twelve choices, T-1 to
-  T-12, wait for his answers in its §12. On acceptance it is exported to
-  `docs/specs/6-presets-and-text.md` with its corrections to Specs 1–5 and
-  `ARCHITECTURE.md`, and Areas 6 and 11 get their prompt blocks.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -100,6 +95,10 @@ on 2026-11-04: approved as built, merged (89641e9).
 
 ### Housekeeping
 
+- **Areas 6 and 11 in the Build tracker.** Their spec and prompt blocks are on `main`, but
+  both still read `spec needed` in `docs/build-order.md` and in the tracker, which only
+  Nimbalyst changes, and a status changes in both places or in neither. Each area's first
+  session sets both to `in progress`; until then they can move to `not started` together.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -146,13 +145,6 @@ None from Area 16; Spec 4 §11, §12 and §13 read as built. Accepted by Adam on
 in the scope gaps doc, and applied when the spec that owns each is written (that spec
 proposes the exact text):
 
-- Spec 1 §2, §3, §9 and §10, Spec 3 §7, Spec 4 §4, §9 and §15: the offset moves from the
-  slot to the box, so a channel appears once per stack again; Preset 1 carries the
-  confidence stack's layout under stack 2 and becomes editable, not deletable; first run
-  adds channel 3, Clock (presets-and-text spec, Area 6).
-- Spec 4 §8: the text style's vertical anchor, defaulting to centre; popups adopt a new
-  value at once, with the raster debounced at about 100 ms; the bundled OFL fonts
-  registered in the engine process (presets-and-text spec).
 - Spec 1 §2, §3 and §5, Spec 2 §3, Spec 3 §5: a playlist's title is its identity, unique
   per machine, and its date is optional metadata; `playlist "TITLE"` loses its date
   argument; playlist items gain a uuid, which the pointer follows; lists live in real
@@ -161,8 +153,8 @@ proposes the exact text):
   shutdown (log-and-saving spec).
 - Spec 1 §7: an import hashes before it copies, so a known file is not copied again; a
   poster is the in-point frame, kept beside its index tier (media-pool spec).
-- Spec 2 §3 and §6: `stack all blackout` (Area 15); `timer N set … up`; the media and
-  restore commands; `/o/live/armed` (the specs that own each).
+- Spec 2 §3 and §6: `stack all blackout` (Area 15); the media and restore commands;
+  `/o/live/armed` (the specs that own each).
 - Spec 2 §9: the app reaches the engine over a local socket only the same user can open,
   and only the engine touches the Keychain, as ADR 0007 requires (show-mode-ui spec).
 
@@ -199,14 +191,15 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 §10's groups and log rows. Nothing in app/.
 ```
 
-The presets-and-text spec (Areas 6 and 11) is drafted and waits for Adam's answers; the
-others follow in the scope gaps doc's order: cues, lists and playlists; media pool; log
-and saving; the show-mode UI with its settings section and the operator lock; edit mode.
-Each is reviewed before it is exported to `docs/specs/` and its area's prompt is added to
-`docs/build-order.md`, when its Build tracker task moves from `spec needed` to `not
-started`. The bench run with the card happens whenever Adam sets a window; it does not
-block Area 15 or the engine-side areas, and it must pass before anything in `app/` starts
-(Areas 13 and 14) and before Area 7's bench verification.
+After Area 15, Areas 6 and 11 are ready, in that order, from their blocks in
+`docs/build-order.md`; both are engine-side and need no bench run. Spec 7, cues, lists and
+playlists (Area 9), is drafted next in Cowork, then the others in the scope gaps doc's
+order: media pool; log and saving; the show-mode UI with its settings section and the
+operator lock; edit mode. Each is reviewed before it is exported to `docs/specs/` and its
+area's prompt is added to `docs/build-order.md`, when its Build tracker task moves from
+`spec needed` to `not started`. The bench run with the card happens whenever Adam sets a
+window; it does not block Area 15 or the engine-side areas, and it must pass before
+anything in `app/` starts (Areas 13 and 14) and before Area 7's bench verification.
 
 Spec 5 has no area of its own. Following the scope gaps doc, its engine side lands with
 Area 9, which applies the list, cue and playlist edits (L1) and so builds the edit path
