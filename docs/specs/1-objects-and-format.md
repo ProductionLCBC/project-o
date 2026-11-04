@@ -100,7 +100,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Numbers.** Each numbered type has its own space of positive integers. Numbers are unique within a type and a library (or a machine, for machine-level types), gaps are allowed, and the default ordering everywhere is by number. A reference from one object to another is the target's number, nothing else.
 
-**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognise an object across renumbering.
+**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. A machine-level object (a stack, output, audio output or input) is the exception: portable documents name its number so that they meet it at every campus, so only references in the machine root are rewritten, and the edit warns about portable references that now name something else (Spec 5 §4). The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognise an object across renumbering.
 
 **Cue addressing.** A cue's number is its 1-based position in its list, recomputed whenever cues are inserted, removed or reordered; it is never stored. A cue's `uuid` is stored and stable, and is what thumbnail caches, undo and the fire log reference. The two user-facing addresses from the UX spec are both resolved at the moment of use: `list 42 cue 3` through list number and position, `item 4 cue 3` through playlist position and cue position.
 
@@ -110,7 +110,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Machines and libraries** each have a `uuid`, generated on first run and never changed; logs, snapshots and local-copy reports are tagged with the machine's.
 
-**Versions.** Every List master carries an integer `version` that increments on each save. Saving writes the previous document to the versions folder (section 5) before overwriting, which is the whole version-history mechanism: last write wins, and any version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
+**Versions.** Every List master carries an integer `version` that increments on each save. A save writes the previous document to the versions folder (section 5) before overwriting when the last copy there is more than ten minutes old, so a kept version marks each editing session and edit undo covers the steps inside it (Spec 5, choice E-3). That is the whole version-history mechanism: last write wins, and any kept version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
 
 **Variables** are not objects. `[Timer 1]`, `[Popup 3]`, `[Time]` and the context values are resolved by name at render time; the only persisted facts about them are the slot counts in machine settings and the format strings embedded in text.
 
@@ -144,6 +144,7 @@ machine/
   state/last.json           channel state at last clean shutdown (restore-last-state)
   logs/  snapshots/         written by the app, read by nothing it depends on
   thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10)
+  conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
 ```
 
 File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it and renames the file to match on save. Every document starts with the same header.
@@ -246,7 +247,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Hard failures** are malformed JSON, a schema outside what the app can read, and a document whose shape does not decode. All leave the previous good state in place and surface a plain message naming the file, and where inside it.
 
-**Concurrency.** Last write wins at the file level. Because each list and preset is its own file and every master save first copies the previous version aside, the worst case of two machines editing one master is a recoverable one-version rollback, never a merge.
+**Concurrency.** Last write wins at the file level. Because each list and preset is its own file and a master save copies the previous version aside whenever the last kept copy is more than ten minutes old (section 4), the worst case of two machines editing one master is a recoverable rollback to the last kept version, never a merge. A change that arrives on disk while the engine holds unwritten edits to the same document loses to them and is kept in `machine/conflicts/` (Spec 5 §10).
 
 ## 9. Worked examples
 

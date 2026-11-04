@@ -197,7 +197,7 @@ One pass per due stack, compositing its slots bottom to top into the stack textu
 | Box binding | Source for this stack | Drawn as |
 | --- | --- | --- |
 | pixels | The channel texture (or nothing for text content) | A quad placing the channel texture in the box frame by fit mode: `fit` letterboxes, `fill` crops to cover, `stretch` ignores aspect, `crop` centers at 1:1 |
-| field | The cached line textures for (this channel's field text, this box, this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate` |
+| field | The cached line textures for (this channel's field text, this box, this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate`. After an edit that changes how a box's text looks (the box's frame, fit or text style, or the text style itself) while the text is on air, the box keeps drawing its previous lines until the new raster is ready, so a look edit never blanks a line for a tick (Spec 5 §2) |
 | static | The cached textures for the box's own text with variables resolved | As field |
 
 **Fallback boxes** draw only if no earlier box in the same channel's group drew anything, which the control thread decides when resolving (it knows the content kind), not the GPU.

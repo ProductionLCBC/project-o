@@ -160,7 +160,7 @@ The projection needs one fact about where a command came from: whether lock appl
 
 **Restores** (v1.5) replace ShowState wholesale with a snapshot taken before a runtime command. The projection is not involved except to re-derive effects: the engine diffs old and new state and synthesizes `transition` effects as cuts, `attribute` effects for every changed attribute, and a `pointer` effect, then marks every restored channel's `provenance` as `restored`. Lock values are copied from the current state, not the snapshot. `armed` is cleared.
 
-**Operator lock** (the role, not the channel flag) never reaches the projection; it is enforced at the API boundary by refusing edit commands and edit undo.
+**Operator lock** (the role, not the channel flag) never reaches the projection. The engine enforces it for commands from every source by refusing edit commands, edit undo and redo, and the library restore commands (Spec 5 §7, §9); inside a cue, macro, key binding or scheduler entry the refusal is a `blocked` result and the rest of the group runs (Spec 5 §2).
 
 ## 9. Test table
 

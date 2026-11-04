@@ -8,7 +8,7 @@ Everything an operator, a cue, a macro, a key, a console or a remote app does to
 
 **In scope:** the canonical text grammar; the full v1 runtime vocabulary; the mapping between text and command objects; sources and selection expansion; the OSC address scheme and feedback; macro guards; execution rules (validation, errors, lock, ordering); the log entry; the API envelope.
 
-**Out of scope:** library edit commands (the editing spec defines their inverses and the edit log; this spec fixes only their shape), timeline and timecode commands (v2), and the UI's palette, which is a view over this vocabulary.
+**Out of scope:** library edit commands (Spec 5, Editing, defines their vocabulary, inverses and the edit log; this spec fixes only their shape), timeline and timecode commands (v2), and the UI's palette, which is a view over this vocabulary.
 
 **Rules every command obeys**
 
@@ -129,13 +129,13 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | Text form | Object | Effect | Lock | Undo |
 | --- | --- | --- | --- | --- |
 | `macro N` | `macro.run` | Runs the macro's commands in order; each inner command is logged and judged on its own | per inner command | per inner command |
-| `undo`, `redo` | `history.undo`, `history.redo` | Runtime or edit undo depending on the filter in view; operator lock allows runtime, blocks edit | passes | none |
-| `history jump N` | `history.jump` | Jumps to a point within the current filter | passes | none |
+| `undo`, `redo` | `history.undo`, `history.redo` | Runtime or edit undo depending on the filter in view; operator lock allows runtime, blocks edit. In v1, before runtime undo exists, both are edit undo (Spec 5 §8) | passes | none |
+| `history jump N` | `history.jump` | Jumps to a point within the current filter. v1.5, with the history view; in v1 it is rejected with `notInV1` (Spec 5 §8) | passes | none |
 | `system clearall` | `system.clearAll` | Clear content and reset attributes on every channel; the panic button, no confirmation | passes | runtime |
 | `system preflight` | `system.preflight` | Runs the pre-flight report on the live playlist | passes | none |
 | `system snapshot` | `system.snapshot` | Writes a library and machine snapshot now | passes | none |
 
-**Edit commands** share the shape `edit TARGET N FIELD VALUE` (`edit channel 2 label "Lyrics"`), each carrying its inverse in the log entry. The editing spec defines them; this spec reserves the `edit` target so the grammar, the log and the API already accommodate them.
+**Edit commands** share the shape `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`, where a field path after the address means `set` (`edit channel 2 label "Lyrics"`), each carrying its inverse in the log entry. Spec 5 defines them; this spec reserves the `edit` target so the grammar, the log and the API already accommodate them.
 
 ## 4. Text and object forms
 
@@ -262,7 +262,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 
 **Validate** checks, in order: the target number exists (or is `all`); referenced objects exist (a preset, a transition, a macro); arguments are in range (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1); content references resolve in the media index (a missing file is allowed and produces the missing state, an unknown id is rejected); macro depth and cycles. A group validates as a whole: one bad command rejects the group, and the rejection names the command and the reason.
 
-**Lock.** A channel's lock blocks `write`, `clear` and tracked attribute writes whose source is `cue` or `timeline`. The blocked command is logged with result `blocked` and the cue still counts as fired; its other channels run. Every other source passes. Lock never enters tracking and is never restored by undo.
+**Lock.** A channel's lock blocks `write`, `clear` and tracked attribute writes whose source is `cue` or `timeline`. The blocked command is logged with result `blocked` and the cue still counts as fired; its other channels run. Every other source passes. Lock never enters tracking and is never restored by undo. An edit held by a cue, macro, key binding or scheduler entry that operator lock, library mode or a library changed since its holder was saved refuses at run time is logged `blocked` the same way, and the rest of its group runs (Spec 5 §2).
 
 **Missing media.** A write of an id whose file is missing succeeds: the channel enters the missing state, shows the badge, and renders nothing for the pixel path while text fields, if any, still render. Pre-flight is the place this is meant to be caught.
 
