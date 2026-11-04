@@ -14,13 +14,13 @@ This spec defines what is on a channel at any moment, how commands change it, an
 
 ## 2. The state model
 
-**ShowState** is one value holding everything the projection reads or writes: `channels` (a map from channel number to ChannelState), `outputs` (live stack per output), `stacks` (blackout flag and per-slot mutes), `pointer` (the live position, section 5), `armed` (a pending Time or advance-after trigger, or none), and `popups` (slot text, because popup writes change rendered text). Timers are not in ShowState; they advance with the clock and are read through the variable provider when a guard needs them.
+**ShowState** is one value holding everything the projection reads or writes: `channels` (a map from channel number to ChannelState), `outputs` (live stack per output), `stacks` (blackout flag and the muted channels), `pointer` (the live position, section 5), `armed` (a pending Time or advance-after trigger, or none), and `popups` (slot text, because popup writes change rendered text). Timers are not in ShowState; they advance with the clock and are read through the variable provider when a guard needs them.
 
 **ChannelState** has three groups of fields, and the groups have different lifetimes.
 
 | Group | Fields | Lifetime |
 | --- | --- | --- |
-| Content | `content` (an instance, below) and `provenance` (the cue uuid that wrote it, or `restored`, or `ui`); `build` is part of slide content (§3 rule 8), not a tracked attribute | Holds until the next write, across list boundaries; outgoing (the previous instance and the frame its transition ends, kept for the decoder budget) lives here too |
+| Content | `content` (an instance, below) and `provenance` (the cue uuid that wrote it and the uuid of the list it was fired from, also for a write by a macro the cue ran; or `restored`, keeping the cue and list it had; or the source kind, such as `ui`); `build` is part of slide content (§3 rule 8), not a tracked attribute | Holds until the next write, across list boundaries; outgoing (the previous instance and the frame its transition ends, kept for the decoder budget) lives here too |
 | Tracked attributes | `grade`, `transition`, `audioTransition`, `gain`, `chase` (reserved) | Each holds until written again, or until a list boundary resets it to the channel default |
 | Operator state | `lock` | Outside tracking entirely; never reset, never restored by undo |
 
@@ -60,7 +60,7 @@ A write replaces the channel's content instance, applies its riders, and emits a
 
 **Media.** A new instance with `startedAtFrame` set to the frame the write lands on, `transport: playing`, and `inMs`, `outMs`, `loop`, `gainOverride`, `syncOffsetMs` taken from the content expression, falling back to the pool item's defaults, then to none. `loop` in the expression asks for a loop and cannot refuse the pool item's (`end hold` does that); the pool item's default grade is not a fall-back. `endBehavior` starts as `loop` when the expression says loop, otherwise `hold`. If the same media ref is already on the channel, the instance restarts from its in-point and the effect is a dissolve from the current frame rather than from the previous content.
 
-**Text.** A new instance with the written fields. If the fields are identical to the current text, the result is `noop`: no state change, no transition. Fields not written are absent, not inherited.
+**Text.** A new instance with the written fields. If the fields and the provenance are identical to the current ones, the result is `noop`: no state change, no transition. Identical fields from another cue or list update the provenance alone, with no transition (Spec 6 §5). Fields not written are absent, not inherited.
 
 **Slide.** A new instance with `build` from the rider or the slide's final state. The same slide ref with a different build changes only `build` and emits a `build` effect (animate to that build), not a transition; the same slide and build is a `noop`.
 
@@ -142,9 +142,9 @@ func project(_ state: ShowState,
 
 The same function, run from three different starting states.
 
-**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colours. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states.
+**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colours. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states. An offset box in a projected state folds that many more cues of the same list, and draws nothing past its end (Spec 6 §3).
 
-**Lookahead for offset slots.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` slot shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behaviour a confidence monitor wants. Past the end of the playlist the slot is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
+**Lookahead for offset boxes.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` box shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behaviour a confidence monitor wants. Past the end of the playlist the box is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
 
 **Timecode seek** (v2). Fold the list's cues whose Timecode triggers fall at or before the target time, in order, from the state at the list's start, and apply the result in one step with every transition effect collapsed to a cut, so a seek never replays a minute of dissolves.
 
@@ -158,7 +158,7 @@ The projection needs one fact about where a command came from: whether lock appl
 - With any other source (`ui`, `key`, `osc`, `midi`, `macro`, `api`, `commandbar`, `scheduler`, `restore`), lock is ignored. A macro fired by a cue inherits `cue` as its source kind, so lock cannot be dodged by wrapping a write in a macro.
 - `channel N lock` and `unlock` are themselves never blocked.
 
-**Restores** (v1.5) replace ShowState wholesale with a snapshot taken before a runtime command. The projection is not involved except to re-derive effects: the engine diffs old and new state and synthesizes `transition` effects as cuts, `attribute` effects for every changed attribute, and a `pointer` effect, then marks every restored channel's `provenance` as `restored`. Lock values are copied from the current state, not the snapshot. `armed` is cleared.
+**Restores** (v1.5) replace ShowState wholesale with a snapshot taken before a runtime command. The projection is not involved except to re-derive effects: the engine diffs old and new state and synthesizes `transition` effects as cuts, `attribute` effects for every changed attribute, and a `pointer` effect, then marks every restored channel's `provenance` as `restored`, keeping the cue and list it had. Lock values are copied from the current state, not the snapshot. `armed` is cleared.
 
 **Operator lock** (the role, not the channel flag) never reaches the projection. The engine enforces it for commands from every source by refusing edit commands, edit undo and redo, and the library restore commands (Spec 5 §7, §9); inside a cue, macro, key binding or scheduler entry the refusal is a `blocked` result and the rest of the group runs (Spec 5 §2).
 

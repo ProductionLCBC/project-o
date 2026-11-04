@@ -38,7 +38,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 | `textThumbnail` | enum: `body`, `firstLine` | Thumbnail style for text content |
 | `usualContent` | enum: `media`, `text`, `slide`, `live`, `any` | Hint for the cue picker |
 
-**Preset** holds `layouts`, a map from stack number to a layout, plus one entry under `"*"` that applies to any stack not named. A layout is an ordered `boxes` array (bottom to top within the channel's group) and a `mask` (*reserved*: alpha image reference and crop). Because stacks are machine-level and presets are portable, the two meet by stack number: a preset's layout for stack 2 is used at every campus where stack 2 exists, and the `"*"` layout covers the rest. The preset editor opens each layout at its stack's output size. Preset 1 is built in with a single `"*"` layout: one pixel box filling the frame, then a fallback body box.
+**Preset** holds `layouts`, a map from stack number to a layout, plus one entry under `"*"` that applies to any stack not named. A layout is an ordered `boxes` array (bottom to top within the channel's group) and a `mask` (*reserved*: alpha image reference and crop). Because stacks are machine-level and presets are portable, the two meet by stack number: a preset's layout for stack 2 is used at every campus where stack 2 exists, and the `"*"` layout covers the rest. The preset editor opens each layout at its stack's output size. Preset 1 is built in and editable, and can't be deleted, renumbered or swapped (Spec 5 §6). Its `"*"` layout is one pixel box filling the frame, then a fallback body box; its `"2"` layout is the confidence stack's: a body box for the current cue and one at +1 for the next (Spec 6 §3).
 
 **Box** (child of a Preset layout)
 
@@ -50,10 +50,11 @@ Portable objects live in the library and travel between campuses. Every one has 
 | `textStyle` | an inline Text Style value, plus `fromStyle` (style number or null) | Copied on apply; `fromStyle` only records provenance for re-apply |
 | `transition` | `{ref: transition number, ms: override or null}` | References the same Transition objects channels use; v1 implements cut and dissolve for boxes, and text-specific types join the Transition type set later |
 | `transitionOnVariableChange` | bool | Default false; a popup box wants true |
-| `fallback` | bool | Renders only if no earlier box drew |
+| `fallback` | bool | Renders only if no earlier box at the same offset drew |
+| `offset` | integer, −2 to +3, default 0; written on every box | Draws the slot's channel as it will be after this many cues (Spec 6 §3); v1 draws 0 to +3 |
 | `grade` | grade number or null | Per-box output correction, separate from channel grades |
 
-**Text Style** (numbered, portable): `font` (PostScript name), `size` ({value, unit}: pt is points on a 1080-line canvas scaled with output height, the default; percent is a percentage of output height), `weight`, `color` (RGBA 0–1), `alignment`, `lineSpacing`, `letterSpacing`, `outline` `{width, color}`, `shadow` `{x, y, blur, color}`, `allCaps` (bool), variations (a map of OpenType axis tag to value, such as wght, wdth, opsz, for variable fonts; weight is the wght axis when the font is variable and the nearest instance when it is not). The same value type is embedded in boxes and in slide-designer text layers.
+**Text Style** (numbered, portable): `font` (PostScript name), `size` ({value, unit}: pt is points on a 1080-line canvas scaled with output height, the default; percent is a percentage of output height), `weight`, `color` (RGBA 0–1), `alignment`, `verticalAlignment` (`top`, `center` or `bottom`; default `center`), `lineSpacing`, `letterSpacing`, `outline` `{width, color}`, `shadow` `{x, y, blur, color}`, `allCaps` (bool), variations (a map of OpenType axis tag to value, such as wght, wdth, opsz, for variable fonts; weight is the wght axis when the font is variable and the nearest instance when it is not). The same value type is embedded in boxes and in slide-designer text layers. `outline.width`, the shadow's `x`, `y` and `blur`, and `letterSpacing` are points on the 1080-line canvas, scaled like `size`; `lineSpacing` is a multiple of the font's line height (Spec 6 §4).
 
 **Grade**: `hue`, `saturation`, `brightness`, `contrast`, `blur`, `tint` (RGBA), `opacity`. All numbers with a defined identity value, so a grade of all-identity is a no-op.
 
@@ -71,7 +72,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 
 Machine-level objects describe one machine's hardware, mappings and local show structure. They never sync between campuses. The same `number`, `label`, `uuid` rule applies.
 
-**Stack**: `slots` (ordered array, bottom to top), `base` (`black` or `transparent`), `defaultPreset` (preset number or null). A slot is `{channel, preset (number or null), offset (integer, -2 to +3), opacity (0–1), mute (bool)}`. A channel appears at most once per stack at each offset (offset slots of one channel are distinct slots); the loader rejects duplicates. gammaBlend (bool, default false) selects encoded-space compositing for that stack (Spec 4 section 9).
+**Stack**: `slots` (ordered array, bottom to top), `base` (`black` or `transparent`), `defaultPreset` (preset number or null). A slot is `{channel, preset (number or null), opacity (0–1), mute (bool)}`. A channel appears at most once per stack; the engine uses the first slot for a channel and reports the rest (section 8). A box's `offset` shows a channel at a later cue (section 2). gammaBlend (bool, default false) selects encoded-space compositing for that stack (Spec 4 section 9).
 
 **Output**
 
@@ -90,7 +91,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Input**: `kind` (`sdi`, `ndi`, `camera`, `screen`), `device`, `format`, `deinterlace` (bool), `colorRange`, `audioMap` (array), `bufferingMs`, `expected` (bool, for pre-flight).
 
-**Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `archived` (bool), `items` (ordered). An item is one of `{kind: "header", label}`, `{kind: "linked", list: list number}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root. Playlists carry no cues of their own. The playlist's name is its title; the pair of title and date must be unique on a machine (case-insensitive), and the UI prompts for a different name on a clash, so a weekly "Sunday" playlist is fine as long as each has its date. The tree sorts dated playlists by date and lists undated ones by name in their own group.
+**Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `serviceTime` (`HH:MM` or null, in the machine's time zone, read by `[Service In]`, Spec 6 §5), `archived` (bool), `items` (ordered). An item is one of `{kind: "header", label}`, `{kind: "linked", list: list number}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root. Playlists carry no cues of their own. The playlist's name is its title; the pair of title and date must be unique on a machine (case-insensitive), and the UI prompts for a different name on a clash, so a weekly "Sunday" playlist is fine as long as each has its date. The tree sorts dated playlists by date and lists undated ones by name in their own group.
 
 **Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
@@ -156,7 +157,7 @@ File names carry the number and a slug of the label for human reading only; the 
 **JSON rules**
 
 - UTF-8, LF line endings, two-space indentation, keys sorted by UTF-8 byte order. A container whose members are all scalars or empty containers prints on one line; any other container prints one member per line, so an array of small objects is one object per line. UUIDs are lowercase. The point is diffs that read.
-- Catalog objects write every known key, nullable ones as `null`. Command objects (section 6) omit absent optionals and write `loop` only when true, as the examples show.
+- Catalog objects write every known key, nullable ones as `null`. Command objects (section 6) omit absent optionals and write `loop`, and a timer's `up`, only when true, as the examples show.
 - Keys are camelCase. Enums are lowercase strings. Booleans are real booleans, never 0 and 1.
 - Times on disk are integer milliseconds (`ms` suffix), timecode is `"HH:MM:SS:FF"`, frame rates are `{num, den}` (so 59.94 is `{60000, 1001}`), dates are ISO 8601. Internally the engine uses nanoseconds; conversion happens at the file boundary.
 - Colors are `{r, g, b, a}` floats 0–1 in sRGB. Normalized geometry is 0–1 of the containing size.
@@ -211,7 +212,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 | `size`, `modified` | For change detection without re-hashing |
 | `durationMs`, `fps` `{num, den}`, `width`, `height` | Video and audio metadata read at import |
 | `hasAudio`, `hasAlpha`, `codec` | Drive decoder choice and the pre-flight report |
-| `poster` | Relative path to the extracted poster frame (PNG), used by offset slots and thumbnails |
+| `poster` | Relative path to the extracted poster frame (PNG), used by offset boxes and thumbnails |
 | `defaults` | `trimInMs`, `trimOutMs`, `loop`, `gain` (dB), `grade` (number or null), `syncOffsetMs` (±1000), `defaultChannel` (number or null) |
 | `addedAt`, `folder` | For sort and the folder rail |
 
@@ -229,7 +230,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Designed slides and templates** are JSON files in the media root with the extensions `.oslide` and `.otemplate`. Their first-level keys are `uuid`, `schema`, `size` `{width, height}`, `layers` (text, shape, image, video, referencing pool ids), `fieldTags` (which text layers expose `body`, `title` and so on), `builds`, and for templates `editableLayers`. Their full schema belongs to the slide-designer spec; this spec fixes only the envelope and the identity rule.
 
-**Fonts** live in `media/fonts/` so they sync with the library. Registration from that folder is deferred; v1 references fonts by PostScript name and uses whatever is installed, with the machine's fallback font substituting and the substitution reported.
+**Fonts** live in `media/fonts/` so they sync with the library. Registration from that folder is deferred; v1 references fonts by PostScript name and uses those installed or bundled with the engine (Spec 6 §4), with the machine's fallback font substituting and the substitution reported.
 
 ## 8. Validation, migration and forward compatibility
 
@@ -241,7 +242,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 
-**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, media ids with no path, and fonts not installed. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
+**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, media ids with no path, and fonts neither installed nor bundled. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
 
 **External changes.** When a document changes on disk under the app (a master arriving by sync, a hand edit), the app reloads it on the control thread and applies the nothing-edits-live rule: the live list keeps playing from its loaded cues, each cue picks up the new version on its next fire, and the cue grid marks the list as updated. A reload never touches channel state or the live pointer.
 
@@ -266,13 +267,17 @@ The first-run library, as written by the app on a fresh install, with a two-cue 
     { "audioOutputs": [1], "decoderCap": 2,
       "defaultPreset": 1, "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
       "label": "Foreground", "number": 2, "renderSize": "largest",
-      "textThumbnail": "body", "usualContent": "text", "uuid": "2b77..." }
+      "textThumbnail": "body", "usualContent": "text", "uuid": "2b77..." },
+    { "audioOutputs": [1], "decoderCap": 2,
+      "defaultPreset": 2, "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+      "label": "Clock", "number": 3, "renderSize": "largest",
+      "textThumbnail": "body", "usualContent": "any", "uuid": "3c3c..." }
   ],
   "kind": "channels", "schema": 1
 }
 ```
 
-**`library/presets/001-default.json`** (built in, copyable, not deletable)
+**`library/presets/001-default.json`** (built in, editable and copyable, not deletable)
 
 ```json
 {
@@ -282,16 +287,16 @@ The first-run library, as written by the app on a fresh install, with a two-cue 
       "mask": null,
       "boxes": [
         { "binding": { "kind": "pixels" }, "fallback": false, "fit": "fit",
-          "frame": { "h": 1, "w": 1, "x": 0, "y": 0 }, "grade": null,
+          "frame": { "h": 1, "w": 1, "x": 0, "y": 0 }, "grade": null, "offset": 0,
           "transition": { "ms": null, "ref": 1 } },
         { "binding": { "kind": "field", "name": "body" }, "fallback": true,
           "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
-          "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 }, "grade": null,
+          "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 }, "grade": null, "offset": 0,
           "textStyle": { "alignment": "center", "allCaps": false, "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
                          "font": "HelveticaNeue-Bold", "fromStyle": 1, "letterSpacing": 0, "lineSpacing": 1.1,
                          "outline": { "color": { "a": 1, "b": 0, "g": 0, "r": 0 }, "width": 0 },
                          "shadow": { "blur": 8, "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 }, "x": 0, "y": 2 },
-                         "size": { "unit": "pt", "value": 72 }, "weight": 700 },
+                         "size": { "unit": "pt", "value": 72 }, "verticalAlignment": "center", "weight": 700 },
           "transition": { "ms": 250, "ref": 2 }, "transitionOnVariableChange": false }
       ]
     }
@@ -328,23 +333,23 @@ The first-run library, as written by the app on a fresh install, with a two-cue 
 }
 ```
 
-**`machine/stacks.json`**: stack 1 is the main look on output 1; stack 2 is the unassigned confidence stack from the first-run defaults.
+**`machine/stacks.json`**: stack 1 is the main look on output 1; stack 2 is the unassigned confidence stack from the first-run defaults, where channel 2 lands through Preset 1's `"2"` layout and channel 3 through the Clock preset (Spec 6 §9, which also shows that preset and the `"2"` layout).
 
 ```json
 {
   "app": "0.1.0", "kind": "stacks", "schema": 1,
   "stacks": [
-    { "base": "black", "defaultPreset": null, "label": "Main", "number": 1, "uuid": "5e5e...",
-      "slots": [ { "channel": 1, "mute": false, "offset": 0, "opacity": 1, "preset": null },
-                 { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null } ] },
-    { "base": "black", "defaultPreset": 2, "label": "Confidence", "number": 2, "uuid": "6f6f...",
-      "slots": [ { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null },
-                 { "channel": 2, "mute": false, "offset": 1, "opacity": 1, "preset": 3 } ] }
+    { "base": "black", "defaultPreset": null, "gammaBlend": false, "label": "Main", "number": 1,
+      "slots": [ { "channel": 1, "mute": false, "opacity": 1, "preset": null },
+                 { "channel": 2, "mute": false, "opacity": 1, "preset": null } ],
+      "uuid": "5e5e..." },
+    { "base": "black", "defaultPreset": null, "gammaBlend": false, "label": "Confidence", "number": 2,
+      "slots": [ { "channel": 2, "mute": false, "opacity": 1, "preset": null },
+                 { "channel": 3, "mute": false, "opacity": 1, "preset": null } ],
+      "uuid": "6f6f..." }
   ]
 }
 ```
-
-Note the confidence stack: the UX spec says a channel appears at most once per stack, but offset slots of the same channel are distinct slots by design (the +1 slot shows the next cue). The rule is therefore *a channel appears at most once per stack at each offset*, and the loader enforces that form.
 
 **`machine/machine.json`** (excerpt)
 
@@ -374,7 +379,7 @@ These are written before the format code, from this document, and are the defini
 - **Migration.** A schema-0 fixture (invented for the test) migrates to schema 1 in memory and is not written until a save.
 - **Atomic writes.** A simulated crash between temp-file write and rename leaves the original readable.
 - **Command encoding.** Every command object in the fixtures converts to canonical text and back without loss (shared with Spec 2's tests).
-- **Stack rule.** Duplicate channel-and-offset pairs in a stack are rejected; distinct offsets of one channel are accepted.
+- **Stack rule.** A second slot for a channel in a stack is ignored and reported.
 
 ## Resolved questions
 

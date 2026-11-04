@@ -57,7 +57,7 @@ clock, touches no I/O, and is tested with a table of command sequences.
 
 Per tick (Spec 4): control thread builds a frame plan from the ShowState → render thread
 encodes channel passes (decode → linear light → grade → transition) → stack passes
-(boxes, text, offset slots) → sink encodes → each output presents on its own cadence
+(boxes, text, offset boxes) → sink encodes → each output presents on its own cadence
 (display vsync, or DeckLink scheduled playback on the card's clock).
 
 - One master tick at the highest output rate; one rate family per machine.
@@ -76,7 +76,7 @@ encodes channel passes (decode → linear light → grade → transition) → st
 - Failures are detected on the render thread and recovered on another. The audience
   sees the last good frame; the operator sees a badge; the log sees the detail.
 - Every tick is measured; the soak rig fails a build that breaks the budget.
-- All engine time is monotonic. The wall clock only stamps logs and resolves `[Time]`.
+- All engine time is monotonic. The wall clock only stamps logs and resolves `[Time]`, `[Date]` and `[Service In]`.
 
 ## Seams kept open on purpose
 

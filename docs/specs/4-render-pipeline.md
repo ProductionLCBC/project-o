@@ -32,7 +32,7 @@ This spec defines how a ShowState becomes pixels on every output and sound on ev
 | A DeckLink output, no reference | The DeckLink hardware clock, free-running | Still a hardware clock; displays follow it |
 | Display outputs only | The primary output's CADisplayLink | The best clock available without hardware |
 
-The render thread's wake-up is a timer disciplined to the master clock: each tick it reads the master's time (DeckLink hardware reference time, or the display link's target timestamp), corrects its phase, and never free-runs for more than one tick without a reference reading. If the master clock disappears (a card unplugged), the engine falls back to the next row in the table within one second and logs it. All engine time is monotonic (mach absolute time); the wall clock is read only to stamp log lines and resolve \[Time\], so an NTP adjustment mid-service can never move a frame.
+The render thread's wake-up is a timer disciplined to the master clock: each tick it reads the master's time (DeckLink hardware reference time, or the display link's target timestamp), corrects its phase, and never free-runs for more than one tick without a reference reading. If the master clock disappears (a card unplugged), the engine falls back to the next row in the table within one second and logs it. All engine time is monotonic (mach absolute time); the wall clock is read only to stamp log lines and resolve \[Time\], \[Date\] and \[Service In\], so an NTP adjustment mid-service can never move a frame.
 
 **Decoupled presentation.** The render thread renders; sinks present. Each output owns a ring of three completed frames and presents the newest one on its own cadence (its vsync, or its scheduled DeckLink slot). When the master tick and a display's vsync are not the same clock they drift, which shows up as one repeated or skipped frame every few minutes on that display; this is accepted on display outputs, counted in the metrics, and is the reason SDI, not HDMI, is the frame-accurate path.
 
@@ -80,7 +80,7 @@ struct FramePlan: Sendable {
 
 **ChannelPass** names the channel, its target texture, the incoming source (a decoder queue, a still, a slide renderer, an input), the outgoing source if a transition is running, the transition (type, progress 0–1 for this tick, easing, colour), the grade parameters for this tick (interpolated on the control thread when a grade is animating) and the channel's render size.
 
-**StackPass** names the stack, the output size, the base, and an ordered list of resolved boxes: for each slot, the preset layout chosen by the Spec 1 resolution order, with every box already bound to a concrete source (a channel texture with a fit mode, a text texture from the cache or a placeholder while it rasterizes, a static-text texture), its frame in pixels, its opacity (slot opacity times mute), its transition state, and its per-box grade. Offset slots arrive already resolved by the control thread's lookahead run, pointing at poster frames and cached text.
+**StackPass** names the stack, the output size, the base, and an ordered list of resolved boxes: for each slot, the preset layout chosen by the Spec 1 resolution order, with every box already bound to a concrete source (a channel texture with a fit mode, a text texture from the cache or a placeholder while it rasterizes, a static-text texture), its frame in pixels, its opacity (slot opacity times mute), its transition state, and its per-box grade. Offset boxes arrive already resolved by the control thread's lookahead run, pointing at poster frames and cached text.
 
 **SinkPass** names the output, the stack texture to take, the encode (display 10-bit, DeckLink v210 with or without weave, NDI BGRA) and the destination (a drawable, a shared buffer slot). Output transitions (stack switch, blackout) are expressed as a second stack texture and a mix factor.
 
@@ -106,7 +106,7 @@ Everything the render thread touches is allocated before it is needed, in privat
 | Decoded frame | VideoToolbox's IOSurface in its native format (NV12, P010, 4:2:2 10-bit, or 16-bit RGBA for 4444) | Source size | Decoder pool of 8 per session: 4 queued, 1 on screen, headroom for the outgoing instance | Wrapped by CVMetalTextureCache; no copy |
 | Still image | RGBA16Float linear with mips, private | Downsampled at load to the channel render size | 1 per still on a channel; 2 during a transition | Decoded with ImageIO off-thread |
 | Text texture | BGRA8Unorm sRGB, premultiplied | The box's pixel width, one line high | LRU cache capped by bytes (default 256 MB) | The GPU converts sRGB to linear on sample |
-| Poster frame | BGRA8Unorm sRGB | Half the channel render size | 1 per pool item, loaded on demand | For offset slots and thumbnails |
+| Poster frame | BGRA8Unorm sRGB | Half the channel render size | 1 per pool item, loaded on demand | For offset boxes and thumbnails |
 | Readback buffer | MTLBuffer, shared storage | One encoded frame (v210: 23.6 MB at 4096×2160; BGRA: 35.4 MB) | 3 per CPU sink | Section 10 |
 | Thumbnail and multiviewer textures | BGRA8Unorm sRGB | Small (480 px wide thumbnails; a quarter-size multiviewer) | A fixed pool | Section 10 |
 
@@ -174,19 +174,19 @@ Text has no look of its own; a box gives it one, per stack, at that stack's size
 
 **Layout** is Core Text: an attributed string from the field text and the box's Text Style (font by PostScript name, size resolved from points-at-1080 or percent of output height, weight, colour, spacing, all-caps), laid out into a `CTFrame` within the box's pixel width. Core Text supplies shaping, kerning, ligatures, line breaking and non-Latin scripts; nothing else in the engine needs to know how text works.
 
-**Fit policies** run on the layout, not the pixels. `shrinkToFit` binary-searches the point size between `minSize` and the style's size until the frame fits the box in both dimensions. `maxLines` truncates after N lines with an ellipsis and reports the overflow for the pre-flight and the editor. Horizontal alignment comes from the style; the style has no vertical anchor yet, so the lines are centred vertically in the box until the presets-and-text spec adds one (defaulting to centre, so nothing moves when it does).
+**Fit policies** run on the layout, not the pixels. `shrinkToFit` binary-searches the point size between `minSize` and the style's size until the frame fits the box in both dimensions. `maxLines` truncates after N lines with an ellipsis and reports the overflow for the pre-flight and the editor. Horizontal and vertical alignment come from the style (`alignment`, `verticalAlignment`). Text that overflows at `minSize`, or N lines taller than the box, keeps the whole lines that fit from the top, the last ending in an ellipsis, and reports the overflow (Spec 6 §4).
 
 **Raster** is Core Graphics into a premultiplied BGRA8 bitmap, one texture per *line*, with the style's outline and shadow drawn as part of the line (shadow and outline extend the line's bounds, which the raster accounts for). Per-line textures cost nothing extra and make line-by-line reveals, crawls and per-line transitions possible without re-rasterizing. The texture is uploaded as an sRGB-typed Metal texture so the GPU linearizes on sample; 8-bit is sufficient for text edges and keeps the cache small.
 
 **The glyph-run model is kept.** The layout result stored beside each cached texture is the list of glyph runs: for every line, every glyph's ID, font, position and advance. In v1 nothing reads it but the editor's caret and the tests. It is kept so that when per-glyph animation arrives, the renderer can switch to a glyph atlas (every glyph a quad) or signed-distance-field glyphs from Core Text's outline paths, driven by the same layout, with the slide and preset data unchanged.
 
-**Cache.** Keyed by a hash of (field text, text style value, box pixel width, box pixel height, fit policy, output scale). Entries hold the line textures and the layout. The cache is an LRU bounded by bytes (section 5). Lookahead pre-rasterizes the next cue's text for every due stack so a fire never waits on text; a cache miss on a fire draws nothing for that box on the first tick and the texture from the second, which the soak metrics count as a `textLate` event that should read zero.
+**Cache.** Keyed by a hash of (field text, text style value, box pixel width, box pixel height, fit policy, output scale, tabular digits). Entries hold the line textures and the layout. The cache is an LRU bounded by bytes (section 5). Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each offset box, the text one cue beyond its offset, so a fire never waits on text; a cache miss on a fire draws nothing for that box on the first tick and the texture from the second, which the soak metrics count as a `textLate` event that should read zero.
 
-**Variables.** A box whose text contains variables is re-laid-out only when its resolved text changes, and no more than once a second; the result replaces the cache entry. A timer box therefore costs one small raster per second. Boxes with `transitionOnVariableChange` run their box transition between the old and new textures; the rest swap.
+**Variables.** A box whose text contains variables is re-laid-out only when its resolved text changes, at the pace Spec 6 §5 sets: at once for context values, at most ten times a second for a popup, and at most once a wall-clock second for the clock, timers and `[Service In]`; the result replaces the cache entry. A timer box therefore costs one small raster per second. Boxes with `transitionOnVariableChange` run their box transition between the old and new textures; the rest swap.
 
 **Thumbnails** use the same rasterizer at thumbnail scale so a cue's thumbnail shows the real line breaks, not an approximation.
 
-**Fonts.** v1 resolves PostScript names against installed fonts and falls back to the machine's fallback font, recording the substitution for pre-flight. Registering fonts from the media root is deferred, as decided.
+**Fonts.** v1 resolves PostScript names against installed fonts and the OFL fonts bundled with the engine, which it registers for its own process at launch (Spec 6 §4), and falls back to the machine's fallback font, recording the substitution for pre-flight. Registering fonts from the media root is deferred, as decided.
 
 ## 9. The stack pass
 
@@ -197,10 +197,10 @@ One pass per due stack, compositing its slots bottom to top into the stack textu
 | Box binding | Source for this stack | Drawn as |
 | --- | --- | --- |
 | pixels | The channel texture (or nothing for text content) | A quad placing the channel texture in the box frame by fit mode: `fit` letterboxes, `fill` crops to cover, `stretch` ignores aspect, `crop` centers at 1:1 |
-| field | The cached line textures for (this channel's field text, this box, this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate`. After an edit that changes how a box's text looks (the box's frame, fit or text style, or the text style itself) while the text is on air, the box keeps drawing its previous lines until the new raster is ready, so a look edit never blanks a line for a tick (Spec 5 §2) |
+| field | The cached line textures for (this channel's field text with variables resolved, or the list's metadata when the write lacks the field, Spec 6 §3; this box; this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate`. After an edit that changes how a box's text looks (the box's frame, fit or text style, or the text style itself) while the text is on air, the box keeps drawing its previous lines until the new raster is ready, so a look edit never blanks a line for a tick (Spec 5 §2) |
 | static | The cached textures for the box's own text with variables resolved | As field |
 
-**Fallback boxes** draw only if no earlier box in the same channel's group drew anything, which the control thread decides when resolving (it knows the content kind), not the GPU.
+**Fallback boxes** draw only if no earlier box at the same offset in the same channel's group drew anything, which the control thread decides when resolving (it knows the content kind), not the GPU.
 
 **Per-box grade** is a second instance of the channel pass's stage 2 applied in the box's fragment shader; it exists for output correction (broadcast levels on one stack) and is identity for most boxes, in which case the shader variant without it is used.
 
@@ -208,7 +208,7 @@ One pass per due stack, compositing its slots bottom to top into the stack textu
 
 **Opacity and mute.** A slot's effective opacity is its opacity times zero when muted; a muted slot still resolves (so unmuting is instant) and draws with alpha zero, which the pass skips. Output-level mute and blackout are not in the stack pass; they are a mix at the sink (section 10) so they can use the output's own transition.
 
-**Offset slots** arrive pre-resolved from the lookahead run: a pixel box points at the pool item's poster frame texture, a field box at text rasterized from the projected state. They cut rather than transition, by definition.
+**Offset boxes** arrive pre-resolved from the lookahead run: a pixel box points at the pool item's poster frame texture, a field box at text rasterized from the projected state. They cut rather than transition, by definition.
 
 **The gamma-blend switch.** A stack with `gammaBlend` on composites in encoded space: each box shader applies the sRGB OETF to its sampled colour before blending and the final stack pass output is linearized again for the sink. It is a shader variant selected per stack, costs two conversions per box, and exists only for matching an older look.
 
@@ -324,9 +324,9 @@ The seams below are protocols with exactly one v1 implementation each. They are 
 
 The spike is the smallest build that exercises every guarantee in section 1 on real hardware, and nothing else. No UI, no library editing, no playlists: a headless `OEngine` process driven over OSC, with the fixture library from Spec 1 on disk.
 
-**It builds:** the master tick with the DeckLink clock and the CADisplayLink fallback; the frame plan builder over OCore's projection; one video `ContentSource` with the frame queue, trims, loops and the two-decoder transition path; the still source; the channel pass with grade and the three transitions; the per-line text rasterizer with its cache; the stack pass with pixel, field and static boxes, fit modes and the +1 offset slot; the display sink at 10-bit; the DeckLink sink with v210, scheduled playback and embedded audio (the interlace weave is the first addition after the spike); the audio mix graph for one device; the metrics ring, black box and watchdog; and the headless test harness with a software clock and a capturing sink.
+**It builds:** the master tick with the DeckLink clock and the CADisplayLink fallback; the frame plan builder over OCore's projection; one video `ContentSource` with the frame queue, trims, loops and the two-decoder transition path; the still source; the channel pass with grade and the three transitions; the per-line text rasterizer with its cache; the stack pass with pixel, field and static boxes, fit modes and the +1 offset box; the display sink at 10-bit; the DeckLink sink with v210, scheduled playback and embedded audio (the interlace weave is the first addition after the spike); the audio mix graph for one device; the metrics ring, black box and watchdog; and the headless test harness with a software clock and a capturing sink.
 
-**Configuration:** the first-run defaults from the UX spec. Channel 1 background, channel 2 foreground. Stack 1 at 4096×2160 on the LED-wall output (DeckLink if the test bench has 12G, otherwise the display). Stack 2, the confidence stack, at 1920×1080 on a display: plain-text stack default preset, channel 2 at offset 0 and +1, a static `[Time]` box. A fixture list of public-domain hymn lyrics over ProRes and HEVC backgrounds with trims and one loop.
+**Configuration:** the first-run defaults from the UX spec. Channel 1 background, channel 2 foreground, channel 3 clock. Stack 1 at 4096×2160 on the LED-wall output (DeckLink if the test bench has 12G, otherwise the display). Stack 2, the confidence stack, at 1920×1080 on a display: channel 2 through Preset 1's stack-2 layout (a current and a +1 body box) and channel 3's static `[Time]` box (Spec 6 §9). A fixture list of public-domain hymn lyrics over ProRes and HEVC backgrounds with trims and one loop.
 
 **Driven by** the Spec 2 vocabulary over OSC from a script: writes with dissolves, video-to-video dissolves, text changes every few seconds, a grade animated over two seconds, a stack switch and a blackout every ten minutes, `next` through the fixture list with the confidence stack showing the next lyric, for three hours.
 
@@ -337,7 +337,7 @@ The spike is the smallest build that exercises every guarantee in section 1 on r
 - p99 GPU time under 8 ms at 60 Hz; CPU encode under 2 ms.
 - Zero `textLate` after the first minute; zero audio underruns; zero watchdog recoveries.
 - Memory flat within 5% after the first ten minutes (section 13: the footprint's sliding median and the heap's live bytes).
-- The confidence stack's +1 slot is correct on every `next`, checked by the capture against the projected state.
+- The confidence stack's +1 box is correct on every `next`, checked by the capture against the projected state.
 - A/V sync within one frame on a clapper fixture, measured on the capture.
 - The DeckLink output is frame-accurate against the capture; the 1080i weave, added right after the spike, is verified field-correct on a motion fixture the same way.
 - The headless harness reproduces a tick from a saved frame plan and matches the golden images.

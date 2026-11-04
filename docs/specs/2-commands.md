@@ -118,8 +118,8 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 
 | Text form | Object | Effect | Lock | Undo |
 | --- | --- | --- | --- | --- |
-| `timer N set DURATION` | `timer.set` | Sets and stops | passes | none |
-| `timer N start`, `pause`, `reset` | `timer.start`, `timer.pause`, `timer.reset` | Runs, pauses, returns to the set value | passes | none |
+| `timer N set DURATION [up]` | `timer.set` | Sets a countdown, or with `up` a count-up, and stops it (Spec 6 §6) | passes | none |
+| `timer N start`, `pause`, `reset` | `timer.start`, `timer.pause`, `timer.reset` | Runs, pauses, returns to the set value and stops | passes | none |
 | `popup N set "TEXT" [clearafter SECONDS]` | `popup.set` | Sets the slot; every `[Popup N]` box updates | passes | runtime |
 | `popup N clear` | `popup.clear` | Clears the slot | passes | runtime |
 | `audio N mute on`, `off`, `toggle` | `audio.mute` | Mutes a numbered audio output; `audio all` for every one | passes | runtime |
@@ -206,7 +206,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `next` | `/o/next` |
 | `cue 7` | `/o/cue` `i:7` |
 | `item 4 cue 3` | `/o/item/4/cue` `i:3` |
-| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds) |
+| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds); `up` follows as `s:"up"` |
 | `popup 3 set "text" clearafter 30` | `/o/popup/3/set` `s:"text"` `i:30` |
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |
@@ -225,7 +225,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `/o/channel/N/remaining` | `i:ms` | Once a second while timed content plays, only to clients that subscribed to that channel's remaining time (see below) |
 | `/o/output/N/stack` | `i` | Stack switches |
 | `/o/stack/N/blackout` | `i:0 or 1` | Blackout changes |
-| `/o/timer/N` | `s:formatted` `i:ms` | Once a second while running, and on set |
+| `/o/timer/N` | `s:formatted` `i:ms` | Once a second while running, and after every timer command that changes it; `i` is the value in milliseconds, signed for a countdown (Spec 6 §8) |
 | `/o/popup/N` | `s` | Set or cleared |
 | `/o/lock/N` | `i` | Channel lock changes |
 

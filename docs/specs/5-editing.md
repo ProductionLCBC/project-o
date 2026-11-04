@@ -174,7 +174,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 | Result | When | Logged |
 | --- | --- | --- |
-| `ok` | The edit applied. It may carry `warnings`: a preset used as a stack default without a pixel box or a body box (the UX spec's preset editor), an object deleted while still referenced, a list deleted while a playlist links it, or portable references that a machine-level renumber left naming something else (§4) | Yes, with its inverse |
+| `ok` | The edit applied. It may carry `warnings`: a preset used as a stack default without a pixel box or a body box at offset 0 (the UX spec's preset editor), an object deleted while still referenced, a list deleted while a playlist links it, or portable references that a machine-level renumber left naming something else (§4) | Yes, with its inverse |
 | `noop` | The edit would change nothing | Yes (Spec 2 §8) |
 | `rejected` | A check above failed; the reason is `code: message` | No; answered at the API or the command bar only (Spec 2 §9) |
 
