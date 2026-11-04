@@ -48,7 +48,11 @@ question, then a review of the answers whose fixes he accepted. It added a spec 
 owned, Spec 5, Editing (the `edit` command family, its inverses and edit undo), to be
 written before the others, and an app-and-engine section for the show-mode UI spec. On his
 word the Area 15 prompt block went into `docs/build-order.md` with `stack all blackout`
-added. Spec 5 is being drafted in Cowork as a new tab of the Project O specs doc.
+added. Spec 5 was then drafted in Cowork as a tab of the Project O specs doc, reviewed,
+and accepted by Adam the same day with his answers to its seven choices (E-1 widened so
+every source can hold an edit, with three rules for edits held by cues; the rest as
+drafted). It is in `docs/specs/5-editing.md`, and its corrections to Specs 1–4 are
+applied.
 
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
@@ -66,11 +70,6 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
-
-- **Spec 5, Editing, for review.** Drafted in Cowork as a tab of the Project O specs doc
-  from the scope gaps doc's answers (C1 and C2, with S13, G6, L1, L3 and E2). On Adam's
-  review it is exported to `docs/specs/5-editing.md`; the areas that wait on it (9, 10,
-  12, 14 and 17) get their prompt blocks once their own specs are written too.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -189,11 +188,18 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 §10's groups and log rows. Nothing in app/.
 ```
 
-Spec 5, Editing, is drafted in Cowork alongside, then the other specs in the scope gaps
-doc's order: presets and text; cues, lists and playlists; media pool; log and saving; the
-show-mode UI with its settings section and the operator lock; edit mode. Each is reviewed
-before it is exported to `docs/specs/` and its area's prompt is added to
-`docs/build-order.md`, when its Build tracker task moves from `spec needed` to `not
-started`. The bench run with the card happens whenever Adam sets a window; it does not
-block Area 15 or the engine-side areas, and it must pass before anything in `app/` starts
-(Areas 13 and 14) and before Area 7's bench verification.
+The presets-and-text spec (Areas 6 and 11) is drafted next in Cowork as a tab of the specs
+doc, then the others in the scope gaps doc's order: cues, lists and playlists; media pool;
+log and saving; the show-mode UI with its settings section and the operator lock; edit
+mode. Each is reviewed before it is exported to `docs/specs/` and its area's prompt is
+added to `docs/build-order.md`, when its Build tracker task moves from `spec needed` to
+`not started`. The bench run with the card happens whenever Adam sets a window; it does
+not block Area 15 or the engine-side areas, and it must pass before anything in `app/`
+starts (Areas 13 and 14) and before Area 7's bench verification.
+
+Spec 5 has no area of its own. Following the scope gaps doc, its engine side lands with
+Area 9, which applies the list, cue and playlist edits (L1) and so builds the edit path
+first, and with Area 12, which takes edit undo and redo and the restore commands (C2,
+G6) alongside the debounced write and the versions folder; the app areas issue edits
+through that path. The exact split goes into those areas' blocks when their specs are
+written.
