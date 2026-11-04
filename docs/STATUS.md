@@ -54,6 +54,10 @@ every source can hold an edit, with three rules for edits held by cues; the rest
 drafted). It is in `docs/specs/5-editing.md`, and its corrections to Specs 1–4 are
 applied.
 
+Spec 6, Presets and text (Areas 6 and 11), was then drafted the same way and revised after
+an independent review. Its twelve choices, T-1 to T-12, wait for Adam's answers in the
+specs doc.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
@@ -70,6 +74,13 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
+
+- **Spec 6, Presets and text, for review.** Drafted in Cowork as a tab of the Project O
+  specs doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
+  answers (P1–P14, R3, R4) and revised after an independent review. Twelve choices, T-1 to
+  T-12, wait for his answers in its §12. On acceptance it is exported to
+  `docs/specs/6-presets-and-text.md` with its corrections to Specs 1–5 and
+  `ARCHITECTURE.md`, and Areas 6 and 11 get their prompt blocks.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -188,14 +199,14 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 §10's groups and log rows. Nothing in app/.
 ```
 
-The presets-and-text spec (Areas 6 and 11) is drafted next in Cowork as a tab of the specs
-doc, then the others in the scope gaps doc's order: cues, lists and playlists; media pool;
-log and saving; the show-mode UI with its settings section and the operator lock; edit
-mode. Each is reviewed before it is exported to `docs/specs/` and its area's prompt is
-added to `docs/build-order.md`, when its Build tracker task moves from `spec needed` to
-`not started`. The bench run with the card happens whenever Adam sets a window; it does
-not block Area 15 or the engine-side areas, and it must pass before anything in `app/`
-starts (Areas 13 and 14) and before Area 7's bench verification.
+The presets-and-text spec (Areas 6 and 11) is drafted and waits for Adam's answers; the
+others follow in the scope gaps doc's order: cues, lists and playlists; media pool; log
+and saving; the show-mode UI with its settings section and the operator lock; edit mode.
+Each is reviewed before it is exported to `docs/specs/` and its area's prompt is added to
+`docs/build-order.md`, when its Build tracker task moves from `spec needed` to `not
+started`. The bench run with the card happens whenever Adam sets a window; it does not
+block Area 15 or the engine-side areas, and it must pass before anything in `app/` starts
+(Areas 13 and 14) and before Area 7's bench verification.
 
 Spec 5 has no area of its own. Following the scope gaps doc, its engine side lands with
 Area 9, which applies the list, cue and playlist edits (L1) and so builds the edit path
