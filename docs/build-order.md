@@ -141,6 +141,22 @@ and the weave. Stop for review at each of: the text cache, the aux passes, the
 measurement, the weave. Nothing here runs unattended.
 ```
 
+**Area 15 — Macros, basic** (branch `area/macros`)
+
+```
+Area: 15, macros, basic. Spec: docs/specs/2-commands.md §3 (the macro row), §5 (groups
+and macro expansion, the depth cap, the cycle check) and §9 (the macro's own log line
+then each inner command under the same group). The runner on main already expands a
+macro into its commands with the cap and the check; Area 15 gives the engine the
+machine-level and library macros as first-class objects it can run from a key, OSC
+and a cue (no guards: Spec 2 §7's guards are v1.5), and the clears tab's command
+lists (ux-spec, the tabbed panel) as macros the UI will call. Add `stack all blackout
+on | off | toggle` to the vocabulary, one grammar row like `channel all` with its OSC
+address, for the clears tab's "blackout stack and all" (Adam's word, 2026-11-04);
+propose the Spec 2 §3 and §6 correction in the plan before any code. Tests first from
+§10's groups and log rows. Nothing in app/.
+```
+
 **Area 16 — Audio, basic** (branch `area/audio`)
 
 ```
