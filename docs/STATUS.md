@@ -23,7 +23,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`: the offset on the box, Preset 1's confidence layout and the Clock preset, field boxes over the list's metadata with the provenance's list in `core/`, the text style's anchor, units and overflow, tabular digits, the bundled fonts, the fixtures and schemas. The object types are on `main` since Area 2; the stack pass, the +1 slot and the one shared `SlotResolver` since Areas 4 and 5. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: key and fill stays v1.5, and the area becomes bench verification and fixes, its block written from the run's findings; its `docs/build-order.md` row and Build tracker task change together in a Nimbalyst session. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the 1080i weave since Area 5, the DeckLink sink as the embedded audio feed's destination since Area 16. |
-| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | not started | Spec needed first: the media-pool spec, settled 2026-11-04 (the engine imports, rebuilds and replaces as commands, a poster is the in-point frame, a known hash is not copied again). The index, the resolver, SHA-256 identity and the missing state are on `main` since Area 2; the rebuild walk, import by copy and poster extraction remain. |
+| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Spec 8 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 9 (`media replace`, `media delete` and the defaults edits ride its edit path): the six media commands, import with staging and hash first, the walk with its hash cache telling moves, re-exports and restores apart, the two indexes and `machine/media/`, the media root on the startup volume (M-8), posters at the in-point and pool tiles, delete and replace with their inverses, the `media` topic and the use query, drop channels. The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | not started | Spec 7 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`: list folders on disk, a playlist's title as its identity and items with uuids, the live pointer placed from the engine's kept copies when what it names is gone, the armed trigger with `disarm`, archive as a dated copy, live feedback and the countdown, and Spec 5's edit path for lists, cues, folders and playlists with the debounced write. The runner on `main` logs a fired cue as its own group with `fire`; the engine's control loop fires armed Time triggers as `next`; the thumbnail job projects a list from its top (Area 5). |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (one channel at a time, each chunk bound to its cue's uuid, an empty chunk clears). |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance): the variable language and the v1 set with the context values and `[Service In]`, the adoption pacing, timers counting down and up, popups resolving their variables one level deep, the timer and remaining-time feedback. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes, behind the once-a-second gate, since Area 5. |
@@ -66,11 +66,13 @@ each time it reads it), and accepted by Adam with every choice as drafted. It is
 `docs/specs/7-cues-lists-and-playlists.md`, its corrections to Specs 1, 2, 3, 5 and 6 are
 applied, and the Area 9 prompt block is in `docs/build-order.md`.
 
-Spec 8, Media pool (Area 8), was then drafted the same way and revised after three
-independent reviews. They moved the cases that syncing to read-only campuses creates to
-library mode (v1.5), and settled how the walk tells a move from a re-export or a restore
-and how a delete meets undo. Its eight choices, M-1 to M-8, wait for Adam's answers in the
-specs doc.
+Spec 8, Media pool (Area 8), followed the same day: drafted, revised after three
+independent reviews (they moved the cases that syncing to read-only campuses creates to
+library mode in v1.5, and settled how the walk tells a move from a re-export or a restore
+and how a delete meets undo), and accepted by Adam with every choice as drafted; on M-8 he
+asked to look into the alternative later. It is in `docs/specs/8-media-pool.md`, its
+corrections to Specs 1–5 are applied, and the Area 8 prompt block is in
+`docs/build-order.md`.
 
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
@@ -89,13 +91,13 @@ on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
 
-- **Spec 8, Media pool, for review.** Drafted in Cowork as a tab of the Project O specs
-  doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
-  answers (M1–M11) and revised after three independent reviews. Eight choices, M-1 to
-  M-8, wait for his answers in its §12; M-8 asks where the media root may live while
-  builds are ad-hoc signed (ADR 0007). On acceptance it is exported to
-  `docs/specs/8-media-pool.md` with its corrections to Specs 1–5, and Area 8 gets its
-  prompt block.
+- **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
+  volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
+  ad-hoc-signed engine again after every update before it reads an external drive, a
+  share or those folders (ADR 0007). Adam asked on 2026-11-07 to look into the
+  alternative later: a media root anywhere, with access granted again after each update,
+  or kept once builds are signed. It belongs with ADR 0007's revisit when the pilot is
+  scheduled.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -115,11 +117,11 @@ on 2026-11-04: approved as built, merged (89641e9).
 
 ### Housekeeping
 
-- **Areas 6, 9 and 11 in the Build tracker.** Their specs and prompt blocks are on `main`,
-  but all three still read `spec needed` in `docs/build-order.md` and in the tracker,
-  which only Nimbalyst changes, and a status changes in both places or in neither. Each
-  area's first session sets both to `in progress`; until then they can move to
-  `not started` together.
+- **Areas 6, 8, 9 and 11 in the Build tracker.** Their specs and prompt blocks are on
+  `main`, but all four still read `spec needed` in `docs/build-order.md` and in the
+  tracker, which only Nimbalyst changes, and a status changes in both places or in
+  neither. Each area's first session sets both to `in progress`; until then they can move
+  to `not started` together.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -168,10 +170,8 @@ proposes the exact text):
 
 - Spec 1 §5: `state/last.json` is written after every runtime group, not only at a clean
   shutdown (log-and-saving spec).
-- Spec 1 §7: an import hashes before it copies, so a known file is not copied again; a
-  poster is the in-point frame, kept beside its index tier (media-pool spec).
-- Spec 2 §3 and §6: `stack all blackout` (Area 15); the media and restore commands (the
-  specs that own each).
+- Spec 2 §3 and §6: `stack all blackout` (Area 15); the restore commands (log-and-saving
+  spec).
 - Spec 2 §9: the app reaches the engine over a local socket only the same user can open,
   and only the engine touches the Keychain, as ADR 0007 requires (show-mode-ui spec).
 
@@ -208,15 +208,16 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 §10's groups and log rows. Nothing in app/.
 ```
 
-After Area 15, Areas 6, 11 and 9 are ready, in that order, from their blocks in
-`docs/build-order.md`; all three are engine-side and need no bench run. The media-pool
-spec (Area 8) is drafted and waits for Adam's answers; the others follow in the scope gaps
-doc's order: log and saving; the show-mode UI with its settings section and the operator lock; edit
-mode. Each is reviewed before it is exported to `docs/specs/` and its area's prompt is
-added to `docs/build-order.md`, when its Build tracker task moves from `spec needed` to
-`not started`. The bench run with the card happens whenever Adam sets a window; it does
-not block Area 15 or the engine-side areas, and it must pass before anything in `app/`
-starts (Areas 13 and 14) and before Area 7's bench verification.
+After Area 15, Areas 6, 11, 9 and 8 are ready, in that order, from their blocks in
+`docs/build-order.md`; all four are engine-side and need no bench run, and Area 8 starts
+after Area 9, whose edit path it extends. The log-and-saving spec (Area 12) is drafted
+next in Cowork, then the others in the scope gaps doc's order: the show-mode UI with its
+settings section and the operator lock; edit mode. Each is reviewed before it is exported
+to `docs/specs/` and its area's prompt is added to `docs/build-order.md`, when its Build
+tracker task moves from `spec needed` to `not started`. The bench run with the card
+happens whenever Adam sets a window; it does not block Area 15 or the engine-side areas,
+and it must pass before anything in `app/` starts (Areas 13 and 14) and before Area 7's
+bench verification.
 
 Spec 5 has no area of its own. Its engine side lands with Area 9, which builds the edit
 path with the list, cue, folder and playlist edits and the debounced write with the

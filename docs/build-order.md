@@ -15,7 +15,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | shipped |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | spec needed |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
-| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | spec needed |
+| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | spec needed |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | spec needed |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
@@ -161,6 +161,37 @@ Preset 1's "2" layout, the Clock preset, and the fixtures and JSON Schemas of §
 (library-v1 and spike; no schema bump, §2). Tests first from §11's Area 6 list, with
 goldens for the anchor, the overflow and the confidence stack. Stop for review after the
 core changes and again after the fixtures. Nothing in app/.
+```
+
+**Area 8 — Media pool** (branch `area/media`)
+
+```
+Area: 8, media pool. Spec: docs/specs/8-media-pool.md, with §11's tests; Spec 1 §3, §5,
+§7 and §8, Spec 2 §2, §3, §6 and §9, Spec 3 §4, §6 and §8, Spec 4 §10 and Spec 5 §1, §2
+and §6–§8 as Spec 8 corrected them. Starts after Area 9 is merged: media replace, media
+delete and the edits of an item's defaults ride its edit path. On main: the two index
+types, a resolver that reads every path under the media root, SHA-256 hashing, a missing
+set computed once at launch, the poster loader, and the decoders Spec 4 §6 plays. Build
+the core changes first: the resolver returns a location (the media root, machine/media/
+or an override) and follows both indexes' replaced maps to the end of the chain with the
+repeat check; the machine index gains its replaced map and an entry gains deletedAt;
+media-local.json's paths read against machine/media/ (no schema bump, §9); the media
+target and the hash token (the edit target and json values come with Area 9's edit
+parser) and the six media commands in the grammar, parser, printer and OSC form;
+dropChannels in machine settings; the projection's media defaults read from the entry a
+ref resolves to. Then the file work on a background worker: import (§3) with staging,
+hash first, the kinds v1 takes, numbered names, the hidden copy checked against its
+hash, diskFull; the walk (§4) at launch, on media rebuild and from the watcher, with the
+two-second settle, the hash cache, moves, landings, copies, ids the other folder's index
+holds, pruning in the launch walk only and the undo steps it drops; presence per
+location after every walk and index reload, with the missing set, the thumbnail keys and
+the OSC hash expansion following it; the media root refused off the startup volume (§2,
+M-8). Then posters at the in-point and pool tiles (§5), delete and replace with their
+inverses as edits, groups included (§6), the media topic and mediaUse (§7), the defaults
+edits (Spec 7 §7), and §9's fixtures. Tests first from §11; the clauses marked Area 12
+wait for edit undo. Stop for review after the core changes, after the walk, and after
+delete and replace. Nothing in app/: the app's staging copy and the pool tab come with
+Area 13.
 ```
 
 **Area 9 — Cues, lists and playlists** (branch `area/playlists`)
