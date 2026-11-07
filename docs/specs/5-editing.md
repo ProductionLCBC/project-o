@@ -8,7 +8,7 @@ It defines the `edit` family Spec 2 §3 reserves, and it is the first of the spe
 
 Every change to the library or to a machine's configuration is an `edit` command, run by the engine like any other command. Spec 2 §3 reserves the `edit` target and leaves its vocabulary to this spec. This spec defines where an edit runs and what it writes, how an edit names what it changes, the verbs and their inverses, groups and typing, validation, lock and library mode, edit undo and redo, and how edits meet changes that arrive on disk.
 
-**Out of scope:** the screens that issue edits (the show-mode and edit-mode specs); the media commands `media import`, `media rebuild` and `media replace`, which change the media index through this same path but belong to the media-pool spec; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8), which are not edits; and secrets, which never travel in an edit (§7).
+**Out of scope:** the screens that issue edits (the show-mode and edit-mode specs); the media commands of Spec 8, which change the media index through this same path; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8), which are not edits; and secrets, which never travel in an edit (§7).
 
 **Rules every edit obeys**
 
@@ -26,7 +26,7 @@ Every change to the library or to a machine's configuration is an `edit` command
 **From every source.** Every input path can send an edit, an undo, a redo or a restore, as Spec 2 §1 asks of every command (choice E-1, §12). That covers the UI, the API, the command bar, OSC, a key binding, MIDI and Stream Deck, a cue, a macro, the scheduler, and the startup and shutdown macros. Three rules keep that safe on a Sunday:
 
 - **An edit in a cue is permanent.** Firing it changes the library for good, not just for this service. The change is saved, and on a writable machine it syncs like any other edit.
-- **A failing edit doesn't stop the cue.** A cue, macro, key binding or scheduler entry may run an edit that lock, library mode or a since-changed library refuses. That edit yields `blocked` with its reason, like a write to a locked channel (Spec 2 §8), and the rest of the group runs; a cue still counts as fired. Edits sent from the UI, the API, the command bar or OSC are rejected as usual, so their groups stay all-or-nothing (§5).
+- **A failing edit doesn't stop the cue.** A cue, macro, key binding or scheduler entry may run an edit that lock, library mode or a since-changed library refuses. That edit yields `blocked` with its reason, like a write to a locked channel (Spec 2 §8), and the rest of the group runs; a cue still counts as fired. Edits sent from the UI, the API, the command bar or OSC are rejected as usual, so their groups stay all-or-nothing (§5). Any refusal of a media command held this way is `blocked` too (Spec 8 §2).
 - **Lookahead never edits.** The projection passes edits through untouched (Spec 3 §6). Lookahead, the +1 box and thumbnails therefore show a cue's edit only once the cue really fires.
 
 Edits run by a cue, a macro, a key or the scheduler join the undo stack, one group per run (§8).
@@ -61,7 +61,7 @@ A group that touches several documents writes each one atomically. A crash betwe
   "changed": [ { "object": "cue", "list": 42, "cue": "22bb…", "paths": ["commands"] } ] }
 ```
 
-`cause` is `edit`, `undo`, `redo` or `file`. The event names what changed and carries no object bodies; a client queries the objects it shows.
+`cause` is `edit`, `undo`, `redo`, `file` or `media`, the last for the index changes an import or the media walk makes, which also raise the revision (Spec 8 §2). The event names what changed and carries no object bodies; a client queries the objects it shows.
 
 ## 3. Addressing
 
@@ -163,7 +163,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 2. **The object.** It exists, or, for `create`, its number or title is free. A local copy isn't editable in v1 (§3). An archived playlist takes only the edit that unarchives it and `delete`, since archived playlists are read-only until restored (UX spec); `duplicate` and `archive` read it without changing it, and renumbering or swapping a list rewrites its links (Spec 7 §5).
 3. **The path.** It exists in the object's JSON Schema (`formats/schemas`, on `main` since Area 2) and is editable. `uuid`, `schema`, `app`, `kind`, `version`, `builtIn` and `number` never are; numbers change only through `renumber` and `swap`.
 4. **The value.** It has the field's type and enum, and it is in range. That means Spec 1's ranges (a decoder cap of 2 or 3, box frames 0–1, an audio output delay of 0–1000 ms) and Spec 2 §8's (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1). When an edit changes a cue's commands, commands kept verbatim because they are unknown (Spec 1 §6) pass through unchanged; only the commands the edit adds or changes are validated.
-5. **References.** Every number the value names exists on this machine: a preset, transition, grade, channel, stack, output, audio output, macro or list. Every media id is in the index. Loading tolerates a broken reference and degrades it (Spec 1 §8). An edit never creates one, with three exceptions, all flagged by the reference report:
+5. **References.** Every number the value names exists on this machine: a preset, transition, grade, channel, stack, output, audio output, macro or list. Every media id resolves to an entry in either index (Spec 8 §2). Loading tolerates a broken reference and degrades it (Spec 1 §8). An edit never creates one, with three exceptions, all flagged by the reference report:
    - a delete leaves the references to what it removed (E7);
    - an undo or redo puts back exactly what was there, broken references included (§8);
    - a portable document may name a stack, output, audio output or input this machine lacks, since it meets those numbers at other campuses (Spec 1 §2).
@@ -179,13 +179,13 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 | `noop` | The edit would change nothing | Yes (Spec 2 §8) |
 | `rejected` | A check above failed; the reason is `code: message` | No; answered at the API or the command bar only (Spec 2 §9) |
 
-**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`.
+**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`, `noTrash` (Spec 8 §6).
 
 ## 7. Lock, library mode and secrets
 
-**Operator lock** (S13). While the lock is on, the engine refuses every `edit`, every undo and redo of an edit, and every restore (§9). The refusal comes from every source, OSC and the API included, with code `operatorLock`; runtime commands pass as they always do. Inside a cue, a macro, a key binding or a scheduler entry the refusal is a `blocked` result rather than a rejection (§2), so the rest of the group still runs. Settings changes are edits of machine objects, so a locked station's settings are read-only. Turning the lock off is the show-mode spec's passcode command, not an edit. Spec 3 §8 already makes this check at the API boundary for edit commands and edit undo; this spec adds redo and restores to it.
+**Operator lock** (S13). While the lock is on, the engine refuses every `edit`, every media command but `media rebuild` (Spec 8 §2), every undo and redo of an edit, and every restore (§9). The refusal comes from every source, OSC and the API included, with code `operatorLock`; runtime commands pass as they always do. Inside a cue, a macro, a key binding or a scheduler entry the refusal is a `blocked` result rather than a rejection (§2), so the rest of the group still runs. Settings changes are edits of machine objects, so a locked station's settings are read-only. Turning the lock off is the show-mode spec's passcode command, not an edit. Spec 3 §8 already makes this check at the API boundary for edit commands and edit undo; this spec adds redo and restores to it.
 
-**Library mode in v1.** The engine honours `libraryMode` (Spec 1 §3). On a `readOnlyMasters` machine it refuses edits of library objects with code `readOnlyLibrary`: lists and their cues, library folders, channels, presets, text styles, grades, transitions, audio transitions, portable macros and the defaults of library media. Machine-level edits pass, including the defaults of media that exists only on this machine (M11). Two things that make read-only masters workable at a campus arrive with library mode in v1.5: roles that can exceed the machine's mode (the UX spec's librarian), and detach-and-edit. Until then the pilot machine runs `writable` (choice E-2, §12).
+**Library mode in v1.** The engine honours `libraryMode` (Spec 1 §3). On a `readOnlyMasters` machine it refuses edits of library objects with code `readOnlyLibrary`: lists and their cues, library folders, channels, presets, text styles, grades, transitions, audio transitions, portable macros and the defaults of library media, which `media replace` and `media delete` of library media join (Spec 8 §2). Machine-level edits pass, including the defaults of media that exists only on this machine (M11). Two things that make read-only masters workable at a campus arrive with library mode in v1.5: roles that can exceed the machine's mode (the UX spec's librarian), and detach-and-edit. Until then the pilot machine runs `writable` (choice E-2, §12).
 
 **Secrets.** The lock passcode and the API token never travel in an edit, a log line or a snapshot. The show-mode spec gives them their own commands, and only the engine handles those, against the Keychain (the scope doc's R2).
 
@@ -193,7 +193,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 **What undoes in v1** (C2). Only edits. Runtime undo and the history view are v1.5, so in v1 `undo` and `redo` (Spec 2 §3) always mean edit undo, and `history jump N` is rejected with `notInV1`.
 
-**One linear stack per run.** The engine keeps the applied edit groups of this run, newest on top, up to the last 500 (choice E-4, §12). The stack starts empty at launch and is cleared at quit. Older states come back through the versions folder and the restore commands (§9).
+**One linear stack per run.** The engine keeps the applied edit groups of this run, newest on top, up to the last 500 (choice E-4, §12). `media replace` and `media delete` join it like any edit; the index changes an import or the media walk makes aren't edits and never do (Spec 8 §2). The stack starts empty at launch and is cleared at quit. Older states come back through the versions folder and the restore commands (§9).
 
 **Undo** takes the top group and runs its inverses, last first, as one new group. That group is logged with source `restore` and an `undoes` field naming the group it reverses, and its `library` event has cause `undo`. The undone group moves to the redo stack.
 
@@ -201,7 +201,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 **An undo is validated like any edit**, except that it puts references back exactly as they were (§6). If an inverse would now break another rule (its number has since been taken, say), the undo is rejected with `conflict` and the group stays on the stack.
 
-**A reload drops steps.** When a document is reloaded from disk (§10), every undo and redo step that touches it is dropped, with one log line. An undo therefore never overwrites a change that arrived by sync.
+**A reload drops steps.** When a document is reloaded from disk (§10), every undo and redo step that touches it is dropped, with one log line. An undo therefore never overwrites a change that arrived by sync. The media walk drops the steps that name an entry it maps to another file or brings back (Spec 8 §4).
 
 **Keys.** `undo` and `redo` can be bound to keys like any command (UX spec). While a text field has focus, ⌘Z and ⇧⌘Z undo that field's own typing; the result reaches the engine as a new text edit (§5).
 

@@ -25,9 +25,9 @@ One command per line. Words are separated by spaces; case is ignored for keyword
 
 ```
 command   := target [number] verb [argument...] [rider...]
-target    := channel | stack | output | audio | timer | popup | macro | history | playlist | list | item | system
+target    := channel | stack | output | audio | timer | popup | macro | history | playlist | list | item | system | edit | media
 verb      := a keyword from the vocabulary table
-argument  := integer | decimal | duration | string | ref | keyword
+argument  := integer | decimal | duration | string | ref | keyword | hash | json
 rider     := transition REF [DURATION] SCOPE | audiotransition REF [DURATION] SCOPE
            | grade REF [DURATION] SCOPE | gain DECIBELS SCOPE | chase SCOPE | build INTEGER
 scope     := once | track
@@ -45,6 +45,8 @@ Some verbs have no target number (`next`, `previous`, `undo`), and a few targets
 | timecode | `HH:MM:SS:FF` | `01:00:00:00` |
 | string | double-quoted, JSON escapes (`\n`, `\"`, `\\`) | `"Great is Thy faithfulness,\nO God my Father"` |
 | ref | `media sha256:<hex>`, `slide:<uuid>`, `input N`, `text <string>` | `media sha256:9f2c...` |
+| hash | `sha256:` and the hex, abbreviated to its first 12 hex characters in the command bar as in a ref | `sha256:9f2c...` |
+| json | a JSON object or array: a structured value (Spec 5 §4) or a recorded inverse (Spec 8 §2) | `{…}` |
 | keyword | an unquoted word from a fixed set | `on`, `off`, `toggle`, `loop`, `once`, `track` |
 
 **Content expressions** follow `write`: `media sha256:... [in DURATION] [out DURATION] [loop] [gain DECIBELS] [sync MS]`, `text "..."` for a body-only write or `text body "..." title "..."` for several fields, `slide:<uuid> [build N]`, `input N`, or `empty`. Hashes may be abbreviated to their first 12 hex characters in the command bar and are expanded on parse; stored and logged forms are always full.
@@ -74,7 +76,7 @@ macro 12
 
 ## 3. The v1 vocabulary
 
-The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable. `N` is a channel number or the word `all`.
+The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable; *edit* commands carry their inverse and are undone by edit undo (Spec 5 §8). `N` is a channel number or the word `all`.
 
 **Channels**
 
@@ -135,6 +137,12 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | `system clearall` | `system.clearAll` | Clear content and reset attributes on every channel; the panic button, no confirmation | passes | runtime |
 | `system preflight` | `system.preflight` | Runs the pre-flight report on the live playlist | passes | none |
 | `system snapshot` | `system.snapshot` | Writes a library and machine snapshot now | passes | none |
+| `media import "PATH"` | `media.import` `{path}` | Imports a file or a folder (Spec 8 §3). The result is `ok` with a `job` id once PATH is readable; the files' outcomes follow on the `media` topic (Spec 8 §7) | passes | none |
+| `media rebuild` | `media.rebuild` | Walks the media folders now (Spec 8 §4) | passes | none |
+| `media replace HASH HASH` | `media.replace` `{old, new}` | Points every reference at the new item and records the mapping (Spec 8 §6) | passes | edit |
+| `media delete HASH` | `media.delete` `{id}` | Moves the item's files to the Trash and keeps its entry as deleted (Spec 8 §6) | passes | edit |
+| `media undelete HASH {…}` | `media.undelete` `{id, files}` | Delete's inverse: puts the files back and clears the deletion | passes | edit |
+| `media unreplace HASH HASH {…}` | `media.unreplace` `{old, new, refs, mapping, defaults}` | Replace's inverse: puts back the references, the mapping and the new item's defaults as they were | passes | edit |
 
 **Edit commands** share the shape `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`, where a field path after the address means `set` (`edit channel 2 label "Lyrics"`), each carrying its inverse in the log entry. Spec 5 defines them; this spec reserves the `edit` target so the grammar, the log and the API already accommodate them.
 
@@ -211,6 +219,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `popup 3 set "text" clearafter 30` | `/o/popup/3/set` `s:"text"` `i:30` |
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |
+| `media rebuild` | `/o/media/rebuild` |
 
 **Argument rules.** Typed OSC arguments map positionally to the verb's arguments: integers for numbers and seconds, floats for decibels and decimal durations, strings for text and keywords. As an alternative for any command, a single string argument is parsed as the remainder of the text form, which is how a write with riders travels in one message; a single string is read as the remainder first and as the typed argument when that fails, so a caption's plain text still lands in `popup N set`. Both spellings reach the same command object; the log records the object. The address words are case-insensitive like keywords, and the `ch` and `tr` short forms expand there too. A value that does not survive a 32-bit float (`-6.1` dB) is sent and accepted as a double (`d`); integers and whole seconds are `i`.
 
@@ -304,6 +313,8 @@ A command passes through four stages: parse, validate, execute, log. The first t
 { "type": "event", "topic": "channels", "channel": 2, "state": "empty", "content": null, "seq": 4822 }
 { "id": 20, "type": "query", "what": "state" }
 ```
+
+A `media import` result also carries the `job` its outcomes are reported under (Spec 8 §7).
 
 **Auth and discovery.** The engine listens on the LAN with a token from the Keychain; the first message on a connection must be `{"type": "auth", "token": "..."}` or the socket closes. The service advertises over Bonjour as `_projecto._tcp` with the machine's campus name, so a remote finds it without an address. Nothing listens beyond the local network, and there is no cloud relay.
 

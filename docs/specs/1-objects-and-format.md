@@ -95,7 +95,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
-**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false), `snapshots` `{cadence, retention}`, `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
+**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `dropChannels` (a channel per media kind for drops from the pool, Spec 8 §8), `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false), `snapshots` `{cadence, retention}`, `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
 
 ## 4. Identity
 
@@ -117,7 +117,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 ## 5. File layout and JSON conventions
 
-Two roots, both plain folders the user can see: the **library root** (portable, synced down to campuses) and the **machine root** (local, never synced). The media root is a folder inside the library root by default and may be pointed elsewhere in machine settings.
+Two roots, both plain folders the user can see: the **library root** (portable, synced down to campuses) and the **machine root** (local, never synced). The media root is a folder inside the library root by default and may be pointed elsewhere in machine settings, on the startup volume and outside the Desktop, Documents and Downloads folders (Spec 8 §2).
 
 ```
 library/
@@ -131,7 +131,7 @@ library/
   macros/                   portable macros, one file each
   lists/                    one file per master, in folders that are the library's folders: Hymns/042-great-is-thy-faithfulness.json
   versions/042/             previous versions of list 42: v0017.json ...
-  media/                    the media root (user subfolders, fonts/, imports/)
+  media/                    the media root (user subfolders, fonts/, imports/, and .posters/ for poster frames, Spec 8 §5)
   media-index.json          hash to path, metadata, defaults (section 7)
 
 machine/
@@ -139,12 +139,14 @@ machine/
   stacks.json  outputs.json  audio-outputs.json  inputs.json  clocks.json
   keys.json                 key bindings and scheduler
   media-local.json          local-only media and path overrides (section 7)
+  media/                    local-only media and the files overrides point at, never synced (Spec 8 §2)
+  media-cache.json          a cache of the size, date and hash the media walk last found for each file (Spec 8 §4)
   macros/                   machine-level macros
   playlists/                one file per playlist, named from its title: sunday.json
   lists-local/              local copies of masters, with provenance
   state/last.json           channel state at last clean shutdown (restore-last-state)
   logs/  snapshots/         written by the app, read by nothing it depends on
-  thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10)
+  thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10); pool tiles in pool/ (Spec 8 §5)
   conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
 ```
 
@@ -200,31 +202,32 @@ Text content is inline, which is what keeps a song self-contained in its list fi
 
 ## 7. Media index and resolver
 
-The media root is a plain folder tree the user organizes freely. The index maps identity to what the app knows about each file and is kept in two tiers: a **library index** (`library/media-index.json`, synced with the library, written only by machines in writable library mode) for media that belongs to the library, and a **machine index** (`machine/media-local.json`) for media that exists only on this machine plus any path overrides. Both can be rebuilt from the files if lost. `library/media-index.json` holds `entries` (in id order) and the `replaced` map that `replace media` records; `machine/media-local.json` holds `entries` and `overrides` (id to local path).
+The media root is a plain folder tree the user organizes freely. The index maps identity to what the app knows about each file and is kept in two tiers: a **library index** (`library/media-index.json`, synced with the library, written only by machines in writable library mode) for media that belongs to the library, and a **machine index** (`machine/media-local.json`) for media that exists only on this machine plus any path overrides (that media lives in the machine's own folder, `machine/media/`, Spec 8 §2). Both can be rebuilt from the files if lost. `library/media-index.json` holds `entries` (in id order) and the `replaced` map that `media replace` and the walk record (Spec 8 §4 and §6); `machine/media-local.json` holds `entries`, `overrides` (id to a path relative to `machine/media/`, or absolute) and its own `replaced` map.
 
 **Index entry**
 
 | Field | Notes |
 | --- | --- |
 | `id` | `sha256:...` for files, `slide:<uuid>` for designed slides and templates |
-| `path` | Relative to the media root, forward slashes; updated when the file moves |
+| `path` | Relative to the media root, or to `machine/media/` for a machine-index entry; forward slashes; updated when the file moves, and empty once another file took its place or the item was deleted (Spec 8 §4 and §6) |
 | `kind` | `video`, `image`, `audio`, `audioSet`, `slide`, `template` |
 | `size`, `modified` | For change detection without re-hashing |
 | `durationMs`, `fps` `{num, den}`, `width`, `height` | Video and audio metadata read at import |
 | `hasAudio`, `hasAlpha`, `codec` | Drive decoder choice and the pre-flight report |
-| `poster` | Relative path to the extracted poster frame (PNG), used by offset boxes and thumbnails |
+| `poster` | For video, the frame at the default in-point as a PNG at `.posters/<hash>-<in>.png`, relative like `path`; null for images and audio, and until extracted (Spec 8 §5). Used by offset boxes and thumbnails |
 | `defaults` | `trimInMs`, `trimOutMs`, `loop`, `gain` (dB), `grade` (number or null), `syncOffsetMs` (±1000), `defaultChannel` (number or null) |
 | `addedAt`, `folder` | For sort and the folder rail |
+| `deletedAt` | Set when `media delete` trashed the file; the entry stays, so references show missing (Spec 8 §6) |
 
 **Why two tiers.** A single synced index would let a campus's local import write into a file the central library also writes, and last-write-wins would eventually eat someone's entry. A purely local index would force every campus to re-derive authored data (trim points, loop flags, default grades) that should travel with the library. Splitting them gives each file one writer: central owns the library index, the campus owns its local index.
 
-**Lookup order.** Resolve an id in the machine index first, then the library index. When the library root is synced byte-for-byte, the library index already holds correct relative paths and the machine index is usually empty. When a campus relocates media (a different root, a faster drive), the machine index carries `overrides` from id to local path, and the library index is never edited. Local-only media (a campus announcement video) lives in the machine index with the same entry shape and promotes to the library index when the file is added to the library on a writable machine.
+**Lookup order.** Resolve an id in the machine index first, then the library index. When the library root is synced byte-for-byte, the library index already holds correct relative paths and the machine index is usually empty. When a campus relocates media (a different root, or a faster drive once v1's limit on where media may live is lifted, Spec 8 §2), the machine index carries `overrides` from id to a path relative to `machine/media/` or an absolute one, and the library index is never edited. Local-only media (a campus announcement video) lives in the machine index with the same entry shape, and its file in `machine/media/`; promoting it to the library comes with library mode in v1.5. A replaced id resolves through the `replaced` maps to the end of its chain (Spec 8 §2).
 
-**Rebuild.** On demand, or when an index is missing, the app walks the root, hashes files whose size or modification time is unknown (a 10–20 GB campus library hashes in well under a minute on Apple Silicon), reads metadata, and extracts posters it lacks. A rebuild never discards defaults it still has entries for.
+**Rebuild.** At launch, on `media rebuild` and whenever its watcher sees a change, the engine walks the media root and `machine/media/` (Spec 8 §4), hashes files whose size or modification time is unknown (a 10–20 GB campus library hashes in well under a minute on Apple Silicon), reads metadata, and extracts posters it lacks. A rebuild never discards defaults it still has entries for.
 
-**Missing state** is computed, never stored: an id whose path no longer exists stays in the index, is shown with a missing badge wherever it is referenced, and is listed by pre-flight. A `replace media` command rewrites every reference from one id to another across lists, macros and presets, and records the mapping in the index so re-imports of the old file resolve to the new one.
+**Missing state** is computed, never stored: an id whose file no longer exists, no longer holds its bytes or was deleted (Spec 8 §6) stays in the index, is shown with a missing badge wherever it is referenced, and is listed by pre-flight. A `media replace` command (Spec 8 §6) rewrites every reference from one id to another across lists, presets, macros, key bindings and scheduler entries, and records the mapping in the index so re-imports of the old file resolve to the new one.
 
-**Import** copies any file dragged from outside the root into the default import folder, hashes it, reads metadata, extracts a poster frame, and writes the entry. Optimization (transcoding) is a later phase and will add a `derived` map to the entry for alternate encodings of the same id.
+**Import** hashes any file dragged from outside the root, copies it into the default import folder unless the hash is already known, reads metadata, extracts a poster frame, and writes the entry (Spec 8 §3). Optimization (transcoding) is a later phase and will add a `derived` map to the entry for alternate encodings of the same id.
 
 **Audio sets** are folders treated as one item: the entry's `tracks` array lists the member ids in play order, with a crossfade in ms.
 
@@ -242,7 +245,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 
-**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, two files holding one list or playlist, two playlists with one title, a playlist load that names no playlist (Spec 7 §2–§3), media ids with no path, and fonts neither installed nor bundled. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
+**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, two files holding one list or playlist, two playlists with one title, a playlist load that names no playlist (Spec 7 §2–§3), media a reference names that is unknown, missing or deleted once resolved (Spec 8 §2), and fonts neither installed nor bundled. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
 
 **External changes.** When a document changes on disk under the app (a master arriving by sync, a hand edit), the app reloads it on the control thread and applies the nothing-edits-live rule: the live list keeps playing from its loaded cues, each cue picks up the new version on its next fire, and the cue grid marks the list as updated. A reload never touches channel state or the live pointer. A list file that disappears stays loaded for three seconds in case it reappears in another folder, which makes it a move (Spec 7 §2). Where `next` goes when a reload has removed the live cue, item or list is Spec 7 §4's.
 
