@@ -16,7 +16,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | spec needed |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | media-pool spec | spec needed |
-| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | cues-lists-playlists spec | spec needed |
+| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | spec needed |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | spec needed |
@@ -161,6 +161,34 @@ Preset 1's "2" layout, the Clock preset, and the fixtures and JSON Schemas of §
 (library-v1 and spike; no schema bump, §2). Tests first from §11's Area 6 list, with
 goldens for the anchor, the overflow and the confidence stack. Stop for review after the
 core changes and again after the fixtures. Nothing in app/.
+```
+
+**Area 9 — Cues, lists and playlists** (branch `area/playlists`)
+
+```
+Area: 9, cues, lists and playlists. Spec: docs/specs/7-cues-lists-and-playlists.md, with
+§10's tests; Spec 5 §2–§7 and §10 for the edit path this area builds (Spec 7 §7); Spec 1
+§2–§5 and §8, Spec 2 §3 and §6, Spec 3 §5 and §6 and Spec 6 §5 as Spec 7 corrected them.
+On main: the live pointer with list boundaries; next and previous across items, skipping
+headers and missing or empty lists; Go and Time triggers with the armed state, which the
+control loop fires as next; section jumps; the fire record; playlist load by title and
+date; the atomic writer and the versions folder. Build the core changes first: the
+pointer's item becomes itemUuid and the armed trigger gains itemUuid; playlist items gain
+a uuid (UUIDv5 for hand-made files) and linked items a listUuid they resolve by;
+`playlist "TITLE"` loads by title alone, with §3's order for clashes; `disarm` in the
+grammar, parser, printer and OSC form; list folders in the format (the loader walks
+lists/ and its folders, skipping dot-folders, records empty folders, applies §2's
+tie-breaks and never replaces another file; a save keeps a list in its folder); playlist
+files named from their titles. Then the edit path of §7: Spec 5's parser and printer for
+the edit family, the one queue, validation, inverses logged with each edit, groups and
+typing, the library event, operator lock and library mode, and the debounced write with
+E-3's version cadence, for lists, cues, folders and playlists, archive included (other
+objects' edits wait for Areas 8, 14 and 17 and are rejected until then); changes on disk,
+with the three-second window for moves and the conflicts folder. Then the live pointer of
+§4: the kept copies, the place rules and the reads table, the armed trigger sending next
+or disarm, and §6's feedback with /o/live/armed and the live event. Last, §8's fixtures
+and the playlist schema. Tests first from §10. Stop for review after the core changes,
+after the edit path, and after the live pointer. Nothing in app/.
 ```
 
 **Area 11 — Variables** (branch `area/variables`)
