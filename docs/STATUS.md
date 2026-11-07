@@ -74,6 +74,12 @@ asked to look into the alternative later. It is in `docs/specs/8-media-pool.md`,
 corrections to Specs 1–5 are applied, and the Area 8 prompt block is in
 `docs/build-order.md`.
 
+Spec 9, Log and saving (Area 12), was then drafted the same way and revised after two
+independent reviews. They added a guard so a state that crashes the engine can't come back
+in a loop, filed kept list versions by uuid so nothing writes over them, and settled how a
+snapshot restore runs beside cues and how a full disk is handled. Its twelve choices, G-1
+to G-12, wait for Adam's answers in the specs doc.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
@@ -90,6 +96,14 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
+
+- **Spec 9, Log and saving, for review.** Drafted in Cowork as a tab of the Project O specs
+  doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
+  answers (G1–G6, C2) and revised after two independent reviews. Twelve choices, G-1 to
+  G-12, wait for his answers in its §11; G-12 files kept list versions by uuid, which
+  reverses a line of Spec 7 §2. On acceptance it is exported to
+  `docs/specs/9-log-and-saving.md` with its corrections to Specs 1–8 and the Area 9 block,
+  and Area 12 gets its prompt block.
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -211,8 +225,8 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 After Area 15, Areas 6, 11, 9 and 8 are ready, in that order, from their blocks in
 `docs/build-order.md`; all four are engine-side and need no bench run, and Area 8 starts
 after Area 9, whose edit path it extends. The log-and-saving spec (Area 12) is drafted
-next in Cowork, then the others in the scope gaps doc's order: the show-mode UI with its
-settings section and the operator lock; edit mode. Each is reviewed before it is exported
+and waits for Adam's answers; the others follow in the scope gaps doc's order: the
+show-mode UI with its settings section and the operator lock; edit mode. Each is reviewed before it is exported
 to `docs/specs/` and its area's prompt is added to `docs/build-order.md`, when its Build
 tracker task moves from `spec needed` to `not started`. The bench run with the card
 happens whenever Adam sets a window; it does not block Area 15 or the engine-side areas,
