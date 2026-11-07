@@ -95,7 +95,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
-**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `dropChannels` (a channel per media kind for drops from the pool, Spec 8 §8), `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false), `snapshots` `{cadence, retention}`, `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
+**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `dropChannels` (a channel per media kind for drops from the pool, Spec 8 §8), `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false; brings the last state back after a run that didn't end cleanly, Spec 9 §4), `snapshots` `{cadence, retention}` (one value each in v1, Spec 9 §3), `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
 
 ## 4. Identity
 
@@ -111,7 +111,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Machines and libraries** each have a `uuid`, generated on first run and never changed; logs, snapshots and local-copy reports are tagged with the machine's.
 
-**Versions.** Every List master carries an integer `version` that increments on each save. A save writes the previous document to the versions folder (section 5) before overwriting when the last copy there is more than ten minutes old, so a kept version marks each editing session and edit undo covers the steps inside it (Spec 5, choice E-3). That is the whole version-history mechanism: last write wins, and any kept version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
+**Versions.** Every List master carries an integer `version` that increments on each save. A save writes the previous document to the versions folder (section 5) before overwriting when the last copy there is more than ten minutes old, so a kept version marks each editing session and edit undo covers the steps inside it (Spec 5, choice E-3). No save writes over a kept version: a list at or below the highest version kept for it saves one above that (Spec 9 §6). That is the whole version-history mechanism: last write wins, a kept version of a list comes back with `system restore list N version V` (Spec 9 §6), and any kept version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
 
 **Variables** are not objects. `[Timer 1]`, `[Popup 3]`, `[Time]` and the context values are resolved by name at render time; the only persisted facts about them are the slot counts in machine settings and the format strings embedded in text.
 
@@ -130,7 +130,7 @@ library/
   presets/                  one file per preset: 003-lower-third.json
   macros/                   portable macros, one file each
   lists/                    one file per master, in folders that are the library's folders: Hymns/042-great-is-thy-faithfulness.json
-  versions/042/             previous versions of list 42: v0017.json ...
+  versions/<list uuid>/     previous versions of a list, filed by its uuid: v0017.json … (Spec 9 §6)
   media/                    the media root (user subfolders, fonts/, imports/, and .posters/ for poster frames, Spec 8 §5)
   media-index.json          hash to path, metadata, defaults (section 7)
 
@@ -144,8 +144,10 @@ machine/
   macros/                   machine-level macros
   playlists/                one file per playlist, named from its title: sunday.json
   lists-local/              local copies of masters, with provenance
-  state/last.json           channel state at last clean shutdown (restore-last-state)
-  logs/  snapshots/         written by the app, read by nothing it depends on
+  state/last.json           ShowState for restore-last-state, with how the run that wrote it ended (Spec 9 §4)
+  logs/                     the command log and the engine log, a file a day each (Spec 9 §2)
+  blackbox/                 the black box, a file an hour (Spec 9 §2)
+  snapshots/                zips of both roots' documents (Spec 9 §3); all three are written by the engine and read by nothing it depends on
   thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10); pool tiles in pool/ (Spec 8 §5)
   conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
 ```

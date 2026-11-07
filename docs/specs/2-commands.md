@@ -136,7 +136,9 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | `history jump N` | `history.jump` | Jumps to a point within the current filter. v1.5, with the history view; in v1 it is rejected with `notInV1` (Spec 5 §8) | passes | none |
 | `system clearall` | `system.clearAll` | Clear content and reset attributes on every channel; the panic button, no confirmation | passes | runtime |
 | `system preflight` | `system.preflight` | Runs the pre-flight report on the live playlist | passes | none |
-| `system snapshot` | `system.snapshot` | Writes a library and machine snapshot now | passes | none |
+| `system snapshot` | `system.snapshot` | Writes a snapshot of both roots' documents now (Spec 9 §3) | passes | none |
+| `system restore list N version V` | `system.restoreList` `{list, version}` | Replaces list N with one of its kept versions (Spec 9 §6) | passes | edit |
+| `system restore snapshot "ID"` | `system.restoreSnapshot` `{id}` | Replaces the documents a snapshot covers with its copies (Spec 9 §6) | passes | edit |
 | `media import "PATH"` | `media.import` `{path}` | Imports a file or a folder (Spec 8 §3). The result is `ok` with a `job` id once PATH is readable; the files' outcomes follow on the `media` topic (Spec 8 §7) | passes | none |
 | `media rebuild` | `media.rebuild` | Walks the media folders now (Spec 8 §4) | passes | none |
 | `media replace HASH HASH` | `media.replace` `{old, new}` | Points every reference at the new item and records the mapping (Spec 8 §6) | passes | edit |
@@ -219,6 +221,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `popup 3 set "text" clearafter 30` | `/o/popup/3/set` `s:"text"` `i:30` |
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |
+| `system restore list 42 version 16` | `/o/system/restore` `s:"list 42 version 16"` |
 | `media rebuild` | `/o/media/rebuild` |
 
 **Argument rules.** Typed OSC arguments map positionally to the verb's arguments: integers for numbers and seconds, floats for decibels and decimal durations, strings for text and keywords. As an alternative for any command, a single string argument is parsed as the remainder of the text form, which is how a write with riders travels in one message; a single string is read as the remainder first and as the typed argument when that fails, so a caption's plain text still lands in `popup N set`. Both spellings reach the same command object; the log records the object. The address words are case-insensitive like keywords, and the `ch` and `tr` short forms expand there too. A value that does not survive a 32-bit float (`-6.1` dB) is sent and accepted as a double (`d`); integers and whole seconds are `i`.
@@ -289,7 +292,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 
 ## 9. The log entry and the API envelope
 
-**Log entry.** One JSON line per executed command, appended to the day's log file in the machine root. The history view is this session's slice of it; runtime undo (v1.5) reads the `snapshot` reference.
+**Log entry.** One JSON line per executed command or note (Spec 9 §2), appended to the day's log file, `machine/logs/commands-YYYY-MM-DD.jsonl`. The history view is this session's slice of it; runtime undo (v1.5) reads the `snapshot` reference.
 
 ```json
 { "ts": "2026-11-01T09:14:03.117-05:00", "seq": 4821, "group": "g-7f1a2b3c",
@@ -301,7 +304,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
   "fire": { "listTitle": "Great Is Thy Faithfulness", "ccli": "18723" } }
 ```
 
-`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime` or `edit`; edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number; a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) is logged with `undo: "none"`.
+`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime`, `edit` or `note` (Spec 9 §2); edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number; a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) reaches the log as a note the app sends (Spec 9 §2).
 
 **API envelope.** The WebSocket API carries the same objects. A client sends a request and receives a response with the same `id`; the engine pushes `event` messages for state changes to subscribed clients. The operator app is a client of this API over localhost.
 
@@ -314,7 +317,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 { "id": 20, "type": "query", "what": "state" }
 ```
 
-A `media import` result also carries the `job` its outcomes are reported under (Spec 8 §7).
+A `media import` result also carries the `job` its outcomes are reported under (Spec 8 §7). Spec 9 adds the `note` request (Spec 9 §2), the `versions` and `snapshots` queries (Spec 9 §6), and the `history` and `saving` topics (Spec 9 §5 and §7).
 
 **Auth and discovery.** The engine listens on the LAN with a token from the Keychain; the first message on a connection must be `{"type": "auth", "token": "..."}` or the socket closes. The service advertises over Bonjour as `_projecto._tcp` with the machine's campus name, so a remote finds it without an address. Nothing listens beyond the local network, and there is no cloud relay.
 

@@ -161,7 +161,7 @@ Popups are slots 1 up to the machine's `popups` count, which is 4 on first run, 
 - **Captions** (UX spec). An external captioning system sends `popup N set` over OSC as often as it likes, and a box on the broadcast stack shows `[Popup N]`. The engine does no caption processing of its own. A box takes a popup's new value at once, at most ten times a second (§5), so captions run at most a tenth of a second and a frame behind, not a line behind (P10).
 - **Variables in popups.** A popup's text resolves its variables one level deep when a box shows it (§5, choice T-2), so `popup 1 set "Doors close in [Timer 1]"` counts down. Brackets around anything that isn't a v1 name still print as written (T-1), so a caption's `[MUSIC]` shows as sent.
 - **Clear-all.** `system clearall` leaves popups as they are, since Spec 2 §3 and Spec 3 §3 define it on channels. `popup N clear` clears one slot, and the clears tab can carry a macro that clears them all (choice T-4).
-- **The log.** Popup commands are runtime commands (Spec 2 §3), so each one is logged. A captioning system can send several a second, and the log-and-saving spec decides whether those lines are kept in full.
+- **The log.** Popup commands are runtime commands (Spec 2 §3), so each one is logged. A captioning system can send several a second, and Spec 9 §2 keeps those lines in full.
 
 ## 8. Feedback
 

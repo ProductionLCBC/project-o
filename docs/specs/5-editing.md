@@ -41,7 +41,7 @@ The UX spec says any edit takes effect on the next fire. The second group depart
 
 **The live pointer.** An edit never moves the pointer. The pointer follows its playlist item by the item's uuid (L3), so inserting or moving items around the live one changes nothing. If an edit removes the cue the pointer names (a merge, say, or a delete), `next` fires what followed it and `previous` what came before it; if it removes the item, the song finishes first. A deleted live list or playlist runs on from the copy the engine keeps of it, so the song or the service can finish (L3, Spec 7 §4).
 
-**Writing.** The engine writes a changed document with Spec 1 §5's atomic write within one second of its last change. Typing therefore writes at most once a second, and the last keystroke always lands. Each write of a list master increments its `version`; when the previous file is also copied to `versions/` is choice E-3 (§12, Spec 1 §4).
+**Writing.** The engine writes a changed document with Spec 1 §5's atomic write within one second of its last change, or, while the disk is full, as soon as it can (Spec 9 §7). Typing therefore writes at most once a second, and the last keystroke always lands. Each write of a list master increments its `version`; when the previous file is also copied to `versions/` is choice E-3 (§12, Spec 1 §4).
 
 An edit that changes where a file lives does so in the same write:
 
@@ -61,7 +61,7 @@ A group that touches several documents writes each one atomically. A crash betwe
   "changed": [ { "object": "cue", "list": 42, "cue": "22bb…", "paths": ["commands"] } ] }
 ```
 
-`cause` is `edit`, `undo`, `redo`, `file` or `media`, the last for the index changes an import or the media walk makes, which also raise the revision (Spec 8 §2). The event names what changed and carries no object bodies; a client queries the objects it shows.
+`cause` is `edit`, `undo`, `redo`, `file`, `media` or `restore`: `media` for the index changes an import or the media walk makes, which also raise the revision (Spec 8 §2), and `restore` for the restore commands (Spec 9 §6). The event names what changed and carries no object bodies; a client queries the objects it shows.
 
 ## 3. Addressing
 
@@ -163,10 +163,11 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 2. **The object.** It exists, or, for `create`, its number or title is free. A local copy isn't editable in v1 (§3). An archived playlist takes only the edit that unarchives it and `delete`, since archived playlists are read-only until restored (UX spec); `duplicate` and `archive` read it without changing it, and renumbering or swapping a list rewrites its links (Spec 7 §5).
 3. **The path.** It exists in the object's JSON Schema (`formats/schemas`, on `main` since Area 2) and is editable. `uuid`, `schema`, `app`, `kind`, `version`, `builtIn` and `number` never are; numbers change only through `renumber` and `swap`.
 4. **The value.** It has the field's type and enum, and it is in range. That means Spec 1's ranges (a decoder cap of 2 or 3, box frames 0–1, an audio output delay of 0–1000 ms) and Spec 2 §8's (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1). When an edit changes a cue's commands, commands kept verbatim because they are unknown (Spec 1 §6) pass through unchanged; only the commands the edit adds or changes are validated.
-5. **References.** Every number the value names exists on this machine: a preset, transition, grade, channel, stack, output, audio output, macro or list. Every media id resolves to an entry in either index (Spec 8 §2). Loading tolerates a broken reference and degrades it (Spec 1 §8). An edit never creates one, with three exceptions, all flagged by the reference report:
+5. **References.** Every number the value names exists on this machine: a preset, transition, grade, channel, stack, output, audio output, macro or list. Every media id resolves to an entry in either index (Spec 8 §2). Loading tolerates a broken reference and degrades it (Spec 1 §8). An edit never creates one, with four exceptions, all flagged by the reference report:
    - a delete leaves the references to what it removed (E7);
    - an undo or redo puts back exactly what was there, broken references included (§8);
    - a portable document may name a stack, output, audio output or input this machine lacks, since it meets those numbers at other campuses (Spec 1 §2).
+   - a restore puts documents back as they were, broken references included (Spec 9 §6).
 6. **Uniqueness.** These must be unique: a number within its type, a playlist title on the machine ignoring case (L5), an item's uuid within its playlist (Spec 7 §3), a channel within a stack (P13), and a key within its device. `renumber` and `swap` also refuse a number that broken references still name, so they never adopt references meant for a deleted object. `create` may take such a number, and those references then resolve to the new object, apart from playlist links, which follow the list's uuid (Spec 7 §3); that is how undoing a delete reconnects them.
 7. **Protected objects.** Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped, though both stay editable (the scope doc's review of P13). An object on air can't be deleted until it is off air: a channel with content in a stack that an output shows, or a stack that an output shows (choice E-7, §12). The live list is the exception. Deleting it is allowed, and the engine runs on from its kept copy so the song can finish (L3, Spec 7 §4). The live playlist can't be archived in place while it is live (Spec 7 §5).
 8. **Structure.** A folder is deleted only when it's empty. A macro edit passes Spec 2 §5's cycle and depth checks. An edit held by a cue, macro, key binding or scheduler entry is validated when its holder is saved, like any edit (§2).
@@ -179,7 +180,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 | `noop` | The edit would change nothing | Yes (Spec 2 §8) |
 | `rejected` | A check above failed; the reason is `code: message` | No; answered at the API or the command bar only (Spec 2 §9) |
 
-**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`, `noTrash` (Spec 8 §6).
+**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`, `noTrash` (Spec 8 §6), `diskFull` (Spec 9 §6).
 
 ## 7. Lock, library mode and secrets
 
@@ -207,14 +208,14 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 ## 9. Restores
 
-The log-and-saving spec defines two restore commands (G6): `system restore list N version V` and `system restore snapshot ID`. Both run through the edit path:
+Spec 9 defines two restore commands (G6): `system restore list N version V` and `system restore snapshot "ID"`. Both run through the edit path:
 
 - Each one is an edit group whose inverse puts back what it replaced. For a snapshot, the engine first takes a snapshot of the state it is about to replace.
 - Each one is logged with kind `edit`, is refused under operator lock (§7), and can be undone like any edit.
-- Restoring a list writes it like any save, so its `version` goes up and its versions file follows E-3 (Spec 1 §4).
+- Restoring a list keeps the document it replaces as a version, whatever E-3 says, and its `version` goes above every kept one (Spec 9 §6).
 - A restore changes the library and never ShowState. What it replaces shows on air by §2's rules, as an edit of the same things would.
 
-The log-and-saving spec defines which documents a snapshot restore replaces, and how it treats outputs in use.
+Spec 9 §6 says which documents a snapshot restore replaces, and how it treats outputs in use.
 
 ## 10. Changes that arrive on disk
 
