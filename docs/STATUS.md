@@ -66,6 +66,12 @@ each time it reads it), and accepted by Adam with every choice as drafted. It is
 `docs/specs/7-cues-lists-and-playlists.md`, its corrections to Specs 1, 2, 3, 5 and 6 are
 applied, and the Area 9 prompt block is in `docs/build-order.md`.
 
+Spec 8, Media pool (Area 8), was then drafted the same way and revised after three
+independent reviews. They moved the cases that syncing to read-only campuses creates to
+library mode (v1.5), and settled how the walk tells a move from a re-export or a restore
+and how a delete meets undo. Its eight choices, M-1 to M-8, wait for Adam's answers in the
+specs doc.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
@@ -82,6 +88,14 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
+
+- **Spec 8, Media pool, for review.** Drafted in Cowork as a tab of the Project O specs
+  doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
+  answers (M1–M11) and revised after three independent reviews. Eight choices, M-1 to
+  M-8, wait for his answers in its §12; M-8 asks where the media root may live while
+  builds are ad-hoc signed (ADR 0007). On acceptance it is exported to
+  `docs/specs/8-media-pool.md` with its corrections to Specs 1–5, and Area 8 gets its
+  prompt block.
 
 - **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
@@ -196,8 +210,8 @@ propose the Spec 2 §3 and §6 correction in the plan before any code. Tests fir
 
 After Area 15, Areas 6, 11 and 9 are ready, in that order, from their blocks in
 `docs/build-order.md`; all three are engine-side and need no bench run. The media-pool
-spec (Area 8) is drafted next in Cowork, then the others in the scope gaps doc's order:
-log and saving; the show-mode UI with its settings section and the operator lock; edit
+spec (Area 8) is drafted and waits for Adam's answers; the others follow in the scope gaps
+doc's order: log and saving; the show-mode UI with its settings section and the operator lock; edit
 mode. Each is reviewed before it is exported to `docs/specs/` and its area's prompt is
 added to `docs/build-order.md`, when its Build tracker task moves from `spec needed` to
 `not started`. The bench run with the card happens whenever Adam sets a window; it does
