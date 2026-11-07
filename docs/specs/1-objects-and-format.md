@@ -64,7 +64,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 
 **Macro**: `commands` (array of command objects, see section 6), `color`, `tileLabel`. `scope` is computed, not stored: a macro that references a stack or output is machine-level and is written to the machine root instead of the library. A guard that names a stack or output (`[Output N Stack]`, `[Stack N Blackout]`) counts as a reference.
 
-**List** (a master): `title`, `author`, `copyright`, `ccli`, `trackThrough` (bool), `version` (integer, incremented on every save), `cues` (ordered array), `timeline` (*reserved*). A local copy is the same document with `provenance` `{masterUuid, masterVersion, detachedAt}` and lives in the machine root.
+**List** (a master): `title`, `author`, `copyright`, `ccli`, `trackThrough` (bool), `version` (integer, incremented on every save), `cues` (ordered array), `timeline` (*reserved*). Its folder in the library is the folder under `lists/` that its file is in (section 5, Spec 7 §2). A local copy is the same document with `provenance` `{masterUuid, masterVersion, detachedAt}` and lives in the machine root.
 
 **Cue** (child of List): `uuid`, `label`, `section` (string label or null), `note`, `trigger` (`{type: "go"}`, `{type: "time", ms}`, or `{type: "timecode", tc}`), `advanceAfterMs` (or null), `commands` (array). Cue numbers are positions, not stored; see section 4.
 
@@ -91,7 +91,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Input**: `kind` (`sdi`, `ndi`, `camera`, `screen`), `device`, `format`, `deinterlace` (bool), `colorRange`, `audioMap` (array), `bufferingMs`, `expected` (bool, for pre-flight).
 
-**Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `serviceTime` (`HH:MM` or null, in the machine's time zone, read by `[Service In]`, Spec 6 §5), `archived` (bool), `items` (ordered). An item is one of `{kind: "header", label}`, `{kind: "linked", list: list number}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root. Playlists carry no cues of their own. The playlist's name is its title; the pair of title and date must be unique on a machine (case-insensitive), and the UI prompts for a different name on a clash, so a weekly "Sunday" playlist is fine as long as each has its date. The tree sorts dated playlists by date and lists undated ones by name in their own group.
+**Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `serviceTime` (`HH:MM` or null, in the machine's time zone, read by `[Service In]`, Spec 6 §5), `archived` (bool), `items` (ordered). Every item has a `uuid`, unique within the playlist, and is one of `{kind: "header", label}`, `{kind: "linked", list: list number, listUuid}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root (Spec 7 §3). Playlists carry no cues of their own. The playlist's name is its title, unique on a machine ignoring case; its date is optional metadata and never part of its name (Spec 7 §3). The tree sorts dated playlists by date and lists undated ones by name in their own group.
 
 **Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
@@ -129,7 +129,7 @@ library/
   audio-transitions.json    all audio transitions
   presets/                  one file per preset: 003-lower-third.json
   macros/                   portable macros, one file each
-  lists/                    one file per master: 042-great-is-thy-faithfulness.json
+  lists/                    one file per master, in folders that are the library's folders: Hymns/042-great-is-thy-faithfulness.json
   versions/042/             previous versions of list 42: v0017.json ...
   media/                    the media root (user subfolders, fonts/, imports/)
   media-index.json          hash to path, metadata, defaults (section 7)
@@ -140,7 +140,7 @@ machine/
   keys.json                 key bindings and scheduler
   media-local.json          local-only media and path overrides (section 7)
   macros/                   machine-level macros
-  playlists/                one file per playlist: 2026-11-01-sunday.json, or sunday-night.json when undated
+  playlists/                one file per playlist, named from its title: sunday.json
   lists-local/              local copies of masters, with provenance
   state/last.json           channel state at last clean shutdown (restore-last-state)
   logs/  snapshots/         written by the app, read by nothing it depends on
@@ -148,7 +148,7 @@ machine/
   conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
 ```
 
-File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it and renames the file to match on save. Every document starts with the same header.
+File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it, or a playlist's by its `uuid`, and renames the file to match on save, keeping a list in its folder (Spec 7 §2–§3). Every document starts with the same header.
 
 ```json
 { "schema": 1, "app": "0.1.0", "kind": "list", ... }
@@ -164,7 +164,7 @@ File names carry the number and a slug of the label for human reading only; the 
 - References are plain numbers (`"preset": 3`), hashes are prefixed strings (`"sha256:..."`), authored documents are `"slide:<uuid>"`.
 - Unknown keys are preserved on load and written back unchanged, so a newer app's files survive a round trip through an older one.
 
-**Writing.** Every save writes to a temporary file in the same folder, fsyncs, and renames over the original, so a crash mid-write leaves the previous file intact. Saves are debounced per document; a list being typed into is written at most once a second and always on blur. The loader and the folder watcher ignore a sync tool's temporary and partial files (names beginning with a dot or ending in .tmp, and any file whose JSON does not parse yet), so a document arriving by sync is read only once it is complete. Continuous save means there is no save command anywhere in the UI.
+**Writing.** Every save writes to a temporary file in the same folder, fsyncs, and renames over the original, so a crash mid-write leaves the previous file intact. Saves are debounced per document; a list being typed into is written at most once a second and always on blur. The loader and the folder watcher ignore a sync tool's temporary and partial files (names beginning with a dot or ending in .tmp, anything in a folder whose name begins with a dot, and any file whose JSON does not parse yet), so a document arriving by sync is read only once it is complete. Continuous save means there is no save command anywhere in the UI.
 
 **Why one file per list and per preset:** they are the objects that change most, and per-file granularity keeps sync conflicts and diffs confined to the thing that changed. The small catalog files (channels, grades, transitions) change rarely and are fine as single documents.
 
@@ -242,9 +242,9 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 
-**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, media ids with no path, and fonts neither installed nor bundled. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
+**Reference checks** run on load and produce one report, which is also what the pre-flight command reads: references to numbers that do not exist (a cue writing a deleted channel, a slot naming a missing preset), duplicate channels in a stack, duplicate numbers within a type, two files holding one list or playlist, two playlists with one title, a playlist load that names no playlist (Spec 7 §2–§3), media ids with no path, and fonts neither installed nor bundled. A broken reference degrades to the documented default (Preset 1, the channel default transition as it is defined, an empty slot) and is reported; a channel default transition that is missing too degrades to a zero-second cut. Nothing refuses to load because of it.
 
-**External changes.** When a document changes on disk under the app (a master arriving by sync, a hand edit), the app reloads it on the control thread and applies the nothing-edits-live rule: the live list keeps playing from its loaded cues, each cue picks up the new version on its next fire, and the cue grid marks the list as updated. A reload never touches channel state or the live pointer.
+**External changes.** When a document changes on disk under the app (a master arriving by sync, a hand edit), the app reloads it on the control thread and applies the nothing-edits-live rule: the live list keeps playing from its loaded cues, each cue picks up the new version on its next fire, and the cue grid marks the list as updated. A reload never touches channel state or the live pointer. A list file that disappears stays loaded for three seconds in case it reappears in another folder, which makes it a move (Spec 7 §2). Where `next` goes when a reload has removed the live cue, item or list is Spec 7 §4's.
 
 **Hard failures** are malformed JSON, a schema outside what the app can read, and a document whose shape does not decode. All leave the previous good state in place and surface a plain message naming the file, and where inside it.
 
@@ -386,4 +386,4 @@ These are written before the format code, from this document, and are the defini
 - **Text size:** both units. `size` is `{value, unit}` with `pt` (points on a 1080-line canvas, scaled with output height) as the default and `percent` of output height as the option, so 20% means a fifth of the screen on any output.
 - **Stack-size hint:** superseded. A preset now holds one layout per stack (section 2), each designed at that stack's output size, with a default layout for stacks not named, so no aspect hint is needed.
 - **Index location:** two tiers, library and machine, as section 7 now describes, with the machine index consulted first.
-- **Playlist naming:** the title is the name and the date is optional. Title plus date must be unique per machine; the UI prompts for a new name on a clash. The thing to watch is the weekly case: twenty "Sunday" playlists are fine only because each carries its date, so an undated "Sunday" can exist once.
+- **Playlist naming:** the title is the name, unique per machine, and the date is optional metadata. Archive files a dated copy, so a weekly "Sunday" keeps its name (Spec 7 §5).

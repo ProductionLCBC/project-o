@@ -82,26 +82,26 @@ A write replaces the channel's content instance, applies its riders, and emits a
 
 ## 5. The live pointer and triggers
 
-**The pointer** is `{playlist, item, listUuid, cueUuid}` or, when a master was fired directly from the library, `{list, cueUuid}` with no playlist. It names the last cue fired, not a cursor: browsing in the UI never moves it. Firing any cue moves it there and makes that cue's list live.
+**The pointer** is `{playlist, itemUuid, listUuid, cueUuid}`, where `itemUuid` is the playlist item's uuid, or, when a master was fired directly from the library, `{listUuid, cueUuid}` with no playlist (Spec 7 §4). It names the last cue fired, not a cursor: browsing in the UI never moves it. Firing any cue moves it there and makes that cue's list live.
 
 **Firing** a cue means: compute the list boundary (below), run the cue's commands as one group with source `cue`, set the pointer, then arm the next trigger. A fired cue is logged once with its `fire` record even if every one of its commands was blocked by lock.
 
 **List boundary.** A boundary occurs when the fired cue's `listUuid` differs from the pointer's current one, or when the pointer was empty. At a boundary, before the cue's commands run, every tracked attribute on every channel resets to default unless the list being entered has `trackThrough`. Firing a cue in the same list, in any order, is never a boundary.
 
-**`next`****and****`previous`** operate on playlist positions: the cue after or before the pointer's, crossing item boundaries, skipping headers, and doing nothing past either end. With a library list live (no playlist), they stay inside that list; `next` on its last cue does nothing. Firing a playlist cue again resumes the playlist pointer there.
+**`next`****and****`previous`** operate on playlist positions: the cue after or before the pointer's, crossing item boundaries, skipping headers and items whose list is missing or has no cues, and doing nothing past either end. When an edit, a reload or a library restore has removed what the pointer names, they go from its place (Spec 7 §4). With a library list live (no playlist), they stay inside that list; `next` on its last cue does nothing. Firing a playlist cue again resumes the playlist pointer there.
 
 **Triggers** live on the cue being fired and arm after the fire:
 
 | Trigger | Arms | Fires when |
 | --- | --- | --- |
 | Go | nothing | The operator or a command fires the cue |
-| Time | `armed = {cue: next, at: fireFrame + ms}` on the following cue | The engine clock reaches `at` |
+| Time | `armed = {item, cue: next, at: fireFrame + ms}` on the following cue | The engine clock reaches `at` |
 | Advance-after | the same, set by the firing cue | The engine clock reaches `at`; when both the firing cue's advance-after and the next cue's Time are set, the shorter wins and the editor warns |
 | Timecode | nothing in v1 | v2 |
 
-A manual fire of any cue disarms whatever is armed. A cue with a Timecode trigger ignores Time and advance-after aimed at it (v2). Untimed cues keep their timers and chain from whatever fired before them.
+A manual fire of any cue disarms whatever is armed. When the clock reaches `at`, the engine sends `next` if the armed cue is still the one `next` would fire, and `disarm` otherwise (Spec 7 §4). A cue with a Timecode trigger ignores Time and advance-after aimed at it (v2). Untimed cues keep their timers and chain from whatever fired before them.
 
-**Armed state is in ShowState** (`armed`) so lookahead can show what will fire and when, and so a restored state after undo carries no stale timer: restores always land with `armed` cleared.
+**Armed state is in ShowState** (`armed`) so lookahead can show what will fire and when, while that cue is still the next one (Spec 7 §4), and so a restored state after undo carries no stale timer: restores always land with `armed` cleared.
 
 **Section jumps** (`item N section "chorus"`) fire the first cue whose `section` matches, case-insensitive; no match is `rejected`.
 
@@ -113,9 +113,9 @@ func project(_ state: ShowState,
              context: ProjectionContext) -> (ShowState, [Effect])
 ```
 
-**ProjectionContext** carries everything the fold needs that is not state and not a command, all of it plain data: `frame` (the engine frame the group lands on), `rate` (the machine's frame rate, `{num, den}`, so durations become frames), `library` (channels, presets, transitions, grades, lists, and the media index whose entry defaults a media write falls back to; read only), `machine` (stacks, outputs, playlists and local copies, tracking switches, decoder cap default), `missing` (the set of media ids the resolver cannot find), `source` (Spec 2's source record for lock decisions), and `variables` (a closure or table that resolves `[Timer 1]` and friends for guards). Nothing in the context is mutable and nothing has a side effect.
+**ProjectionContext** carries everything the fold needs that is not state and not a command, all of it plain data: `frame` (the engine frame the group lands on), `rate` (the machine's frame rate, `{num, den}`, so durations become frames), `library` (channels, presets, transitions, grades, lists, and the media index whose entry defaults a media write falls back to; read only), `kept` (the engine's copies of the list and playlist the pointer names, Spec 7 §4), `machine` (stacks, outputs, playlists and local copies, tracking switches, decoder cap default), `missing` (the set of media ids the resolver cannot find), `source` (Spec 2's source record for lock decisions), and `variables` (a closure or table that resolves `[Timer 1]` and friends for guards). Nothing in the context is mutable and nothing has a side effect.
 
-**Commands** are the Spec 2 objects. The projection handles every command that touches ShowState: channel writes and attribute writes, transport, clear and reset, output and stack commands, popups, pointer moves (`next`, `previous`, `cue`, `item`, `list`, `section`, `playlist`), and `macro` by inlining the macro's commands with their guards, from the library root or the machine root (Spec 1 §2). Commands that do not touch state (`timer`, `history`, `system preflight`, `system snapshot`, `edit`) pass through as a `passthrough` effect for the caller to act on, so the fold stays total: every command in, one result out.
+**Commands** are the Spec 2 objects. The projection handles every command that touches ShowState: channel writes and attribute writes, transport, clear and reset, output and stack commands, popups, pointer moves (`next`, `previous`, `cue`, `item`, `list`, `section`, `playlist`) and `disarm`, and `macro` by inlining the macro's commands with their guards, from the library root or the machine root (Spec 1 §2). Commands that do not touch state (`timer`, `history`, `system preflight`, `system snapshot`, `edit`) pass through as a `passthrough` effect for the caller to act on, so the fold stays total: every command in, one result out.
 
 **Effects** are what the engine and the UI act on. They are the only output besides the new state.
 

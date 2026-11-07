@@ -112,7 +112,8 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | `item N cue M` | `playlist.goto` | Fires that cue and makes its item live | passes | runtime |
 | `item N section "NAME"` | `playlist.section` | Fires the first cue of that section in item N | passes | runtime |
 | `list N cue M` | `list.goto` | Fires that cue in a library master; the list becomes live with lookahead confined to it | passes | runtime |
-| `playlist "TITLE" [DATE]` | `playlist.load` | Makes a playlist live at its first cue without firing it | passes | none |
+| `playlist "TITLE"` | `playlist.load` | Makes a playlist live with no cue fired; the first `next` fires its first cue (Spec 7 §3–§4) | passes | none |
+| `disarm` | `playlist.disarm` | Clears the armed trigger, so nothing fires on its own; the engine sends it when a trigger's cue is no longer next at its time (Spec 7 §4) | passes | none |
 
 **Timers, popups and audio**
 
@@ -219,7 +220,8 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 
 | Address | Arguments | When |
 | --- | --- | --- |
-| `/o/live/playlist`, `/o/live/item`, `/o/live/cue`, `/o/live/label` | `s`, `i`, `i`, `s` | Live position changes |
+| `/o/live/playlist`, `/o/live/item`, `/o/live/cue`, `/o/live/label` | `s`, `i`, `i`, `s` | Live position changes, including an edit that renumbers it (Spec 7 §6) |
+| `/o/live/armed` | `i:item` `i:cue` `i:ms`, or none | A trigger arms, or an edit moves its cue; no arguments when it disarms, lapses or fires (Spec 7 §6) |
 | `/o/channel/N/content` | `s:kind` `s:label` | Content changes, including clear |
 | `/o/channel/N/state` | `s` (`empty`, `playing`, `paused`, `held`, `missing`) | Transport or content changes |
 | `/o/channel/N/remaining` | `i:ms` | Once a second while timed content plays, only to clients that subscribed to that channel's remaining time (see below) |

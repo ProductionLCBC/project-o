@@ -39,14 +39,14 @@ Edits run by a cue, a macro, a key or the scheduler join the undo stack, one gro
 
 The UX spec says any edit takes effect on the next fire. The second group departs from that; it is choice E-6 in §12.
 
-**The live pointer.** An edit never moves the pointer. The pointer follows its playlist item by the item's uuid (L3), so inserting or moving items around the live one changes nothing. If an edit removes the cue or item the pointer names (a merge, say, or a delete), `next` fires what followed it and `previous` what came before it. A deleted live list or playlist keeps its loaded copy until the pointer leaves it, so the song or the service can finish (L3).
+**The live pointer.** An edit never moves the pointer. The pointer follows its playlist item by the item's uuid (L3), so inserting or moving items around the live one changes nothing. If an edit removes the cue the pointer names (a merge, say, or a delete), `next` fires what followed it and `previous` what came before it; if it removes the item, the song finishes first. A deleted live list or playlist runs on from the copy the engine keeps of it, so the song or the service can finish (L3, Spec 7 §4).
 
 **Writing.** The engine writes a changed document with Spec 1 §5's atomic write within one second of its last change. Typing therefore writes at most once a second, and the last keystroke always lands. Each write of a list master increments its `version`; when the previous file is also copied to `versions/` is choice E-3 (§12, Spec 1 §4).
 
 An edit that changes where a file lives does so in the same write:
 
 - a renumbered object or a renamed playlist renames its file;
-- a list moved to another folder moves its file (L7);
+- a list or folder moved to another folder is renamed on disk, which isn't a save, so no `version` goes up (L7, Spec 7 §2);
 - a macro whose edit makes it name a stack or an output moves from the library root to the machine root (Spec 1 §2).
 
 A group that touches several documents writes each one atomically. A crash between two files leaves each file whole, and the reference report (Spec 1 §8) names any reference the crash left behind.
@@ -100,22 +100,23 @@ The text form is `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`. When the word after t
 | --- | --- | --- | --- | --- |
 | set | `edit channel 2 label "Lyrics"` | `edit.set` | Sets one field at a path; a value equal to the current one is a `noop` | `edit.set` with the previous value, or `edit.unset` where the key was absent |
 | unset | `edit preset 3 unset layouts.2` | `edit.unset` | Removes a map entry or an optional key | `edit.set` with the removed value |
-| create | `edit preset 7 create`, optionally with a JSON body; `edit playlist create "Sunday"`; `edit folder "Worship/New" create` | `edit.create` | Creates a numbered object at a free number, a playlist, or a folder. Without a body it takes the type's defaults and a fresh uuid | `edit.delete` |
-| delete | `edit channel 5 delete` | `edit.delete` | Removes an object. References to it stay, and the reference report flags them (Spec 1 §8, E7). A folder is deleted only when empty | `edit.create` with the whole previous object |
+| create | `edit preset 7 create`, optionally with a JSON body; `edit playlist create "Sunday"`; `edit folder "Worship/New" create` | `edit.create` | Creates a numbered object at a free number, a playlist, or a folder. A list can be created in a folder (Spec 7 §2). Without a body it takes the type's defaults and a fresh uuid | `edit.delete` |
+| delete | `edit channel 5 delete` | `edit.delete` | Removes an object. References to it stay, and the reference report flags them (Spec 1 §8, E7). A folder is deleted only when empty | `edit.create` with the whole previous object, and a list's folder (Spec 7 §2) |
 | renumber | `edit channel 2 renumber 5` | `edit.renumber` | Moves an object to a free number and rewrites references to it in the same write (Spec 1 §4; machine-level objects below) | `edit.renumber` back |
 | swap | `edit channel 2 swap 5` | `edit.swap` | Exchanges two objects' numbers and both sets of references (Spec 1 §4) | The same swap |
 | insert | `edit list 42 insert cues 2 {…}`; `edit list 42 cue 22bb… insert commands 3 {…}`; `edit preset 3 insert layouts.2.boxes 1 {…}` | `edit.insert` | Inserts a value into an array at a path and position | `edit.remove` of what was inserted |
 | remove | `edit list 42 cue 22bb… remove`; `edit stack 2 slot 3 remove`; `edit preset 3 remove layouts.2.boxes 1` | `edit.remove` | Removes a child, by its own address or by position | `edit.insert` of the removed value at its old position |
 | move | `edit list 42 cue 22bb… move 4`; `edit playlist 2b2b… item 4d4d… move 0` | `edit.move` | Moves a child to a position in its array | `edit.move` back |
-| duplicate | `edit list 42 cue 22bb… duplicate`; `edit preset 3 duplicate 9` | `edit.duplicate` | Copies a child to just after itself with new uuids, or a numbered object to a free number (the UX spec's duplicate-from) | `edit.remove` or `edit.delete` of the copy |
+| duplicate | `edit list 42 cue 22bb… duplicate`; `edit preset 3 duplicate 9` | `edit.duplicate` | Copies a child to just after itself with new uuids, or a numbered object to a free number (the UX spec's duplicate-from), or a playlist under a new title (Spec 7 §3) | `edit.remove` or `edit.delete` of the copy |
+| archive | `edit playlist 2b2b… archive` | `edit.archive` | Files a dated, read-only copy of a playlist and leaves the playlist as it is (Spec 7 §5) | `edit.delete` of the copy |
 | section | `edit list 42 cue 22bb… section duplicate`; `… section move 9`; `… section remove` | `edit.section` | Acts on the cue's section block, the run of consecutive cues that share its section label: `duplicate` copies the block to just after itself with new uuids (the UX spec's duplicate-section), `move` moves it, `remove` removes it. The engine runs it as one group of cue edits | That group's inverses |
 | folder | `edit list 42 folder "Worship/Hymns"` | `edit.folder` | Moves a list's file to another library folder (L7) | `edit.folder` back |
-| rename | `edit folder "Worship" rename "Music"` | `edit.rename` | Renames a library folder | `edit.rename` back |
+| rename | `edit folder "Worship" rename "Music"` | `edit.rename` | Renames a library folder, or moves it when the new path has another parent (Spec 7 §2) | `edit.rename` back |
 | channel | `edit list 42 cue 22bb… channel 2 write text "…"`; `… channel 2 clear`; `… channel 2 hold grade 5` | `edit.cueChannel` | Sets everything a cue says about one channel. That is its content state (write with content and riders, clear, or hold: the UX spec's three states) plus its standalone attribute writes (`grade`, `transition`, `audiotransition`, `gain`; Spec 1 §6), which can stand beside any of the three. Channel commands stay in channel-number order (Spec 2 §8) | `edit.cueChannel` with the previous state and attribute writes |
 
 Positions in paths and in `insert`, `remove` and `move` count from 0, as JSON arrays do. Cue numbers, which people see, count from 1 (Spec 1 §4). A cue's commands for things other than channels (stacks, outputs, macros, timers, popups) are inserted, removed and moved in its `commands` array with the generic verbs. The raw command view can also set a cue's whole `commands` array as one value.
 
-**What the log records.** When the engine picks something for an edit (a free number, a fresh uuid, the uuids of copies), the logged command records what it picked. Redo (§8) runs the logged commands, so a redone group recreates the same numbers and uuids.
+**What the log records.** When the engine picks something for an edit (a free number, a fresh uuid, the uuids of copies), the logged command records what it picked. A number it picks is one more than the highest of that type in use or named by any reference, so a new object never takes over references meant for a deleted one (Spec 7 §2). Redo (§8) runs the logged commands, so a redone group recreates the same numbers and uuids.
 
 **Renumbering machine-level objects.** A stack, output, audio output or input belongs to one machine, but portable documents name machine-level numbers so that they meet them at every campus (Spec 1 §2). Presets key their layouts by stack, cues hold `output N stack M`, and channels list their audio outputs. Renumbering a machine-level object therefore rewrites references in the machine root only. It leaves portable documents alone and returns a warning listing the portable references that now name something else on this machine. This narrows Spec 1 §4's "every internal reference in the library and the machine root" to the root the object lives in.
 
@@ -159,15 +160,15 @@ The text editor's split and merge are groups (E2), and so are the show-mode acti
 An edit is checked in this order. The first failure rejects it, and nothing changes.
 
 1. **Lock and library mode** (§7).
-2. **The object.** It exists, or, for `create`, its number or title is free. A local copy isn't editable in v1 (§3). An archived playlist takes only the edit that unarchives it, since archived playlists are read-only until restored (UX spec).
+2. **The object.** It exists, or, for `create`, its number or title is free. A local copy isn't editable in v1 (§3). An archived playlist takes only the edit that unarchives it and `delete`, since archived playlists are read-only until restored (UX spec); `duplicate` and `archive` read it without changing it, and renumbering or swapping a list rewrites its links (Spec 7 §5).
 3. **The path.** It exists in the object's JSON Schema (`formats/schemas`, on `main` since Area 2) and is editable. `uuid`, `schema`, `app`, `kind`, `version`, `builtIn` and `number` never are; numbers change only through `renumber` and `swap`.
 4. **The value.** It has the field's type and enum, and it is in range. That means Spec 1's ranges (a decoder cap of 2 or 3, box frames 0–1, an audio output delay of 0–1000 ms) and Spec 2 §8's (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1). When an edit changes a cue's commands, commands kept verbatim because they are unknown (Spec 1 §6) pass through unchanged; only the commands the edit adds or changes are validated.
 5. **References.** Every number the value names exists on this machine: a preset, transition, grade, channel, stack, output, audio output, macro or list. Every media id is in the index. Loading tolerates a broken reference and degrades it (Spec 1 §8). An edit never creates one, with three exceptions, all flagged by the reference report:
    - a delete leaves the references to what it removed (E7);
    - an undo or redo puts back exactly what was there, broken references included (§8);
    - a portable document may name a stack, output, audio output or input this machine lacks, since it meets those numbers at other campuses (Spec 1 §2).
-6. **Uniqueness.** These must be unique: a number within its type, a playlist title on the machine ignoring case (L5), a channel within a stack (P13), and a key within its device. `renumber` and `swap` also refuse a number that broken references still name, so they never adopt references meant for a deleted object. `create` may take such a number, and those references then resolve to the new object; that is how undoing a delete reconnects them.
-7. **Protected objects.** Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped, though both stay editable (the scope doc's review of P13). An object on air can't be deleted until it is off air: a channel with content in a stack that an output shows, or a stack that an output shows (choice E-7, §12). The live list is the exception. Deleting it is allowed, and the engine keeps its loaded copy so the song can finish (L3).
+6. **Uniqueness.** These must be unique: a number within its type, a playlist title on the machine ignoring case (L5), an item's uuid within its playlist (Spec 7 §3), a channel within a stack (P13), and a key within its device. `renumber` and `swap` also refuse a number that broken references still name, so they never adopt references meant for a deleted object. `create` may take such a number, and those references then resolve to the new object, apart from playlist links, which follow the list's uuid (Spec 7 §3); that is how undoing a delete reconnects them.
+7. **Protected objects.** Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped, though both stay editable (the scope doc's review of P13). An object on air can't be deleted until it is off air: a channel with content in a stack that an output shows, or a stack that an output shows (choice E-7, §12). The live list is the exception. Deleting it is allowed, and the engine runs on from its kept copy so the song can finish (L3, Spec 7 §4). The live playlist can't be archived in place while it is live (Spec 7 §5).
 8. **Structure.** A folder is deleted only when it's empty. A macro edit passes Spec 2 §5's cycle and depth checks. An edit held by a cue, macro, key binding or scheduler entry is validated when its holder is saved, like any edit (§2).
 
 **Results**
@@ -222,7 +223,7 @@ Spec 1 §8 reloads a document that changes on disk, such as a master arriving by
 - **No unwritten edits.** The engine loads the arriving document, drops the undo and redo steps that touch it (§8), and sends a `library` event with cause `file`.
 - **Unwritten edits.** The engine's edits win. It keeps the arriving file in `machine/conflicts/`, named with the time and the file's name, writes its own document, and logs both. The change that lost is one file copy away, as the UX spec's distribution section asks, and nothing is merged (choice E-5, §12).
 
-`machine/conflicts/` sits in the machine root (a Spec 1 §5 addition): it is never synced, and the loader ignores it. A list file that moves to another folder and keeps its uuid is a move of that list (L7), not a deletion and a new list. The rule above applies to it like any other reload.
+`machine/conflicts/` sits in the machine root (a Spec 1 §5 addition): it is never synced, and the loader ignores it. A list file that moves to another folder and keeps its uuid is a move of that list (L7), not a deletion and a new list. A sync can deliver a move as a delete and a create, so a list file that disappears stays loaded for three seconds before it counts as deleted. When a list with unwritten edits has moved on disk, the engine writes them at the new path (Spec 7 §2, §7). The rule above applies to it like any other reload.
 
 ## 11. Tests this spec implies
 

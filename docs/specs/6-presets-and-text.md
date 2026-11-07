@@ -89,7 +89,7 @@ The fonts and their licences sit together in the engine's resources, and which f
 | `[Timer N]` | Timer N's value (§6); empty while unset | `m:ss` |
 | `[Popup N]` | Popup slot N's text (§7); empty while clear | — |
 | `[Live Title]` | The list's `title` | — |
-| `[Next Title]` | The title of the next list in the live playlist. It skips headers, and is empty after the last list or with no playlist | — |
+| `[Next Title]` | The title of the next list in the live playlist. It skips headers and items whose list is missing or has no cues, as `next` does, and is empty after the last list or with no playlist (Spec 7 §4) | — |
 | `[Section]` | The cue's `section` | — |
 | `[Cue Note]` | The cue's `note` | — |
 | `[Copyright]` | The list's `copyright` | — |
