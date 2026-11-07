@@ -19,7 +19,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | spec needed |
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | log-and-saving spec | spec needed |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | spec needed |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | spec needed |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | spec needed |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started |
@@ -204,8 +204,8 @@ On main: the live pointer with list boundaries; next and previous across items, 
 headers and missing or empty lists; Go and Time triggers with the armed state, which the
 control loop fires as next; section jumps; the fire record; playlist load by title and
 date; the atomic writer and the versions folder. Build the core changes first: the
-pointer's item becomes itemUuid and the armed trigger gains itemUuid; playlist items gain
-a uuid (UUIDv5 for hand-made files) and linked items a listUuid they resolve by;
+pointer's item becomes itemUuid and the armed trigger gains itemUuid; playlist items
+gain a uuid (UUIDv5 for hand-made files) and linked items a listUuid they resolve by;
 `playlist "TITLE"` loads by title alone, with §3's order for clashes; `disarm` in the
 grammar, parser, printer and OSC form; list folders in the format (the loader walks
 lists/ and its folders, skipping dot-folders, records empty folders, applies §2's
@@ -213,13 +213,14 @@ tie-breaks and never replaces another file; a save keeps a list in its folder); 
 files named from their titles. Then the edit path of §7: Spec 5's parser and printer for
 the edit family, the one queue, validation, inverses logged with each edit, groups and
 typing, the library event, operator lock and library mode, and the debounced write with
-E-3's version cadence, for lists, cues, folders and playlists, archive included (other
-objects' edits wait for Areas 8, 14 and 17 and are rejected until then); changes on disk,
-with the three-second window for moves and the conflicts folder. Then the live pointer of
-§4: the kept copies, the place rules and the reads table, the armed trigger sending next
-or disarm, and §6's feedback with /o/live/armed and the live event. Last, §8's fixtures
-and the playlist schema. Tests first from §10. Stop for review after the core changes,
-after the edit path, and after the live pointer. Nothing in app/.
+E-3's version cadence, with kept versions filed by list uuid and never written over
+(Spec 9 §6), for lists, cues, folders and playlists, archive included (other objects'
+edits wait for Areas 8, 14 and 17 and are rejected until then); changes on disk, with
+the three-second window for moves and the conflicts folder. Then the live pointer of §4:
+the kept copies, the place rules and the reads table, the armed trigger sending next or
+disarm, and §6's feedback with /o/live/armed and the live event. Last, §8's fixtures and
+the playlist schema. Tests first from §10. Stop for review after the core changes, after
+the edit path, and after the live pointer. Nothing in app/.
 ```
 
 **Area 11 — Variables** (branch `area/variables`)
@@ -241,6 +242,32 @@ the monotonic clock, counting down and up, with overrun and the noop cases; clea
 logged from source engine; the /o/timer/N and timers-topic feedback and
 /o/channel/N/remaining. Tests first from §11's Area 11 list. Stop for review after the
 core changes and again after the adoption pacing. Nothing in app/.
+```
+
+**Area 12 — Log and saving** (branch `area/saving`)
+
+```
+Area: 12, log and saving. Spec: docs/specs/9-log-and-saving.md, with §10's tests; Spec 5
+§8 and §9 for edit undo and the restores; Spec 1 §3–§5, Spec 2 §3, §6 and §9, Spec 3 §3
+and §8, Spec 4 §12 and §13, Spec 5 §2, §6 and §9, Spec 6 §7, Spec 7 §2 and Spec 8 §2 as
+Spec 9 corrected them. Starts after Area 9 is merged: it builds on Area 9's edit path,
+its debounced write and its versions filed by list uuid. On main: LogEntry and its line,
+the atomic writer and write plans, the versions file, the restoreLastState and snapshots
+settings, Machine.lastState read from state/last.json, the black box writing to the
+folder the command line names, and EngineLog in unified logging. Build the core changes
+first: LogEntry's note lines and its undoes and redoes fields; the two restore commands
+in the grammar, parser, printer and OSC form; last.json's new keys. Then the logs (§2):
+the command log and the engine log per local day, a group's lines in one write, synced
+each second, a partial last line ended on opening, seq per run, the engine's notes, the
+API's note request with its cap, and the black box moved to machine/blackbox/ in hourly
+files, trimmed within the day, its reader following. Then the last state (§4): its
+writes, the clean and restored flags, the minute refresh, the pending clears, the
+two-hour limit and the once-only guard, Spec 3 §8's replacement of ShowState, and the
+launch order. Then snapshots (§3), edit undo and redo with the history topic (§5), and
+the restore commands with the two queries, the renumber check and the worker and queue
+handling (§6). Last, retention, the low and full disk and the saving topic (§7), and
+§8's fixture. Tests first from §10. Stop for review after the logs, after the last
+state, and after the restore commands. Nothing in app/.
 ```
 
 **Area 15 — Macros, basic** (branch `area/macros`)
