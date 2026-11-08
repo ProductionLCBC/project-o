@@ -34,7 +34,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. One mix graph per distinct device and one per SDI-embedded output, the lowest-numbered output's device as the clock, device loss to the fallback or a silence stand-in and the return, the embedded feed on the card's stream time, underruns per device. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Areas 13 and 14: the settings window and its pages, each change an edit with §11's ask-first rules; the engine's edits of outputs, audio outputs, key bindings and the machine settings; the confirmation of an output on the app's own screen, which reverts after 15 seconds without Keep. No Inputs page until live inputs. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 17: the lock turned on by an edit kept off the undo stack and refused until a passcode exists; unlocking and the passcode as requests on the engine's local socket, with a five-attempt lockout that holds across a restart; the Keychain kept to the engine; the administrator's reset. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | New with Spec 10 (U-1), accepted 2026-11-08, with the prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run: the local socket, the LAN listener with the token and Bonjour, the Mach channel (its call proved first) with the preview surfaces, the channel pictures and the meters, the topics, queries and requests, the first-run writer, the relaunch rule and the engine's process behaviour. Its Build tracker task is still to be made. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | New with Spec 10 (U-1), accepted 2026-11-08, with the prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run: the local socket, the LAN listener with the token and Bonjour, the Mach channel (its call proved first) with the preview surfaces, the channel pictures and the meters, the topics, queries and requests, the first-run writer, the relaunch rule and the engine's process behaviour. Its Build tracker task was made on 2026-11-08 (v1, `area/api`, after Area 12). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
@@ -101,13 +101,19 @@ position and the check on a cue's uuid, an output's default stack and transition
 Area 14, the query answer shape), and the prompt blocks for Areas 14 and 10 are in
 `docs/build-order.md`. With it every spec the scope gaps doc listed is written.
 
+A housekeeping session the same day brought the Build tracker back in line with
+`docs/build-order.md` (5291cef): Areas 6, 8–14 and 17–19 moved from `spec needed` to
+`not started` in both together, each task's spec is the v1 table's, Area 19 has its task,
+and every task whose area has a block holds the common preamble and that block verbatim,
+with its dependencies from the block's "Starts after" line.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
 it now also proves the embedded audio feed against the clapper and a real device loss.
 
-Area 15, macros (basic), is next; its block is in `docs/build-order.md`, and its session
-starts from it in its own worktree.
+Area 15, macros (basic), is next; its block is in `docs/build-order.md` and in its Build
+tracker task, and its session starts from it in its own worktree.
 
 ## Needs Adam
 
@@ -144,12 +150,19 @@ on 2026-11-04: approved as built, merged (89641e9).
 
 ### Housekeeping
 
-- **Areas 6, 8, 9, 10, 11, 12, 13, 14, 17, 18 and 19 in the Build tracker.** Their specs
-  and prompt blocks are on `main`, but they still read `spec needed` in
-  `docs/build-order.md` and in the tracker, which only Nimbalyst changes, and a status
-  changes in both places or in neither. Area 19 is new and has no tracker task yet. Each
-  area's first session sets both to `in progress`; until then they can move to
-  `not started` together.
+- **Done 2026-11-08: the Build tracker mirrors `docs/build-order.md` again** (5291cef).
+  Areas 6, 8, 9, 10, 11, 12, 13, 14, 17, 18 and 19 moved from `spec needed` to
+  `not started` in the v1 table and the tracker together; each task's spec is the table's
+  Spec column, and Areas 14 and 17 took the table's titles. Area 19 has its task (v1,
+  `area/api`). Every task whose area has a block in `docs/build-order.md`, Area 15 and the
+  shipped areas included, holds the common preamble and that block verbatim and names the
+  block's branch, checked against the file byte for byte. Dependencies come from each
+  block's "Starts after" line: Areas 8 and 12 after 9, 10 after 14, 11 after 6, 13 after
+  19, 14 after 13, 17 after 13 and 14, 18 after 17, 19 after 12. Areas 13 and 14 no longer
+  list Area 4, which is shipped; the bench run they also wait for has no task, so it lives
+  in their prompts. The blocks for Areas 6, 9 and 15 have no "Starts after" line, so their
+  tasks keep what they had (Area 15 after Area 3). Each area's first session sets both to
+  `in progress`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -233,14 +246,15 @@ and log rows. Nothing in app/.
 ```
 
 After Area 15, Areas 6, 11, 9, 8, 12 and 19 are ready, in that order, from their blocks in
-`docs/build-order.md`; all six are engine-side and need no bench run, Areas 8 and 12 start
-after Area 9, whose edit path they extend, and Area 19 after Area 12. The app's areas come
-after the bench run: 13 after Area 19, 14 after 13, 10 after 14, 17 after 13 and 14, and
-18 after 17. Every spec the scope gaps doc listed is written, Spec 11 the last; the v1.5
-and v2 specs wait until the pilot is scheduled. The bench run with the card happens
-whenever Adam sets a window; it does not block Area 15 or the engine-side areas, and it
-must pass before anything in `app/` starts (Areas 13, 14, 10, 17 and 18) and before Area
-7's bench verification.
+`docs/build-order.md`, which their Build tracker tasks carry verbatim with the same
+dependencies; all six are engine-side and need no bench run, Areas 8 and 12 start after
+Area 9, whose edit path they extend, and Area 19 after Area 12. The app's areas come after
+the bench run: 13 after Area 19, 14 after 13, 10 after 14, 17 after 13 and 14, and 18
+after 17. Every spec the scope gaps doc listed is written, Spec 11 the last; the v1.5 and
+v2 specs wait until the pilot is scheduled. The bench run with the card happens whenever
+Adam sets a window; it does not block Area 15 or the engine-side areas, and it must pass
+before anything in `app/` starts (Areas 13, 14, 10, 17 and 18) and before Area 7's bench
+verification.
 
 Spec 5 has no area of its own. Its engine side lands with Area 9, which builds the edit
 path with the list, cue, folder and playlist edits and the debounced write with the
