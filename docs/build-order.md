@@ -20,12 +20,13 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | spec needed |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | spec needed |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | spec needed |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | spec needed |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | shipped |
-| 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | spec needed |
-| 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | spec needed |
+| 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | spec needed |
+| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | spec needed |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | spec needed |
 
 Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15.
 
@@ -270,6 +271,28 @@ handling (§6). Last, retention, the low and full disk and the saving topic (§7
 state, and after the restore commands. Nothing in app/.
 ```
 
+**Area 13 — Show-mode UI** (branch `area/show`)
+
+```
+Area: 13, show-mode UI. Spec: docs/specs/10-show-mode-ui.md §1–§10, §14 and §15, with
+§18's Area 13 tests; the UX spec (docs/ux-spec.md) and the clickable demo for look and
+feel where the spec is silent, asking before guessing. Starts after Area 19 is merged
+and after the bench run passes (Spec 4 §15). The app is new: an Xcode project in app/
+that depends on the package at the root, with AppKit and SwiftUI as CLAUDE.md divides
+them. Build the engine connection first: the roots in the app's preferences; finding,
+starting and restarting the engine with the curtains and the restart rule (§2, choice
+U-7); Quit; the scripted engine on a local socket that the tests drive; and the models
+fed by §3's topics and queries. Then the window and its regions (§4–§8), with the
+previews, the channel pictures and the meters from the Mach channel; the keys with their
+precedence and the fixed keys (§9); the edits of §10 with undo and redo; drops from the
+Finder that import and then write (choice U-8); the restore sheets and the tags (§14);
+the notes and view.json; and VoiceOver labels and the string catalog from the first
+build (§15). Edit mode is Area 14's, Bind a Key… waits for Area 17, and Lock Station and
+the lock tag for Area 18: their entries stay disabled until then. Tests first from §18.
+Stop for review after the engine connection, after the grid and the strip, and after the
+keys.
+```
+
 **Area 15 — Macros, basic** (branch `area/macros`)
 
 ```
@@ -278,12 +301,13 @@ and macro expansion, the depth cap, the cycle check) and §9 (the macro's own lo
 then each inner command under the same group). The runner on main already expands a
 macro into its commands with the cap and the check; Area 15 gives the engine the
 machine-level and library macros as first-class objects it can run from a key, OSC
-and a cue (no guards: Spec 2 §7's guards are v1.5), and the clears tab's command
-lists (ux-spec, the tabbed panel) as macros the UI will call. Add `stack all blackout
-on | off | toggle` to the vocabulary, one grammar row like `channel all` with its OSC
-address, for the clears tab's "blackout stack and all" (Adam's word, 2026-11-04);
-propose the Spec 2 §3 and §6 correction in the plan before any code. Tests first from
-§10's groups and log rows. Nothing in app/.
+and a cue (no guards: Spec 2 §7's guards are v1.5); the clears tab sends its commands
+directly (Spec 10 §7). Add `stack all blackout on | off | toggle` to the vocabulary,
+one grammar row like `channel all` with its OSC address, for the clears tab's
+"blackout stack and all" (Adam's word, 2026-11-04); its `toggle` with `all` follows
+Spec 2 §3, and `audio all mute toggle` is made to as well (Spec 10 §7); propose the
+Spec 2 §3 and §6 correction in the plan before any code. Tests first from §10's groups
+and log rows. Nothing in app/.
 ```
 
 **Area 16 — Audio, basic** (branch `area/audio`)
@@ -308,6 +332,73 @@ line; the embedded feed's samples landing on the right stream time against a fak
 card. Keep §3's thread rules: nothing on the render thread, nothing blocking in a
 render callback. Nothing here runs unattended; the dev Mac has BlackHole for a silent
 device and no card, so the hardware path waits for the bench.
+```
+
+**Area 17 — Settings** (branch `area/settings`)
+
+```
+Area: 17, settings. Spec: docs/specs/10-show-mode-ui.md §11, with §18's Area 17 tests,
+and §9 for the key names and the key recorder; Spec 5 §4 for the edits of machine
+objects, and Spec 1 §3 and Spec 4 §10 as Spec 10 corrected them. Starts after Areas 13
+and 14 are merged. Build the engine side first: the edits of outputs, audio outputs, key
+bindings and the machine settings through Area 9's edit path (Spec 7 §7), the key-name
+checks with reserved keys refused as badValue, and output and audio-output changes
+applied between ticks. Then the settings window and its pages in SwiftUI, each change an
+edit sent when its control commits, with §11's ask-first rules; the confirmation of an
+output on the app's own screen, which defaults to Revert and reverts with the result's
+inverses after 15 seconds; and Bind a Key… with the key recorder. The lock's controls on
+the Roles and lock page come with Area 18. Tests first from §18. Stop for review after
+the engine side and again after the pages.
+```
+
+**Area 18 — Operator lock** (branch `area/lock`)
+
+```
+Area: 18, operator lock. Spec: docs/specs/10-show-mode-ui.md §12, with §18's Area 18
+tests; Spec 5 §2, §6, §7 and §8 as Spec 10 corrected them; ADR 0007 for the Keychain.
+Starts after Area 17 is merged, whose pages it makes read-only. Build the engine side
+first: the passcode, unlock, resetPasscode, token and newToken requests on the local
+socket; the passcode's Keychain item as a salted PBKDF2 hash with the attempt count, and
+the five-attempt lockout that holds across a restart; noPasscode and keychain for the
+lock edit, which stays off the undo stack and safe from a hand edit of machine.json; the
+library event with cause lock; the administrator's reset through Authorization Services;
+and the Keychain behind a seam, tested with an in-memory store and one bench test against
+the login keychain. Then the lock in the app: Lock Station, the unlock sheet, the lock
+tag, the lock's controls on Roles and lock, and everything §12 disables. Tests first from
+§18. Stop for review after the engine side.
+```
+
+**Area 19 — Engine API and first run** (branch `area/api`)
+
+```
+Area: 19, engine API and first run. Spec: docs/specs/10-show-mode-ui.md §2 (the engine
+side), §3, §13 and §16, with §18's Area 19 tests; Spec 2 §5, §8 and §9, Spec 4 §2, §5,
+§10, §12 and §14, Spec 5 §6 and Spec 9 §2–§5 as Spec 10 corrected them. Starts after
+Area 12 is merged: until then Areas 8, 9, 11 and 12 publish their topics and answer their
+queries and requests through the engine's own publisher, and this area puts them on the
+API. It is engine-only and needs no bench run. On main: the engine driven over OSC, a
+quarter-size preview texture per stack backed by an IOSurface (Area 5), cue thumbnails
+and pool tiles as files, and EngineProcess, whose screen(for:) falls back to the next
+screen. Prove the Mach call first, on the dev Mac: bootstrap_check_in, or
+bootstrap_register behind its seam, looked up from an app that didn't start the engine;
+stop for review there, and if neither works, propose the per-user launchd agent before
+anything else. Then the engine as a process (§2): the local socket with its owner-only
+mode, the peer check, and hello once the engine takes commands; sources taken from that
+socket only; the lock file with the process id and exit status 3; the console log
+trimmed in place; the accessory process with its activity and sleep assertions; output
+windows as non-activating panels on every Space that absorb clicks; and display outputs
+that wait for their own screen. Then §3: subscriptions with answers and events in the
+order produced and their seq, the topics and the queries, results with group and
+applied, the requests the LAN refuses with localOnly, the notes, and Spec 2 §8's group
+validation against the state the earlier commands leave. Then the Mach channel's
+payloads: three preview surfaces per stack and three picture surfaces per channel with
+their frame messages and the pictures' aux pass (choice U-3), and the meters. Then the
+LAN listener with the token read on a background thread, Bonjour and the preview topic;
+the first-run writer of §13 with output detection and --campus; the relaunch rule with
+--relaunch and --released (Spec 9 §4 as corrected); the soak client that holds the Mach
+channel; and the fixture's clear-all binding moved to shift+escape (§16). Tests first
+from §18. Stop for review after the Mach proof, after the socket and §3, and after first
+run. Nothing in app/.
 ```
 
 **Areas marked `spec needed`**: open Cowork with this repo folder connected and ask for the spec first; it is written in `docs/specs/` and reviewed before its prompt is added here.

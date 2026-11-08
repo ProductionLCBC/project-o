@@ -28,12 +28,13 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (one channel at a time, each chunk bound to its cue's uuid, an empty chunk clears). |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance): the variable language and the v1 set with the context values and `[Service In]`, the adoption pacing, timers counting down and up, popups resolving their variables one level deep, the timer and remaining-time feedback. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes, behind the once-a-second gate, since Area 5. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 9 (it builds on Area 9's edit path, debounced write and versions): the command log and the engine log a file a day each, the black box a file an hour in its own folder, notes, snapshots with their cadence and retention, the last state with the guard against a crash loop, edit undo and redo with the `history` topic, the two restore commands, a low or full disk and the `saving` topic. The atomic write, the write plan and the versions folder are on `main` since Area 2, the Spec 2 §9 entry and its one-line form since Area 3, the black box since Area 4. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | show-mode-ui spec | not started | Spec 10, Show-mode UI, drafted 2026-11-07 in the specs doc and revised after three independent reviews; its fifteen choices wait for Adam (U-1 moves the engine side, the API server and first run, to a new Area 19 after Area 12); nothing in `app/` starts before the spike passes on the bench. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack, ids exposed) and of thumbnails (PNGs by cue, stack and library version) is on `main` since Area 5; the Mach hand-off of the surfaces and the API's `metrics` and `preview` topics belong with the app and the API. The audio device badge is the snapshot's `audioDevices` list since Area 16. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench: the app and the engine as two processes, with the curtains and the rule that always starts the engine again; the main window and its regions, with each channel's live picture in the strip; the keys and their precedence; the edits from show mode, Finder drops that import and then write, the restore sheets and the tags; VoiceOver and the string catalog from the first build. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack) and of thumbnails is on `main` since Area 5; the Mach hand-off, the channel pictures and the API's topics are Area 19's. The audio device badge is the snapshot's `audioDevices` list since Area 16. |
 | 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (it also takes the small editors for grades, transition timing and macros); in `app/`, so after the bench run. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | Next. Its prompt block went into `docs/build-order.md` on Adam's word of 2026-11-04, with `stack all blackout` added; it needs no new spec. The runner's macro expansion, the depth cap and the cycle check are on `main`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. One mix graph per distinct device and one per SDI-embedded output, the lowest-numbered output's device as the clock, device loss to the fallback or a silence stand-in and the return, the embedded feed on the card's stream time, underruns per device. The hardware path (a real device unplugged, a card) waits for the bench. |
-| 17 | Settings: inputs, outputs, audio outputs, keys, media root, startup | settings section of show-mode-ui spec | not started | Spec 10 §11 drafted 2026-11-07 with the rest of Spec 10; its choices wait for Adam (no Inputs page until live inputs; a settings change is an edit; an output put on the app's own screen reverts after 15 seconds without Keep). |
-| 18 | Operator lock: passcode in the Keychain, edit mode blocked | show-mode-ui spec | not started | Spec 10 §12 drafted 2026-11-07 with the rest of Spec 10; its choices wait for Adam (the lock refuses every edit, edit undo and restore from every source, and settings are read-only while it is on; unlocking and the passcode are requests on the engine's local socket, and only the engine touches the Keychain). |
+| 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Areas 13 and 14: the settings window and its pages, each change an edit with §11's ask-first rules; the engine's edits of outputs, audio outputs, key bindings and the machine settings; the confirmation of an output on the app's own screen, which reverts after 15 seconds without Keep. No Inputs page until live inputs. |
+| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 17: the lock turned on by an edit kept off the undo stack and refused until a passcode exists; unlocking and the passcode as requests on the engine's local socket, with a five-attempt lockout that holds across a restart; the Keychain kept to the engine; the administrator's reset. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | New with Spec 10 (U-1), accepted 2026-11-08, with the prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run: the local socket, the LAN listener with the token and Bonjour, the Mach channel (its call proved first) with the preview surfaces, the channel pictures and the meters, the topics, queries and requests, the first-run writer, the relaunch rule and the engine's process behaviour. Its Build tracker task is still to be made. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
@@ -82,13 +83,15 @@ with every choice as drafted. It is in `docs/specs/9-log-and-saving.md`, its cor
 Specs 1–8 are applied, the Area 9 block files kept versions by uuid, and the Area 12
 prompt block is in `docs/build-order.md`.
 
-Spec 10, Show-mode UI (Areas 13, 17 and 18), was then drafted the same way and revised
-after three independent reviews. They made a fire in a playlist that isn't loaded load it
-and fire in one group, kept clicks on an output from reaching the windows beneath it, put
-the app's curtains over the output screens while the engine restarts, stopped a relaunch
-from running the startup macro, and made the keys' precedence exact. Its fifteen choices,
-U-1 to U-15, wait for Adam's answers in the specs doc; U-1 adds an engine-side Area 19 for
-the API server, which no area owns, and first run.
+Spec 10, Show-mode UI (Areas 13, 17 and 18), followed: drafted on 2026-11-07, revised
+after three independent reviews, and accepted by Adam on 2026-11-08 with eleven choices
+as drafted and four alternatives: the strip shows each channel's live picture (U-3), the
+app always starts the engine again (U-7), a file from the Finder dropped on a cue or a
+strip cell is imported and then written (U-8), and Next waits until something is live
+(U-15). It adds Area 19, Engine API and first run, engine-side (U-1). It is in
+`docs/specs/10-show-mode-ui.md`, its corrections to Specs 1, 2 and 4–9 and to
+`ARCHITECTURE.md`, ADR 0002, `CLAUDE.md` and `app/README.md` are applied, and the prompt
+blocks for Areas 19, 13, 17 and 18 are in `docs/build-order.md`.
 
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
@@ -106,19 +109,6 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
-
-- **Spec 10, Show-mode UI, for review.** Drafted in Cowork as a tab of the Project O specs
-  doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
-  answers (S1–S13, C3), its review (R1, R2, R6) and the clickable demo, and revised after
-  three independent reviews. Fifteen choices, U-1 to U-15, wait for his answers in its
-  §19. U-1 adds Area 19, Engine API and first run, engine-side and after Area 12. U-4 has
-  the Clears tab's tiles send their commands directly, so the Area 15 block would no
-  longer make them macros; if Area 15 starts before the answer, that part waits for it.
-  U-14 has an engine relaunch put the last state back whatever `restoreLastState` says,
-  which changes Spec 9 §4. On acceptance it is exported to `docs/specs/10-show-mode-ui.md`
-  with its corrections to Specs 1, 2 and 4–9, `ARCHITECTURE.md`, ADR 0002, `CLAUDE.md`,
-  `app/README.md` and `docs/build-order.md`, and Areas 19, 13, 17 and 18 get their prompt
-  blocks.
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -146,11 +136,11 @@ on 2026-11-04: approved as built, merged (89641e9).
 
 ### Housekeeping
 
-- **Areas 6, 8, 9, 11 and 12 in the Build tracker.** Their specs and prompt blocks are on
-  `main`, but all five still read `spec needed` in `docs/build-order.md` and in the
-  tracker, which only Nimbalyst changes, and a status changes in both places or in
-  neither. Each area's first session sets both to `in progress`; until then they can move
-  to `not started` together.
+- **Areas 6, 8, 9, 11, 12, 13, 17, 18 and 19 in the Build tracker.** Their specs and
+  prompt blocks are on `main`, but they still read `spec needed` in `docs/build-order.md`
+  and in the tracker, which only Nimbalyst changes, and a status changes in both places
+  or in neither. Area 19 is new and has no tracker task yet. Each area's first session
+  sets both to `in progress`; until then they can move to `not started` together.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -198,8 +188,6 @@ in the scope gaps doc, and applied when the spec that owns each is written (that
 proposes the exact text):
 
 - Spec 2 §3 and §6: `stack all blackout` (Area 15).
-- Spec 2 §9: the app reaches the engine over a local socket only the same user can open,
-  and only the engine touches the Keychain, as ADR 0007 requires (show-mode-ui spec).
 
 ## Next
 
@@ -226,23 +214,25 @@ and macro expansion, the depth cap, the cycle check) and §9 (the macro's own lo
 then each inner command under the same group). The runner on main already expands a
 macro into its commands with the cap and the check; Area 15 gives the engine the
 machine-level and library macros as first-class objects it can run from a key, OSC
-and a cue (no guards: Spec 2 §7's guards are v1.5), and the clears tab's command
-lists (ux-spec, the tabbed panel) as macros the UI will call. Add `stack all blackout
-on | off | toggle` to the vocabulary, one grammar row like `channel all` with its OSC
-address, for the clears tab's "blackout stack and all" (Adam's word, 2026-11-04);
-propose the Spec 2 §3 and §6 correction in the plan before any code. Tests first from
-§10's groups and log rows. Nothing in app/.
+and a cue (no guards: Spec 2 §7's guards are v1.5); the clears tab sends its commands
+directly (Spec 10 §7). Add `stack all blackout on | off | toggle` to the vocabulary,
+one grammar row like `channel all` with its OSC address, for the clears tab's
+"blackout stack and all" (Adam's word, 2026-11-04); its `toggle` with `all` follows
+Spec 2 §3, and `audio all mute toggle` is made to as well (Spec 10 §7); propose the
+Spec 2 §3 and §6 correction in the plan before any code. Tests first from §10's groups
+and log rows. Nothing in app/.
 ```
 
-After Area 15, Areas 6, 11, 9, 8 and 12 are ready, in that order, from their blocks in
-`docs/build-order.md`; all five are engine-side and need no bench run, and Areas 8 and 12
-start after Area 9, whose edit path they extend. The show-mode UI spec, Spec 10 (Areas 13,
-17 and 18), is drafted and waits for Adam's answers; the edit-mode spec follows. Each is
-reviewed before it is exported to `docs/specs/` and its area's prompt is added to
-`docs/build-order.md`, when its Build tracker task moves from `spec needed` to
+After Area 15, Areas 6, 11, 9, 8, 12 and 19 are ready, in that order, from their blocks
+in `docs/build-order.md`; all six are engine-side and need no bench run, Areas 8 and 12
+start after Area 9, whose edit path they extend, and Area 19 after Area 12. The app's
+areas come after the bench run: 13 after Area 19, then 14 once its spec is in, 17 after 13
+and 14, and 18 after 17. The edit-mode spec (Areas 10 and 14) is drafted next in Cowork,
+reviewed, and exported to `docs/specs/` with its areas' prompts added to
+`docs/build-order.md`, when their Build tracker tasks move from `spec needed` to
 `not started`. The bench run with the card happens whenever Adam sets a window; it does
 not block Area 15 or the engine-side areas, and it must pass before anything in `app/`
-starts (Areas 13 and 14) and before Area 7's bench verification.
+starts (Areas 13, 14, 17 and 18) and before Area 7's bench verification.
 
 Spec 5 has no area of its own. Its engine side lands with Area 9, which builds the edit
 path with the list, cue, folder and playlist edits and the debounced write with the
