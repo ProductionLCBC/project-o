@@ -25,11 +25,11 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: key and fill stays v1.5, and the area becomes bench verification and fixes, its block written from the run's findings; its `docs/build-order.md` row and Build tracker task change together in a Nimbalyst session. The display and DeckLink sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the 1080i weave since Area 5, the DeckLink sink as the embedded audio feed's destination since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Spec 8 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 9 (`media replace`, `media delete` and the defaults edits ride its edit path): the six media commands, import with staging and hash first, the walk with its hash cache telling moves, re-exports and restores apart, the two indexes and `machine/media/`, the media root on the startup volume (M-8), posters at the in-point and pool tiles, delete and replace with their inverses, the `media` topic and the use query, drop channels. The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | not started | Spec 7 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`: list folders on disk, a playlist's title as its identity and items with uuids, the live pointer placed from the engine's kept copies when what it names is gone, the armed trigger with `disarm`, archive as a dated copy, live feedback and the countdown, and Spec 5's edit path for lists, cues, folders and playlists with the debounced write, and kept versions filed by list uuid and never written over (Spec 9 §6). The runner on `main` logs a fired cue as its own group with `fire`; the engine's control loop fires armed Time triggers as `next`; the thumbnail job projects a list from its top (Area 5). |
-| 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (one channel at a time, each chunk bound to its cue's uuid, an empty chunk clears). |
+| 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | not started | Spec 11, Edit mode, drafted 2026-11-08 in the specs doc and revised after three independent reviews, its §5 the text editor; its choices wait for Adam (one channel at a time, each chunk bound to its cue's uuid, an empty chunk clears; a paste breaks cues at blank lines and section lines; ⌘Z is the library's undo while the last change is the editor's own). It starts after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance): the variable language and the v1 set with the context values and `[Service In]`, the adoption pacing, timers counting down and up, popups resolving their variables one level deep, the timer and remaining-time feedback. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes, behind the once-a-second gate, since Area 5. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 9 (it builds on Area 9's edit path, debounced write and versions): the command log and the engine log a file a day each, the black box a file an hour in its own folder, notes, snapshots with their cadence and retention, the last state with the guard against a crash loop, edit undo and redo with the `history` topic, the two restore commands, a low or full disk and the `saving` topic. The atomic write, the write plan and the versions folder are on `main` since Area 2, the Spec 2 §9 entry and its one-line form since Area 3, the black box since Area 4. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench: the app and the engine as two processes, with the curtains and the rule that always starts the engine again; the main window and its regions, with each channel's live picture in the strip; the keys and their precedence; the edits from show mode, Finder drops that import and then write, the restore sheets and the tags; VoiceOver and the string catalog from the first build. The engine side of the preview and the multiviewer (one IOSurface-backed quarter-size texture per stack) and of thumbnails is on `main` since Area 5; the Mach hand-off, the channel pictures and the API's topics are Area 19's. The audio device badge is the snapshot's `audioDevices` list since Area 16. |
-| 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec needed first: the edit-mode spec, settled 2026-11-04 (it also takes the small editors for grades, transition timing and macros); in `app/`, so after the bench run. |
+| 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | not started | Spec 11, Edit mode, drafted 2026-11-08 in the specs doc and revised after three independent reviews; its sixteen choices wait for Adam (A-1 has the engine draw the editors' pictures through a new `render` query, and A-9 adds a `uses` query; it also takes the small editors for grades, transition timing, audio transitions, text styles and macros); in `app/`, so after the bench run and Area 13. The thumbnail job that `render` reuses is on `main` since Area 5. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started | Next. Its prompt block went into `docs/build-order.md` on Adam's word of 2026-11-04, with `stack all blackout` added; it needs no new spec. The runner's macro expansion, the depth cap and the cycle check are on `main`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. One mix graph per distinct device and one per SDI-embedded output, the lowest-numbered output's device as the clock, device loss to the fallback or a silence stand-in and the return, the embedded feed on the card's stream time, underruns per device. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08 and on `main`, with the prompt block in `docs/build-order.md`, to start after Areas 13 and 14: the settings window and its pages, each change an edit with §11's ask-first rules; the engine's edits of outputs, audio outputs, key bindings and the machine settings; the confirmation of an output on the app's own screen, which reverts after 15 seconds without Keep. No Inputs page until live inputs. |
@@ -93,6 +93,17 @@ strip cell is imported and then written (U-8), and Next waits until something is
 `ARCHITECTURE.md`, ADR 0002, `CLAUDE.md` and `app/README.md` are applied, and the prompt
 blocks for Areas 19, 13, 17 and 18 are in `docs/build-order.md`.
 
+Spec 11, Edit mode (Areas 14 and 10), was then drafted the same way on 2026-11-08 and
+revised after three independent reviews. They made the text editor's ⌘Z undo only the
+editor's own last change, made Fire send what a click sends where the list came from (its
+playlist or the Library window), made a section line in a paste break cues as a blank line
+does, had a swap check both of the objects it exchanges, kept `render` to the local
+socket, and defined a move by position for what has no address of its own, such as a box
+or a cue's command. Its sixteen choices, A-1 to A-16, wait for Adam's answers in the specs
+doc; A-1 has the engine draw the editors' pictures through a new `render` query and A-9
+adds a `uses` query, both Area 14's. It is the last of the specs the scope gaps doc
+listed.
+
 The bench's three-hour run with a card and both outputs captured is deferred to a window
 Adam sets aside; it stays the gate for `app/`, its minute records set the §13 median
 window and show the thumbnail job's cost, it checks the weave on the capture rig (§16), and
@@ -109,6 +120,20 @@ None. The Area 16 brief (the final message of the Area 16 session, 2026-11-03) w
 on 2026-11-04: approved as built, merged (89641e9).
 
 ### Decisions
+
+- **Spec 11, Edit mode, for review.** Drafted in Cowork as a tab of the Project O specs
+  doc (https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh) from the scope gaps doc's
+  answers (E1–E9, C4), its review (R5), the UX spec's edit-mode sections and the clickable
+  demo's cue inspector, and revised after three independent reviews. Sixteen choices, A-1
+  to A-16, wait for his answers in its §14. A-1 and A-9 add the `render` and `uses`
+  queries to the engine, which Area 14 builds; A-7 makes audio transitions editable in v1,
+  which takes them out of the v1.5 row but for the sync-offset UI and the strip's split
+  transition bar; A-16 puts edit mode's controls in an edit bar under the top bar. On
+  acceptance it is exported to `docs/specs/11-edit-mode.md` with its corrections to Specs
+  1, 2, 4–8 and 10, `app/README.md` and `docs/build-order.md` (the Area 9 block gains the
+  move by position and the check that a cue's uuid is unique in its list, the Area 19
+  block the query answer shape, and the Area 17 block leaves an output's default stack and
+  transitions to Area 14), and Areas 14 and 10 get their prompt blocks.
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -223,16 +248,17 @@ Spec 2 §3 and §6 correction in the plan before any code. Tests first from §10
 and log rows. Nothing in app/.
 ```
 
-After Area 15, Areas 6, 11, 9, 8, 12 and 19 are ready, in that order, from their blocks
-in `docs/build-order.md`; all six are engine-side and need no bench run, Areas 8 and 12
-start after Area 9, whose edit path they extend, and Area 19 after Area 12. The app's
-areas come after the bench run: 13 after Area 19, then 14 once its spec is in, 17 after 13
-and 14, and 18 after 17. The edit-mode spec (Areas 10 and 14) is drafted next in Cowork,
-reviewed, and exported to `docs/specs/` with its areas' prompts added to
-`docs/build-order.md`, when their Build tracker tasks move from `spec needed` to
-`not started`. The bench run with the card happens whenever Adam sets a window; it does
-not block Area 15 or the engine-side areas, and it must pass before anything in `app/`
-starts (Areas 13, 14, 17 and 18) and before Area 7's bench verification.
+After Area 15, Areas 6, 11, 9, 8, 12 and 19 are ready, in that order, from their blocks in
+`docs/build-order.md`; all six are engine-side and need no bench run, Areas 8 and 12 start
+after Area 9, whose edit path they extend, and Area 19 after Area 12. The app's areas come
+after the bench run: 13 after Area 19, then 14 once its spec is in, 17 after 13 and 14,
+and 18 after 17. The edit-mode spec, Spec 11 (Areas 14 and 10), is drafted and waits for
+Adam's answers; on acceptance it is exported to `docs/specs/` with its areas' prompts
+added to `docs/build-order.md`, when their Build tracker tasks move from `spec needed` to
+`not started`, and every spec the scope gaps doc listed is written. The bench run with the
+card happens whenever Adam sets a window; it does not block Area 15 or the engine-side
+areas, and it must pass before anything in `app/` starts (Areas 13, 14, 17 and 18) and
+before Area 7's bench verification.
 
 Spec 5 has no area of its own. Its engine side lands with Area 9, which builds the edit
 path with the list, cue, folder and playlist edits and the debounced write with the
