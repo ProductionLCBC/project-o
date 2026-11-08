@@ -17,11 +17,11 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | spec needed |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | spec needed |
-| 10 | Text editor: whole-list text document with cue breaks | edit-mode spec | spec needed |
+| 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | spec needed |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | spec needed |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | spec needed |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | spec needed |
-| 14 | Edit mode, minimal: cue inspector with palette, stack editor, channel sheet, preset editor | edit-mode spec | spec needed |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | spec needed |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | not started |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | shipped |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | spec needed |
@@ -38,7 +38,7 @@ Gate between 4 and 5: nothing in `app/` starts until the spike passes every crit
 | Library mode and local copies: detach, promote, relink, where used, version history | spec needed |
 | NDI output and key/fill | spec needed |
 | Live inputs: SDI, NDI and camera sources, freeze, no-signal | spec needed |
-| Audio transitions: crossfade, fade through silence, J and L offsets, sync offset | spec needed |
+| Audio transitions: the sync-offset UI and the strip's split transition bar | spec needed |
 | Pre-flight report | spec needed |
 | Optimize on import: transcode, sync check, audio sets | spec needed |
 | Macro guards and the scheduler | spec needed |
@@ -212,9 +212,11 @@ grammar, parser, printer and OSC form; list folders in the format (the loader wa
 lists/ and its folders, skipping dot-folders, records empty folders, applies §2's
 tie-breaks and never replaces another file; a save keeps a list in its folder); playlist
 files named from their titles. Then the edit path of §7: Spec 5's parser and printer for
-the edit family, the one queue, validation, inverses logged with each edit, groups and
-typing, the library event, operator lock and library mode, and the debounced write with
-E-3's version cadence, with kept versions filed by list uuid and never written over
+the edit family, with the move by position of a child that has no address of its own,
+such as a cue's command (Spec 5 §4 as Spec 11 corrected it), the one queue, validation,
+with a cue's uuid unique in its list (Spec 5 §6), inverses logged with each edit, groups
+and typing, the library event, operator lock and library mode, and the debounced write
+with E-3's version cadence, with kept versions filed by list uuid and never written over
 (Spec 9 §6), for lists, cues, folders and playlists, archive included (other objects'
 edits wait for Areas 8, 14 and 17 and are rejected until then); changes on disk, with
 the three-second window for moves and the conflicts folder. Then the live pointer of §4:
@@ -222,6 +224,32 @@ the kept copies, the place rules and the reads table, the armed trigger sending 
 disarm, and §6's feedback with /o/live/armed and the live event. Last, §8's fixtures and
 the playlist schema. Tests first from §10. Stop for review after the core changes, after
 the edit path, and after the live pointer. Nothing in app/.
+```
+
+**Area 10 — Text editor** (branch `area/text`)
+
+```
+Area: 10, text editor. Spec: docs/specs/11-edit-mode.md §5, with §13's Area 10 tests,
+and §1, §2 and §10 for the rules every page follows, the frame and accessibility; Spec 5
+§4 and §5 for the channel edit, groups and typing, Spec 3 §3 and §7 for tracking and the
+cue view, and Spec 10 §6, §9 and §15 for the app's fold of a list, the keys and
+accessibility, all as Spec 11 corrected them. Starts after Area 14 is merged: the text
+editor is edit mode's Text page and joins its frame and Cues page. On main: Spec 5's
+edit path with typing folded a second at a time (Area 9), the app's fold of a list from
+its top and the scripted engine (Area 13), and edit mode's frame and Cues page (Area
+14). Build the document first: a chunk per cue on the chosen channel, in each state a
+cue can leave it, with the sections in the margin and the thumbnails; then typing (whole
+bodies at most four times a second and once on leaving, composed text held back, an
+emptied chunk sent as a clear that keeps its track riders, typing into held text as a
+copy of the held write, the three chunks after the live cue sent only on leaving),
+selection within a chunk, and other clients' changes. Then breaks: split, merge and
+moved breaks as Spec 5 §5's groups, with the questions a merge asks. Then paste: breaks
+at blank lines and section lines, repeats, SongSelect's footer, a paste into an empty
+list or into a chunk, the question a long paste with no breaks asks, and Paste as
+Two-Line Cues. Last, undo as the library's while the last change is the editor's own,
+the keys, and Open in Text Editor in the list menus. Tests first from §13, against the
+fixture library's lists and the lyric sheets §11 names. Stop for review after typing,
+after breaks, and after paste.
 ```
 
 **Area 11 — Variables** (branch `area/variables`)
@@ -293,6 +321,35 @@ Stop for review after the engine connection, after the grid and the strip, and a
 keys.
 ```
 
+**Area 14 — Edit mode** (branch `area/edit`)
+
+```
+Area: 14, edit mode. Spec: docs/specs/11-edit-mode.md §1–§4 and §6–§11, with §13's Area
+14 tests; the UX spec (docs/ux-spec.md) and the clickable demo's cue inspector for look
+and feel where the spec is silent, asking before guessing; Spec 5 §2 and §4–§6 for the
+edits, when they show, their checks and inverses, Spec 6 §2–§4 for stacks, presets and
+text styles, Spec 4 §10 for the thumbnail job, and Spec 10 §2–§4, §9, §10 and §15 for
+the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged, and so
+after the bench run. On main: Spec 5's edit path with the list, cue, folder and playlist
+edits and the move by position (Area 9), the thumbnail job that draws a cue's projected
+state with the normal stack pass (Area 5), the API's queries with their answer shape
+(Area 19), and the app's window, models and scripted engine (Area 13). Build the engine
+side first: the edits Spec 7 §7 gives this area (channels, stacks, presets, text styles,
+grades, transitions and macros), with those of audio transitions and of an output's
+default stack and transitions, their checks, warnings and inverses, a macro's move
+between the roots, stack edits between ticks, and a box's move by position; then the
+render query on the thumbnail job's queue, with its canvases, files and errors, on the
+local socket only, and the uses query over both roots (§3). Then the app: the frame with
+the edit bar, the ways in and out, the lock and the keys (§2), turning on the ways in
+that Area 13 left disabled (Spec 10 §16); the Cues page with the filmstrip, Fire, the
+canvas, the channel rows and their chips, the inspector, the palette, commands as text
+and multi-cue editing (§4); the stack editor (§6); the channel sheet (§7); the preset
+editor with its canvas, sample, boxes and text styles (§8); and the small editors (§9),
+with VoiceOver and the string catalog as §10 says. Open in Text Editor stays disabled
+until Area 10. Tests first from §13. Stop for review after the engine side, after the
+frame and the Cues page, and after the preset editor.
+```
+
 **Area 15 — Macros, basic** (branch `area/macros`)
 
 ```
@@ -340,15 +397,16 @@ device and no card, so the hardware path waits for the bench.
 Area: 17, settings. Spec: docs/specs/10-show-mode-ui.md §11, with §18's Area 17 tests,
 and §9 for the key names and the key recorder; Spec 5 §4 for the edits of machine
 objects, and Spec 1 §3 and Spec 4 §10 as Spec 10 corrected them. Starts after Areas 13
-and 14 are merged. Build the engine side first: the edits of outputs, audio outputs, key
-bindings and the machine settings through Area 9's edit path (Spec 7 §7), the key-name
-checks with reserved keys refused as badValue, and output and audio-output changes
-applied between ticks. Then the settings window and its pages in SwiftUI, each change an
-edit sent when its control commits, with §11's ask-first rules; the confirmation of an
-output on the app's own screen, which defaults to Revert and reverts with the result's
-inverses after 15 seconds; and Bind a Key… with the key recorder. The lock's controls on
-the Roles and lock page come with Area 18. Tests first from §18. Stop for review after
-the engine side and again after the pages.
+and 14 are merged. Build the engine side first: the edits of outputs (but for their
+default stack and transitions, which are Area 14's), audio outputs, key bindings and the
+machine settings through Area 9's edit path (Spec 7 §7), the key-name checks with
+reserved keys refused as badValue, and output and audio-output changes applied between
+ticks. Then the settings window and its pages in SwiftUI, each change an edit sent when
+its control commits, with §11's ask-first rules; the confirmation of an output on the
+app's own screen, which defaults to Revert and reverts with the result's inverses after
+15 seconds; and Bind a Key… with the key recorder. The lock's controls on the Roles and
+lock page come with Area 18. Tests first from §18. Stop for review after the engine side
+and again after the pages.
 ```
 
 **Area 18 — Operator lock** (branch `area/lock`)
@@ -388,7 +446,8 @@ socket only; the lock file with the process id and exit status 3; the console lo
 trimmed in place; the accessory process with its activity and sleep assertions; output
 windows as non-activating panels on every Space that absorb clicks; and display outputs
 that wait for their own screen. Then §3: subscriptions with answers and events in the
-order produced and their seq, the topics and the queries, results with group and
+order produced and their seq, the topics and the queries, each answered with its
+request's id or refused (Spec 2 §9 as Spec 11 corrected it), results with group and
 applied, the requests the LAN refuses with localOnly, the notes, and Spec 2 §8's group
 validation against the state the earlier commands leave. Then the Mach channel's
 payloads: three preview surfaces per stack and three picture surfaces per channel with
