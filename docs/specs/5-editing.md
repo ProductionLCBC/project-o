@@ -8,7 +8,7 @@ It defines the `edit` family Spec 2 §3 reserves, and it is the first of the spe
 
 Every change to the library or to a machine's configuration is an `edit` command, run by the engine like any other command. Spec 2 §3 reserves the `edit` target and leaves its vocabulary to this spec. This spec defines where an edit runs and what it writes, how an edit names what it changes, the verbs and their inverses, groups and typing, validation, lock and library mode, edit undo and redo, and how edits meet changes that arrive on disk.
 
-**Out of scope:** the screens that issue edits (Spec 10 and the edit-mode spec); the media commands of Spec 8, which change the media index through this same path; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8, Spec 10 §4), which are not edits; and secrets, which never travel in an edit (§7).
+**Out of scope:** the screens that issue edits (Spec 10 and Spec 11); the media commands of Spec 8, which change the media index through this same path; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8, Spec 10 §4), which are not edits; and secrets, which never travel in an edit (§7).
 
 **Rules every edit obeys**
 
@@ -106,7 +106,7 @@ The text form is `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`. When the word after t
 | swap | `edit channel 2 swap 5` | `edit.swap` | Exchanges two objects' numbers and both sets of references (Spec 1 §4) | The same swap |
 | insert | `edit list 42 insert cues 2 {…}`; `edit list 42 cue 22bb… insert commands 3 {…}`; `edit preset 3 insert layouts.2.boxes 1 {…}` | `edit.insert` | Inserts a value into an array at a path and position | `edit.remove` of what was inserted |
 | remove | `edit list 42 cue 22bb… remove`; `edit stack 2 slot 3 remove`; `edit preset 3 remove layouts.2.boxes 1` | `edit.remove` | Removes a child, by its own address or by position | `edit.insert` of the removed value at its old position |
-| move | `edit list 42 cue 22bb… move 4`; `edit playlist 2b2b… item 4d4d… move 0` | `edit.move` | Moves a child to a position in its array | `edit.move` back |
+| move | `edit list 42 cue 22bb… move 4`; `edit playlist 2b2b… item 4d4d… move 0`; `edit preset 3 move layouts.2.boxes 1 3` | `edit.move` | Moves a child to a position in its array; a child without an address of its own, such as a box or a cue's command, is named by its array's path and its position (Spec 11 §4, §8) | `edit.move` back |
 | duplicate | `edit list 42 cue 22bb… duplicate`; `edit preset 3 duplicate 9` | `edit.duplicate` | Copies a child to just after itself with new uuids, or a numbered object to a free number (the UX spec's duplicate-from), or a playlist under a new title (Spec 7 §3) | `edit.remove` or `edit.delete` of the copy |
 | archive | `edit playlist 2b2b… archive` | `edit.archive` | Files a dated, read-only copy of a playlist and leaves the playlist as it is (Spec 7 §5) | `edit.delete` of the copy |
 | section | `edit list 42 cue 22bb… section duplicate`; `… section move 9`; `… section remove` | `edit.section` | Acts on the cue's section block, the run of consecutive cues that share its section label: `duplicate` copies the block to just after itself with new uuids (the UX spec's duplicate-section), `move` moves it, `remove` removes it. The engine runs it as one group of cue edits | That group's inverses |
@@ -130,6 +130,7 @@ Positions in paths and in `insert`, `remove` and `move` count from 0, as JSON ar
   "value": { "advanceAfterMs": null, "commands": [], "label": "Verse 2", "note": "",
              "section": "Verse 2", "trigger": { "type": "go" }, "uuid": "33cc…" } }
 { "cmd": "edit.renumber", "object": "channel", "channel": 2, "to": 5 }
+{ "cmd": "edit.move", "object": "preset", "preset": 3, "path": "layouts.2.boxes", "from": 1, "at": 3 }
 ```
 
 **The log entry** is Spec 2 §9's, with kind `edit`, undo class `edit`, and the inverse beside the command:
@@ -168,8 +169,8 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
    - an undo or redo puts back exactly what was there, broken references included (§8);
    - a portable document may name a stack, output, audio output or input this machine lacks, since it meets those numbers at other campuses (Spec 1 §2).
    - a restore puts documents back as they were, broken references included (Spec 9 §6).
-6. **Uniqueness.** These must be unique: a number within its type, a playlist title on the machine ignoring case (L5), an item's uuid within its playlist (Spec 7 §3), a channel within a stack (P13), and a key within its device. `renumber` and `swap` also refuse a number that broken references still name, so they never adopt references meant for a deleted object. `create` may take such a number, and those references then resolve to the new object, apart from playlist links, which follow the list's uuid (Spec 7 §3); that is how undoing a delete reconnects them.
-7. **Protected objects.** Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped, though both stay editable (the scope doc's review of P13). An object on air can't be deleted until it is off air: a channel with content in a stack that an output shows, or a stack that an output shows (choice E-7, §12). The live list is the exception. Deleting it is allowed, and the engine runs on from its kept copy so the song can finish (L3, Spec 7 §4). The live playlist can't be archived in place while it is live (Spec 7 §5).
+6. **Uniqueness.** These must be unique: a number within its type, a playlist title on the machine ignoring case (L5), an item's uuid within its playlist (Spec 7 §3), a channel within a stack (P13), a key within its device, and a cue's uuid within its list, which the app picks for a cue it inserts (Spec 11 §4). `renumber` and `swap` also refuse a number that broken references still name, so they never adopt references meant for a deleted object. `create` may take such a number, and those references then resolve to the new object, apart from playlist links, which follow the list's uuid (Spec 7 §3); that is how undoing a delete reconnects them.
+7. **Protected objects.** Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped, though both stay editable (the scope doc's review of P13). An object on air can't be deleted, renumbered or swapped until it is off air, a swap checking both objects, since ShowState holds them by number (Spec 11 §6, §7): a channel with content in a stack that an output shows, or a stack that an output shows (choice E-7, §12). The live list is the exception. Deleting it is allowed, and the engine runs on from its kept copy so the song can finish (L3, Spec 7 §4). The live playlist can't be archived in place while it is live (Spec 7 §5).
 8. **Structure.** A folder is deleted only when it's empty. A macro edit passes Spec 2 §5's cycle and depth checks. An edit held by a cue, macro, key binding or scheduler entry is validated when its holder is saved, like any edit (§2).
 
 **Results**
@@ -204,7 +205,7 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 **A reload drops steps.** When a document is reloaded from disk (§10), every undo and redo step that touches it is dropped, with one log line. An undo therefore never overwrites a change that arrived by sync. The media walk drops the steps that name an entry it maps to another file or brings back (Spec 8 §4).
 
-**Keys.** `undo` and `redo` can be bound to keys like any command (UX spec). While a text field has focus, ⌘Z and ⇧⌘Z undo that field's own typing; the result reaches the engine as a new text edit (§5).
+**Keys.** `undo` and `redo` can be bound to keys like any command (UX spec). While a text field has focus, ⌘Z and ⇧⌘Z undo that field's own typing; the result reaches the engine as a new text edit (§5). Edit mode's text editor is the exception: there they are `undo` and `redo` (Spec 11 §5).
 
 ## 9. Restores
 

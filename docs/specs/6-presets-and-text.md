@@ -10,7 +10,7 @@ This spec finishes how a channel lands on a stack and how text gets its look and
 
 **In scope:** stacks and slots once the offset moves to the box (P13); presets, boxes and Preset 1; field boxes that fall back to the list's metadata (P12), and the provenance that tells them which list; the text style's vertical anchor, units and overflow (P1–P3); fonts, bundled and installed (P14); the variable language and the v1 set (P5–P7, P11); timers that count down and up (P8, R3); popups and captions (P10); the timer and remaining-time feedback; the first-run library and stacks (P13); and the corrections all this makes to Specs 1–5 (§10).
 
-**Out of scope:** the screens. The preset editor and text-style authoring belong to the edit-mode spec (Area 14, C4), and the Popups tab's timers group to Spec 10 §7 (P9). The first-run writer, which detects outputs and numbers them (S3), is Spec 10 §13's. Also out: popup templates (v1.5, S6); masks and negative offsets (v1.5); text-motion transitions and per-glyph animation (later; Spec 4 §8 keeps the door open); designed slides, whose text layers will resolve the same variables (v2); `[Timecode]` (v2); fonts from the media root (deferred, Spec 4 §8); and guards, which read some of the same values (v1.5, Spec 2 §7).
+**Out of scope:** the screens. The preset editor and text-style authoring belong to Spec 11 (§8, §9; Area 14, C4), and the Popups tab's timers group to Spec 10 §7 (P9). The first-run writer, which detects outputs and numbers them (S3), is Spec 10 §13's. Also out: popup templates (v1.5, S6); masks and negative offsets (v1.5); text-motion transitions and per-glyph animation (later; Spec 4 §8 keeps the door open); designed slides, whose text layers will resolve the same variables (v2); `[Timecode]` (v2); fonts from the media root (deferred, Spec 4 §8); and guards, which read some of the same values (v1.5, Spec 2 §7).
 
 **Already settled, and kept as written** (C5):
 
@@ -74,7 +74,7 @@ A text channel on stack 2 with no other preset therefore shows its current and n
 - If a bundled font's PostScript name is also installed, the engine uses the installed copy and logs the clash once (choice T-7).
 - A missing font falls back to the machine's `fallbackFont` and is recorded for pre-flight (Spec 4 §8). Pre-flight's "fonts not installed" now means fonts that are neither installed nor bundled.
 
-The fonts and their licences sit together in the engine's resources, and which fonts to bundle is choice T-6. The app's font picker lists the engine's fonts, as the edit-mode spec will say. Fonts in the media root stay deferred.
+The fonts and their licences sit together in the engine's resources, and which fonts to bundle is choice T-6. The app's font picker lists the engine's fonts, and the app registers the bundled ones for its own process to draw them (Spec 11 §8). Fonts in the media root stay deferred.
 
 ## 5. Variables
 

@@ -148,7 +148,7 @@ machine/
   logs/                     the command log and the engine log, a file a day each (Spec 9 §2), and the engine's console output (Spec 10 §2)
   blackbox/                 the black box, a file an hour (Spec 9 §2)
   snapshots/                zips of both roots' documents (Spec 9 §3); all three are written by the engine and read by nothing it depends on
-  thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10); pool tiles in pool/ (Spec 8 §5)
+  thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10); pool tiles in pool/ (Spec 8 §5); edit mode's pictures in render/ (Spec 11 §3)
   conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
   view.json                 the app's view settings, written by the app, ignored by the loader (Spec 10 §4)
   engine.sock  .engine.lock the engine's local socket and the lock that keeps one engine per machine root, while it runs (Spec 10 §2)

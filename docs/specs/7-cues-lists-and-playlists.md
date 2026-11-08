@@ -10,7 +10,7 @@ v1 runs a Sunday "from a linked playlist", and nothing yet creates one. This spe
 
 **In scope:** list folders on disk (L7); list edits; a playlist's identity, file and loading (L5); playlist items, their uuids and their edits (L3); the live pointer and the armed trigger when what they name changes (Spec 5 §2, L3); archive (L4); local items (L2); the live position and the countdown as feedback (L6); the share of Spec 5 that Area 9 builds (L1); fixtures; and the corrections this makes to Specs 1, 2, 3, 5 and 6 (§9).
 
-**Out of scope:** the screens. The Playlists and Library windows, the grid and the browsed-versus-live marker belong to Spec 10 (§5, §6), and the cue inspector and text editor to the edit-mode spec. Also out: detach, promote and relink, the Archive tab and detach-all (v1.5, with library mode); template playlists and their import (v1.5, choice Q-12); Timecode triggers and timelines (v2); pre-flight (v1.5); edit undo and the restore commands (Area 12, Spec 5 §8–§9); and arrangements, which are cut for v1, so a repeated chorus is two cues (UX spec).
+**Out of scope:** the screens. The Playlists and Library windows, the grid and the browsed-versus-live marker belong to Spec 10 (§5, §6), and the cue inspector and text editor to Spec 11 (§4, §5). Also out: detach, promote and relink, the Archive tab and detach-all (v1.5, with library mode); template playlists and their import (v1.5, choice Q-12); Timecode triggers and timelines (v2); pre-flight (v1.5); edit undo and the restore commands (Area 12, Spec 5 §8–§9); and arrangements, which are cut for v1, so a repeated chorus is two cues (UX spec).
 
 ## 2. Lists and folders
 
@@ -156,7 +156,7 @@ Consoles and clients follow the live position and the countdown (L6). The engine
 Area 9 is the first area to apply edits in the engine (L1), so it builds Spec 5's edit path along with this spec's edits (choice Q-10):
 
 - **Spec 5 §2:** the one queue, edits from every source under its three rules, the revision and the `library` event, and the write within a second of the last change, with Spec 1 §4's version cadence (E-3), since Area 9's writes are the first that keep list versions (choice Q-3).
-- **§3–§6:** addressing, the verbs with their inverses, groups and typing, validation and results, for lists and cues, folders and playlists. The other objects' edits come with the areas that edit them: Area 14 for what edit mode edits (channels, stacks, presets, text styles, grades, transitions and macros), Area 17 for settings (outputs, audio outputs, keys and the machine), and Area 8 for media defaults.
+- **§3–§6:** addressing, the verbs with their inverses, groups and typing, validation and results, for lists and cues, folders and playlists. The other objects' edits come with the areas that edit them: Area 14 for what edit mode edits (channels, stacks, presets, text styles, grades, transitions, audio transitions, macros, and an output's default stack and transitions, Spec 11 §11), Area 17 for settings (the rest of outputs, audio outputs, keys and the machine), and Area 8 for media defaults.
 - **§7:** operator lock and library mode. The engine refuses edits while the machine's `operatorLock.enabled` is on; the passcode, and the requests that turn the lock off, are Area 18's (Spec 10 §12). Library mode is honoured as Spec 5 §7 says, and the pilot machine runs `writable`.
 - **§10:** changes that arrive on disk, with the conflicts folder. When a list with unwritten edits has moved on disk, the engine's edits still win, and it writes them at the new path.
 

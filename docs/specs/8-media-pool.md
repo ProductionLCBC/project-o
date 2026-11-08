@@ -158,7 +158,7 @@ The inverse, `media undelete`, moves the files back to where they came from and 
 
 `outcome` is `imported`, `known` or `refused`, a refusal with its `reason` (`unsupported`, `changed`, `diskFull`, `notListed` or `readOnlyLibrary`). Index changes themselves ride Spec 5's `library` event with cause `media`, naming the media by id. A command's own rejections are Spec 2 §9's `code: message` results: `unreadable`, `unknownObject`, `onAir`, `noTrash`, `readOnlyLibrary`, `operatorLock`, `badValue` and `conflict`.
 
-**The use query** answers the delete confirmation: `{"type": "query", "what": "mediaUse", "id": "sha256:…"}` returns `{"cues": 12, "macros": 1, "presets": 0, "keys": 2}`, counted over the library and machine documents on this machine, key bindings and scheduler entries included, with references that resolve to the item through a `replaced` map.
+**The use query** answers the delete confirmation: `{"id": 63, "type": "query", "what": "mediaUse", "media": "sha256:…"}` returns `{"id": 63, "type": "answer", "cues": 12, "macros": 1, "presets": 0, "keys": 2}`, counted over the library and machine documents on this machine, key bindings and scheduler entries included, with references that resolve to the item through a `replaced` map.
 
 **A file that comes back** plays from the next write. A channel that showed it as missing keeps rendering nothing, with the badge, because the instance carries its missing state from the write (Spec 3 §4, Spec 4 §12).
 
