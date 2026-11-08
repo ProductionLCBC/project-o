@@ -139,6 +139,7 @@ rules; adding a dependency; merging (which happens only on Adam's `approved`).
 - One `.metal` file per pass; variants via function constants; shaders are never
   string-assembled at runtime.
 - Objective-C++ only inside the DeckLink module.
+- In `app/`, AppKit for the grid, the strip, the trees and the editors; SwiftUI for the settings window and simple panels (Spec 10 §1).
 - JSON on disk: sorted keys, two-space indent, LF, camelCase, ms for time,
   `{num, den}` for frame rates. Unknown keys survive a round trip.
 - Commands are stored as objects, printed and parsed in canonical text; `parse(print(x)) == x`.

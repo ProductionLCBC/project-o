@@ -10,7 +10,7 @@ v1 runs a Sunday "from a linked playlist", and nothing yet creates one. This spe
 
 **In scope:** list folders on disk (L7); list edits; a playlist's identity, file and loading (L5); playlist items, their uuids and their edits (L3); the live pointer and the armed trigger when what they name changes (Spec 5 §2, L3); archive (L4); local items (L2); the live position and the countdown as feedback (L6); the share of Spec 5 that Area 9 builds (L1); fixtures; and the corrections this makes to Specs 1, 2, 3, 5 and 6 (§9).
 
-**Out of scope:** the screens. The Playlists and Library windows, the grid and the browsed-versus-live marker belong to the show-mode spec, and the cue inspector and text editor to the edit-mode spec. Also out: detach, promote and relink, the Archive tab and detach-all (v1.5, with library mode); template playlists and their import (v1.5, choice Q-12); Timecode triggers and timelines (v2); pre-flight (v1.5); edit undo and the restore commands (Area 12, Spec 5 §8–§9); and arrangements, which are cut for v1, so a repeated chorus is two cues (UX spec).
+**Out of scope:** the screens. The Playlists and Library windows, the grid and the browsed-versus-live marker belong to Spec 10 (§5, §6), and the cue inspector and text editor to the edit-mode spec. Also out: detach, promote and relink, the Archive tab and detach-all (v1.5, with library mode); template playlists and their import (v1.5, choice Q-12); Timecode triggers and timelines (v2); pre-flight (v1.5); edit undo and the restore commands (Area 12, Spec 5 §8–§9); and arrangements, which are cut for v1, so a repeated chorus is two cues (UX spec).
 
 ## 2. Lists and folders
 
@@ -133,7 +133,7 @@ The UX spec archives a playlist with an explicit command, and an archived playli
 
 **Read-only.** Every edit to an archived playlist is refused with `archived` (Spec 5 §6), except `archived false` and `delete`: an archive can be removed outright, and that is how an `archive` is undone. Two other changes reach it, since neither changes what it records: `duplicate` and `archive` read it and change only their copies, and renumbering or swapping a list rewrites its links like any reference, so an archive keeps naming the same songs. It still shows its masters' current content (UX spec). Detach-all, for a true snapshot, comes with the Archive tab in v1.5 (L4).
 
-**Hidden but loadable.** The Playlists window hides archived playlists behind a filter (L4, the show-mode spec). An archived playlist can still be loaded by its title and run as it is, since loading is not an edit (choice Q-6).
+**Hidden but loadable.** The Playlists window hides archived playlists behind a filter (L4, Spec 10 §5). An archived playlist can still be loaded by its title and run as it is, since loading is not an edit (choice Q-6).
 
 ## 6. Feedback
 
@@ -141,7 +141,7 @@ Consoles and clients follow the live position and the countdown (L6). The engine
 
 - **Positions.** `/o/live/item` and `/o/live/cue` send the live item's and cue's numbers as they are now, not as they were when the cue fired. While the live item is gone and its song finishes, `/o/live/item` sends 0, as for a library list, and the cue keeps its number and label. When the live cue is gone, `/o/live/cue` sends the number of the cue just before its place, or 0 at the top, so `next` fires the number after it, and `/o/live/label` sends that cue's label. Before a cue fires, the item and cue are 0 and the label is empty; `/o/live/playlist` sends the playlist's title, or an empty string when none is loaded.
 - **The countdown.** `/o/live/armed` carries `i:item` `i:cue` `i:ms`: the positions of the cue that will fire and the milliseconds left when the message is sent. It is sent when a trigger arms and when an edit moves those positions, and with no arguments when the trigger disarms, lapses or fires. `item` is 0 with a library list live, and for a cue in a gone item. It joins Spec 2 §6's table and goes to every target on change.
-- **The `live` event** is sent at the same moments. It names the pointer by both handles, in Spec 5's style (a list by number, everything else by uuid), with the positions the OSC messages send, what is gone and the armed trigger. The show-mode spec adds anything else the UI needs from this topic (S2).
+- **The `live` event** is sent at the same moments. It names the pointer by both handles, in Spec 5's style (a list by number, everything else by uuid), with the positions the OSC messages send, what is gone and the armed trigger. Spec 10 §3 adds the playlist's and list's titles, the cue's label and the list boundary (S2).
 
 ```json
 { "type": "event", "topic": "live", "playlist": "2b2b…", "item": "4d4d…", "list": 42, "listUuid": "a9f0…",
@@ -157,7 +157,7 @@ Area 9 is the first area to apply edits in the engine (L1), so it builds Spec 5'
 
 - **Spec 5 §2:** the one queue, edits from every source under its three rules, the revision and the `library` event, and the write within a second of the last change, with Spec 1 §4's version cadence (E-3), since Area 9's writes are the first that keep list versions (choice Q-3).
 - **§3–§6:** addressing, the verbs with their inverses, groups and typing, validation and results, for lists and cues, folders and playlists. The other objects' edits come with the areas that edit them: Area 14 for what edit mode edits (channels, stacks, presets, text styles, grades, transitions and macros), Area 17 for settings (outputs, audio outputs, keys and the machine), and Area 8 for media defaults.
-- **§7:** operator lock and library mode. The engine refuses edits while the machine's `operatorLock.enabled` is on; the passcode, and the commands that turn the lock on and off, are Area 18's. Library mode is honoured as Spec 5 §7 says, and the pilot machine runs `writable`.
+- **§7:** operator lock and library mode. The engine refuses edits while the machine's `operatorLock.enabled` is on; the passcode, and the requests that turn the lock off, are Area 18's (Spec 10 §12). Library mode is honoured as Spec 5 §7 says, and the pilot machine runs `writable`.
 - **§10:** changes that arrive on disk, with the conflicts folder. When a list with unwritten edits has moved on disk, the engine's edits still win, and it writes them at the new path.
 
 Area 9 logs each applied edit with its inverse in the Spec 2 §9 entry `main` already builds; Area 12 adds the log file. Area 12 then builds Spec 5 §8, edit undo and redo over the logged inverses, and §9, the restore commands, along with snapshots and `state/last.json`.

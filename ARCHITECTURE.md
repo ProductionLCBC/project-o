@@ -11,7 +11,7 @@ detail; when this page and a spec disagree, the spec wins and this page gets fix
    each channel renders once to a texture, and each output composites its own ordered
    stack of channels.
 2. **Everything is a command.** Keys, OSC, MIDI, macros, cues, the scheduler and the UI
-   all emit one vocabulary (Spec 2). The UI composes commands; it has no private verbs.
+   all emit one vocabulary (Spec 2). The UI composes commands; it has no private verbs, apart from the few local requests that control the engine process, the lock and the operator's own screen (Spec 10 §3).
 3. **Numbers are identities, labels are display.** Every object type has its own
    number space; references are by number; renumbering rewrites references.
 4. **Portable objects travel with the library; machine objects stay with the machine.**
@@ -32,7 +32,7 @@ Paths are never identity. Everything is plain JSON in two folder roots (Spec 1).
 ## Processes and modules
 
 ```
-app/      Operator app (Swift, AppKit + SwiftUI). A client of the engine's API over localhost.
+app/      Operator app (Swift, AppKit + SwiftUI). A client of the engine's API over a local socket (Spec 10 §2).
 engine/   OEngine: the playback engine as its own process. Metal, VideoToolbox, Core Audio, DeckLink.
 core/     OCore: objects, commands, channel state and the projection. Pure Swift, no Apple frameworks.
 formats/  JSON schemas, the OFormats file adapter (the one place that touches disk for the Spec 1 roots) and the .pro importer. (The fixture library lives in tests/fixtures/, Spec 1 §10.)

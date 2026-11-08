@@ -10,7 +10,7 @@ Everything already saves as it changes: Spec 1 §5 writes each document atomical
 
 **In scope:** the command log, the engine log and the black box on disk, their writers and their lines, notes from clients and from the engine (G4); snapshots, what they hold and when they're taken (G1, G2); `state/last.json` and restore-last-state (G5); what Area 12 builds of Spec 5 §8's edit undo and redo, with the `history` topic (C2); the restore commands and the queries behind their pickers (G6), and how kept versions are filed so a restore can trust them; retention (G3); a low or full disk and the `saving` topic (Spec 4 §12); fixtures; and the corrections this makes to Specs 1–8 (§9).
 
-**Out of scope:** runtime undo, its per-command channel snapshots and the log entry's `snapshot` field (v1.5); the history view, its plain-language rows and `history jump` (v1.5); the restore pickers and confirmations themselves, and the badges, which belong to the show-mode spec; the layout a sync tool uses to send logs and snapshots upward (v1.5's distribution conventions); CCLI reporting over the log (later); and pre-flight (v1.5).
+**Out of scope:** runtime undo, its per-command channel snapshots and the log entry's `snapshot` field (v1.5); the history view, its plain-language rows and `history jump` (v1.5); the restore pickers and confirmations themselves, and the badges, which are Spec 10's (§14); the layout a sync tool uses to send logs and snapshots upward (v1.5's distribution conventions); CCLI reporting over the log (later); and pre-flight (v1.5).
 
 ## 2. The logs
 
@@ -44,21 +44,23 @@ Not in it: rejected commands, which are answered at the API and the command bar 
 
 ```json
 { "ts": "2026-11-08T09:02:11.540-05:00", "seq": 312, "source": { "kind": "ui" }, "kind": "note",
-  "note": { "event": "listOpened", "list": 42 }, "text": "Opened Great Is Thy Faithfulness" }
+  "note": { "event": "browse", "list": 42 }, "text": "Browsed Great Is Thy Faithfulness" }
 ```
 
-A note changes nothing and is never undone. Which actions the app notes is the show-mode spec's, such as opening a list or entering edit mode. `text` holds at most 1,000 characters and `note` at most 4 KB, or the note is refused with `badValue`. One client's notes are capped at ten a second (choice G-9): beyond that a note is answered `noop` and not written, and the next note written carries `dropped` with the count. The engine's notes have source `engine` (Spec 2 §5):
+A note changes nothing and is never undone. Spec 10 §3 lists the actions the app notes, such as browsing a list or entering edit mode. `text` holds at most 1,000 characters and `note` at most 4 KB, or the note is refused with `badValue`. One client's notes are capped at ten a second (choice G-9): beyond that a note is answered `noop` and not written, and the next note written carries `dropped` with the count. The engine's notes have source `engine` (Spec 2 §5):
 
 | `event` | Written | Fields |
 | --- | --- | --- |
 | `start` | At launch | `run` (its uuid), `app`, `machine`, `previous` (`clean`, `unclean` or `none`) |
 | `stop` | When the engine stops on request, after the shutdown macro (§4) | `unsaved`: any document it couldn't write (§7) |
 | `lastStateRestored` | After a restore of the last state (§4) | `writtenAt`; `state`, the ShowState put back, so a replay of the run starts from it; `left`, what didn't come back |
-| `lastStateSkipped` | When the setting is on and the last state isn't restored (§4) | `writtenAt`, `reason` (`clean`, `old` or `restoredBefore`) |
+| `lastStateSkipped` | When the setting is on, or at a relaunch (Spec 10 §2), and the last state isn't restored (§4) | `writtenAt`, `reason` (`clean`, `old` or `restoredBefore`) |
 | `snapshot` | After an automatic snapshot (§3) | `id`, `reason` |
 | `conflict` | When a file arriving on disk loses to unwritten edits (Spec 5 §10) | `document`, `kept`: where the arriving file was kept |
 | `stepsDropped` | When a reload or the media walk drops undo or redo steps (§5) | `groups`, `cause` (`file` or `media`) |
 | `logToMemory`, `logToFile` | When a full disk moves the logs to memory and back (§7) | `lost`: lines that couldn't be kept |
+
+Spec 10 adds the notes its local requests write, with the requester's source (Spec 10 §9, §12).
 
 **Captions.** Spec 6 §7 leaves to this spec whether a captioning feed's popup lines are kept in full. They are: three lines a second come to about 4 MB an hour, well inside §7's limits, and a full log is what CCLI reporting and a postmortem read.
 
@@ -75,7 +77,7 @@ A note changes nothing and is never undone. Which actions the app notes is the s
   "folders": ["Hymns", "Worship/New"] }
 ```
 
-`reason` is `launch`, `playlist`, `timer`, `command` or `restore`; `run` and `seq` name the last command logged before it; `folders` lists the library's folders, so an empty one survives a restore (Spec 7 §2). Left out: `media/`, `logs/`, `snapshots/`, `thumbnails/`, the black box, the machine's own media folder (`machine/media/`, Spec 8 §2) and the media cache, as G1 says, and also `versions/`, `conflicts/` and `state/` (choice G-6). The media is named by hash and kept versions are never written over (§6), so what's left is what is worth keeping, a few megabytes for a whole library.
+`reason` is `launch`, `playlist`, `timer`, `command` or `restore`; `run` and `seq` name the last command logged before it; `folders` lists the library's folders, so an empty one survives a restore (Spec 7 §2). Left out: `media/`, `logs/`, `snapshots/`, `thumbnails/`, the black box, the machine's own media folder (`machine/media/`, Spec 8 §2) and the media cache, as G1 says, and also `versions/`, `conflicts/` and `state/` (choice G-6), and the app's `view.json` and the engine's socket and lock (Spec 10 §2, §4). The media is named by hash and kept versions are never written over (§6), so what's left is what is worth keeping, a few megabytes for a whole library.
 
 **The file.** `machine/snapshots/<id>.zip`. The id is the local date and time to the second, `2026-11-08-085959`, with `-2` and on added for a second snapshot in the same second. The engine copies the documents on the control thread, so a snapshot is one consistent moment, then writes the zip on a worker at background priority, under a hidden name renamed when complete (Spec 1 §5). It uses deflate, so the Finder and `unzip` open it.
 
@@ -111,7 +113,7 @@ An automatic snapshot (`launch`, `playlist` or `timer`) whose documents equal th
 
 `restored` stays `true` for the first minute after a restore, whatever runs in it, and is `false` after that. `pendingClears` lists the popup slots with a clear-after still counting (Spec 6 §7). Every write is atomic (Spec 1 §5) and happens whether or not `restoreLastState` is on. Edits never change ShowState (Spec 5 §2), so they don't write it. A full disk removes the file (§7). The new keys are optional, so the fixture's file reads as before.
 
-**When it comes back** (choice G-1). At launch, with `restoreLastState` on, the engine restores the last state when all three hold: its run didn't end cleanly; it was written less than two hours ago, so the run was alive then; and it isn't `restored: true`, which would mean the engine stopped within a minute of putting it back, as it would if the state itself crashed it. Otherwise the launch starts empty, and a `lastStateSkipped` note says why. A state that crashes the engine is so restored once at most, and nobody has to touch a file to get the screens working again.
+**When it comes back** (choice G-1). At launch, with `restoreLastState` on, or at a relaunch whatever it says (a launch the app marks with `--relaunch`, or one after a run that ended without a stop in this boot of the Mac, Spec 10 §2), the engine restores the last state when all three hold: its run didn't end cleanly; it was written less than two hours ago, so the run was alive then; and it isn't `restored: true`, which would mean the engine stopped within a minute of putting it back, as it would if the state itself crashed it. Otherwise the launch starts empty, and a `lastStateSkipped` note says why. A state that crashes the engine is so restored once at most, and nobody has to touch a file to get the screens working again.
 
 **What comes back**, the way Spec 3 §8 replaces ShowState:
 
@@ -131,7 +133,7 @@ The engine then writes a `lastStateRestored` note carrying the state it put back
 2. The `start` note (§2).
 3. `last.json` written for this run, then the last state put back or not.
 4. The launch snapshot (§3).
-5. The startup macro, unless the last state was restored (choice G-2).
+5. The startup macro, unless the last state was restored (choice G-2) or the launch is a relaunch (Spec 10 §2).
 6. The retention pass (§7).
 
 The engine takes commands from step 5 on.
@@ -149,11 +151,11 @@ Spec 5 §8 defines them, and Area 12 builds them (C2, Spec 7 §7):
 
 ```json
 { "type": "event", "topic": "history",
-  "undo": { "group": "g-7f1a2b3c", "commands": 1, "text": "edit list 42 title \"Great Is Thy Faithfulness\"" },
+  "undo": { "group": "g-7f1a2b3c", "commands": 1, "source": { "kind": "ui" }, "text": "edit list 42 title \"Great Is Thy Faithfulness\"" },
   "redo": null, "seq": 5230 }
 ```
 
-`text` is the group's first command in its canonical form and `commands` how many it has. Plain-language labels are the app's, and the history view is v1.5.
+`text` is the group's first command in its canonical form, `commands` how many it has, and `source` where it came from (Spec 10 §10). Plain-language labels are the app's, and the history view is v1.5.
 
 ## 6. The restore commands
 
@@ -194,7 +196,7 @@ N is the list's number, as edits name lists (Spec 5 §3). Each command is an edi
 
 **On a worker.** A snapshot restore can't apply in one tick: the snapshot has to be read and checked and the one before it written, and that file is the inverse. So the restore is validated, the reading, checking and writing happen on a worker, and then the checks run again and the restore applies in one step on the control thread. Meanwhile runtime commands keep flowing, and edits, undos and redos wait in the queue behind it, so nothing lands in documents the restore is about to replace. In a group sent from the UI, the API, the command bar or OSC, the whole group waits and applies with it, or is rejected with it. Held by a cue, macro, key binding or scheduler entry, the rest of the group runs at once and the restore applies after it, or is logged `blocked` if it fails, as Spec 8 §2 does for a held `media delete`.
 
-**Picking one.** The pickers and the confirmation are the show-mode spec's; two queries feed them:
+**Picking one.** The pickers and the confirmation are Spec 10's (§14); two queries feed them:
 
 - `{ "type": "query", "what": "versions", "list": 42 }` returns that list's kept versions, newest first, each with `version`, `keptAt` (the file's date), `title` and `cues`, how many it has.
 - `{ "type": "query", "what": "snapshots" }` returns the snapshots in `machine/snapshots/`, newest first, each with `id`, `takenAt`, `reason`, `bytes`, and `machine` and `campus` from its manifest.
@@ -316,7 +318,7 @@ Written before the code, from this page, against the fixtures. The clock, the ti
 - **Notes.** A client's note is written with the engine's `ts`, `seq` and the client's source and no group, command, undo or result, answered `ok` with its `seq`, and changes nothing; an oversized one is `badValue`; the eleventh in a second is answered `noop` and not written, and the next one written carries `dropped: 1`. Each engine note in §2's table is written when its event happens, with its fields.
 - **Captions.** A feed of three popup sets a second for an hour writes every line.
 - **Snapshots.** The zip holds exactly the documents §3 lists, unwritten edits included, under `library/` and `machine/`, with the manifest and its folders; it opens with `unzip`. One is taken at launch before the startup macro, on a playlist load, on the ten-minute timer when something changed and not when nothing did, on `system snapshot` (always, its result naming the id once the file is complete) and before a snapshot restore. Two in one second get `-2`. A half-written zip never shows under its final name. Automatic ones pause under 1 GB free.
-- **The last state.** It's written at launch before the restore, within a second of a runtime group and at most once a second during a feed, at least once a minute, never for an edit, and with `clean: true` after the shutdown macro on a clean stop; a killed engine leaves `clean: false`. With the setting on, an unclean end and a state written under two hours ago, launch restores content, attributes with origins, outputs, blackout, mutes, popups without a pending clear, locks and the pointer in each of its three shapes; media restarts from its in-point and plays though the walk hasn't hashed it; changes are cuts with provenance `restored`; `armed` and outgoing instances don't come back and timers are unset; a vanished channel is left out and unknown media comes back missing; the startup macro doesn't run; `lastStateRestored` carries the state. An engine killed 20 seconds after a restore, with a caption line in between, starts empty next time with `restoredBefore`; one killed 40 minutes after a restore with nothing fired restores again. A clean end, a state written over two hours ago and the setting off each start empty and run the startup macro, the first two with `lastStateSkipped` and its reason.
+- **The last state.** It's written at launch before the restore, within a second of a runtime group and at most once a second during a feed, at least once a minute, never for an edit, and with `clean: true` after the shutdown macro on a clean stop; a killed engine leaves `clean: false`. With the setting on, an unclean end and a state written under two hours ago, launch restores content, attributes with origins, outputs, blackout, mutes, popups without a pending clear, locks and the pointer in each of its three shapes; media restarts from its in-point and plays though the walk hasn't hashed it; changes are cuts with provenance `restored`; `armed` and outgoing instances don't come back and timers are unset; a vanished channel is left out and unknown media comes back missing; the startup macro doesn't run; `lastStateRestored` carries the state. An engine killed 20 seconds after a restore, with a caption line in between, starts empty next time with `restoredBefore`; one killed 40 minutes after a restore with nothing fired restores again. At a launch that isn't a relaunch, a clean end, a state written over two hours ago and the setting off each start empty and run the startup macro, the first two with `lastStateSkipped` and its reason. A relaunch restores with the setting off, and runs no startup macro even when it starts empty (Spec 10 §2).
 - **Undo and redo** (Spec 5 §11's undo tests, now against the engine). The stack holds 500 groups, is empty at launch and runs `undoes` and `redoes` groups with source `restore`; a reload or the media walk drops the steps it should with a `stepsDropped` note; operator lock refuses both; `history jump` is refused with `notInV1`; the `history` topic is sent on subscribe and follows every change to either stack. Two quick undos after a snapshot restore undo it and then the group below, in that order, each against the state the one before left.
 - **Versions.** A save keeps versions in the list's uuid folder; after a renumber they stay with the list, and a list that takes the freed number writes to its own folder. A list copied back over itself from an old version and then edited twice writes its next versions above every kept one, and no kept file changes.
 - **List restore.** A kept version comes back with the list's current number, uuid and folder and a `version` above every kept one; the current document is kept first whatever the ten-minute rule says; undo brings back exactly what was replaced. No such version is `unknownObject`; a deleted list can't be restored; a local copy is `notInV1`; a `readOnlyMasters` machine is `readOnlyLibrary`; a full disk is `diskFull`; operator lock refuses it, and inside a cue it's `blocked`.

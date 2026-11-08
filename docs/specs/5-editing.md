@@ -8,7 +8,7 @@ It defines the `edit` family Spec 2 §3 reserves, and it is the first of the spe
 
 Every change to the library or to a machine's configuration is an `edit` command, run by the engine like any other command. Spec 2 §3 reserves the `edit` target and leaves its vocabulary to this spec. This spec defines where an edit runs and what it writes, how an edit names what it changes, the verbs and their inverses, groups and typing, validation, lock and library mode, edit undo and redo, and how edits meet changes that arrive on disk.
 
-**Out of scope:** the screens that issue edits (the show-mode and edit-mode specs); the media commands of Spec 8, which change the media index through this same path; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8), which are not edits; and secrets, which never travel in an edit (§7).
+**Out of scope:** the screens that issue edits (Spec 10 and the edit-mode spec); the media commands of Spec 8, which change the media index through this same path; runtime undo and the history view (v1.5); detach, promote, relink and editing local copies (library mode, v1.5); slide documents (v2); the app's own view settings in `machine/view.json` (S8, Spec 10 §4), which are not edits; and secrets, which never travel in an edit (§7).
 
 **Rules every edit obeys**
 
@@ -34,7 +34,7 @@ Edits run by a cue, a macro, a key or the scheduler join the undo stack, one gro
 **When an edit shows on air.** The engine holds the loaded documents of both roots (Spec 1 §5). An edit changes the document in memory; ShowState never moves (§1). When the change shows depends on when the engine reads what changed:
 
 - **Read when a cue fires**: a cue's commands and triggers, a list's cues, a playlist's items. These show on the next fire of the edited cue (L3). Lookahead and the +1 box show them at once, because they show what will happen. The cue's thumbnail is redrawn because its library version changes (Spec 4 §10).
-- **Read every frame**: presets and their boxes, grades, transition and audio transition timing, stacks and outputs, and the list metadata, sections and notes that field boxes and context values show (P5, P12). These show from the next frame, which is what the stack editor's live render expects (UX spec). A transition already running keeps the timing it started with. Text on air keeps its old raster until the new one is ready, so a look edit never blanks a line for a tick (an addition to Spec 4 §9's cache rule). An edit to an output, an audio output or a stack the engine is using takes effect between ticks, the way Spec 4 §5 rebuilds resources. The show-mode spec decides which of these the app asks about first (S12).
+- **Read every frame**: presets and their boxes, grades, transition and audio transition timing, stacks and outputs, and the list metadata, sections and notes that field boxes and context values show (P5, P12). These show from the next frame, which is what the stack editor's live render expects (UX spec). A transition already running keeps the timing it started with. Text on air keeps its old raster until the new one is ready, so a look edit never blanks a line for a tick (an addition to Spec 4 §9's cache rule). An edit to an output, an audio output or a stack the engine is using takes effect between ticks, the way Spec 4 §5 rebuilds resources. Spec 10 §11 says which of these the app asks about first (S12).
 - **Copied into ShowState at a reset**: a channel's defaults (transition, audio transition, gain). Spec 3 §2 stores the default values in each channel's attributes, so an edit to them shows at the next list boundary, `channel N reset` or clear all.
 
 The UX spec says any edit takes effect on the next fire. The second group departs from that; it is choice E-6 in §12.
@@ -51,7 +51,7 @@ An edit that changes where a file lives does so in the same write:
 
 A group that touches several documents writes each one atomically. A crash between two files leaves each file whole, and the reference report (Spec 1 §8) names any reference the crash left behind.
 
-**The revision.** The engine keeps one library revision per run. It starts at 1 at launch and goes up by one for every applied edit group and every reload from disk.
+**The revision.** The engine keeps one library revision per run. It starts at 1 at launch and goes up by one for every applied edit group, every reload from disk and every unlock (Spec 10 §12).
 
 **The library event.** After each applied group or reload, subscribed clients get one event on the `library` topic:
 
@@ -61,7 +61,7 @@ A group that touches several documents writes each one atomically. A crash betwe
   "changed": [ { "object": "cue", "list": 42, "cue": "22bb…", "paths": ["commands"] } ] }
 ```
 
-`cause` is `edit`, `undo`, `redo`, `file`, `media` or `restore`: `media` for the index changes an import or the media walk makes, which also raise the revision (Spec 8 §2), and `restore` for the restore commands (Spec 9 §6). The event names what changed and carries no object bodies; a client queries the objects it shows.
+`cause` is `edit`, `undo`, `redo`, `file`, `media`, `restore` or `lock`: `media` for the index changes an import or the media walk makes, which also raise the revision (Spec 8 §2), and `restore` for the restore commands (Spec 9 §6). `lock` is for the requests that turn the operator lock off (Spec 10 §12). The event names what changed and carries no object bodies; a client queries the objects it shows.
 
 ## 3. Addressing
 
@@ -176,25 +176,25 @@ An edit is checked in this order. The first failure rejects it, and nothing chan
 
 | Result | When | Logged |
 | --- | --- | --- |
-| `ok` | The edit applied. It may carry `warnings`: a preset used as a stack default without a pixel box or a body box at offset 0 (the UX spec's preset editor), an object deleted while still referenced, a list deleted while a playlist links it, or portable references that a machine-level renumber left naming something else (§4) | Yes, with its inverse |
+| `ok` | The edit applied. Its result names what it applied, with the inverses (Spec 10 §3), and it may carry `warnings`: a preset used as a stack default without a pixel box or a body box at offset 0 (the UX spec's preset editor), an object deleted while still referenced, a list deleted while a playlist links it, or portable references that a machine-level renumber left naming something else (§4) | Yes, with its inverse |
 | `noop` | The edit would change nothing | Yes (Spec 2 §8) |
 | `rejected` | A check above failed; the reason is `code: message` | No; answered at the API or the command bar only (Spec 2 §9) |
 
-**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`, `noTrash` (Spec 8 §6), `diskFull` (Spec 9 §6).
+**Rejection codes:** `unknownObject`, `unknownPath`, `readOnlyField`, `badValue`, `unknownReference`, `duplicate`, `danglingReferences`, `protected`, `onAir`, `archived`, `notEmpty`, `cycle`, `operatorLock`, `readOnlyLibrary`, `conflict`, `notInV1`, `noTrash` (Spec 8 §6), `diskFull` (Spec 9 §6), `noPasscode` and `keychain` (Spec 10 §12).
 
 ## 7. Lock, library mode and secrets
 
-**Operator lock** (S13). While the lock is on, the engine refuses every `edit`, every media command but `media rebuild` (Spec 8 §2), every undo and redo of an edit, and every restore (§9). The refusal comes from every source, OSC and the API included, with code `operatorLock`; runtime commands pass as they always do. Inside a cue, a macro, a key binding or a scheduler entry the refusal is a `blocked` result rather than a rejection (§2), so the rest of the group still runs. Settings changes are edits of machine objects, so a locked station's settings are read-only. Turning the lock off is the show-mode spec's passcode command, not an edit. Spec 3 §8 already makes this check at the API boundary for edit commands and edit undo; this spec adds redo and restores to it.
+**Operator lock** (S13). While the lock is on, the engine refuses every `edit`, every media command but `media rebuild` (Spec 8 §2), every undo and redo of an edit, and every restore (§9). The refusal comes from every source, OSC and the API included, with code `operatorLock`; runtime commands pass as they always do. Inside a cue, a macro, a key binding or a scheduler entry the refusal is a `blocked` result rather than a rejection (§2), so the rest of the group still runs. Settings changes are edits of machine objects, so a locked station's settings are read-only. Turning the lock on is an edit of `operatorLock.enabled`, refused with `noPasscode` until a passcode is set; turning it off is Spec 10 §12's `unlock` request, not an edit. Spec 3 §8 already makes this check at the API boundary for edit commands and edit undo; this spec adds redo and restores to it.
 
 **Library mode in v1.** The engine honours `libraryMode` (Spec 1 §3). On a `readOnlyMasters` machine it refuses edits of library objects with code `readOnlyLibrary`: lists and their cues, library folders, channels, presets, text styles, grades, transitions, audio transitions, portable macros and the defaults of library media, which `media replace` and `media delete` of library media join (Spec 8 §2). Machine-level edits pass, including the defaults of media that exists only on this machine (M11). Two things that make read-only masters workable at a campus arrive with library mode in v1.5: roles that can exceed the machine's mode (the UX spec's librarian), and detach-and-edit. Until then the pilot machine runs `writable` (choice E-2, §12).
 
-**Secrets.** The lock passcode and the API token never travel in an edit, a log line or a snapshot. The show-mode spec gives them their own commands, and only the engine handles those, against the Keychain (the scope doc's R2).
+**Secrets.** The lock passcode and the API token never travel in an edit, a log line or a snapshot. Spec 10 §12 gives them their own requests on the engine's local socket, and only the engine handles those, against the Keychain (the scope doc's R2).
 
 ## 8. Undo and redo
 
 **What undoes in v1** (C2). Only edits. Runtime undo and the history view are v1.5, so in v1 `undo` and `redo` (Spec 2 §3) always mean edit undo, and `history jump N` is rejected with `notInV1`.
 
-**One linear stack per run.** The engine keeps the applied edit groups of this run, newest on top, up to the last 500 (choice E-4, §12). `media replace` and `media delete` join it like any edit; the index changes an import or the media walk makes aren't edits and never do (Spec 8 §2). The stack starts empty at launch and is cleared at quit. Older states come back through the versions folder and the restore commands (§9).
+**One linear stack per run.** The engine keeps the applied edit groups of this run, newest on top, up to the last 500 (choice E-4, §12). `media replace` and `media delete` join it like any edit; the index changes an import or the media walk makes aren't edits and never do (Spec 8 §2). The edit that turns the operator lock on doesn't join it either, so undo and redo never lock or unlock (Spec 10 §12). The stack starts empty at launch and is cleared at quit. Older states come back through the versions folder and the restore commands (§9).
 
 **Undo** takes the top group and runs its inverses, last first, as one new group. That group is logged with source `restore` and an `undoes` field naming the group it reverses, and its `library` event has cause `undo`. The undone group moves to the redo stack.
 

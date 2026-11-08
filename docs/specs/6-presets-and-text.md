@@ -10,7 +10,7 @@ This spec finishes how a channel lands on a stack and how text gets its look and
 
 **In scope:** stacks and slots once the offset moves to the box (P13); presets, boxes and Preset 1; field boxes that fall back to the list's metadata (P12), and the provenance that tells them which list; the text style's vertical anchor, units and overflow (P1–P3); fonts, bundled and installed (P14); the variable language and the v1 set (P5–P7, P11); timers that count down and up (P8, R3); popups and captions (P10); the timer and remaining-time feedback; the first-run library and stacks (P13); and the corrections all this makes to Specs 1–5 (§10).
 
-**Out of scope:** the screens. The preset editor and text-style authoring belong to the edit-mode spec (Area 14, C4), and the Popups tab's timers group to the show-mode spec (P9). So does the first-run writer, which detects outputs and numbers them (S3). Also out: popup templates (v1.5, S6); masks and negative offsets (v1.5); text-motion transitions and per-glyph animation (later; Spec 4 §8 keeps the door open); designed slides, whose text layers will resolve the same variables (v2); `[Timecode]` (v2); fonts from the media root (deferred, Spec 4 §8); and guards, which read some of the same values (v1.5, Spec 2 §7).
+**Out of scope:** the screens. The preset editor and text-style authoring belong to the edit-mode spec (Area 14, C4), and the Popups tab's timers group to Spec 10 §7 (P9). The first-run writer, which detects outputs and numbers them (S3), is Spec 10 §13's. Also out: popup templates (v1.5, S6); masks and negative offsets (v1.5); text-motion transitions and per-glyph animation (later; Spec 4 §8 keeps the door open); designed slides, whose text layers will resolve the same variables (v2); `[Timecode]` (v2); fonts from the media root (deferred, Spec 4 §8); and guards, which read some of the same values (v1.5, Spec 2 §7).
 
 **Already settled, and kept as written** (C5):
 
@@ -160,7 +160,7 @@ Popups are slots 1 up to the machine's `popups` count, which is 4 on first run, 
 - **`clearafter`** clears the slot that many seconds after the set. A later `popup N set` replaces any pending clear with its own, or cancels it if it has none, and `popup N clear` cancels it too. The clear is logged as a `popup N clear` from source `engine` (Spec 2 §5), so replaying the log reproduces it.
 - **Captions** (UX spec). An external captioning system sends `popup N set` over OSC as often as it likes, and a box on the broadcast stack shows `[Popup N]`. The engine does no caption processing of its own. A box takes a popup's new value at once, at most ten times a second (§5), so captions run at most a tenth of a second and a frame behind, not a line behind (P10).
 - **Variables in popups.** A popup's text resolves its variables one level deep when a box shows it (§5, choice T-2), so `popup 1 set "Doors close in [Timer 1]"` counts down. Brackets around anything that isn't a v1 name still print as written (T-1), so a caption's `[MUSIC]` shows as sent.
-- **Clear-all.** `system clearall` leaves popups as they are, since Spec 2 §3 and Spec 3 §3 define it on channels. `popup N clear` clears one slot, and the clears tab can carry a macro that clears them all (choice T-4).
+- **Clear-all.** `system clearall` leaves popups as they are, since Spec 2 §3 and Spec 3 §3 define it on channels. `popup N clear` clears one slot, and the Clears tab's Clear Popups tile clears them all (choice T-4, Spec 10 §7).
 - **The log.** Popup commands are runtime commands (Spec 2 §3), so each one is logged. A captioning system can send several a second, and Spec 9 §2 keeps those lines in full.
 
 ## 8. Feedback
@@ -176,11 +176,11 @@ Spec 2 §6 and §9 name the timer and remaining-time feedback; this section give
 ```
 
 - **Remaining time.** `/o/channel/N/remaining` (Spec 2 §6) is built in Area 11 as Spec 2 defines it: once a second while timed content plays, and only to clients that subscribed to that channel.
-- **Popups.** `/o/popup/N` reports a set or a clear (Spec 2 §6), unchanged. The API's popup events belong to the show-mode spec, with the other topics the UI consumes (S2).
+- **Popups.** `/o/popup/N` reports a set or a clear (Spec 2 §6), unchanged. The API's `popups` topic is Spec 10 §3's, with the other topics the app uses (S2).
 
 ## 9. First run
 
-These are the first-run library and stacks (P13 and the review's note on it). They replace the UX spec's first-run rows for channels, Preset 1 and stack 2. Writing them on a fresh install, detecting outputs and numbering them (S3) belongs to the show-mode spec. Area 6 makes Preset 1's built-in definition and the fixtures match them.
+These are the first-run library and stacks (P13 and the review's note on it). They replace the UX spec's first-run rows for channels, Preset 1 and stack 2. The engine writes them on a fresh install, and detects and numbers the outputs (S3), as Spec 10 §13 says. Area 6 makes Preset 1's built-in definition and the fixtures match them.
 
 | Object | First run |
 | --- | --- |
@@ -190,7 +190,7 @@ These are the first-run library and stacks (P13 and the review's note on it). Th
 | Text styles | 1 Body and 2 Caption, as in the fixtures, each with `verticalAlignment` `center` |
 | Stack 1, Main | Channels 1 and 2, no default preset; output 1's default |
 | Stack 2, Confidence | Channels 2 and 3, no default preset; on no output, so it shows in the multiviewer |
-| Stacks 3 and up | One per further output, with channels 1 and 2, numbered by the show-mode spec (S3) |
+| Stacks 3 and up | One per further output, with channels 1 and 2, numbered as Spec 10 §13 says (S3) |
 
 Channel 3's `usualContent` is `any`, so channel 2 stays the only text channel and the text editor's default (E1). On stack 1, channels 1 and 2 resolve to Preset 1's `"*"` layout through their default preset. On stack 2, channel 2 resolves to Preset 1's `"2"` layout and channel 3 to the Clock preset. The confidence stack therefore shows the current and next lyric with the time above them, and the clock needs nothing on any channel.
 

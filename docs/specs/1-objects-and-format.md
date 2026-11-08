@@ -80,7 +80,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 | --- | --- | --- |
 | `kind` | `sdi`, `display`, `ndi`, `multiviewer` |  |
 | `device` | string | A stable hardware identifier: DeckLink port persistent ID, display UUID, or NDI source name |
-| `format` | `{width, height, rate: {num, den}, interlaced: bool}` | Interlace is handled in the sink by weaving a progressive render |
+| `format` | `{width, height, rate: {num, den}, interlaced: bool}` | Interlace is handled in the sink by weaving a progressive render. For a display, the screen's mode when the output was made; the engine always uses the screen's current mode (Spec 10 §11) |
 | `colorRange` | `full` or `limited` | Default full for displays, limited for SDI |
 | `genlock` | `reference`, `freeRun` | SDI only |
 | `defaultStack` | stack number | Loaded at launch |
@@ -93,9 +93,9 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Playlist**: `uuid`, `title`, `serviceDate` (ISO date or null; a date is optional), `serviceTime` (`HH:MM` or null, in the machine's time zone, read by `[Service In]`, Spec 6 §5), `archived` (bool), `items` (ordered). Every item has a `uuid`, unique within the playlist, and is one of `{kind: "header", label}`, `{kind: "linked", list: list number, listUuid}`, or `{kind: "local", localUuid}` pointing at a local copy in the machine root (Spec 7 §3). Playlists carry no cues of their own. The playlist's name is its title, unique on a machine ignoring case; its date is optional metadata and never part of its name (Spec 7 §3). The tree sorts dated playlists by date and lists undated ones by name in their own group.
 
-**Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`; the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
+**Key bindings**: an array of `{device: "keyboard" or a MIDI or Stream Deck device id, key, command}`, where a keyboard's `key` is a key name such as `shift+escape` (Spec 10 §9); the scheduler is the same array with `{when: {days, time}}` in place of `key`. A scheduler entry's `device` is `"scheduler"`; `days` are lowercase English day names and `time` is `HH:MM` in the machine's time zone. Exportable as its own file so stations can be standardized.
 
-**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `dropChannels` (a channel per media kind for drops from the pool, Spec 8 §8), `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false; brings the last state back after a run that didn't end cleanly, Spec 9 §4), `snapshots` `{cadence, retention}` (one value each in v1, Spec 9 §3), `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
+**Machine settings** (one document): machine `uuid` and `campusName`, `defaultRole`, `operatorLock` (enabled flag; the passcode hash lives in the Keychain, never here, Spec 10 §12), `libraryMode` (`readOnlyMasters` or `writable`), `mediaRoot`, `defaultImportFolder`, `dropChannels` (a channel per media kind for drops from the pool, Spec 8 §8), `fallbackFont`, `thumbnailStack`, `decoderCapDefault`, `tracking` (per-attribute booleans), `timers` and `popups` (slot counts, 1 to 16 each, Spec 10 §11), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`, `restoreLastState` (bool, default false; brings the last state back after a run that didn't end cleanly, Spec 9 §4), `snapshots` `{cadence, retention}` (one value each in v1, Spec 9 §3), `commandBar` (bool, default false), `network` `{oscInPort, oscOutTargets, apiPort, apiToken reference}`.
 
 ## 4. Identity
 
@@ -117,7 +117,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 ## 5. File layout and JSON conventions
 
-Two roots, both plain folders the user can see: the **library root** (portable, synced down to campuses) and the **machine root** (local, never synced). The media root is a folder inside the library root by default and may be pointed elsewhere in machine settings, on the startup volume and outside the Desktop, Documents and Downloads folders (Spec 8 §2).
+Two roots, both plain folders the user can see: the **library root** (portable, synced down to campuses) and the **machine root** (local, never synced). The media root is a folder inside the library root by default and may be pointed elsewhere in machine settings, on the startup volume and outside the Desktop, Documents and Downloads folders (Spec 8 §2). A new install puts both roots in `~/Project O/`, unless it uses a library already there (Spec 10 §13).
 
 ```
 library/
@@ -145,11 +145,13 @@ machine/
   playlists/                one file per playlist, named from its title: sunday.json
   lists-local/              local copies of masters, with provenance
   state/last.json           ShowState for restore-last-state, with how the run that wrote it ended (Spec 9 §4)
-  logs/                     the command log and the engine log, a file a day each (Spec 9 §2)
+  logs/                     the command log and the engine log, a file a day each (Spec 9 §2), and the engine's console output (Spec 10 §2)
   blackbox/                 the black box, a file an hour (Spec 9 §2)
   snapshots/                zips of both roots' documents (Spec 9 §3); all three are written by the engine and read by nothing it depends on
   thumbnails/               the engine's cue thumbnails: <stack>/<cue uuid>-<library version>.png (Spec 4 §10); pool tiles in pool/ (Spec 8 §5)
   conflicts/                files that arrived on disk while the engine held unwritten edits to them (Spec 5 §10); never synced, ignored by the loader
+  view.json                 the app's view settings, written by the app, ignored by the loader (Spec 10 §4)
+  engine.sock  .engine.lock the engine's local socket and the lock that keeps one engine per machine root, while it runs (Spec 10 §2)
 ```
 
 File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it, or a playlist's by its `uuid`, and renames the file to match on save, keeping a list in its folder (Spec 7 §2–§3). Every document starts with the same header.
@@ -257,7 +259,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 ## 9. Worked examples
 
-The first-run library, as written by the app on a fresh install, with a two-cue song added.
+The first-run library, as the engine writes it on a fresh install (Spec 10 §13), with a two-cue song added.
 
 **`library/channels.json`**
 

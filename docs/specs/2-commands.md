@@ -15,7 +15,7 @@ Everything an operator, a cue, a macro, a key, a console or a remote app does to
 - A command names its target by number, never by label. `channel 2 clear`, never `channel Foreground clear`.
 - Every command has exactly one canonical text form and one object form, convertible both ways without loss.
 - Commands are absolute. "Selected" is expanded to numbers before a command exists, so a macro, a cue or a log entry never depends on what someone had highlighted.
-- Every input path emits the same vocabulary and nothing else. The UI composes and shows commands; it has no private verbs.
+- Every input path emits the same vocabulary and nothing else. The UI composes and shows commands; it has no private verbs, apart from the few local requests that control the engine process, the lock and the operator's own screen (Spec 10 §3).
 - A command either runs or is rejected with a reason before anything changes. There are no partial runs.
 - Every executed command is logged with its source, and the log is the only history the app has.
 
@@ -76,7 +76,7 @@ macro 12
 
 ## 3. The v1 vocabulary
 
-The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable; *edit* commands carry their inverse and are undone by edit undo (Spec 5 §8). `N` is a channel number or the word `all`.
+The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable; *edit* commands carry their inverse and are undone by edit undo (Spec 5 §8). `N` is a channel number or the word `all`. With `all`, `toggle` turns every one on unless every one is already on, when it turns them all off (Spec 10 §7).
 
 **Channels**
 
@@ -182,8 +182,8 @@ Every command enters through one of these paths and is tagged with its source fo
 
 | Source | How commands arrive | Notes |
 | --- | --- | --- |
-| `ui` | Buttons, clicks and drags in the operator app compose a command object and submit it through the local API | Selection expansion happens here, before submission |
-| `key` | The key-binding table maps a key (with device) to one command; the scheduler is the same table keyed by day and time | Bindings are absolute: `channel 2 pause`, never "pause selected" |
+| `ui` | Buttons, clicks and drags in the operator app compose a command object and submit it through the engine's local socket (Spec 10 §2) | Selection expansion happens here, before submission |
+| `key` | The app maps a key (with device) to one command through the key-binding table (Spec 10 §9); the scheduler is the same table keyed by day and time | Bindings are absolute: `channel 2 pause`, never "pause selected" |
 | `osc` | OSC messages mapped one-to-one by the address scheme in section 6 | The primary external control path |
 | `midi`, `streamdeck` | The binding table with a device column; a note, CC or button maps to one command | MIDI is v1.5 if cheap |
 | `macro` | A macro's commands run in order; each inner command is logged with source `macro` and the macro number | A macro can call another macro; depth is capped at 8 and cycles are rejected at save |
@@ -192,7 +192,7 @@ Every command enters through one of these paths and is tagged with its source fo
 | `scheduler` | Time-of-day entries in the binding table | Runs with source `scheduler` |
 | `startup`, `shutdown` | The startup and shutdown macros from machine settings | Logged as such |
 | `commandbar` | Typed text, parsed, shown canonically before Enter | Off by default |
-| `api` | WebSocket clients, including the operator app itself over localhost | Section 9 |
+| `api` | WebSocket clients on the local network (Spec 10 §2) | Section 9 |
 | `restore` | Undo and history restores | Pass lock; show as "restored" in provenance |
 
 One more source, `engine`, covers commands the engine issues to itself: the end-of-media `clear` from Spec 4, fallback and recovery actions. They are logged like any other, pass lock, and are never user-visible as buttons.
@@ -274,7 +274,7 @@ Guards are evaluated at the moment the command would run, inside the macro's gro
 
 A command passes through four stages: parse, validate, execute, log. The first two can reject; the last two cannot fail silently.
 
-**Validate** checks, in order: the target number exists (or is `all`); referenced objects exist (a preset, a transition, a macro); arguments are in range (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1); content references resolve in the media index (a missing file is allowed and produces the missing state, an unknown id is rejected); macro depth and cycles. A group validates as a whole: one bad command rejects the group, and the rejection names the command and the reason.
+**Validate** checks, in order: the target number exists (or is `all`); referenced objects exist (a preset, a transition, a macro); arguments are in range (gain within ±60 dB, offsets within ±1000 ms, opacity 0–1); content references resolve in the media index (a missing file is allowed and produces the missing state, an unknown id is rejected); macro depth and cycles. A group validates as a whole, each command against the state the commands before it leave, so `playlist "TITLE"` then `item N cue M` fires a cue of that playlist (Spec 10 §6): one bad command rejects the group, and the rejection names the command and the reason.
 
 **Lock.** A channel's lock blocks `write`, `clear` and tracked attribute writes whose source is `cue` or `timeline`. The blocked command is logged with result `blocked` and the cue still counts as fired; its other channels run. Every other source passes. Lock never enters tracking and is never restored by undo. An edit held by a cue, macro, key binding or scheduler entry that operator lock, library mode or a library changed since its holder was saved refuses at run time is logged `blocked` the same way, and the rest of its group runs (Spec 5 §2).
 
@@ -306,7 +306,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 
 `fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime`, `edit` or `note` (Spec 9 §2); edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number; a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) reaches the log as a note the app sends (Spec 9 §2).
 
-**API envelope.** The WebSocket API carries the same objects. A client sends a request and receives a response with the same `id`; the engine pushes `event` messages for state changes to subscribed clients. The operator app is a client of this API over localhost.
+**API envelope.** The WebSocket API carries the same objects. A client sends a request and receives a response with the same `id`; the engine pushes `event` messages for state changes to subscribed clients. A connection carries answers and events in the order the engine produces them, so an answer reflects every event sent before it; an event carries the `seq` of the log line that caused it, or of the last line logged before it. The operator app is a client of the same API over the engine's local socket (Spec 10 §2). Until the API server exists (Area 19), the engine's areas publish their events and answer their queries and requests through the engine's own publisher, which their tests read in-process.
 
 ```json
 { "id": 17, "type": "command", "command": { "cmd": "channel.clear", "channel": 2 } }
@@ -317,13 +317,13 @@ A command passes through four stages: parse, validate, execute, log. The first t
 { "id": 20, "type": "query", "what": "state" }
 ```
 
-A `media import` result also carries the `job` its outcomes are reported under (Spec 8 §7). Spec 9 adds the `note` request (Spec 9 §2), the `versions` and `snapshots` queries (Spec 9 §6), and the `history` and `saving` topics (Spec 9 §5 and §7).
+A `media import` result also carries the `job` its outcomes are reported under (Spec 8 §7). Spec 9 adds the `note` request (Spec 9 §2), the `versions` and `snapshots` queries (Spec 9 §6), and the `history` and `saving` topics (Spec 9 §5 and §7). Spec 10 §3 defines the `channels` topic, gives the `preview` topic its rate and adds the `outputs`, `audio`, `popups`, `thumbnails`, `engine` and `devices` topics, the `catalog`, `list`, `media`, `listUse`, `thumbnails`, `devices` and `fonts` queries, the requests only the local socket takes, and the `group` and `applied` an applied edit's result carries.
 
-**Auth and discovery.** The engine listens on the LAN with a token from the Keychain; the first message on a connection must be `{"type": "auth", "token": "..."}` or the socket closes. The service advertises over Bonjour as `_projecto._tcp` with the machine's campus name, so a remote finds it without an address. Nothing listens beyond the local network, and there is no cloud relay.
+**Auth and discovery.** The engine listens on the LAN with a token from the Keychain; the first message on a connection must be `{"type": "auth", "token": "..."}` or the socket closes. The operator app connects instead over a local socket in the machine root that only the same macOS user can open, sends no token, and never reads the Keychain, which only the engine touches (Spec 10 §2). The service advertises over Bonjour as `_projecto._tcp` with the machine's campus name, so a remote finds it without an address. Nothing listens beyond the local network, and there is no cloud relay.
 
-**The****`commands`****topic** streams every executed command object with its sequence number to subscribers. It exists for two future uses that cost nothing to reserve: a warm-standby engine on a second Mac that subscribes and applies the same commands against the same library, and external loggers or CCLI tooling that want the fire stream live rather than from files.
+**The `commands` topic** streams every executed command object with its sequence number to subscribers. It exists for two future uses that cost nothing to reserve: a warm-standby engine on a second Mac that subscribes and applies the same commands against the same library, and external loggers or CCLI tooling that want the fire stream live rather than from files.
 
-**Versioning.** The envelope carries `"api": 1` in the auth reply. Adding fields never bumps it; changing a field's meaning does.
+**Versioning.** The envelope carries `"api": 1` in the auth reply, and in `hello` on the local socket (Spec 10 §2). Adding fields never bumps it; changing a field's meaning does.
 
 ## 10. Tests this spec implies
 
@@ -335,13 +335,11 @@ A `media import` result also carries the `job` its outcomes are reported under (
 - **Lock.** A locked channel refuses `write`, `clear` and tracked attribute writes from `cue` and `timeline` sources, logs `blocked`, and accepts the same commands from every other source.
 - **Groups.** A cue's commands land on one frame boundary; a macro's commands run in order with each inner command logged under the macro's group id.
 - **Log.** Every executed command produces one line with the fields in section 9; the first command of a cue group carries `fire`.
-- **API.** A connection without auth closes; a command yields a result with the same id; subscribed clients receive events with monotonic `seq`.
+- **API.** A LAN connection without auth closes; a command yields a result with the same id; subscribed clients receive answers and events in the order the engine produced them.
 
 ## Resolved questions
 
 - **`cue N`** fires in the live list, never the browsed one.
 - **`audio all mute`** is a first-class command form; nothing in the vocabulary depends on built-in macros, which may change.
 - **Bonjour service name** `_projecto._tcp` is a placeholder that follows the product name.
-- **Per-channel remaining time** is opt-in: a client subscribes per channel with `/o/subscribe` (or the API's `subscribe` with a channel list) and receives it once a second only while subscribed, so nothing is chatty by default.
-
-Correct
+- **Per-channel remaining time** is opt-in: a client subscribes per channel with `/o/subscribe` (or the API's `channels` topic, which carries a playing channel's position once a second, Spec 10 §3) and receives it once a second only while subscribed, so nothing is chatty by default.
