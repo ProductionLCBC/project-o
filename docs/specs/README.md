@@ -14,17 +14,18 @@ One page per area, numbered in build order. Each is written before its code and 
 | `8-media-pool.md` | The media commands and who runs them, import (staging, hash first, the kinds v1 takes), the walk with its hash cache and how it tells a move from a re-export or a restore, the two indexes and the machine's own media folder, where media may live, poster frames and pool tiles, delete and replace with their inverses, the `media` topic and the use query, drop channels. | Accepted 2026-11-07 |
 | `9-log-and-saving.md` | The command log, the engine log and the black box on disk, notes, snapshots and when they're taken, the last state and restore-last-state with its guard against a crash loop, edit undo and redo with the `history` topic, the two restore commands, kept versions filed by list uuid, retention, a low or full disk and the `saving` topic. | Accepted 2026-11-07 |
 | `10-show-mode-ui.md` | The app and the engine as two processes (the local socket, the LAN API, the Mach channel with the previews, the channel pictures and the meters, the curtains, relaunching and quitting), the topics, queries and requests the app uses, the main window and its regions, the keys and their precedence, edits from show mode, settings, the operator lock and its secrets, first run, restores and saving, accessibility and localization. | Accepted 2026-11-08 |
+| `11-edit-mode.md` | The edit-mode frame (the pages and the edit bar, the ways in and out, the keys, the lock, editing what is live), the `render` and `uses` queries, the Cues page with the filmstrip, the cue inspector, its palette, commands as text and multi-cue editing, the text editor and its paste rules, the stack editor, the channel sheet, the preset editor with text styles, the small editors for grades, transitions, audio transitions, text styles and macros, accessibility and localization. | Accepted 2026-11-08 |
 
 ## Still to write, in order
 
-One is left of the order the scope gaps doc settled with Adam on 2026-11-04: edit-mode UI, minimal (Areas 10 and 14). It is drafted as a tab of the specs doc below and exported here once Adam accepts it. The v1.5 and v2 specs (library mode, runtime undo, live inputs, NDI, audio transitions, slide designer, timelines) wait until the pilot is scheduled.
+None of the order the scope gaps doc settled with Adam on 2026-11-04: the last of it, edit mode (Areas 14 and 10), is Spec 11. The v1.5 and v2 specs (library mode, runtime undo, live inputs, NDI, audio transitions, slide designer, timelines) wait until the pilot is scheduled.
 
 ## Provenance
 
-These pages were exported from the Claude Docs where they were drafted and reviewed, on 2026-10-25 except Specs 5 and 6, exported on 2026-11-04, Specs 7 to 9, exported on 2026-11-07, and Spec 10, exported on 2026-11-08:
+These pages were exported from the Claude Docs where they were drafted and reviewed, on 2026-10-25 except Specs 5 and 6, exported on 2026-11-04, Specs 7 to 9, exported on 2026-11-07, and Specs 10 and 11, exported on 2026-11-08:
 
 - UX and system design spec (`../ux-spec.md`): https://claude.ai/artifact/N5bsbuj2pDaJNBdi3TJMUX
-- Specs 1–10: https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh (one tab per spec)
+- Specs 1–11: https://claude.ai/artifact/Gv6oJ5sSvzr9jBnMcaUpWh (one tab per spec)
 - Scope gaps doc (the scope of every area that waited on a spec, as Adam settled it on 2026-11-04; Spec 5 onward is written from its answers): https://claude.ai/artifact/2wd3EJdEYcY1uf3zpvFtW6
 - Planning doc (spec review, build order, working process): https://claude.ai/artifact/Pr5jArnzv7EXbKjGDf3Seq
 - Clickable UI demo: https://claude.ai/artifact/S1GmeEwBMrouCAW2MFTtLt
