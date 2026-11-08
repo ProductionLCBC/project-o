@@ -2,7 +2,7 @@
 
 A Metal-native macOS presenter with DeckLink SDI output, built by LCBC Church for a multi-campus church. Working name until the brand team names it.
 
-**Status:** early; no UI yet. Areas 1–4 of `docs/build-order.md` have shipped: in `OCore` and `formats/`, channel state and the projection, the object model and library format, and the command vocabulary; in `engine/`, the engine spike, a headless `OEngine` driven over OSC. Next is the spike's three-hour run on the test bench, then Area 5, the rest of the render pipeline. `docs/STATUS.md` is the current one-page view.
+**Status:** early; no UI yet. Areas 1–5 and 16 of `docs/build-order.md` have shipped: in `OCore` and `formats/`, channel state and the projection, the object model and library format, and the command vocabulary; in `engine/`, a headless `OEngine` driven over OSC, with the render pipeline (the 1080i weave, the text cache, thumbnails, the multiviewer and measurement) and basic audio. Every v1 area's spec is written. Next is Area 15, basic macros, then the other engine-side areas; the app's areas wait for the engine's three-hour run on the test bench with a DeckLink card. `docs/STATUS.md` is the current one-page view.
 
 ## Read first
 
