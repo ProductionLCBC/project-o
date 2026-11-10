@@ -34,6 +34,9 @@ public final class DocumentWriter: @unchecked Sendable {
         /// Spec 5 §10 — an arriving file the engine's edits beat, kept under
         /// its file name in `machine/conflicts/`.
         case keep(Data, name: String, about: String)
+        /// Spec 5 §10 — look for what changed on disk since the queue last
+        /// read or wrote the watched folders.
+        case scan
     }
 
     /// What the queue did, in order, for the control thread.
@@ -47,6 +50,8 @@ public final class DocumentWriter: @unchecked Sendable {
         /// A file kept in `machine/conflicts/`, by its path in the machine root.
         case kept(path: String, about: String)
         case keepFailed(about: String, reason: String)
+        /// What a scan found; never the queue's own writes.
+        case scanned(DiskDelta)
     }
 
     /// What the queue knows a watched file holds: the digest of the bytes it
@@ -82,6 +87,7 @@ public final class DocumentWriter: @unchecked Sendable {
     private let lock = NSLock()
     private var nextSeq = 0
     private var reports: [Report] = []
+    private var scanQueued = false
     // The queue's own: touched only on `queue`.
     var files: [FileKey: Known] = [:]
     var folders: Set<String> = []
@@ -138,6 +144,17 @@ public final class DocumentWriter: @unchecked Sendable {
         return seq
     }
 
+    /// Spec 5 §10 — a scan after everything queued so far. Any thread: the
+    /// folder watcher asks from its own. One waiting scan covers every ask
+    /// made before it starts.
+    public func requestScan() {
+        lock.lock()
+        let queued = scanQueued
+        scanQueued = true
+        lock.unlock()
+        if !queued { submit(.scan) }
+    }
+
     /// Everything reported since the last call, in order.
     public func takeReports() -> [Report] {
         lock.lock()
@@ -168,7 +185,85 @@ public final class DocumentWriter: @unchecked Sendable {
             structure(change, root: root, operations: operations, seq: seq)
         case .keep(let data, let name, let about):
             keep(data, name: name, about: about)
+        case .scan:
+            lock.lock()
+            scanQueued = false
+            lock.unlock()
+            let delta = scan()
+            if !delta.isEmpty { report(.scanned(delta)) }
         }
+    }
+
+    // MARK: - Scanning (Spec 5 §10, Spec 1 §8)
+
+    /// Spec 5 §10 — the watched folders compared with what the queue last
+    /// read or wrote there: the documents that arrived or changed, read and
+    /// parsed here, off the control thread; those that went; folders and
+    /// other files under `lists/`. A file whose identity on disk is unchanged
+    /// isn't read again. "The loader and the folder watcher ignore a sync
+    /// tool's temporary and partial files" (Spec 1 §5). The queue then knows
+    /// the disk as it is.
+    func scan() -> DiskDelta {
+        var delta = DiskDelta()
+        delta.library = scan(.library, under: ["lists"])
+        delta.machine = scan(.machine, under: ["playlists", "lists-local"])
+        return delta
+    }
+
+    private func scan(_ root: Root, under tops: [String]) -> RootDelta {
+        var delta = RootDelta()
+        var seenFolders: Set<String> = []
+        var seenOthers: Set<String> = []
+        let base = url(root).standardizedFileURL.path + "/"
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
+        for top in tops {
+            guard let walker = FileManager.default.enumerator(at: url(root).appendingPathComponent(top), includingPropertiesForKeys: keys) else { continue }
+            for case let item as URL in walker {
+                let full = item.standardizedFileURL.path
+                guard full.hasPrefix(base) else { continue }
+                let path = String(full.dropFirst(base.count))
+                let values = try? item.resourceValues(forKeys: Set(keys))
+                if FileLayout.isIgnored(path: path) {
+                    if values?.isDirectory == true { walker.skipDescendants() }
+                    continue
+                }
+                if values?.isDirectory == true {
+                    if root == .library { seenFolders.insert(path) }
+                    continue
+                }
+                guard values?.isRegularFile == true else { continue }
+                guard item.pathExtension == "json" else {
+                    if root == .library { seenOthers.insert(path) }
+                    continue
+                }
+                guard let stamp = Stamp.of(full) else { continue }
+                delta.present[path] = stamp.modified / 1_000_000
+                let key = FileKey(root: root, path: path)
+                if let known = files[key], known.stamp == stamp { continue }
+                guard let data = FileManager.default.contents(atPath: full) else { continue }
+                let digest = Self.digest(data)
+                if let known = files[key], known.digest == digest {
+                    files[key]?.stamp = stamp
+                    continue
+                }
+                files[key] = Known(digest: digest, stamp: stamp)
+                delta.arrived.append(ArrivedFile.reading(path: path, data: data, digest: digest))
+            }
+        }
+        for (key, known) in files where key.root == root && delta.present[key.path] == nil {
+            delta.removed[key.path] = known.digest
+            files.removeValue(forKey: key)
+        }
+        if root == .library {
+            delta.foldersAdded = seenFolders.subtracting(folders)
+            delta.foldersRemoved = folders.subtracting(seenFolders)
+            delta.otherAdded = seenOthers.subtracting(others)
+            delta.otherRemoved = others.subtracting(seenOthers)
+            folders = seenFolders
+            others = seenOthers
+        }
+        delta.arrived.sort { $0.path < $1.path }
+        return delta
     }
 
     /// Spec 1 §5 — one document's write. A kept-version copy whose file has

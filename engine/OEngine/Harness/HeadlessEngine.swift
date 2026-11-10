@@ -162,6 +162,14 @@ public final class HeadlessEngine: @unchecked Sendable {
         control.documents?.writer.waitUntilIdle()
     }
 
+    /// Spec 5 §10 — what the folder watcher does when a file changes: a scan
+    /// after everything queued, then a tick that reloads what it found.
+    public func scanDisk() {
+        control.requestScan()
+        waitForWrites()
+        tick()
+    }
+
     /// One master tick.
     public func tick() {
         clock.advance()

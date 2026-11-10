@@ -174,8 +174,15 @@ public final class ControlLoop: @unchecked Sendable {
         let variables = self.variables
         let writer = DocumentWriter(libraryRoot: libraryRoot, machineRoot: machineRoot, librarySnapshot: librarySnapshot,
                                     machineSnapshot: machineSnapshot, fileStamp: { variables.fileStamp() })
+        let reload = ReloadState.loaded(library: library, machine: machine, librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
         documents = DocumentStore(writer: writer, library: library, machine: machine, kept: KeptVersions.reading(librarySnapshot.versions),
-                                  log: log, wallMilliseconds: { variables.wallMilliseconds })
+                                  reload: reload, log: log, wallMilliseconds: { variables.wallMilliseconds })
+    }
+
+    /// Spec 5 §10 — look for changes that arrived on disk: the folder
+    /// watcher asks, from its own thread, and so does the engine at start.
+    public func requestScan() {
+        documents?.writer.requestScan()
     }
 
     /// Spec 9 §4 — before the engine stops, every unwritten edit is written,

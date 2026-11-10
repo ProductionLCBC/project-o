@@ -169,9 +169,7 @@ public enum Loader {
     static func install(lists candidates: [(list: List, path: String)], snapshot: RootSnapshot,
                         into library: inout Library, report: inout ValidationReport) {
         func rank(_ candidate: (list: List, path: String)) -> (Int, Int, Int64, String) {
-            let name = candidate.path.split(separator: "/").last.map(String.init) ?? candidate.path
-            let own = name == FileLayout.numbered(candidate.list.number, candidate.list.title) + ".json"
-            return (own ? 0 : 1, -candidate.list.version, -(snapshot.modified[candidate.path] ?? 0), candidate.path)
+            Loader.rank(list: candidate.list, path: candidate.path, modified: snapshot.modified[candidate.path] ?? 0)
         }
         var groups: [UUID: [(list: List, path: String)]] = [:]
         var order: [UUID] = []
@@ -195,6 +193,23 @@ public enum Loader {
             library.lists.append(candidate.list)
             library.documentPaths[FileLayout.documentKey(list: candidate.list.uuid)] = candidate.path
         }
+    }
+
+    /// Spec 7 §2 — the order two files holding one list are preferred in,
+    /// least first: "the file whose name is the one it would write for that
+    /// list, then the higher `version`, then the later modification date,
+    /// then the path that sorts first". A reload ranks them the same way.
+    static func rank(list: List, path: String, modified: Int64) -> (Int, Int, Int64, String) {
+        let name = path.split(separator: "/").last.map(String.init) ?? path
+        let own = name == FileLayout.numbered(list.number, list.title) + ".json"
+        return (own ? 0 : 1, -list.version, -modified, path)
+    }
+
+    /// Spec 7 §3 — "the file named with the plain slug of its title, then the
+    /// later modification date, then the path that sorts first".
+    static func rank(playlist: Playlist, path: String, modified: Int64) -> (Int, Int64, String) {
+        let plain = path == FileLayout.plainPath(forPlaylist: playlist)
+        return (plain ? 0 : 1, -modified, path)
     }
 
     /// Spec 7 §2 — "On a case-sensitive volume two folders can differ only by
@@ -252,8 +267,7 @@ public enum Loader {
     static func install(playlists candidates: [(playlist: Playlist, path: String)], snapshot: RootSnapshot,
                         into machine: inout Machine, report: inout ValidationReport) {
         func rank(_ candidate: (playlist: Playlist, path: String)) -> (Int, Int64, String) {
-            let plain = candidate.path == FileLayout.plainPath(forPlaylist: candidate.playlist)
-            return (plain ? 0 : 1, -(snapshot.modified[candidate.path] ?? 0), candidate.path)
+            Loader.rank(playlist: candidate.playlist, path: candidate.path, modified: snapshot.modified[candidate.path] ?? 0)
         }
         var groups: [UUID: [(playlist: Playlist, path: String)]] = [:]
         var order: [UUID] = []

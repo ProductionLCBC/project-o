@@ -35,6 +35,12 @@ final class DocumentStore {
     private var playlistFiles: [UUID: String]
     private var reverts: [Int: Revert] = [:]
     private var failing: Set<DocumentRef> = []
+    /// Spec 5 §10 — documents whose writes, or whose files' removal, the
+    /// queue hasn't reported yet: unwritten edits, for a scan.
+    private var inFlight: Set<DocumentRef> = []
+    private var removing: Set<DocumentRef> = []
+    /// Spec 7 §2 — spare files and the three-second window.
+    private(set) var reload: ReloadState
 
     /// What a planned save changed in memory, put back if it fails.
     private struct Revert {
@@ -44,10 +50,11 @@ final class DocumentStore {
         var wasOnDisk: Bool
     }
 
-    init(writer: DocumentWriter, library: Library, machine: Machine, kept: KeptVersions, log: EngineLog,
+    init(writer: DocumentWriter, library: Library, machine: Machine, kept: KeptVersions, reload: ReloadState, log: EngineLog,
          wallMilliseconds: @escaping @Sendable () -> Int64) {
         self.writer = writer
         self.kept = kept
+        self.reload = reload
         self.log = log
         self.wallMilliseconds = wallMilliseconds
         var onDisk: Set<DocumentRef> = [.keys]
@@ -106,13 +113,16 @@ final class DocumentStore {
             if onDisk.contains(.list(uuid)) { submit(change, .library, [.move(from: from, to: to)]) }
         case .removeList(let uuid, let path):
             dirty.removeValue(forKey: .list(uuid))
+            reload.pending.removeValue(forKey: uuid)
             guard onDisk.remove(.list(uuid)) != nil else { return nil }
+            removing.insert(.list(uuid))
             submit(change, .library, [.remove(path: path)])
             return .list(uuid)
         case .removePlaylist(let uuid, let path):
             dirty.removeValue(forKey: .playlist(uuid))
             let file = playlistFiles.removeValue(forKey: uuid) ?? path
             guard onDisk.remove(.playlist(uuid)) != nil else { return nil }
+            removing.insert(.playlist(uuid))
             submit(change, .machine, [.remove(path: file)])
             return .playlist(uuid)
         }
@@ -127,12 +137,15 @@ final class DocumentStore {
 
     /// Spec 5 §2 — write every document whose unwritten edits are due: at
     /// once when it hasn't been written for a second, else a second after its
-    /// last write. `everything` writes them all now (the engine stops).
-    /// Returns whether the roots changed: a list's version, a file's name.
+    /// last write. `everything` writes them all now (the engine stops). A
+    /// list whose file went within the last three seconds waits to see
+    /// whether it moved (Spec 7 §2). Returns whether the roots changed: a
+    /// list's version, a file's name.
     @discardableResult
     func writeDue(library: inout Library, machine: inout Machine, now: MonotonicTime, everything: Bool = false) -> Bool {
         let due = dirty.filter { ref, _ in
-            everything || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
+            if case .list(let uuid) = ref, reload.pending[uuid] != nil, !everything { return false }
+            return everything || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
         }
         guard !due.isEmpty else { return false }
         var changed = false
@@ -207,6 +220,7 @@ final class DocumentStore {
         let seq = writer.submit(.save(ref, root, operations, path: path))
         reverts[seq] = Revert(ref: ref, recorded: recorded, planned: path, wasOnDisk: wasOnDisk)
         issuedSeq[ref] = seq
+        inFlight.insert(ref)
         onDisk.insert(ref)
     }
 
@@ -228,17 +242,24 @@ final class DocumentStore {
 
     // MARK: - What the writer reported
 
-    /// The queue's reports since the last build. A failed write is logged
-    /// once and tried again a second later, the document named where its file
-    /// still is; a list move that failed leaves the list where it was (Spec 7
-    /// §2: "a move onto one is refused"), and is returned for a `library`
-    /// event. Kept-version copies not made are forgotten.
+    /// The queue's reports since the last build, in the order it made them.
+    /// A failed write is logged once and tried again a second later, the
+    /// document named where its file still is; a list move that failed
+    /// leaves the list where it was (Spec 7 §2: "a move onto one is
+    /// refused"). Kept-version copies not made are forgotten. What a scan
+    /// found is reloaded (Spec 5 §10), and the lists whose files have been
+    /// gone three seconds are deleted. Returns what changed, for one
+    /// `library` event with cause `file`.
     func absorbReports(library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
         var changes: [LibraryChange] = []
         for report in writer.takeReports() {
             switch report {
             case .saved(let seq, let ref, _, let skipped):
                 reverts.removeValue(forKey: seq)
+                inFlight.remove(ref)
+                onDisk.insert(ref)
+                // A write that landed after its file went brought the file back.
+                if case .list(let uuid) = ref { reload.pending.removeValue(forKey: uuid) }
                 for path in skipped {
                     for (uuid, versions) in KeptVersions.reading([path: 0]).lists {
                         for version in versions.keys { kept.lists[uuid]?[version] = nil }
@@ -246,12 +267,14 @@ final class DocumentStore {
                 }
                 if failing.remove(ref) != nil { log.info("wrote \(ref) again") }
             case .saveFailed(let seq, let ref, let reason):
+                inFlight.remove(ref)
                 if failing.insert(ref).inserted { log.error("could not write \(ref): \(reason); trying again every second") }
                 if let revert = reverts.removeValue(forKey: seq) { putBack(revert, library: &library, machine: &machine) }
                 if dirty[ref] == nil, DocumentChanges.exists(ref, library: library, machine: machine) { dirty[ref] = now }
-            case .structured:
-                break
+            case .structured(_, let change):
+                removing.subtract(Self.removed(by: change))
             case .structureFailed(_, let change, let reason):
+                removing.subtract(Self.removed(by: change))
                 log.error("\(DocumentWriter.describe(change)) failed on disk: \(reason)")
                 if case .moveList(let uuid, let from, _) = change, let list = library.list(uuid: uuid) {
                     library.documentPaths[FileLayout.documentKey(list: uuid)] = from
@@ -262,9 +285,50 @@ final class DocumentStore {
                 log.warning("\(about) changed on disk while the engine held unwritten edits: the arriving file is kept as \(path), and the engine's document is written")
             case .keepFailed(let about, let reason):
                 log.error("\(about) changed on disk while the engine held unwritten edits, and the arriving file could not be kept: \(reason)")
+            case .scanned(let delta):
+                let outcome = DiskReload.apply(delta, library: library, machine: machine, state: reload,
+                                               unwritten: Set(dirty.keys).union(inFlight), deleting: removing, now: now.nanoseconds)
+                changes += adopt(outcome, library: &library, machine: &machine, now: now)
             }
         }
+        if !reload.pending.isEmpty {
+            let outcome = DiskReload.expire(library: library, machine: machine, state: reload,
+                                            unwritten: Set(dirty.keys).union(inFlight), now: now.nanoseconds)
+            changes += adopt(outcome, library: &library, machine: &machine, now: now)
+        }
         return LibraryChange.merged(changes)
+    }
+
+    static func removed(by change: StructureChange) -> [DocumentRef] {
+        switch change {
+        case .removeList(let uuid, _): return [.list(uuid)]
+        case .removePlaylist(let uuid, _): return [.playlist(uuid)]
+        default: return []
+        }
+    }
+
+    /// Spec 5 §10 — a reload's roots, its files' places, the arriving files
+    /// kept in `conflicts/`, the documents the engine's edits win for written
+    /// again, and both logged.
+    private func adopt(_ outcome: ReloadOutcome, library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
+        library = outcome.library
+        machine = outcome.machine
+        reload = outcome.state
+        for ref in outcome.gone {
+            onDisk.remove(ref)
+            if case .playlist(let uuid) = ref { playlistFiles.removeValue(forKey: uuid) }
+        }
+        for (ref, path) in outcome.located {
+            onDisk.insert(ref)
+            if case .playlist(let uuid) = ref { playlistFiles[uuid] = path }
+        }
+        for conflict in outcome.conflicts {
+            writer.submit(.keep(conflict.data, name: conflict.name, about: conflict.about))
+        }
+        for ref in outcome.rewrite where dirty[ref] == nil { dirty[ref] = now }
+        for note in outcome.notes { log.info(note) }
+        for warning in outcome.warnings { log.warning(warning) }
+        return outcome.changes
     }
 
     /// A failed save's document is named where its file still is.

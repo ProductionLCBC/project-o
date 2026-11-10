@@ -78,6 +78,8 @@ public final class EngineProcess: @unchecked Sendable {
     public let audio: AudioSystem?
     public let displaySinks: [DisplaySink]
     public let deckLinkSinks: [DeckLinkSink]
+    /// Spec 1 §8 — documents that change on disk under the engine are reloaded.
+    public let watcher: DiskWatcher
     private let startedAt = MonotonicClock.now()
 
     @MainActor
@@ -163,6 +165,8 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 5 §2 — edits are written to the roots they were loaded from.
         engine.control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
                                        librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+        let control = engine.control
+        watcher = DiskWatcher(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot) { control.requestScan() }
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
             engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,
@@ -210,6 +214,9 @@ public final class EngineProcess: @unchecked Sendable {
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
         }
+        // Spec 1 §8 — the watcher, and one scan for anything that changed between the load and the watch.
+        if !watcher.start() { log.error("the folder watcher did not start: changes on disk are read at the next launch") }
+        engine.control.requestScan()
         let engine = self.engine
         let textCache = self.textCache
         let audio = self.audio
@@ -244,6 +251,7 @@ public final class EngineProcess: @unchecked Sendable {
     }
 
     public func stop() {
+        watcher.stop()
         engine.stop()
         osc?.stop()
     }
