@@ -98,6 +98,10 @@ final class CommandTextTests: XCTestCase {
         row("stack 2 blackout on", .stackBlackout(stack: .number(2), state: .on)),
         row("stack 2 blackout off", .stackBlackout(stack: .number(2), state: .off)),
         row("stack 2 blackout toggle", .stackBlackout(stack: .number(2), state: .toggle)),
+        // Spec 2 §3 — `stack all blackout`, for the clears tab's Blackout All (Spec 10 §7).
+        row("stack all blackout on", .stackBlackout(stack: .all, state: .on)),
+        row("stack all blackout off", .stackBlackout(stack: .all, state: .off)),
+        row("stack all blackout toggle", .stackBlackout(stack: .all, state: .toggle)),
         row("stack 2 mute 1 toggle", .stackMute(stack: 2, channel: 1, state: .toggle)),
         // Playlist and library navigation
         row("next", .next),
@@ -387,6 +391,7 @@ final class CommandTextTests: XCTestCase {
             .channelBuild(channel: .number(1), build: 3),
             .outputStack(output: 1, stack: 4),
             .stackBlackout(stack: .number(2), state: .toggle),
+            .stackBlackout(stack: .all, state: .off),
             .stackMute(stack: 2, channel: 1, state: .off),
             .next, .previous, .cue(7),
             .itemCue(item: 4, cue: 3),

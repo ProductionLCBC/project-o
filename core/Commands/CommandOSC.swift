@@ -184,7 +184,7 @@ public enum OSCMapping {
         var head = [target]
         if hasNumber {
             let n = words[1]
-            if case .target? = rows.first?.number, n == "all" {
+            if Vocabulary.takesAll(target: target), n == "all" {
                 head.append("all")
             } else {
                 guard let value = Int(n), value >= 1 else { throw reject(.badArgument, "\(n) is not a \(target) number") }
@@ -196,6 +196,10 @@ public enum OSCMapping {
             let verb = Vocabulary.canonicalVerb(words[expected - 1], target: target)
             guard let found = Vocabulary.row(target: target, verb: verb) else {
                 throw reject(.unknownVerb, "\(words[expected - 1]) is not a \(target) verb")
+            }
+            // Spec 2 §3 — `all` is the named row's to take (`stack all blackout`, not `stack all mute`).
+            if hasNumber, head[1] == "all", !found.takesAll {
+                throw reject(.badArgument, "\(target) \(verb) takes a number, not all")
             }
             row = found
             head.append(verb)
