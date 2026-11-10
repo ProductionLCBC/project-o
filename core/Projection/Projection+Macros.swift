@@ -7,8 +7,8 @@ extension Fold {
     /// Spec 2 §5 — depth is capped at 8. An unknown macro, or one whose
     /// guards all fail, is a `noop`. Spec 1 §2 — a macro that names a stack
     /// or an output lives in the machine root, so both roots are searched.
-    mutating func runMacro(_ number: Int, command: Command, source: CommandSource, depth: Int) {
-        guard depth < Fold.maxDepth, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
+    mutating func runMacro(_ number: Int, command: Command, source: CommandSource, nesting: Nesting) {
+        guard nesting.levelsLeft > 0, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
             effects.append(.noop(command))
             return
         }
@@ -21,7 +21,7 @@ extension Fold {
             if let condition = guarded.when, !condition.holds(actual: value(of: condition.variable)) {
                 continue
             }
-            apply(guarded.command, source: inner, depth: depth + 1)
+            apply(guarded.command, source: inner, nesting: nesting.insideMacro)
         }
         if effects.count == before {
             effects.append(.noop(command))

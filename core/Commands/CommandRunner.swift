@@ -67,7 +67,7 @@ public enum CommandRunner {
         for entry in group.commands {
             // Spec 2 §7 — "the command runs only when it holds".
             if let condition = entry.when, !runner.holds(condition) { continue }
-            runner.run(entry.command, group: group.id, source: group.source, fire: fire, depth: 0, makeGroupID: makeGroupID)
+            runner.run(entry.command, group: group.id, source: group.source, fire: fire, nesting: .top, makeGroupID: makeGroupID)
             fire = nil
         }
         return .success(RunOutcome(state: runner.state, executed: runner.executed))
@@ -101,37 +101,43 @@ struct Runner {
         condition.holds(actual: Fold(state: state, context: context).value(of: condition.variable))
     }
 
-    mutating func run(_ command: Command, group: GroupID, source: CommandSource, fire: FireRecord?, depth: Int,
+    /// One command at its place in the group (Spec 2 §5, "Macro depth"). It
+    /// is folded at that same place, so the lines logged and the state that
+    /// results always agree, and a cue whose commands fire cues stops at the
+    /// cap rather than recursing without end.
+    mutating func run(_ command: Command, group: GroupID, source: CommandSource, fire: FireRecord?, nesting: Nesting,
                       makeGroupID: () -> GroupID) {
         if case .macro(let number) = command {
-            runMacro(number, command: command, group: group, source: source, fire: fire, depth: depth, makeGroupID: makeGroupID)
+            runMacro(number, command: command, group: group, source: source, fire: fire, nesting: nesting, makeGroupID: makeGroupID)
             return
         }
         var projectionContext = context
         projectionContext.source = source
         let before = state
-        let (after, effects) = project(before, [command], context: projectionContext)
+        var fold = Fold(state: before, context: projectionContext)
+        fold.apply(command, source: source, nesting: nesting)
+        let (after, effects) = (fold.state, fold.effects)
 
-        if let position = firedPosition(after: after, effects: effects, context: projectionContext) {
-            // Spec 2 §9 — the navigation, then the cue's commands as a cue group.
-            let own = effects.filter { effect in
-                switch effect {
-                case .boundary, .pointer: return true
-                default: return false
-                }
-            }
-            executed.append(ExecutedCommand(group: group, source: source, command: command, result: .ok, effects: own, fire: fire))
+        if let (position, pointer) = firedCue(after: after, effects: effects, context: projectionContext),
+           let cueNesting = nesting.firingCue {
+            // Spec 2 §9 — the navigation's line, then the cue's commands as a
+            // cue group. The navigation's line carries only its own fire's
+            // effects: Spec 3 §5's boundary, with the attribute resets it
+            // makes, and the pointer; cues fired deeper log their own.
+            let boundary = before.pointer?.listUuid != position.list.uuid
             var replay = Fold(state: before, context: projectionContext)
-            if effects.contains(where: { if case .boundary(_, let reset) = $0 { return reset } else { return false } }) {
-                replay.resetAllAttributes()
-            }
+            if boundary, !position.list.trackThrough { replay.resetAllAttributes() }
+            var own = replay.effects
+            if boundary { own.append(.boundary(list: position.list.uuid, reset: !position.list.trackThrough)) }
+            own.append(pointer)
+            executed.append(ExecutedCommand(group: group, source: source, command: command, result: .ok, effects: own, fire: fire))
             state = replay.state
             let cueSource = CommandSource(kind: .cue, list: position.list.uuid, cue: position.cue.uuid, playlist: position.playlist?.uuid)
             let cueGroup = makeGroupID()
             var cueFire: FireRecord? = FireRecord(listTitle: position.list.title, ccli: position.list.ccli)
             for entry in position.cue.commands {
                 // Spec 1 §6 — a guard on a cue command is reserved and not run; the command runs unguarded.
-                run(entry.command, group: cueGroup, source: cueSource, fire: cueFire, depth: depth + 1, makeGroupID: makeGroupID)
+                run(entry.command, group: cueGroup, source: cueSource, fire: cueFire, nesting: cueNesting, makeGroupID: makeGroupID)
                 cueFire = nil
             }
             state = after
@@ -143,22 +149,22 @@ struct Runner {
                                         result: CommandRunner.result(of: effects), effects: effects, fire: fire))
     }
 
-    /// The cue a navigation command fired, read from its `pointer` effect.
-    func firedPosition(after: ShowState, effects: [Effect], context: ProjectionContext) -> CuePosition? {
-        for effect in effects {
-            if case .pointer(_, let new?, _) = effect, new.cueUuid != nil {
-                return Fold(state: after, context: context).position(of: new)
-            }
-        }
-        return nil
+    /// The cue a navigation command fired and its `pointer` effect. A fire
+    /// sets the pointer after its cue's commands ran, so the command's own
+    /// fire is the last pointer effect; earlier ones are cues its cue fired.
+    func firedCue(after: ShowState, effects: [Effect], context: ProjectionContext) -> (CuePosition, Effect)? {
+        guard let last = effects.last(where: { if case .pointer = $0 { return true } else { return false } }),
+              case .pointer(_, let new?, _) = last, new.cueUuid != nil,
+              let position = Fold(state: after, context: context).position(of: new) else { return nil }
+        return (position, last)
     }
 
     /// Spec 2 §3 — `macro N`; Spec 2 §5 — "depth is capped at 8"; Spec 3 §8
     /// — the cue source is inherited. The macro's own line is `ok` when any
     /// inner command did something, else `noop`; an unknown macro is `noop`.
     mutating func runMacro(_ number: Int, command: Command, group: GroupID, source: CommandSource, fire: FireRecord?,
-                           depth: Int, makeGroupID: () -> GroupID) {
-        guard depth < Fold.maxDepth, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
+                           nesting: Nesting, makeGroupID: () -> GroupID) {
+        guard nesting.levelsLeft > 0, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
             executed.append(ExecutedCommand(group: group, source: source, command: command, result: .noop,
                                             effects: [.noop(command)], fire: fire))
             return
@@ -168,7 +174,7 @@ struct Runner {
         executed.append(ExecutedCommand(group: group, source: source, command: command, result: .noop, effects: [], fire: fire))
         for entry in macro.commands {
             if let condition = entry.when, !holds(condition) { continue }
-            run(entry.command, group: group, source: inner, fire: nil, depth: depth + 1, makeGroupID: makeGroupID)
+            run(entry.command, group: group, source: inner, fire: nil, nesting: nesting.insideMacro, makeGroupID: makeGroupID)
         }
         let acted = executed[(index + 1)...].contains { $0.result != .noop }
         executed[index].result = acted ? .ok : .noop
