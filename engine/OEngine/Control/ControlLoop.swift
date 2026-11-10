@@ -262,6 +262,11 @@ public final class ControlLoop: @unchecked Sendable {
             lastExecuted.append(contentsOf: outcome.executed)
             for executed in outcome.executed {
                 for effect in executed.effects { apply(effect, frame: frame) }
+                // Spec 2 §5 — a macro that cannot run whole "runs nothing and is logged `noop`";
+                // the engine log says why (CLAUDE.md: unknown input is a noop and a log line).
+                if case .macro(let number) = executed.command, let refusal = executed.refusal {
+                    log.warning("macro \(number) ran nothing: \(refusal.message)")
+                }
             }
         }
     }
