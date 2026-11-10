@@ -10,9 +10,27 @@ import Foundation
 /// The media folder is not part of it.
 public struct RootSnapshot: Equatable, Sendable {
     public var files: [String: Data]
+    /// Spec 7 §2 — the root's folders, empty ones included, as relative paths
+    /// (`lists/Hymns`): the loader "records folders as well as files, so an
+    /// empty folder survives a reload". Dot-folders are not walked.
+    public var folders: Set<String>
+    /// Spec 7 §2 — visible files that aren't documents (a note, a picture),
+    /// which keep a folder from being empty.
+    public var otherFiles: Set<String>
+    /// Spec 7 §2 — each document's modification date, in milliseconds since
+    /// 1970, for the tie-breaks between files that hold one list or playlist.
+    public var modified: [String: Int64]
+    /// Spec 9 §6 — the kept versions under `versions/`, by path, with their
+    /// dates; their bytes aren't read.
+    public var versions: [String: Int64]
 
-    public init(files: [String: Data] = [:]) {
+    public init(files: [String: Data] = [:], folders: Set<String> = [], otherFiles: Set<String> = [],
+                modified: [String: Int64] = [:], versions: [String: Int64] = [:]) {
         self.files = files
+        self.folders = folders
+        self.otherFiles = otherFiles
+        self.modified = modified
+        self.versions = versions
     }
 }
 
@@ -115,10 +133,21 @@ public enum Loader {
             } catch let failure as DocumentFailure {
                 report.add(failure)
                 if let previous { carryOver(path: path, kind: expected, from: previous, into: &library) }
+                // Spec 7 §2 — a file that didn't load is still a file: it keeps
+                // its folder from being empty and its name from being taken.
+                if path.hasPrefix("lists/") { library.otherFiles.insert(path) }
             } catch {
                 report.add(.error, .unreadableDocument, file: path, subject: path, message: "\(error)")
+                if path.hasPrefix("lists/") { library.otherFiles.insert(path) }
             }
         }
+        // Spec 7 §2 — "The Library window's folder tree is the tree of folders
+        // under `lists/`", empty ones included; dot-folders are not walked.
+        library.folders = snapshot.folders.compactMap { folder in
+            guard folder.hasPrefix("lists/"), !FileLayout.isIgnored(path: folder) else { return nil }
+            return String(folder.dropFirst("lists/".count))
+        }.sorted()
+        library.otherFiles.formUnion(snapshot.otherFiles.filter { $0.hasPrefix("lists/") && !FileLayout.isIgnored(path: $0) })
         sort(&library)
         return (library, report)
     }

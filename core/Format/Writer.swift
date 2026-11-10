@@ -94,6 +94,10 @@ public enum Writer {
         var plan = WritePlan()
         var path = FileLayout.path(for: document)
         if case .playlist = document, let currentPath { path = currentPath }
+        // Spec 7 §2 — "a save renames the file within its folder".
+        if case .list(let list) = document, !list.isLocalCopy, let currentPath {
+            path = FileLayout.listPath(for: list, folder: FileLayout.folder(ofListPath: currentPath))
+        }
         if let currentPath, currentPath != path {
             plan.operations.append(.move(from: currentPath, to: path))
         }
@@ -136,8 +140,12 @@ public enum Writer {
         put(.mediaIndex(library.mediaIndex))
         for preset in library.presets { put(.preset(preset)) }
         for macro in library.macros { put(.macro(macro)) }
-        for list in library.lists { put(.list(list)) }
-        return RootSnapshot(files: files)
+        for list in library.lists {
+            // Spec 7 §2 — a list is written in its folder.
+            let folder = library.folder(ofList: list.uuid) ?? ""
+            files[FileLayout.listPath(for: list, folder: folder)] = data(for: .list(list))
+        }
+        return RootSnapshot(files: files, folders: Set(library.folders.map { "lists/" + $0 }))
     }
 
     /// Every document of a machine root at its canonical path, as bytes.

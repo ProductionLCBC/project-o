@@ -41,8 +41,25 @@ enum FixtureLibrary {
         return out.sorted { $0.0 < $1.0 }
     }
 
+    /// The root as the loader takes it: its documents and, as Spec 7 §2 asks,
+    /// its folders, empty ones included (OFormats' `LocalFiles.snapshot` does
+    /// the same on a real root; OCore's tests can't depend on it).
     static func snapshot(of root: URL) -> RootSnapshot {
-        RootSnapshot(files: Dictionary(uniqueKeysWithValues: documents(under: root).map { ($0.path, $0.data) }))
+        var snapshot = RootSnapshot(files: Dictionary(uniqueKeysWithValues: documents(under: root).map { ($0.path, $0.data) }))
+        let prefix = root.standardizedFileURL.path + "/"
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return snapshot }
+        for case let url as URL in enumerator {
+            let path = url.standardizedFileURL.path
+            guard path.hasPrefix(prefix) else { continue }
+            let relative = String(path.dropFirst(prefix.count))
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            if relative == "media" || FileLayout.isIgnored(path: relative) {
+                enumerator.skipDescendants()
+            } else {
+                snapshot.folders.insert(relative)
+            }
+        }
+        return snapshot
     }
 
     static var librarySnapshot: RootSnapshot { snapshot(of: libraryRoot) }

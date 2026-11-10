@@ -267,10 +267,9 @@ public enum FileLayout {
 
     /// Spec 1 §5 — "The loader and the folder watcher ignore a sync tool's
     /// temporary and partial files (names beginning with a dot or ending in
-    /// .tmp)".
+    /// .tmp, anything in a folder whose name begins with a dot, ...)".
     public static func isIgnored(path: String) -> Bool {
-        let name = path.split(separator: "/").last.map(String.init) ?? path
-        return name.hasPrefix(".") || name.hasSuffix(".tmp")
+        path.split(separator: "/").contains { $0.hasPrefix(".") || $0.hasSuffix(".tmp") }
     }
 
     /// The kind a path's place in a root implies, or nil for a path the
@@ -311,6 +310,27 @@ public enum FileLayout {
     /// The key `documentPaths` uses for a playlist's document.
     public static func documentKey(playlist uuid: UUID) -> String {
         "playlist/" + uuid.uuidString.lowercased()
+    }
+
+    /// The key `documentPaths` uses for a master's document.
+    public static func documentKey(list uuid: UUID) -> String {
+        "list/" + uuid.uuidString.lowercased()
+    }
+
+    /// Spec 7 §2 — "`lists/Worship/Hymns/042-great-is-thy-faithfulness.json`
+    /// is list 42 in the folder "Worship/Hymns", and a file directly in
+    /// `lists/` is in no folder": the folder under `lists/`, "" at the top.
+    public static func folder(ofListPath path: String) -> String {
+        guard path.hasPrefix("lists/") else { return "" }
+        var parts = path.dropFirst("lists/".count).split(separator: "/", omittingEmptySubsequences: false)
+        parts.removeLast()
+        return parts.joined(separator: "/")
+    }
+
+    /// Spec 7 §2 — a master's file in a folder: its number and a slug of its
+    /// title, "and a save renames the file within its folder".
+    public static func listPath(for list: List, folder: String) -> String {
+        "lists/" + (folder.isEmpty ? "" : folder + "/") + numbered(list.number, list.title) + ".json"
     }
 
     /// The key `documentPaths` uses for a per-object document.

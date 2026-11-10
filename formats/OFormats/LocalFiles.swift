@@ -44,33 +44,54 @@ public struct FileError: Error, Equatable, Sendable, CustomStringConvertible {
 public enum LocalFiles {
     // MARK: - Reading
 
+    /// Folders at the top of a root that hold no documents the loader reads:
+    /// the media root, the logs, snapshots, black box and thumbnails the
+    /// engine writes, and Spec 5 §10's conflicts, which "the loader ignores".
+    static let unreadFolders: Set<String> = ["media", "logs", "snapshots", "blackbox", "thumbnails", "conflicts"]
+
     /// Spec 1 §5 — every document under a root as the loader sees it: `.json`
     /// files by relative path, skipping the media root, logs and snapshots
     /// (written by the app, read by nothing it depends on), and "a sync tool's
     /// temporary and partial files (names beginning with a dot or ending in
-    /// .tmp)".
+    /// .tmp, anything in a folder whose name begins with a dot, ...)". Spec 7
+    /// §2 — with every folder walked, empty ones too, the visible files that
+    /// aren't documents, and each document's modification date; Spec 9 §6 —
+    /// the kept versions by name and date, without their bytes.
     public static func snapshot(ofRoot root: URL) throws -> RootSnapshot {
-        var files: [String: Data] = [:]
+        var snapshot = RootSnapshot()
         let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey], options: []) else {
-            return RootSnapshot()
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey]
+        guard let enumerator = fm.enumerator(at: root, includingPropertiesForKeys: keys, options: []) else {
+            return snapshot
         }
         let prefix = root.standardizedFileURL.path + "/"
         for case let url as URL in enumerator {
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(prefix) else { continue }
             let relative = String(path.dropFirst(prefix.count))
-            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+            let values = try? url.resourceValues(forKeys: Set(keys))
             if values?.isDirectory == true {
-                if ["media", "logs", "snapshots"].contains(relative) || FileLayout.isIgnored(path: relative) {
+                if unreadFolders.contains(relative) || FileLayout.isIgnored(path: relative) {
                     enumerator.skipDescendants()
+                } else {
+                    snapshot.folders.insert(relative)
                 }
                 continue
             }
-            guard values?.isRegularFile == true, url.pathExtension == "json", !FileLayout.isIgnored(path: relative) else { continue }
-            files[relative] = try Data(contentsOf: url)
+            guard values?.isRegularFile == true, !FileLayout.isIgnored(path: relative) else { continue }
+            let modified = values?.contentModificationDate.map { Int64(($0.timeIntervalSince1970 * 1000).rounded()) } ?? 0
+            guard url.pathExtension == "json" else {
+                snapshot.otherFiles.insert(relative)
+                continue
+            }
+            if relative.hasPrefix("versions/") {
+                snapshot.versions[relative] = modified
+                continue
+            }
+            snapshot.files[relative] = try Data(contentsOf: url)
+            snapshot.modified[relative] = modified
         }
-        return RootSnapshot(files: files)
+        return snapshot
     }
 
     /// Spec 1 §7 — the relative paths of every file under the media root, for

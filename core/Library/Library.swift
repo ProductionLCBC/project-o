@@ -52,12 +52,23 @@ public struct Library: Equatable, Sendable {
     public var documentExtras: [DocumentKind: [String: JSONValue]]
     /// Spec 1 §5 — where each per-object document was loaded from, keyed by
     /// `FileLayout.documentKey`, so a save can rename the file to match.
+    /// Spec 7 §2 — a list's folder is the folder its path is in.
     public var documentPaths: [String: String]
+    /// Spec 7 §2 — "The Library window's folder tree is the tree of folders
+    /// under `lists/`": every folder, empty ones included, as its path under
+    /// `lists/` ("Worship/Hymns"), in the case it was made with.
+    public var folders: [String]
+    /// Spec 7 §2 — the visible files under `lists/` that aren't loaded lists
+    /// (a note, a list file that didn't read, the other of two files holding
+    /// one list), by path: they keep a folder from being empty, and no save
+    /// or move ever replaces one ("Other files are never replaced").
+    public var otherFiles: Set<String>
 
     public init(channels: [Channel] = [], transitions: [Transition] = [], audioTransitions: [AudioTransition] = [],
                 lists: [List] = [], macros: [Macro] = [], info: LibraryInfo = LibraryInfo(), textStyles: [TextStyle] = [],
                 grades: [Grade] = [], presets: [Preset] = [], mediaIndex: MediaIndex = MediaIndex(),
-                documentExtras: [DocumentKind: [String: JSONValue]] = [:], documentPaths: [String: String] = [:]) {
+                documentExtras: [DocumentKind: [String: JSONValue]] = [:], documentPaths: [String: String] = [:],
+                folders: [String] = [], otherFiles: Set<String> = []) {
         self.info = info
         self.channels = channels
         self.textStyles = textStyles
@@ -70,6 +81,17 @@ public struct Library: Equatable, Sendable {
         self.mediaIndex = mediaIndex
         self.documentExtras = documentExtras
         self.documentPaths = documentPaths
+        self.folders = folders
+        self.otherFiles = otherFiles
+    }
+
+    /// Spec 7 §2 — the folder a master's file is in, under `lists/` ("" at
+    /// the top), or nil for a list the library doesn't hold.
+    public func folder(ofList uuid: UUID) -> String? {
+        guard let path = documentPaths[FileLayout.documentKey(list: uuid)] else {
+            return list(uuid: uuid) == nil ? nil : ""
+        }
+        return FileLayout.folder(ofListPath: path)
     }
 
     // MARK: - Lookups by number (Spec 1 §4: "A reference ... is the target's number")

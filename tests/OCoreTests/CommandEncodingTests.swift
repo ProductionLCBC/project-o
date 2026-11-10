@@ -117,7 +117,7 @@ final class CommandEncodingTests: XCTestCase {
     /// A cue's commands decode one at a time, so one bad command never takes
     /// the list down (Spec 1 §6, §8).
     func test_oneBadCommandDoesNotFailTheList() throws {
-        var tree = try JSONValue.parse(try XCTUnwrap(F.librarySnapshot.files["lists/042-great-is-thy-faithfulness.json"]))
+        var tree = try JSONValue.parse(try XCTUnwrap(F.librarySnapshot.files["lists/Hymns/042-great-is-thy-faithfulness.json"]))
         var cues = tree["cues"]?.arrayValue ?? []
         var commands = cues[1]["commands"]?.arrayValue ?? []
         commands.append(.object(["cmd": .string("channel.gain"), "channel": .number(1), "db": .string("loud")]))

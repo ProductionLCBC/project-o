@@ -65,8 +65,8 @@ final class LocalFilesTests: XCTestCase {
         let expected = Set([
             "library.json", "channels.json", "text-styles.json", "grades.json", "transitions.json", "audio-transitions.json",
             "presets/001-default.json", "presets/002-confidence.json", "presets/003-lower-third.json",
-            "macros/001-welcome.json", "lists/007-doxology.json", "lists/042-great-is-thy-faithfulness.json",
-            "versions/042/v0016.json", "media-index.json",
+            "macros/001-welcome.json", "lists/007-doxology.json", "lists/Hymns/042-great-is-thy-faithfulness.json",
+            "media-index.json",
         ])
         XCTAssertEqual(Set(snapshot.files.keys), expected)
         XCTAssertEqual(snapshot.files["channels.json"], read("channels.json", in: root))
@@ -76,11 +76,34 @@ final class LocalFilesTests: XCTestCase {
         XCTAssertEqual(loaded.library.lists.map(\.number), [7, 42])
     }
 
+    /// Spec 7 §2 — "The loader walks `lists/` and the folders in it, skipping
+    /// any folder whose name starts with a dot, and ignores hidden files and
+    /// anything that isn't `.json`. It records folders as well as files, so an
+    /// empty folder survives a reload." Spec 7 §2's tie-breaks read each file's
+    /// modification date; Spec 9 §6's versions are read as names and dates,
+    /// and Spec 5 §10's conflicts folder is never read.
+    func test_snapshotRecordsFoldersOtherFilesDatesAndVersions() throws {
+        let root = try copyFixtureLibrary()
+        try write("notes", to: "lists/Hymns/notes.txt", in: root)
+        try write("{}", to: "lists/.stversions/042-old.json", in: root)
+        try write("{}", to: "conflicts/2026-11-08-084112-042.json", in: root)
+
+        let snapshot = try LocalFiles.snapshot(ofRoot: root)
+        XCTAssertEqual(Set(snapshot.folders.filter { $0.hasPrefix("lists/") }), ["lists/Christmas", "lists/Hymns"])
+        XCTAssertEqual(snapshot.otherFiles, ["lists/Hymns/notes.txt"])
+        XCTAssertEqual(Set(snapshot.versions.keys), ["versions/042/v0016.json"])
+        XCTAssertNil(snapshot.files["versions/042/v0016.json"], "a kept version's bytes aren't read")
+        XCTAssertFalse(snapshot.files.keys.contains { $0.hasPrefix("conflicts/") })
+        XCTAssertEqual(Set(snapshot.modified.keys), Set(snapshot.files.keys))
+        let date = try FileManager.default.attributesOfItem(atPath: root.appendingPathComponent("lists/007-doxology.json").path)[.modificationDate] as? Date
+        XCTAssertEqual(snapshot.modified["lists/007-doxology.json"], date.map { Int64(($0.timeIntervalSince1970 * 1000).rounded()) })
+    }
+
     // MARK: - Writing
 
     func test_aCrashBetweenTemporaryWriteAndRenameLeavesTheOriginalReadable() throws {
         let root = try copyFixtureLibrary()
-        let path = "lists/042-great-is-thy-faithfulness.json"
+        let path = "lists/Hymns/042-great-is-thy-faithfulness.json"
         let original = try XCTUnwrap(read(path, in: root))
         let loaded = Loader.library(from: try LocalFiles.snapshot(ofRoot: root))
         var list = try XCTUnwrap(loaded.library.list(number: 42))
@@ -92,10 +115,10 @@ final class LocalFilesTests: XCTestCase {
         }
         XCTAssertEqual(read(path, in: root), original, "the original is intact")
         XCTAssertNoThrow(try JSONValue.parse(try XCTUnwrap(read(path, in: root))))
-        let leftovers = names(in: root.appendingPathComponent("lists")).filter { $0 != "007-doxology.json" && $0 != "042-great-is-thy-faithfulness.json" }
+        let leftovers = names(in: root.appendingPathComponent("lists/Hymns")).filter { $0 != "042-great-is-thy-faithfulness.json" }
         XCTAssertFalse(leftovers.isEmpty, "the temporary file is left behind for the next launch to ignore")
         XCTAssertTrue(leftovers.allSatisfy { $0.hasPrefix(".") || $0.hasSuffix(".tmp") }, "\(leftovers)")
-        XCTAssertEqual(Set(try LocalFiles.snapshot(ofRoot: root).files.keys).intersection(leftovers.map { "lists/" + $0 }), [])
+        XCTAssertEqual(Set(try LocalFiles.snapshot(ofRoot: root).files.keys).intersection(leftovers.map { "lists/Hymns/" + $0 }), [])
         XCTAssertEqual(Loader.library(from: try LocalFiles.snapshot(ofRoot: root)).library.list(number: 42)?.version, 17, "the versions copy ran first, but the list itself did not change")
 
         try LocalFiles.execute(save.plan, in: root)
@@ -103,7 +126,7 @@ final class LocalFilesTests: XCTestCase {
         XCTAssertNotEqual(after, original)
         XCTAssertEqual(after, Writer.data(for: .list(save.list)))
         XCTAssertEqual(read("versions/042/v0017.json", in: root), original)
-        XCTAssertEqual(names(in: root.appendingPathComponent("lists")), ["007-doxology.json", "042-great-is-thy-faithfulness.json"], "no temporary files remain")
+        XCTAssertEqual(names(in: root.appendingPathComponent("lists/Hymns")), ["042-great-is-thy-faithfulness.json"], "no temporary files remain")
         XCTAssertEqual(Loader.library(from: try LocalFiles.snapshot(ofRoot: root)).library.list(number: 42)?.version, 18)
     }
 
