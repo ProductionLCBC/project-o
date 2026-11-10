@@ -74,10 +74,20 @@ extension Fold {
         case ("stack", let n?, "blackout"):
             return state.stacks[n].map { $0.blackout ? "on" : "off" }
         case ("live", nil, _) where words.count == 2:
+            // Spec 7 §4 — "What reads the pointer reads its place": the positions as
+            // they are now, and the title from the kept copy once the list is gone.
+            guard case .placed(let place) = placer.placement(of: state.pointer) else {
+                return words[1].lowercased() == "item" || words[1].lowercased() == "cue" || words[1].lowercased() == "title"
+                    ? nil : context.variables(name)
+            }
             switch words[1].lowercased() {
-            case "item": return position(of: state.pointer)?.item.map(String.init)
-            case "cue": return position(of: state.pointer).map { String($0.cueIndex + 1) }
-            case "title": return position(of: state.pointer)?.list.title
+            case "item": return place.itemPosition.map(String.init)
+            case "cue":
+                switch place.cue {
+                case .at(let index): return String(index + 1)
+                case .after(let index): return String(index + 1)
+                }
+            case "title": return place.list.title
             default: return context.variables(name)
             }
         default:

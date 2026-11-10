@@ -39,10 +39,13 @@ public struct ProjectionContext: Sendable {
     public var source: CommandSource
     /// Resolves `[Timer 1]` and friends for guards; the name without brackets.
     public var variables: @Sendable (String) -> String?
+    /// Spec 3 §6 as Spec 7 §9 corrects it — "`kept` (the engine's copies of
+    /// the list and playlist the pointer names, Spec 7 §4)".
+    public var kept: KeptCopies
 
     public init(frame: Int, rate: FrameRate = .fps60, library: Library, machine: Machine,
                 missing: Set<String> = [], source: CommandSource,
-                variables: @escaping @Sendable (String) -> String? = { _ in nil }) {
+                variables: @escaping @Sendable (String) -> String? = { _ in nil }, kept: KeptCopies = KeptCopies()) {
         self.frame = frame
         self.rate = rate
         self.library = library
@@ -50,5 +53,6 @@ public struct ProjectionContext: Sendable {
         self.missing = missing
         self.source = source
         self.variables = variables
+        self.kept = kept
     }
 }

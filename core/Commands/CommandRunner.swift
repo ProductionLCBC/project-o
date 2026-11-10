@@ -44,20 +44,23 @@ public struct ExecutedCommand: Equatable, Sendable {
 }
 
 /// What a run leaves behind: the new state, every executed command in the
-/// order it ran, and the roots as the group's edits left them (Spec 5 §1,
-/// "An edit changes the library or a machine's configuration and never
-/// ShowState").
+/// order it ran, the roots as the group's edits left them (Spec 5 §1, "An
+/// edit changes the library or a machine's configuration and never
+/// ShowState"), and the kept copies of the live list and playlist (Spec 7
+/// §4), which the engine keeps between runs.
 public struct RunOutcome: Equatable, Sendable {
     public var state: ShowState
     public var executed: [ExecutedCommand]
     public var library: Library
     public var machine: Machine
+    public var kept: KeptCopies
 
-    public init(state: ShowState, executed: [ExecutedCommand], library: Library, machine: Machine) {
+    public init(state: ShowState, executed: [ExecutedCommand], library: Library, machine: Machine, kept: KeptCopies = KeptCopies()) {
         self.state = state
         self.executed = executed
         self.library = library
         self.machine = machine
+        self.kept = kept
     }
 }
 
@@ -92,6 +95,11 @@ public struct RunOutcome: Equatable, Sendable {
 /// cue's edits apply once its fire is done (Spec 7 §4: what the fire read is
 /// "the library the fire read, before any edit the fired cue holds is
 /// applied"), logged in the cue's group after its other commands.
+///
+/// Spec 7 §4 — the kept copies start as the context's. They are taken again
+/// whenever the pointer moves, from the library the fire read, and after the
+/// group, from the library it leaves; each time only a version that still
+/// holds what the pointer names replaces a copy.
 public enum CommandRunner {
     public static func run(_ group: CommandGroup, state: ShowState, context: ProjectionContext, validate: Bool = true,
                            editing: EditContext = EditContext(), makeGroupID: () -> GroupID = { GroupID.random() },
@@ -101,7 +109,7 @@ public enum CommandRunner {
         for (index, entry) in group.commands.enumerated() {
             if validate {
                 let validation = ValidationContext(library: runner.context.library, machine: runner.context.machine,
-                                                   state: runner.state, source: group.source)
+                                                   state: runner.state, source: group.source, kept: runner.context.kept)
                 if let rejection = CommandValidator.validate(entry.command, guard: entry.when, context: validation) {
                     return .failure(rejection.naming(index, of: group.commands))
                 }
@@ -113,8 +121,9 @@ public enum CommandRunner {
             if let refused = runner.refused { return .failure(refused.naming(index, of: group.commands)) }
             fire = nil
         }
+        runner.refreshKept()
         return .success(RunOutcome(state: runner.state, executed: runner.executed,
-                                   library: runner.context.library, machine: runner.context.machine))
+                                   library: runner.context.library, machine: runner.context.machine, kept: runner.context.kept))
     }
 
     /// Spec 2 §8 — the result a command's effects add up to: `steppedOn` when
@@ -165,6 +174,12 @@ struct Runner {
 
     func holds(_ condition: Guard) -> Bool {
         condition.holds(actual: Fold(state: state, context: context).value(of: condition.variable))
+    }
+
+    /// Spec 7 §4 — the copies for the pointer as it is now, from the roots as
+    /// they are now: "only a version that still holds what the pointer names".
+    mutating func refreshKept() {
+        context.kept = context.kept.refreshed(for: state.pointer, library: context.library, machine: context.machine)
     }
 
     /// One command at its place in the group (Spec 2 §5, "Macro depth"). It
@@ -229,6 +244,8 @@ struct Runner {
             }
             state = after
             if outermost {
+                // Spec 7 §4 — "A fire's copies come from the library the fire read, before any edit the fired cue holds is applied".
+                refreshKept()
                 deferring = false
                 let waiting = deferred
                 deferred = []
@@ -240,6 +257,8 @@ struct Runner {
         }
 
         state = after
+        // Spec 7 §4 — "Whenever the pointer moves": a playlist load.
+        if before.pointer != after.pointer, !deferring { refreshKept() }
         executed.append(ExecutedCommand(group: group, source: source, command: command,
                                         result: CommandRunner.result(of: effects), effects: effects, fire: fire))
     }

@@ -17,13 +17,19 @@ public struct ValidationContext: Sendable {
     /// this machine lacks, since it meets those numbers at other campuses",
     /// and a playlist title it loads "is looked up when it runs" (Spec 7 §3).
     public var portable: Bool
+    /// Spec 7 §4 — "The engine passes the copies to the projection and the
+    /// validator alongside the library": `cue N` and `item N` read the live
+    /// list and playlist from them once they are gone.
+    public var kept: KeptCopies
 
-    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil, portable: Bool = false) {
+    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil, portable: Bool = false,
+                kept: KeptCopies = KeptCopies()) {
         self.library = library
         self.machine = machine
         self.state = state
         self.source = source
         self.portable = portable
+        self.kept = kept
     }
 }
 
@@ -148,12 +154,16 @@ struct Checker {
         }
     }
 
+    /// Spec 7 §4's place, for the live checks.
+    var placer: Placer { Placer(library: library, machine: machine, kept: context.kept) }
+
     /// Spec 2 §3 — `cue N` "Fires cue N of the live list", checked when a
-    /// state is given.
+    /// state is given. Spec 7 §4 — "Rejected: no list is live" before a cue
+    /// fires; the live list from its kept copy once it is gone; "`cue N` is
+    /// rejected if the live list can't be found".
     func liveCue(_ n: Int) throws {
         guard let state = context.state else { return }
-        guard let listUuid = state.pointer?.listUuid,
-              let list = library.list(uuid: listUuid) ?? machine.localList(uuid: listUuid) else {
+        guard let list = placer.placement(of: state.pointer).liveList else {
             throw reject(.noSuchTarget, "cue \(n): no list is live")
         }
         guard n >= 1, n <= list.cues.count else {
@@ -163,10 +173,11 @@ struct Checker {
 
     /// Spec 2 §3 — `item N cue M` and `item N section "NAME"` in the live
     /// playlist, checked when a state is given. Spec 3 §5 — a section with
-    /// no match "is `rejected`".
+    /// no match "is `rejected`". Spec 7 §4 — the playlist's kept copy stands
+    /// in for it once it is gone.
     func liveItem(_ item: Int, cue: Int?, section: String?) throws {
         guard let state = context.state else { return }
-        guard let playlistUuid = state.pointer?.playlist, let playlist = machine.playlist(uuid: playlistUuid) else {
+        guard let playlist = placer.placement(of: state.pointer).livePlaylist else {
             throw reject(.noSuchTarget, "item \(item): no playlist is live")
         }
         guard item >= 1, item <= playlist.items.count else {

@@ -323,6 +323,14 @@ public enum OSCFeedback {
     public static func liveCue(_ cue: Int) -> OSCMessage { OSCMessage("/o/live/cue", [.int32(Int32(clamping: cue))]) }
     public static func liveLabel(_ label: String) -> OSCMessage { OSCMessage("/o/live/label", [.string(label)]) }
 
+    /// Spec 7 §6 — "`/o/live/armed` carries `i:item` `i:cue` `i:ms` ... and
+    /// with no arguments when the trigger disarms, lapses or fires".
+    public static func liveArmed(_ armed: (item: Int, cue: Int, ms: Int)?) -> OSCMessage {
+        guard let armed else { return OSCMessage("/o/live/armed") }
+        return OSCMessage("/o/live/armed", [.int32(Int32(clamping: armed.item)), .int32(Int32(clamping: armed.cue)),
+                                            .int32(Int32(clamping: armed.ms))])
+    }
+
     /// "`s:kind` `s:label`: content changes, including clear".
     public static func channelContent(_ channel: Int, kind: String, label: String) -> OSCMessage {
         OSCMessage("/o/channel/\(channel)/content", [.string(kind), .string(label)])
