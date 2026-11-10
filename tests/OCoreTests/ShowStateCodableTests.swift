@@ -142,7 +142,7 @@ final class ShowStateCodableTests: XCTestCase {
             .audioMute(audio: .all, state: .on),
             .macro(12), .undo, .redo, .historyJump(5),
             .systemClearAll, .systemPreflight, .systemSnapshot,
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             .unknown(cmd: "channel.teleport"),
         ]
         for command in corpus {

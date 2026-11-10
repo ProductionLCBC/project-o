@@ -91,9 +91,11 @@ final class OSCMappingTests: XCTestCase {
         row(.systemClearAll, "/o/system/clearall"),
         row(.systemPreflight, "/o/system/preflight"),
         row(.systemSnapshot, "/o/system/snapshot"),
-        row(.edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
+        row(.edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             "/o/edit", [s("channel 2 label \"Lyrics\"")]),
     ]
+    // Spec 5 §2 — every edit verb as `/o/edit` with the rest of its text form.
+    + EditTextTests.rows.map { row(.edit($0.edit), "/o/edit", [s(String($0.canonical.dropFirst("edit ".count)))]) }
 
     func test_everyRowMapsToItsAddressAndBack() {
         var seen: Set<String> = []

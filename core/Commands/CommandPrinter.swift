@@ -161,20 +161,6 @@ enum CommandPrinter {
         }
     }
 
-    // MARK: - Spec 2 §3, the reserved edit form
-
-    static func printEdit(_ edit: EditCommand) -> String {
-        let value: String
-        switch edit.value {
-        case nil, .null?: value = "null"
-        case .string(let s)?: value = quoted(s)
-        case .number(let n)?: value = decimalText(n)
-        case .bool(let b)?: value = b ? "true" : "false"
-        case .array?, .object?: value = JSONCanonical.line(edit.value ?? .null)
-        }
-        return ["edit", edit.target, String(edit.number), edit.field, value].joined(separator: " ")
-    }
-
     // MARK: - Pieces
 
     /// Spec 2 §4 — "Strings are JSON strings in both forms; the text form

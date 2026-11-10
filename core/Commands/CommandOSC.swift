@@ -171,6 +171,10 @@ public enum OSCMapping {
         guard Vocabulary.targets.contains(target) else {
             throw reject(.unknownTarget, "\(first) is not a target")
         }
+        if target == "edit" {
+            let original = message.address.dropFirst(prefix.count + 1).split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+            return try parseEdit(original, message, options: options)
+        }
         let rows = Vocabulary.rows(target: target)
         let hasNumber = rows.first?.hasNumber ?? false
         let hasVerb = rows.contains(where: \.hasVerb)
@@ -254,6 +258,52 @@ public enum OSCMapping {
         }
         switch CommandText.parse(pieces.joined(separator: " "), options: options) {
         case .success(let entry): return entry.command
+        case .failure(let rejection): throw rejection
+        }
+    }
+
+    /// Spec 5 §2 — an edit arrives "over OSC as `/o/edit/...` (the text form
+    /// with slashes, Spec 2 §6)": `/o/edit` with the rest of the text form as
+    /// one string, or the text form's words in the address up to the value,
+    /// as in `/o/edit/list/42/title s:"Great Is Thy Faithfulness"`. A field
+    /// path keeps its case. One string is read as the remainder first and,
+    /// with words in the address, as the value when that fails (Spec 2 §6).
+    /// A folder's path holds a slash, so a folder edit goes as one string.
+    static func parseEdit(_ words: [String], _ message: OSCMessage, options: ParseOptions) throws -> Command {
+        let head = (["edit"] + words.dropFirst()).joined(separator: " ")
+        func command(_ text: String) -> Result<Command, Rejection> {
+            switch CommandText.parse(text, options: options) {
+            case .success(let entry):
+                guard entry.when == nil else { return .failure(reject(.unexpectedToken, "a guard is not accepted over OSC")) }
+                return .success(entry.command)
+            case .failure(let rejection):
+                return .failure(rejection)
+            }
+        }
+        if message.arguments.count == 1, case .string(let s) = message.arguments[0] {
+            switch command(head + " " + s) {
+            case .success(let c): return c
+            case .failure(let rejection):
+                guard words.count > 1, case .success(let c) = command(head + " " + CommandPrinter.quoted(s)) else { throw rejection }
+                return c
+            }
+        }
+        var pieces = [head]
+        for (k, argument) in message.arguments.enumerated() {
+            switch argument {
+            case .int32(let n): pieces.append(String(n))
+            case .int64(let n): pieces.append(String(n))
+            case .float32(let x): pieces.append(x.description)
+            case .double(let x): pieces.append(CommandPrinter.decimalText(x))
+            case .string(let s): pieces.append(CommandPrinter.quoted(s))
+            case .bool(let b): pieces.append(b ? "true" : "false")
+            case .null: pieces.append("null")
+            default:
+                throw reject(.badArgument, "argument \(k + 1) of \(message.address) has a type an edit does not use")
+            }
+        }
+        switch command(pieces.joined(separator: " ")) {
+        case .success(let c): return c
         case .failure(let rejection): throw rejection
         }
     }

@@ -74,22 +74,6 @@ public struct ChannelWrite: Equatable, Sendable {
     }
 }
 
-/// Spec 2 §3 — "Edit commands share the shape `edit TARGET N FIELD VALUE`";
-/// reserved here so the object form already accommodates them.
-public struct EditCommand: Codable, Equatable, Sendable {
-    public var target: String
-    public var number: Int
-    public var field: String
-    public var value: JSONValue?
-
-    public init(target: String, number: Int, field: String, value: JSONValue? = nil) {
-        self.target = target
-        self.number = number
-        self.field = field
-        self.value = value
-    }
-}
-
 /// Spec 2 §3 and Spec 3 §10 — `Command`: the Spec 2 objects. One case per
 /// row of the vocabulary table, encoded in the Spec 1 §6 object form with
 /// `cmd` as `target.verb`.
@@ -147,6 +131,7 @@ public enum Command: Codable, Equatable, Sendable {
     case systemClearAll
     case systemPreflight
     case systemSnapshot
+    /// Spec 5 §4 — the edit family, `edit.` plus the verb.
     case edit(EditCommand)
     /// Spec 1 §6 — an unknown `cmd`, kept verbatim with its parameters.
     case unknown(cmd: String, fields: [String: JSONValue] = [:])
@@ -196,7 +181,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .systemClearAll: return "system.clearAll"
         case .systemPreflight: return "system.preflight"
         case .systemSnapshot: return "system.snapshot"
-        case .edit: return "edit"
+        case .edit(let e): return e.cmd
         case .unknown(let cmd, _): return cmd
         case .invalid(let cmd, _): return cmd
         }
@@ -206,15 +191,15 @@ public enum Command: Codable, Equatable, Sendable {
     /// Spec 1 §6 used before its correction for the verbs whose text form is
     /// bare (`next`, `previous`, `cue`, `undo`, `redo`, `macro`): accepted on
     /// input, never printed (Area 1 brief, deviation 2).
-    public static let knownNames: Set<String> = [
+    public static let knownNames: Set<String> = Set<String>([
         "channel.write", "channel.clear", "channel.reset", "channel.transition", "channel.audioTransition", "channel.grade",
         "channel.gain", "channel.transport", "channel.endBehavior", "channel.lock", "channel.freeze", "channel.track",
         "channel.build", "output.stack", "stack.blackout", "stack.mute", "playlist.next", "playlist.previous",
         "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "playlist.disarm", "timer.set", "timer.start",
         "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "history.undo",
-        "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot", "edit",
+        "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot",
         "next", "previous", "cue", "undo", "redo", "macro",
-    ]
+    ]).union(EditAction.commandNames)
 
     public var isUnknown: Bool {
         if case .unknown = self { return true }
@@ -361,7 +346,8 @@ public enum Command: Codable, Equatable, Sendable {
         case "system.clearAll": self = .systemClearAll
         case "system.preflight": self = .systemPreflight
         case "system.snapshot": self = .systemSnapshot
-        case "edit": self = .edit(try EditCommand(from: decoder))
+        case let edit where edit.hasPrefix("edit."):
+            self = .edit(try EditCommand(cmd: edit, fields: try Command.parameters(from: decoder)))
         default:
             throw DecodingError.dataCorruptedError(forKey: Key("cmd"), in: c, debugDescription: "unknown command \(cmd)")
         }
@@ -458,7 +444,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .historyJump(let position):
             try c.encode(position, forKey: Key("position"))
         case .edit(let e):
-            try e.encode(to: encoder)
+            for (key, value) in e.fields { try c.encode(value, forKey: Key(key)) }
         }
     }
 
@@ -538,9 +524,8 @@ public enum Command: Codable, Equatable, Sendable {
         case .listCue(let list, let cue): return .listCue(list: transform(.list, list), cue: cue)
         case .audioMute(let audio, let state): return .audioMute(audio: target(.audioOutput, audio), state: state)
         case .macro(let n): return .macro(transform(.macro, n))
-        case .edit(var e):
-            if let type = NumberedType(editTarget: e.target) { e.number = transform(type, e.number) }
-            return .edit(e)
+        case .edit(let e):
+            return .edit(e.mapReferences(transform))
         case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .disarm, .timerSet, .timerStart, .timerPause, .timerReset,
              .popupSet, .popupClear, .undo, .redo, .historyJump, .systemClearAll, .systemPreflight, .systemSnapshot,
              .unknown, .invalid:

@@ -15,9 +15,14 @@ public enum NumberedType: String, CaseIterable, Sendable {
         }
     }
 
-    /// Spec 2 §3 — the `edit TARGET N ...` target word.
-    public init?(editTarget: String) {
-        self.init(rawValue: editTarget)
+    /// Spec 5 §3 — the word an edit names this type by, which is also its
+    /// field in the object form: `channel 2`, `textstyle 1`, `audiotransition
+    /// 1`, `audiooutput 1`.
+    public var editWord: String { rawValue.lowercased() }
+
+    public init?(editWord: String) {
+        guard let type = NumberedType.allCases.first(where: { $0.editWord == editWord.lowercased() }) else { return nil }
+        self = type
     }
 }
 

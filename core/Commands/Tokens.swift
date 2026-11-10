@@ -3,13 +3,15 @@
 /// Spec 2 §2 — "Words are separated by spaces; case is ignored for keywords
 /// and significant inside quoted strings." A token is a word (a keyword, a
 /// ref, a clock duration, a date), a number (integer or decimal, as written),
-/// a string (double-quoted, JSON escapes, already unescaped) or a bracketed
-/// value name for guards (`[Timer 1]`, Spec 2 §7).
+/// a string (double-quoted, JSON escapes, already unescaped), a bracketed
+/// value name for guards (`[Timer 1]`, Spec 2 §7), or a JSON object or array
+/// ("a structured value (Spec 5 §4)"), parsed.
 public enum CommandToken: Equatable, Sendable {
     case word(String)
     case number(String)
     case string(String)
     case bracket(String)
+    case json(JSONValue)
 
     /// How the token reads in a rejection message.
     var described: String {
@@ -21,6 +23,7 @@ public enum CommandToken: Equatable, Sendable {
             JSONCanonical.writeString(s, into: &out)
             return out
         case .bracket(let b): return "[\(b)]"
+        case .json(let value): return JSONCanonical.line(value)
         }
     }
 }
@@ -80,6 +83,17 @@ enum CommandTokenizer {
                 i = j
                 continue
             }
+            if c == "{" || (c == "[" && startsJSONArray(text, after: i)) {
+                let end = try jsonEnd(text, from: i)
+                let raw = String(text[i..<end])
+                do {
+                    spans.append(TokenSpan(token: .json(try JSONValue.parse(raw)), start: i, end: end))
+                } catch let error as JSONParseError {
+                    throw Rejection(reason: .malformed, message: "bad JSON \(raw): \(error.message)")
+                }
+                i = end
+                continue
+            }
             if c == "[" {
                 guard let close = text[i...].firstIndex(of: "]") else {
                     throw Rejection(reason: .malformed, message: "unterminated [ ]: \(text[start...])")
@@ -101,6 +115,52 @@ enum CommandTokenizer {
             i = j
         }
         return spans
+    }
+
+    /// A `[` that opens a JSON array rather than a guard's value name: the
+    /// next character that isn't a space opens a value (`{`, `[`, `"`, a sign
+    /// or a digit), closes an empty array, or begins `true`, `false` or `null`.
+    /// A value name begins with a letter: `[Timer 1]`, `[Live Title]`.
+    static func startsJSONArray(_ text: String, after open: String.Index) -> Bool {
+        var j = text.index(after: open)
+        while j < text.endIndex, text[j].isWhitespace { j = text.index(after: j) }
+        guard j < text.endIndex else { return false }
+        let c = text[j]
+        if "{[\"]-".contains(c) || DurationText.isDigit(c) { return true }
+        let rest = text[j...]
+        for literal in ["true", "false", "null"] where rest.hasPrefix(literal) {
+            let after = rest.dropFirst(literal.count).first
+            if after == nil || after == "," || after == "]" || after?.isWhitespace == true { return true }
+        }
+        return false
+    }
+
+    /// The end of the JSON object or array that opens at `start`: brackets
+    /// balanced outside strings, a string's escapes skipped.
+    static func jsonEnd(_ text: String, from start: String.Index) throws -> String.Index {
+        var depth = 0
+        var j = start
+        var inString = false
+        while j < text.endIndex {
+            let c = text[j]
+            if inString {
+                if c == "\\" {
+                    j = text.index(after: j)
+                    if j < text.endIndex { j = text.index(after: j) }
+                    continue
+                }
+                if c == "\"" { inString = false }
+            } else if c == "\"" {
+                inString = true
+            } else if c == "{" || c == "[" {
+                depth += 1
+            } else if c == "}" || c == "]" {
+                depth -= 1
+                if depth == 0 { return text.index(after: j) }
+            }
+            j = text.index(after: j)
+        }
+        throw Rejection(reason: .malformed, message: "unterminated JSON: \(text[start...])")
     }
 
     /// Spec 2 §2 — integer: "digits, optional sign"; decimal: "digits with a point".

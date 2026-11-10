@@ -46,6 +46,49 @@ public enum RejectionReason: String, Codable, Equatable, Sendable {
     /// Spec 1 §6 — a command object the vocabulary does not know, or one
     /// whose parameters did not decode; kept in a file, refused at run time.
     case unknownCommand
+
+    // Spec 5 §6 — "Rejection codes" of the edit path, in its order.
+    /// The object an edit names does not exist.
+    case unknownObject
+    /// The path is not in the object's schema, or not there in the object.
+    case unknownPath
+    /// "`uuid`, `schema`, `app`, `kind`, `version`, `builtIn` and `number` never are" editable.
+    case readOnlyField
+    /// The value has the wrong type or enum, or is out of range.
+    case badValue
+    /// "Every number the value names exists on this machine" failed.
+    case unknownReference
+    /// A number, title, uuid, file or folder that must be unique is taken.
+    case duplicate
+    /// "`renumber` and `swap` also refuse a number that broken references still name".
+    case danglingReferences
+    /// "Preset 1 and Transitions 1–3 can't be deleted, renumbered or swapped".
+    case protected
+    /// "An object on air can't be deleted, renumbered or swapped until it is off air".
+    case onAir
+    /// "An archived playlist takes only the edit that unarchives it and `delete`".
+    case archived
+    /// "A folder is deleted only when it's empty."
+    case notEmpty
+    /// "A macro edit passes Spec 2 §5's cycle and depth checks."
+    case cycle
+    /// Spec 5 §7 — "While the lock is on, the engine refuses every `edit`".
+    case operatorLock
+    /// Spec 5 §7 — library edits on a `readOnlyMasters` machine.
+    case readOnlyLibrary
+    /// Spec 5 §8 — an undo whose inverse would now break a rule (Area 12).
+    case conflict
+    /// Spec 5 §3 — what v1 doesn't edit: local copies, local items, and the
+    /// objects whose edits come with later areas.
+    case notInV1
+    /// Spec 8 §6 — `media delete` with no Trash to move the files to.
+    case noTrash
+    /// Spec 9 §6 — refused while the disk is full.
+    case diskFull
+    /// Spec 10 §12 — the lock can't be turned on before a passcode is set.
+    case noPasscode
+    /// Spec 10 §12 — the Keychain can't be read.
+    case keychain
 }
 
 /// Spec 2 §8 — "A command either runs or is rejected with a reason before

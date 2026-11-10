@@ -126,13 +126,10 @@ struct Checker {
             guard MacroCalls.macro(n, library: library, machine: machine) != nil else {
                 throw reject(.noSuchTarget, "macro \(n) does not exist")
             }
-        case .edit(let edit):
-            guard let type = NumberedType(editTarget: edit.target) else {
-                throw reject(.noSuchTarget, "\(edit.target) is not an object type")
-            }
-            guard Identity.exists(type, edit.number, library, machine) else {
-                throw reject(.noSuchTarget, "\(type.displayName) \(edit.number) does not exist")
-            }
+        case .edit:
+            // Spec 5 §6 — an edit is checked by the edit path, in its own order
+            // (`LibraryEditor`), against the library the earlier commands leave.
+            break
         default:
             break
         }

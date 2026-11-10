@@ -249,7 +249,7 @@ final class ProjectionSupplementaryTests: XCTestCase {
     func test_passThroughAndUnknownCommands() {
         let passing: [Command] = [.timerStart(timer: 1), .undo, .redo, .historyJump(3), .systemPreflight, .systemSnapshot,
                                   .audioMute(audio: .all, state: .on),
-                                  .edit(EditCommand(target: "channel", number: 1, field: "label", value: .string("x")))]
+                                  .edit(EditCommand(.numbered(.channel, 1), .set(path: "label", value: .string("x"))))]
         let (state, effects) = run(F.fresh(), passing)
         XCTAssertEqual(state, F.fresh())
         XCTAssertEqual(effects, passing.map { .passthrough($0) })

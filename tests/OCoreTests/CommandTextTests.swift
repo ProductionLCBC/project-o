@@ -133,10 +133,11 @@ final class CommandTextTests: XCTestCase {
         row("system clearall", .systemClearAll),
         row("system preflight", .systemPreflight),
         row("system snapshot", .systemSnapshot),
-        // The reserved edit shape
+        // Spec 5 §4 — the edit family; every verb has its rows in EditTextTests.
         row("edit channel 2 label \"Lyrics\"",
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics")))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics"))))),
     ]
+    + EditTextTests.rows.map { row($0.text, .edit($0.edit), canonical: $0.canonical) }
 
     func test_everyVocabularyRowParsesAndPrintsCanonically() {
         for row in vocabulary { check(row) }
@@ -409,12 +410,12 @@ final class CommandTextTests: XCTestCase {
             .audioMute(audio: .all, state: .on),
             .macro(12), .undo, .redo, .historyJump(5), .historyJump(0),
             .systemClearAll, .systemPreflight, .systemSnapshot,
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
-            .edit(EditCommand(target: "stack", number: 1, field: "gammaBlend", value: .bool(true))),
-            .edit(EditCommand(target: "channel", number: 2, field: "decoderCap", value: .number(3))),
-            .edit(EditCommand(target: "channel", number: 2, field: "audioOutputs", value: .array([.number(1), .number(2)]))),
-            .edit(EditCommand(target: "channel", number: 2, field: "defaults", value: .object(["gain": .number(-6)]))),
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: nil)),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
+            .edit(EditCommand(.numbered(.stack, 1), .set(path: "gammaBlend", value: .bool(true)))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "decoderCap", value: .number(3)))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "audioOutputs", value: .array([.number(1), .number(2)])))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "defaults", value: .object(["gain": .number(-6)])))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .null))),
         ]
         for command in corpus {
             guard let text = CommandText.print(command) else { return XCTFail("no text for \(command)") }

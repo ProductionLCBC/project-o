@@ -53,12 +53,12 @@ final class LogEntryTests: XCTestCase {
 
         // An edit entry carries its inverse; a rejected result its reason.
         var edit = example
-        edit.command = .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics")))
+        edit.command = .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics"))))
         edit.text = "edit channel 2 label \"Lyrics\""
         edit.kind = .edit
         edit.undo = .edit
-        edit.inverse = .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Words")))
-        XCTAssertTrue(edit.line.contains("\"inverse\": { \"cmd\": \"edit\""), edit.line)
+        edit.inverse = .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Words"))))
+        XCTAssertTrue(edit.line.contains("\"inverse\": { \"channel\": 2, \"cmd\": \"edit.set\""), edit.line)
         XCTAssertEqual(try LogEntry(line: edit.line), edit)
 
         var rejected = example
@@ -139,7 +139,7 @@ final class LogEntryTests: XCTestCase {
                               .macro(1), .undo, .redo, .historyJump(1), .systemPreflight, .systemSnapshot, .unknown(cmd: "x")] {
             XCTAssertEqual(none.undoClass, .none, "\(none)")
         }
-        let edit = Command.edit(EditCommand(target: "channel", number: 1, field: "label"))
+        let edit = Command.edit(EditCommand(.numbered(.channel, 1), .set(path: "label", value: .null)))
         XCTAssertEqual(edit.undoClass, .edit)
         XCTAssertEqual(edit.logKind, .edit)
         XCTAssertEqual(write.logKind, .runtime)

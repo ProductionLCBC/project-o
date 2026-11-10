@@ -5,12 +5,19 @@ import Foundation
 /// Spec 2 §2 and §4 — what the parser needs besides the text: the media ids
 /// it may expand an abbreviated hash against ("Hashes may be abbreviated to
 /// their first 12 hex characters in the command bar and are expanded on
-/// parse; stored and logged forms are always full").
+/// parse; stored and logged forms are always full"), and, for an edit's
+/// short forms, the library and the machine: "The command bar accepts `list
+/// 42 cue 3`, `playlist "Sunday"` and `playlist "Sunday" item 4` as short
+/// forms. It expands them to uuids when it parses" (Spec 5 §3).
 public struct ParseOptions: Sendable {
     public var mediaIDs: Set<String>
+    public var library: Library?
+    public var machine: Machine?
 
-    public init(mediaIDs: Set<String> = []) {
+    public init(mediaIDs: Set<String> = [], library: Library? = nil, machine: Machine? = nil) {
         self.mediaIDs = mediaIDs
+        self.library = library
+        self.machine = machine
     }
 }
 
@@ -150,6 +157,7 @@ struct CommandParser {
         case .number(let n): return n
         case .word(let w): return w
         case .bracket(let b): return "[\(b)]"
+        case .json(let value): return JSONCanonical.line(value)
         }
     }
 
@@ -176,6 +184,8 @@ struct CommandParser {
     }
 
     mutating func parseTarget(_ target: String) throws -> Command {
+        // Spec 5 §4 — the edit family has its own grammar.
+        if target == "edit" { return try parseEditCommand() }
         let rows = Vocabulary.rows(target: target)
         guard let sample = rows.first else { throw reject(.unknownTarget, "\(target) is not a target") }
         var object: [String: JSONValue] = [:]
@@ -234,8 +244,6 @@ struct CommandParser {
         switch row.args.first?.kind {
         case .write?:
             try parseWrite(into: &object)
-        case .edit?:
-            try parseEdit(into: &object)
         default:
             for arg in row.args {
                 try parseArgument(arg, into: &object)
@@ -492,6 +500,9 @@ struct CommandParser {
     /// scope ... A rider without a scope is an error, not a default."
     mutating func parseRiders(into object: inout [String: JSONValue]) throws {
         while let t = peek() {
+            // A JSON object after a write is an edit's record of where it goes
+            // (Spec 5 §4, `edit.cueChannel`); a plain write rejects it after.
+            if case .json = t { return }
             guard case .word(let w) = t else {
                 throw reject(.unexpectedToken, "unexpected \(t.described) after the content")
             }
@@ -537,37 +548,4 @@ struct CommandParser {
         return .string(w.lowercased())
     }
 
-    // MARK: - Spec 2 §3, the reserved edit form
-
-    /// `edit TARGET N FIELD VALUE`; the value is the rest of the line, read
-    /// as JSON when it looks like JSON, else as one word.
-    mutating func parseEdit(into object: inout [String: JSONValue]) throws {
-        guard let t = next() else { throw reject(.missingArgument, "edit needs a target (channel, stack, ...)") }
-        guard case .word(let target) = t else { throw reject(.badArgument, "edit needs a target word, not \(t.described)") }
-        let number = try intToken(what: "edit needs the object's number")
-        guard let f = next() else { throw reject(.missingArgument, "edit needs a field name") }
-        guard case .word(let field) = f else { throw reject(.badArgument, "the edit field must be a word, not \(f.described)") }
-        guard index < tokens.count else { throw reject(.missingArgument, "edit needs a value") }
-        var raw = Substring(text[tokens[index].start...])
-        while let last = raw.last, last.isWhitespace { raw = raw.dropLast() }
-        index = tokens.count
-        let value: JSONValue
-        let first = raw.first
-        if first == "\"" || first == "[" || first == "{" || first == "-" || first.map(DurationText.isDigit) == true
-            || raw == "true" || raw == "false" || raw == "null" {
-            do {
-                value = try JSONValue.parse(String(raw))
-            } catch let error as JSONParseError {
-                throw reject(.malformed, "the edit value is not valid JSON: \(error.message)")
-            }
-        } else if !raw.contains(where: \.isWhitespace) {
-            value = .string(String(raw))
-        } else {
-            throw reject(.malformed, "quote the edit value: \(raw)")
-        }
-        object["target"] = .string(target.lowercased())
-        object["number"] = .number(Double(number))
-        object["field"] = .string(field)
-        if value != .null { object["value"] = value }
-    }
 }

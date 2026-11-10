@@ -182,8 +182,10 @@ final class CommandRejectionTests: XCTestCase {
         noPlaylist.pointer = nil
         expect("cue 1", .noSuchTarget, state: noPlaylist)
         expect("item 2 cue 1", .noSuchTarget, state: noPlaylist)
-        expect("edit channel 9 label \"x\"", .noSuchTarget)
-        expect("edit nothing 1 label \"x\"", .noSuchTarget)
+        // Spec 5 §3 — an edit names an object type the edit path knows; whether
+        // the object exists is the edit path's to check, in Spec 5 §6's order
+        // (EditRejectionTests), not this validator's.
+        expect("edit nothing 1 label \"x\"", .unknownTarget)
         accept("edit channel 2 label \"x\"")
     }
 
