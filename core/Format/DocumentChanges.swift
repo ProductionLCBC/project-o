@@ -42,6 +42,8 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
 /// its file goes by the edit's `StructureChange`. A move alone isn't either:
 /// "Moving a list or a folder is a rename on disk, not a save" (Spec 7 §2).
 public enum DocumentChanges {
+    /// Spec 5 §2 — the documents that differ from `old` to `new`, in the
+    /// roots' order: what the writer saves after an applied group.
     public static func between(_ old: (library: Library, machine: Machine),
                                _ new: (library: Library, machine: Machine)) -> [DocumentRef] {
         var out: [DocumentRef] = []
@@ -59,7 +61,8 @@ public enum DocumentChanges {
         return out
     }
 
-    /// Whether the roots hold the document.
+    /// Spec 5 §2 — whether the roots hold the document, so a write is still
+    /// wanted: a document an edit deleted is removed, not saved.
     public static func exists(_ ref: DocumentRef, library: Library, machine: Machine) -> Bool {
         switch ref {
         case .list(let uuid): return library.list(uuid: uuid) != nil

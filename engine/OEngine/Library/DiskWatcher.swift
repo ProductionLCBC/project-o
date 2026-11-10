@@ -21,6 +21,8 @@ public final class DiskWatcher: @unchecked Sendable {
     private let lock = NSLock()
     private var stream: FSEventStreamRef?
 
+    /// Spec 1 §8 — a watcher on the two roots; `onChange` runs on the
+    /// watcher's own queue when something under the watched folders changed.
     public init(libraryRoot: URL, machineRoot: URL, onChange: @escaping @Sendable () -> Void) {
         let library = Self.realPath(libraryRoot)
         let machine = Self.realPath(machineRoot)
@@ -70,6 +72,7 @@ public final class DiskWatcher: @unchecked Sendable {
         return true
     }
 
+    /// Spec 1 §8 — the watcher stops with the engine.
     public func stop() {
         lock.lock()
         defer { lock.unlock() }

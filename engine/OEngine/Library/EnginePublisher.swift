@@ -35,6 +35,7 @@ public final class EnginePublisher: @unchecked Sendable {
         return Subscription(id: nextID)
     }
 
+    /// Spec 2 §9 — a subscriber stops receiving its topics.
     public func unsubscribe(_ subscription: Subscription) {
         lock.lock()
         subscribers.removeValue(forKey: subscription.id)
