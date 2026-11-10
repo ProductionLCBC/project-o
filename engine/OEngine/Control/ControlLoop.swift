@@ -1007,7 +1007,8 @@ public final class ControlLoop: @unchecked Sendable {
     private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> StackPass {
         let size = geometry.stackSize(stack.number)
         let target = stackRings[stack.number]?[Int(frame % Int64(FrameRing.depth))] ?? .none
-        let inputs = SlotResolver.Inputs(library: library, stack: stack, size: size, muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
+        let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
+                                         muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
             // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each

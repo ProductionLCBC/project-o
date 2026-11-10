@@ -289,7 +289,10 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let library = roots.library
         let state = states[min(index, states.count - 1)]
         let eager = EagerTextProvider(cache: textCache)
-        let inputs = SlotResolver.Inputs(library: library, stack: stackObject, size: size, muted: state.stacks[stack]?.muted ?? [], text: eager)
+        // Spec 6 §3 — the list being drawn stands as the kept copy, so its field boxes find it even when the
+        // library no longer holds that version.
+        let inputs = SlotResolver.Inputs(library: library, machine: roots.machine, kept: KeptCopies(list: list), stack: stackObject, size: size,
+                                         muted: state.stacks[stack]?.muted ?? [], text: eager)
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stackObject.effectiveSlots(library: library).enumerated() {
             let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot,

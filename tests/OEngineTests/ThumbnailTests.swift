@@ -133,9 +133,31 @@ final class ThumbnailTests: XCTestCase {
         var newer = list
         newer.version += 1
         XCTAssertNotEqual(LibraryVersion.hash(library: library, list: newer), base, "the list's version, incremented on every save")
-        var retitled = list
-        retitled.title = "Another title"
-        XCTAssertEqual(LibraryVersion.hash(library: library, list: retitled), base, "the list's text is not in the hash; its version is")
+        // Spec 6 §3 — field boxes fall back to the list's title, author, copyright and ccli, so they are in it.
+        for edit in [\List.title, \List.author, \List.copyright, \List.ccli] {
+            var changed = list
+            changed[keyPath: edit] += " (edited)"
+            XCTAssertNotEqual(LibraryVersion.hash(library: library, list: changed), base, "a list's \(edit) is drawn by a field box")
+        }
+        var renoted = list
+        renoted.cues[0].note = "A new note"
+        XCTAssertEqual(LibraryVersion.hash(library: library, list: renoted), base, "the cues' own text is covered by the list's version")
+    }
+
+    /// Spec 6 §3 — a field box in a projected state reads the list whose cue
+    /// wrote the content: in a thumbnail, the list being drawn.
+    func test_aFieldBoxInAThumbnailFallsBackToTheListsMetadata() throws {
+        var library = try EngineFixtures.library()
+        library.presets.append(FieldBoxTests.credits)
+        library.lists.append(FieldBoxTests.slideA)
+        var machine = try EngineFixtures.spikeMachine()
+        machine.settings.thumbnailStack = 2
+        machine.stacks[1].slots[0].preset = FieldBoxTests.credits.number
+        let service = try service(library: library, machine: machine)
+        let list = FieldBoxTests.slideA
+        let roots = (library: service.library, machine: service.machine)
+        let pass = service.stackPass(states: service.projectedStates(of: list, through: 0, roots: roots), index: 0, roots: roots, list: list)
+        XCTAssertEqual(pass.boxes.compactMap(\.text), ["Song A", "Author A", "Copyright A", "1001"])
     }
 
     /// Spec 6 §3 — "In a projected state, such as a thumbnail or the cue

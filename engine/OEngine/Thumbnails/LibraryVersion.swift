@@ -8,7 +8,8 @@ import OCore
 /// on every save", so the library version is a content hash of the documents
 /// a render depends on: presets, grades, text styles, transitions, channels
 /// and the media index's poster paths, plus the list's own version (Area 5
-/// reading, approved 2026-11-03). The UX spec wants thumbnails "invalidated
+/// reading, approved 2026-11-03), and the list's title, author, copyright and
+/// ccli, which field boxes fall back to (Spec 6 §3). The UX spec wants thumbnails "invalidated
 /// when the cue, a preset or a grade changes", and these are the documents a
 /// cue's picture is made of.
 public enum LibraryVersion {
@@ -35,6 +36,9 @@ public enum LibraryVersion {
         feed(library.channels)
         feed(library.mediaIndex.entries.map { PosterPath(id: $0.id, poster: $0.poster) }.sorted { $0.id < $1.id })
         feed(ListVersion(uuid: list.uuid.uuidString.lowercased(), version: list.version))
+        // Spec 6 §3 — a field box with no such field in the write draws the list's title, author,
+        // copyright or ccli, so they are part of what a thumbnail is made of, version or not.
+        feed(ListMetadata(title: list.title, author: list.author, copyright: list.copyright, ccli: list.ccli))
         return String(format: "%016llx", hash)
     }
 
@@ -46,5 +50,12 @@ public enum LibraryVersion {
     private struct ListVersion: Encodable {
         var uuid: String
         var version: Int
+    }
+
+    private struct ListMetadata: Encodable {
+        var title: String
+        var author: String
+        var copyright: String
+        var ccli: String
     }
 }

@@ -47,14 +47,22 @@ public enum SlotResolver {
     /// What every slot of one stack pass shares.
     public struct Inputs {
         public var library: Library
+        /// Spec 6 §3 — where "the list" of a field box's content is found
+        /// besides the library: the machine's local copies, and the kept copy
+        /// of the live list (Spec 7 §4).
+        public var machine: Machine
+        public var kept: KeptCopies
         public var stack: Stack
         public var size: PixelSize
         /// Spec 4 §9 — the channels muted on this stack.
         public var muted: Set<Int>
         public var text: any TextProvider
 
-        public init(library: Library, stack: Stack, size: PixelSize, muted: Set<Int>, text: any TextProvider) {
+        public init(library: Library, machine: Machine, kept: KeptCopies = KeptCopies(), stack: Stack, size: PixelSize,
+                    muted: Set<Int>, text: any TextProvider) {
             self.library = library
+            self.machine = machine
+            self.kept = kept
             self.stack = stack
             self.size = size
             self.muted = muted
@@ -151,12 +159,19 @@ public enum SlotResolver {
     }
 
     /// Spec 6 §3 — "Field boxes draw a field of the channel's text content: the
-    /// write's `fields` map, under the box's name (Spec 1 §2)"; "A field box
-    /// draws only for text content. On media or an empty channel it draws
-    /// nothing". Nil when there is nothing to draw; an empty value hides the box.
+    /// write's `fields` map, under the box's name (Spec 1 §2). If the write has
+    /// no such field, a box named `title`, `author`, `copyright` or `ccli` falls
+    /// back to the list's metadata of the same name (P12)"; "'The list' is the
+    /// one §5 names for the content: the list whose cue wrote it, or the
+    /// state's pointer for content no cue wrote"; "A field box draws only for
+    /// text content. On media or an empty channel it draws nothing". Read in
+    /// `state`, the state being drawn (Spec 6 §5). Nil when there is nothing
+    /// to draw; an empty value, the write's own or the list's, hides the box.
     public static func fieldValue(_ name: String, channel: Int, state: ShowState, inputs: Inputs) -> String? {
         guard case .text(let content)? = state.channels[channel]?.content else { return nil }
-        return content.fields[name]
+        if let own = content.fields[name] { return own }
+        guard List.metadataFields.contains(name) else { return nil }
+        return state.contentList(channel: channel, library: inputs.library, machine: inputs.machine, kept: inputs.kept)?.metadata(name)
     }
 
     /// Spec 4 §8 — "Boxes with `transitionOnVariableChange` run their box
