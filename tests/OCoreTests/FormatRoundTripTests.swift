@@ -76,7 +76,7 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(machine.inputs.map(\.number), [1])
         XCTAssertEqual(machine.keys.count, 6)
         XCTAssertEqual(machine.macros.map(\.number), [2])
-        XCTAssertEqual(machine.playlists.map(\.uuid), [F.playlistUuid])
+        XCTAssertEqual(machine.playlists.map(\.uuid), [F.sundayNightUuid, F.playlistUuid, F.archivedSundayUuid])
         XCTAssertEqual(machine.localLists.map(\.uuid), [F.localCopyUuid])
         XCTAssertEqual(machine.mediaLocal.entries.map(\.id), [F.announcement])
         XCTAssertEqual(machine.mediaLocal.overrides, [F.cross: "local/cross-fast.png"])
@@ -149,7 +149,7 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(machine.settings.startupMacro, 2)
         XCTAssertEqual(machine.localLists.first?.provenance,
                        LocalProvenance(masterUuid: F.listUuid(42), masterVersion: 16, detachedAt: "2026-10-25T14:03:22Z"))
-        XCTAssertEqual(machine.playlists.first?.items.map(\.kind),
+        XCTAssertEqual(machine.playlist(uuid: F.playlistUuid)?.items.map(\.kind),
                        [.header(label: "Welcome"), .linked(list: 42, listUuid: F.listUuid(42)), .local(F.localCopyUuid),
                         .header(label: "Response"), .linked(list: 7, listUuid: F.listUuid(7))])
     }

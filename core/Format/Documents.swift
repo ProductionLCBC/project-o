@@ -253,12 +253,7 @@ public enum FileLayout {
         case .preset(let p): return "presets/\(numbered(p.number, p.label)).json"
         case .macro(let m): return "macros/\(numbered(m.number, m.label)).json"
         case .list(let l): return (l.isLocalCopy ? "lists-local/" : "lists/") + numbered(l.number, l.title) + ".json"
-        case .playlist(let p):
-            let s = slug(p.title)
-            if let date = p.serviceDate, !date.isEmpty {
-                return "playlists/" + date + (s.isEmpty ? "" : "-" + s) + ".json"
-            }
-            return "playlists/" + (s.isEmpty ? p.uuid.uuidString.lowercased() : s) + ".json"
+        case .playlist(let p): return plainPath(forPlaylist: p)
         default:
             return document.kind.fixedPath ?? document.kind.fileStem + ".json"
         }
@@ -298,6 +293,19 @@ public enum FileLayout {
     public static func plainPath(forPlaylist playlist: Playlist) -> String {
         let s = slug(playlist.title)
         return "playlists/" + (s.isEmpty ? playlist.uuid.uuidString.lowercased() : s) + ".json"
+    }
+
+    /// Spec 7 §3 — the file a playlist is given when it is made or retitled:
+    /// its plain name, or "When that name belongs to another playlist's file,
+    /// the engine takes the first free one of `sunday-2.json`,
+    /// `sunday-3.json` and so on". `taken` holds the other files' paths.
+    public static func playlistPath(for playlist: Playlist, taken: Set<String>) -> String {
+        let plain = plainPath(forPlaylist: playlist)
+        guard taken.contains(plain) else { return plain }
+        let stem = String(plain.dropLast(".json".count))
+        var n = 2
+        while taken.contains(stem + "-" + String(n) + ".json") { n += 1 }
+        return stem + "-" + String(n) + ".json"
     }
 
     /// The key `documentPaths` uses for a playlist's document.

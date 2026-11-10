@@ -87,10 +87,13 @@ public enum Writer {
 
     /// Spec 1 §5 — save one document: rename its file to match its number and
     /// label if it moved ("renames the file to match on save"), then replace
-    /// it atomically.
+    /// it atomically. Spec 7 §3 — a playlist "keeps [its name] until the title
+    /// changes", so a save writes it where its file is; the edit that changes
+    /// its title names its new file.
     public static func save(_ document: Document, extras: [String: JSONValue] = [:], currentPath: String? = nil) -> WritePlan {
         var plan = WritePlan()
-        let path = FileLayout.path(for: document)
+        var path = FileLayout.path(for: document)
+        if case .playlist = document, let currentPath { path = currentPath }
         if let currentPath, currentPath != path {
             plan.operations.append(.move(from: currentPath, to: path))
         }
@@ -152,7 +155,11 @@ public enum Writer {
         put(.keys(machine.keys))
         put(.mediaLocal(machine.mediaLocal))
         for macro in machine.macros { put(.macro(macro)) }
-        for playlist in machine.playlists { put(.playlist(playlist)) }
+        for playlist in machine.playlists {
+            // Spec 7 §3 — a playlist is written where its file is.
+            let path = machine.documentPaths[FileLayout.documentKey(playlist: playlist.uuid)] ?? FileLayout.path(for: .playlist(playlist))
+            files[path] = data(for: .playlist(playlist))
+        }
         for list in machine.localLists { put(.list(list)) }
         if let state = machine.lastState { put(.state(state)) }
         return RootSnapshot(files: files)

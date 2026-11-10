@@ -21,13 +21,14 @@ final class WriterTests: XCTestCase {
         XCTAssertEqual(FileLayout.slug(String(repeating: "x", count: 100)).count, 60, "slugs are bounded")
 
         let (library, machine, _) = F.load()
+        guard let sunday = machine.playlist(uuid: F.playlistUuid) else { return XCTFail("the fixture's Sunday") }
         XCTAssertEqual(FileLayout.path(for: .preset(library.presets[2])), "presets/003-lower-third.json")
         XCTAssertEqual(FileLayout.path(for: .list(library.lists[1])), "lists/042-great-is-thy-faithfulness.json")
         XCTAssertEqual(FileLayout.path(for: .list(machine.localLists[0])), "lists-local/042-great-is-thy-faithfulness-manheim.json")
         XCTAssertEqual(FileLayout.path(for: .macro(library.macros[0])), "macros/001-welcome.json")
         XCTAssertEqual(FileLayout.path(for: .macro(machine.macros[0])), "macros/002-preshow.json")
-        XCTAssertEqual(FileLayout.path(for: .playlist(machine.playlists[0])), "playlists/2026-11-01-sunday.json")
-        var undated = machine.playlists[0]
+        XCTAssertEqual(FileLayout.path(for: .playlist(sunday)), "playlists/sunday.json")
+        var undated = sunday
         undated.serviceDate = nil
         undated.title = "Sunday Night"
         XCTAssertEqual(FileLayout.path(for: .playlist(undated)), "playlists/sunday-night.json")

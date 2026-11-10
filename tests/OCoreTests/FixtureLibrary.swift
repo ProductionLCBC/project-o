@@ -90,6 +90,10 @@ enum FixtureLibrary {
     static let list7Cues = [uuid("55ee", 1), uuid("66ff", 2), uuid("77aa", 3)]
     static let localCopyUuid = uuid("10ca1", 42)
     static let playlistUuid = uuid("b1a7", 1)
+    /// Spec 7 §8 — "Sunday Night", which links list 42 twice, and the
+    /// archived copy of "Sunday", "Sunday 2026-11-01".
+    static let sundayNightUuid = uuid("b1a7", 0x10)
+    static let archivedSundayUuid = uuid("b1a7", 0x11)
     /// Spec 7 §3 — the Sunday playlist's items by position, carrying the
     /// uuids `KIND:KEY:N` gives them.
     static let sundayItems: [UUID] = ["header:Welcome:0", "linked:42:0", "local:10ca1000-0000-4000-8000-00000000002a:0",
