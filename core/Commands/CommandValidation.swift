@@ -49,17 +49,15 @@ public enum CommandValidator {
 
     /// Spec 2 §8 — "A group validates as a whole: one bad command rejects
     /// the group, and the rejection names the command and the reason." The
-    /// group's own source decides the guard rule.
+    /// group's own source decides the guard rule. Every command is checked
+    /// against the one state given; the runner checks each against "the
+    /// state the commands before it leave" as it runs (`CommandRunner`).
     public static func validate(_ group: CommandGroup, context: ValidationContext) -> Rejection? {
         var context = context
         context.source = group.source
         for (index, entry) in group.commands.enumerated() {
-            guard var rejection = validate(entry.command, guard: entry.when, context: context) else { continue }
-            rejection.index = index
-            rejection.text = CommandText.print(entry.command)
-            let name = rejection.text.map { " (\($0))" } ?? ""
-            rejection.message = "command \(index + 1) of \(group.commands.count)\(name): " + rejection.message
-            return rejection
+            guard let rejection = validate(entry.command, guard: entry.when, context: context) else { continue }
+            return rejection.naming(index, of: group.commands)
         }
         return nil
     }
