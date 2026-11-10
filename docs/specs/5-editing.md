@@ -41,7 +41,7 @@ The UX spec says any edit takes effect on the next fire. The second group depart
 
 **The live pointer.** An edit never moves the pointer. The pointer follows its playlist item by the item's uuid (L3), so inserting or moving items around the live one changes nothing. If an edit removes the cue the pointer names (a merge, say, or a delete), `next` fires what followed it and `previous` what came before it; if it removes the item, the song finishes first. A deleted live list or playlist runs on from the copy the engine keeps of it, so the song or the service can finish (L3, Spec 7 §4).
 
-**Writing.** The engine writes a changed document with Spec 1 §5's atomic write within one second of its last change, or, while the disk is full, as soon as it can (Spec 9 §7). Typing therefore writes at most once a second, and the last keystroke always lands. Each write of a list master increments its `version`; when the previous file is also copied to `versions/` is choice E-3 (§12, Spec 1 §4).
+**Writing.** The engine writes a changed document with Spec 1 §5's atomic write within one second of each change, and at most once a second, or, while the disk is full, as soon as it can (Spec 9 §7). Typing therefore writes at most once a second, and the last keystroke always lands. Each write of a list master increments its `version`; when the previous file is also copied to `versions/` is choice E-3 (§12, Spec 1 §4).
 
 An edit that changes where a file lives does so in the same write:
 
@@ -132,6 +132,10 @@ Positions in paths and in `insert`, `remove` and `move` count from 0, as JSON ar
 { "cmd": "edit.renumber", "object": "channel", "channel": 2, "to": 5 }
 { "cmd": "edit.move", "object": "preset", "preset": 3, "path": "layouts.2.boxes", "from": 1, "at": 3 }
 ```
+
+**What a verb carries** (Spec 7 §3). `swap` names the other number as `with`. `duplicate` names a numbered copy's number as `to`, a playlist copy's title as `title`, and records the uuids it made: `uuid` for the copy, and `cueUuids` for a list's cues or `itemUuids` for a playlist's items. `archive` records the dated `title` it made, with `uuid` and `itemUuids`. In the text form, what the engine picked for `duplicate`, `archive` and `cueChannel` prints as one JSON object at the end: `edit playlist 2b2b… duplicate "Sunday Night" {"itemUuids": ["4d4e…"], "uuid": "2c2c…"}`. `create` keeps its picks where they live: a list's number in its address and its uuid in its body, a playlist's uuid in its address.
+
+**`cueChannel`.** Beside `state`, a write carries `channel.write`'s content and riders, `attributes` holds the channel's standalone attribute commands (`channel.grade`, `channel.transition`, `channel.audioTransition`, `channel.gain`) in order, and `at` is where in the cue's `commands`, counted without the channel's old commands, the channel's commands go: where its old commands were, or in channel-number order for a channel the cue didn't mention, recorded when the engine picks it. In the cue, the attribute writes come before the content command. The text form names the attributes before the state, `edit list 42 cue 22bb… channel 1 transition 2 0.75 hold`, so a standalone `gain` beside a media write is never read as the media's own gain; `… channel 2 hold grade 5` parses too. When the channel's previous commands can't be put back by a `cueChannel` (two content commands, or other commands between them), its inverse is an `edit.set` of the cue's whole `commands`.
 
 **The log entry** is Spec 2 §9's, with kind `edit`, undo class `edit`, and the inverse beside the command:
 

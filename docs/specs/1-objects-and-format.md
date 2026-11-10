@@ -111,7 +111,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Machines and libraries** each have a `uuid`, generated on first run and never changed; logs, snapshots and local-copy reports are tagged with the machine's.
 
-**Versions.** Every List master carries an integer `version` that increments on each save. A save writes the previous document to the versions folder (section 5) before overwriting when the last copy there is more than ten minutes old, so a kept version marks each editing session and edit undo covers the steps inside it (Spec 5, choice E-3). No save writes over a kept version: a list at or below the highest version kept for it saves one above that (Spec 9 §6). That is the whole version-history mechanism: last write wins, a kept version of a list comes back with `system restore list N version V` (Spec 9 §6), and any kept version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
+**Versions.** Every List master carries an integer `version` that increments on each save that replaces its file. A new list is written at the version it has, and moving or renaming a list's file is not a save (Spec 7 §2). A save writes the previous document to the versions folder (section 5) before overwriting when the last copy there is more than ten minutes old, so a kept version marks each editing session and edit undo covers the steps inside it (Spec 5, choice E-3). No save writes over a kept version: a list at or below the highest version kept for it saves one above that, and a previous document whose version is already kept isn't copied again (Spec 9 §6). That is the whole version-history mechanism: last write wins, a kept version of a list comes back with `system restore list N version V` (Spec 9 §6), and any kept version is one file copy away. Local copies record the master's `uuid` and `version` they were cut from.
 
 **Variables** are not objects. `[Timer 1]`, `[Popup 3]`, `[Time]` and the context values are resolved by name at render time; the only persisted facts about them are the slot counts in machine settings and the format strings embedded in text.
 
@@ -154,7 +154,7 @@ machine/
   engine.sock  .engine.lock the engine's local socket and the lock that keeps one engine per machine root, while it runs (Spec 10 §2)
 ```
 
-File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it, or a playlist's by its `uuid`, and renames the file to match on save, keeping a list in its folder (Spec 7 §2–§3). Every document starts with the same header.
+File names carry the number and a slug of the label for human reading only; the loader identifies a file by the `number` inside it, or a playlist's by its `uuid`, and renames the file to match on save, keeping a list in its folder (Spec 7 §2–§3). A playlist keeps its file's name until its title changes, so no save changes which of two playlists sharing a title `playlist "TITLE"` loads (Spec 7 §3). Every document starts with the same header.
 
 ```json
 { "schema": 1, "app": "0.1.0", "kind": "list", ... }
