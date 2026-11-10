@@ -30,8 +30,9 @@ public enum LogKind: String, Codable, Equatable, Sendable {
 /// The parser, the printer and the OSC mapping all read it, so the three
 /// cannot disagree.
 struct VocabularyRow: Sendable {
-    /// Spec 2 §2 — `target [number]`: none, a positive integer, or a channel
-    /// or audio-output number that may be the word `all` (Spec 2 §3).
+    /// Spec 2 §2 — `target [number]`: none, a positive integer, or a channel,
+    /// stack (for `blackout`) or audio-output number that may be the word
+    /// `all` (Spec 2 §3).
     enum Number: Sendable {
         case none
         case int(String)
@@ -112,6 +113,12 @@ struct VocabularyRow: Sendable {
     var hasNumber: Bool { number.key != nil }
     var hasVerb: Bool { !verb.isNone }
 
+    /// Spec 2 §3 — whether this row's number may be the word `all`.
+    var takesAll: Bool {
+        if case .target = number { return true }
+        return false
+    }
+
     /// The write and edit forms have their own parser and printer.
     var isSpecial: Bool {
         switch args.first?.kind {
@@ -160,7 +167,7 @@ enum Vocabulary {
         // Stacks and outputs
         VocabularyRow("output.stack", target: "output", number: .int("output"), verb: .word("stack"),
                       args: [Arg("stack", .int)], lock: .passes, undo: .runtime),
-        VocabularyRow("stack.blackout", target: "stack", number: .int("stack"), verb: .word("blackout"),
+        VocabularyRow("stack.blackout", target: "stack", number: .target("stack"), verb: .word("blackout"),
                       args: [Arg("state", .keyword(onOffToggle))], lock: .passes, undo: .runtime),
         VocabularyRow("stack.mute", target: "stack", number: .int("stack"), verb: .word("mute"),
                       args: [Arg("channel", .int), Arg("state", .keyword(onOffToggle))], lock: .passes, undo: .runtime),
@@ -210,6 +217,12 @@ enum Vocabulary {
 
     static func rows(target: String) -> [VocabularyRow] {
         byTarget[target] ?? []
+    }
+
+    /// Spec 2 §3 — whether any row of a target takes the word `all`; the
+    /// row the verb names decides for itself once it is known.
+    static func takesAll(target: String) -> Bool {
+        rows(target: target).contains(where: \.takesAll)
     }
 
     /// Spec 2 §4 — short forms: "`ch` for `channel`".

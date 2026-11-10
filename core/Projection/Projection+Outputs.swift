@@ -1,14 +1,6 @@
 // OCore — Spec 3 §6, output, stack and popup commands.
 
 extension Fold {
-    func resolve(_ switchState: SwitchState, current: Bool) -> Bool {
-        switch switchState {
-        case .on: return true
-        case .off: return false
-        case .toggle: return !current
-        }
-    }
-
     /// Spec 2 §3 — `output N stack M`: "Switches the output's live stack with
     /// its switch transition." Spec 3 §6 — `stackSwitch` carries "output,
     /// old, new, transition ref". An unknown output or stack is a `noop`.
@@ -23,25 +15,40 @@ extension Fold {
     }
 
     /// Spec 2 §3 — `stack N blackout on | off | toggle`: "Mutes every slot
-    /// with the output's blackout transition; video only." The transition is
+    /// with the output's blackout transition; video only; `stack all` for
+    /// every stack, each with its own output's transition". The transition is
     /// the blackout transition of the first output currently showing the
-    /// stack, or nil when no output shows it.
-    mutating func stackBlackout(_ stack: Int, _ switchState: SwitchState, command: Command) {
-        guard var stackState = state.stacks[stack] else {
-            effects.append(.noop(command))
-            return
+    /// stack, or nil when no output shows it. With `all`, every stack in
+    /// number order ends at one value ("`toggle` turns every one on unless
+    /// every one is already on, when it turns them all off"), and only the
+    /// stacks that change have an effect; when none changes, one `noop`.
+    mutating func stackBlackout(_ target: Target, _ switchState: SwitchState, command: Command) {
+        let numbers: [Int]
+        let new: Bool
+        switch target {
+        case .number(let stack):
+            guard let stackState = state.stacks[stack] else {
+                effects.append(.noop(command))
+                return
+            }
+            numbers = [stack]
+            new = switchState.resolve(current: stackState.blackout)
+        case .all:
+            numbers = state.stacks.keys.sorted()
+            new = switchState.resolve(all: numbers.compactMap { state.stacks[$0]?.blackout })
         }
-        let new = resolve(switchState, current: stackState.blackout)
-        guard new != stackState.blackout else {
-            effects.append(.noop(command))
-            return
+        var acted = false
+        for stack in numbers {
+            guard var stackState = state.stacks[stack], stackState.blackout != new else { continue }
+            let old = stackState.blackout
+            stackState.blackout = new
+            state.stacks[stack] = stackState
+            let showing = state.outputs.filter { $0.value == stack }.keys.sorted().first
+            effects.append(.blackout(stack: stack, old: old, new: new,
+                                     transition: showing.flatMap { context.machine.output($0)?.transitions.blackout }))
+            acted = true
         }
-        let old = stackState.blackout
-        stackState.blackout = new
-        state.stacks[stack] = stackState
-        let showing = state.outputs.filter { $0.value == stack }.keys.sorted().first
-        effects.append(.blackout(stack: stack, old: old, new: new,
-                                 transition: showing.flatMap { context.machine.output($0)?.transitions.blackout }))
+        if !acted { effects.append(.noop(command)) }
     }
 
     /// Spec 2 §3 — `stack N mute CHANNEL on | off | toggle`: "Mutes one
@@ -52,7 +59,7 @@ extension Fold {
             return
         }
         let old = stackState.muted.contains(channel)
-        let new = resolve(switchState, current: old)
+        let new = switchState.resolve(current: old)
         guard new != old else {
             effects.append(.noop(command))
             return

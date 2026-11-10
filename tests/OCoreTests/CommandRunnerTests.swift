@@ -131,7 +131,8 @@ final class CommandRunnerTests: XCTestCase {
     }
 
     /// Spec 3 §8 — "A macro fired by a cue inherits `cue` as its source kind,
-    /// so lock cannot be dodged by wrapping a write in a macro."
+    /// so lock cannot be dodged by wrapping a write in a macro." Spec 2 §9 —
+    /// its inner commands carry "the cue's source and the macro's number".
     func test_aMacroFiredByACueInheritsTheCueSource() throws {
         var locked = F.fresh()
         locked.channels[2]?.lock = true
@@ -139,7 +140,8 @@ final class CommandRunnerTests: XCTestCase {
         let outcome = try XCTUnwrap(run(group([.macro(2)], .cue, list: list, cue: cue, playlist: F.playlistUuid), state: locked))
         XCTAssertEqual(outcome.executed.map(\.command), [.macro(2), F.write(2, text: "from macro")])
         XCTAssertEqual(results(outcome), [.ok, .blocked])
-        XCTAssertEqual(outcome.executed[1].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid))
+        XCTAssertEqual(outcome.executed[0].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid))
+        XCTAssertEqual(outcome.executed[1].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid, macro: 2))
         XCTAssertEqual(outcome.state.channels[2]?.content, .empty)
 
         let fromKey = try XCTUnwrap(run(group([.macro(2)], .key), state: locked))
@@ -147,13 +149,15 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertEqual(fromKey.executed[1].source, CommandSource(kind: .macro, macro: 2))
     }
 
-    /// Spec 2 §5 — "depth is capped at 8": a macro that calls itself stops.
-    func test_macroDepthIsCapped() throws {
+    /// Spec 2 §5 — "A macro runs whole or not at all": a macro that calls
+    /// itself runs nothing, and its one line says why.
+    func test_aMacroThatCallsItselfRunsNothing() throws {
         var library = F.library
-        library.macros.append(Macro(number: 3, commands: [GuardedCommand(.macro(3))]))
+        library.macros.append(Macro(number: 3, commands: [GuardedCommand(F.write(1, text: "x")), GuardedCommand(.macro(3))]))
         let outcome = try XCTUnwrap(run(group([.macro(3)]), state: F.fresh(), library: library, validate: false))
-        XCTAssertEqual(outcome.executed.count, 9)
-        XCTAssertTrue(outcome.executed.allSatisfy { $0.command == .macro(3) && $0.result == .noop })
+        XCTAssertEqual(outcome.executed.map(\.command), [.macro(3)])
+        XCTAssertEqual(results(outcome), [.noop])
+        XCTAssertEqual(outcome.executed[0].refusal?.reason, .macroCycle)
         XCTAssertEqual(outcome.state, F.fresh())
     }
 
@@ -161,6 +165,15 @@ final class CommandRunnerTests: XCTestCase {
         let outcome = try XCTUnwrap(run(group([.macro(99)]), state: F.fresh(), validate: false))
         XCTAssertEqual(results(outcome), [.noop])
         XCTAssertEqual(outcome.executed[0].effects, [.noop(.macro(99))])
+        XCTAssertEqual(outcome.executed[0].refusal?.reason, .noSuchTarget)
+    }
+
+    /// A macro that changes nothing ran whole: `noop`, with no refusal.
+    func test_aMacroThatChangesNothingHasNoRefusal() throws {
+        let first = try XCTUnwrap(run(group([.macro(2)]), state: F.fresh()))
+        let again = try XCTUnwrap(run(group([.macro(2)]), state: first.state))
+        XCTAssertEqual(results(again), [.noop, .noop])
+        XCTAssertNil(again.executed[0].refusal)
     }
 
     /// A guard on a command submitted outside a macro is honoured too: a
@@ -236,6 +249,122 @@ final class CommandRunnerTests: XCTestCase {
             let (projected, _) = project(state, commands, context: F.context(frame: 100, source: source))
             XCTAssertEqual(outcome.state, projected, "\(commands)")
         }
+    }
+
+    // MARK: - Spec 2 §9 and Spec 3 §5, the cue path
+
+    /// List 9's cue fires itself; list 10's cue 2 holds `next`, which fires it
+    /// again while the pointer still names cue 1; list 11's cue 2 runs macro
+    /// 50, which fires cue 3; macro 51 starts an 8-deep chain (51 → … → 58).
+    static var cuePathLibrary: Library {
+        var library = F.library
+        library.lists.append(List(uuid: F.listUuid(9), number: 9, title: "Self", cues: [
+            F.cue(list: 9, 1, commands: [F.write(1, text: "loop"), .listCue(list: 9, cue: 1)]),
+        ]))
+        library.lists.append(List(uuid: F.listUuid(10), number: 10, title: "Next inside", cues: [
+            F.cue(list: 10, 1, commands: [F.write(2, text: "one")]),
+            F.cue(list: 10, 2, commands: [F.write(2, text: "two"), .next]),
+        ]))
+        library.lists.append(List(uuid: F.listUuid(11), number: 11, title: "Two cues", cues: [
+            F.cue(list: 11, 1, commands: [F.write(1, text: "one")]),
+            F.cue(list: 11, 2, commands: [.macro(50)]),
+            F.cue(list: 11, 3, commands: [F.write(2, text: "three")]),
+            F.cue(list: 11, 4, commands: [.macro(51)]),
+        ]))
+        library.macros.append(Macro(number: 50, commands: [GuardedCommand(.cue(3))]))
+        for n in 51...58 {
+            library.macros.append(Macro(number: n, commands: [GuardedCommand(n == 58 ? F.write(3, text: "deep") : .macro(n + 1))]))
+        }
+        return library
+    }
+
+    /// Spec 2 §5 — "Every macro entered and every cue fired inside one group
+    /// uses up one of the 8 levels": a cue that fires itself stops at the cap
+    /// (before Area 15 the runner's replay recursed until the process died).
+    func test_aCueThatFiresItselfStopsAtTheCap() throws {
+        let library = Self.cuePathLibrary
+        let outcome = try XCTUnwrap(run(group([.listCue(list: 9, cue: 1)], .key), state: F.fresh(), library: library, validate: false))
+        // The key's fire, then nine cue groups (levels 0 to 8), each a write and a fire; the last fire has no level left.
+        XCTAssertEqual(outcome.executed.count, 1 + 9 * 2)
+        XCTAssertEqual(Set(outcome.executed.map(\.group)).count, 10)
+        XCTAssertEqual(outcome.executed.last?.command, .listCue(list: 9, cue: 1))
+        XCTAssertEqual(outcome.executed.last?.result, .noop)
+        XCTAssertEqual(outcome.state.pointer, F.pointer(list: 9, cue: 1))
+        let (projected, _) = project(F.fresh(), [.listCue(list: 9, cue: 1)], context: F.context(frame: 100, source: .key, library: library))
+        XCTAssertEqual(outcome.state, projected)
+    }
+
+    /// A cue holding `next`, fired by `next`: its `next` fires the same cue
+    /// again until no level is left.
+    func test_aCueHoldingNextStopsAtTheCap() throws {
+        let library = Self.cuePathLibrary
+        var onCue = F.fresh()
+        onCue.pointer = F.pointer(list: 10, cue: 1)
+        let outcome = try XCTUnwrap(run(group([.next], .key), state: onCue, library: library, validate: false))
+        XCTAssertEqual(outcome.executed.count, 1 + 9 * 2)
+        XCTAssertEqual(outcome.executed.last?.result, .noop)
+        XCTAssertEqual(outcome.state.pointer, F.pointer(list: 10, cue: 2))
+        let (projected, _) = project(onCue, [.next], context: F.context(frame: 100, source: .key, library: library))
+        XCTAssertEqual(outcome.state, projected)
+    }
+
+    /// Spec 2 §9 — `cue 2`, whose cue runs macro 50, which fires cue 3: the
+    /// navigation's line, cue 2's group with the macro and its fire, then cue
+    /// 3's group. Before Area 15 cue 3's commands were logged as cue 2's group,
+    /// and the inner fire's pointer was logged twice.
+    func test_aCueFiredInsideACueLogsItsOwnGroup() throws {
+        let library = Self.cuePathLibrary
+        var onCue = F.fresh()
+        onCue.pointer = F.pointer(list: 11, cue: 1)
+        let outcome = try XCTUnwrap(run(group([.cue(2)], .key), state: onCue, library: library, validate: false))
+        XCTAssertEqual(outcome.executed.map(\.command), [.cue(2), .macro(50), .cue(3), F.write(2, text: "three")])
+        XCTAssertEqual(outcome.executed.map(\.group), [GroupID("g-1"), GroupID("g-2"), GroupID("g-2"), GroupID("g-3")])
+        let cue2 = CommandSource(kind: .cue, list: F.listUuid(11), cue: F.cueUuid(list: 11, cue: 2))
+        let cue3 = CommandSource(kind: .cue, list: F.listUuid(11), cue: F.cueUuid(list: 11, cue: 3))
+        XCTAssertEqual(outcome.executed.map(\.source), [CommandSource(kind: .key), cue2, cue2.inMacro(50), cue3])
+        XCTAssertEqual(outcome.executed.map(\.fire), [nil, FireRecord(listTitle: "Two cues", ccli: ""), nil,
+                                                      FireRecord(listTitle: "Two cues", ccli: "")])
+        XCTAssertEqual(outcome.executed[0].effects, [.pointer(old: F.pointer(list: 11, cue: 1), new: F.pointer(list: 11, cue: 2), armed: nil)],
+                       "the navigation's line carries its own fire's pointer only")
+        XCTAssertEqual(outcome.executed[2].effects, [.pointer(old: F.pointer(list: 11, cue: 1), new: F.pointer(list: 11, cue: 3), armed: nil)])
+        XCTAssertEqual(outcome.state.pointer, F.pointer(list: 11, cue: 2), "the outer fire sets the pointer last")
+        let (projected, _) = project(onCue, [.cue(2)], context: F.context(frame: 100, source: .key, library: library))
+        XCTAssertEqual(outcome.state, projected)
+    }
+
+    /// Spec 3 §5 — "At a boundary ... every tracked attribute on every
+    /// channel resets to default unless the list being entered has
+    /// `trackThrough`": the navigation's line carries the resets, so the
+    /// engine's gain follows (before Area 15 they were dropped).
+    func test_aBoundaryCarriesItsAttributeResets() throws {
+        var onCue = F.fresh()
+        onCue.pointer = F.pointer(item: 2, list: 1, cue: 3)
+        let gained = try XCTUnwrap(run(group([.channelGain(channel: .number(1), db: -6), .channelGrade(channel: .number(2), ref: 1, ms: nil)], .ui),
+                                       state: onCue, validate: false))
+        let outcome = try XCTUnwrap(run(group([.next], .key), state: gained.state))
+        XCTAssertEqual(outcome.executed.map(\.command), [.next, F.write(1, media: F.mediaB)])
+        XCTAssertEqual(outcome.executed[0].effects, [
+            .attribute(channel: 1, attribute: .gain, old: .gain(-6), new: .gain(0), ms: nil),
+            .attribute(channel: 2, attribute: .grade, old: .grade(1), new: .grade(0), ms: nil),
+            .boundary(list: F.listUuid(2), reset: true),
+            .pointer(old: F.pointer(item: 2, list: 1, cue: 3), new: F.pointer(item: 3, list: 2, cue: 1), armed: nil),
+        ])
+        XCTAssertEqual(outcome.state.channels[1]?.attributes.gain.value, 0)
+    }
+
+    /// Spec 2 §5 — "the cue that the group's own navigation fires does not
+    /// [use a level], so a cue's macros nest as deep as a key's": an 8-deep
+    /// chain in a cue the operator fired runs to its end.
+    func test_anEightDeepChainRunsWholeInACueTheOperatorFired() throws {
+        let library = Self.cuePathLibrary
+        var onCue = F.fresh()
+        onCue.pointer = F.pointer(list: 11, cue: 3)
+        let outcome = try XCTUnwrap(run(group([.next], .key), state: onCue, library: library))
+        XCTAssertEqual(outcome.executed.map(\.command), [.next] + (51...58).map { Command.macro($0) } + [F.write(3, text: "deep")])
+        XCTAssertEqual(outcome.executed.last?.result, .ok)
+        XCTAssertEqual(outcome.state.channels[3]?.content, .text(TextInstance(fields: ["body": "deep"])))
+        let key = try XCTUnwrap(run(group([.macro(51)], .key), state: F.fresh(), library: library))
+        XCTAssertEqual(key.executed.last?.command, F.write(3, text: "deep"))
     }
 
     // MARK: - Spec 2 §8, "A command either runs or is rejected with a reason before anything changes."

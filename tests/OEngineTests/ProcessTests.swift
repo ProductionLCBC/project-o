@@ -57,8 +57,8 @@ final class ProcessTests: XCTestCase {
         XCTAssertEqual(commands.count, scenario.steps.count)
         XCTAssertEqual(scenario.steps, scenario.steps.sorted { $0.atMs < $1.atMs }, "steps in time order")
         XCTAssertTrue(commands.contains(.outputStack(output: 1, stack: 2)))
-        XCTAssertTrue(commands.contains(.stackBlackout(stack: 1, state: .on)))
-        XCTAssertTrue(commands.contains(.stackBlackout(stack: 1, state: .off)))
+        XCTAssertTrue(commands.contains(.stackBlackout(stack: .number(1), state: .on)))
+        XCTAssertTrue(commands.contains(.stackBlackout(stack: .number(1), state: .off)))
         XCTAssertEqual(commands.filter { if case .listCue(1, 1) = $0 { return true } else { return false } }.count, 5, "the list restarts five times a loop")
         XCTAssertEqual(commands.filter { $0 == .next }.count, scenario.steps.count - 9)
         // The schedule loops: two passes for twenty minutes, and the end is cut at the duration.

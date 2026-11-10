@@ -13,9 +13,39 @@
 public func project(_ state: ShowState, _ commands: [Command], context: ProjectionContext) -> (ShowState, [Effect]) {
     var fold = Fold(state: state, context: context)
     for command in commands {
-        fold.apply(command, source: context.source, depth: 0)
+        fold.apply(command, source: context.source, nesting: .top)
     }
     return (fold.state, fold.effects)
+}
+
+/// Spec 2 §5 — "Macro depth": where a command sits in its group. "Every macro
+/// entered and every cue fired inside one group uses up one of the 8 levels;
+/// the cue that the group's own navigation fires (`next`, `cue N`, …) does
+/// not, so a cue's macros nest as deep as a key's." The commands passed to the
+/// projection are the group's own; the commands of a cue or a macro they reach
+/// are not.
+struct Nesting: Equatable, Sendable {
+    /// The levels used so far: macros entered and cues fired inside the group.
+    var levels: Int
+    /// One of the group's own commands.
+    var own: Bool
+
+    static let top = Nesting(levels: 0, own: true)
+
+    /// The nesting of the commands of a cue this command fires: the group's
+    /// own navigation uses no level; any other uses one, and none is left
+    /// past the cap (nil).
+    var firingCue: Nesting? {
+        if own { return Nesting(levels: levels, own: false) }
+        return levels < Fold.maxDepth ? Nesting(levels: levels + 1, own: false) : nil
+    }
+
+    /// The levels a macro entered here may use (Spec 2 §5, "reached where
+    /// fewer levels are left, it runs nothing").
+    var levelsLeft: Int { Fold.maxDepth - levels }
+
+    /// The nesting of a macro's inner commands.
+    var insideMacro: Nesting { Nesting(levels: levels + 1, own: false) }
 }
 
 /// Spec 3 §7 — "Lookahead for offset slots. Start from the live ShowState and
@@ -42,9 +72,10 @@ struct Fold {
     var effects: [Effect] = []
     let context: ProjectionContext
 
-    /// Spec 2 §5 — a macro can call a macro; "depth is capped at 8". The same
-    /// cap bounds a cue whose commands fire cues.
-    static let maxDepth = 8
+    /// Spec 2 §5 — "A macro can call another macro up to 8 deep. Every macro
+    /// entered and every cue fired inside one group uses up one of the 8
+    /// levels."
+    static let maxDepth = MacroCalls.maxDepth
 
     init(state: ShowState, context: ProjectionContext) {
         self.state = state
@@ -56,7 +87,7 @@ struct Fold {
     /// Spec 3 §6 — "The projection handles every command that touches
     /// ShowState ... Commands that do not touch state pass through as a
     /// `passthrough` effect for the caller to act on."
-    mutating func apply(_ command: Command, source: CommandSource, depth: Int) {
+    mutating func apply(_ command: Command, source: CommandSource, nesting: Nesting) {
         switch command {
         // Channels (§4)
         case .channelWrite(let write):
@@ -109,17 +140,17 @@ struct Fold {
 
         // Navigation (§5)
         case .next:
-            fireFollowing(command: command, depth: depth)
+            fireFollowing(command: command, nesting: nesting)
         case .previous:
-            firePreceding(command: command, depth: depth)
+            firePreceding(command: command, nesting: nesting)
         case .cue(let position):
-            fireCue(position, command: command, depth: depth)
+            fireCue(position, command: command, nesting: nesting)
         case .itemCue(let item, let position):
-            fireItem(item, cue: position, command: command, depth: depth)
+            fireItem(item, cue: position, command: command, nesting: nesting)
         case .itemSection(let item, let section):
-            fireSection(item, section, command: command, depth: depth)
+            fireSection(item, section, command: command, nesting: nesting)
         case .listCue(let list, let position):
-            fireList(list, cue: position, command: command, depth: depth)
+            fireList(list, cue: position, command: command, nesting: nesting)
         case .playlistLoad(let title, let date):
             loadPlaylist(title, date: date, command: command)
 
@@ -127,7 +158,7 @@ struct Fold {
         case .systemClearAll:
             clearAll(command: command)
         case .macro(let number):
-            runMacro(number, command: command, source: source, depth: depth)
+            runMacro(number, command: command, source: source, nesting: nesting)
 
         // Pass-through: no ShowState in them.
         case .timerSet, .timerStart, .timerPause, .timerReset,

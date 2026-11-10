@@ -4,20 +4,18 @@ extension Fold {
     /// Spec 3 §6 — "`macro` by inlining the macro's commands with their
     /// guards." Spec 3 §8 — "A macro fired by a cue inherits `cue` as its
     /// source kind, so lock cannot be dodged by wrapping a write in a macro."
-    /// Spec 2 §5 — depth is capped at 8. An unknown macro, or one whose
-    /// guards all fail, is a `noop`. Spec 1 §2 — a macro that names a stack
-    /// or an output lives in the machine root, so both roots are searched.
-    mutating func runMacro(_ number: Int, command: Command, source: CommandSource, depth: Int) {
-        guard depth < Fold.maxDepth, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
+    /// Spec 2 §5 — "A macro runs whole or not at all": one that loops, nests
+    /// deeper than the levels left here, or does not exist is a `noop`, and so
+    /// is one whose guards all fail. Spec 1 §2 — a macro that names a stack or
+    /// an output lives in the machine root, so both roots are searched.
+    mutating func runMacro(_ number: Int, command: Command, source: CommandSource, nesting: Nesting) {
+        // Spec 2 §5 — "A macro runs whole or not at all": the same check as the runner's and the validator's.
+        guard MacroCalls.check(number, levels: nesting.levelsLeft, library: context.library, machine: context.machine) == nil,
+              let macro = MacroCalls.macro(number, library: context.library, machine: context.machine) else {
             effects.append(.noop(command))
             return
         }
-        let inner: CommandSource
-        if source.kind.isSubjectToLock {
-            inner = source
-        } else {
-            inner = CommandSource(kind: .macro, list: source.list, cue: source.cue, playlist: source.playlist, macro: number)
-        }
+        let inner = source.inMacro(number)
         let before = effects.count
         for guarded in macro.commands {
             // Spec 2 §7 — "Guards are evaluated at the moment the command
@@ -26,7 +24,7 @@ extension Fold {
             if let condition = guarded.when, !condition.holds(actual: value(of: condition.variable)) {
                 continue
             }
-            apply(guarded.command, source: inner, depth: depth + 1)
+            apply(guarded.command, source: inner, nesting: nesting.insideMacro)
         }
         if effects.count == before {
             effects.append(.noop(command))

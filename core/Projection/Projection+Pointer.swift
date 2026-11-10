@@ -110,7 +110,8 @@ extension Fold {
     /// cue's commands as one group with source `cue`, set the pointer, then
     /// arm the next trigger." Spec 3 §8 — the cue's commands run with
     /// `source.kind` `cue`, so lock applies to them whatever fired the cue.
-    mutating func fire(_ position: CuePosition, depth: Int) {
+    /// `nesting` is the cue's commands' own (Spec 2 §5, "Macro depth").
+    mutating func fire(_ position: CuePosition, nesting: Nesting) {
         let list = position.list
         let cue = position.cue
         let old = state.pointer
@@ -128,7 +129,7 @@ extension Fold {
         // Spec 1 §6 — a `when` guard on a cue command is reserved: "the field
         // exists without the behaviour" (Spec 2 §7), so the command runs unguarded.
         for entry in cue.commands {
-            apply(entry.command, source: source, depth: depth + 1)
+            apply(entry.command, source: source, nesting: nesting)
         }
 
         let new = position.pointer
@@ -158,13 +159,15 @@ extension Fold {
         return ArmedTrigger(cueUuid: nextCue.uuid, atFrame: frame + context.rate.frames(forMs: max(0, delay)))
     }
 
-    /// Fires a position if there is one and depth allows; otherwise `noop`.
-    mutating func fire(_ position: CuePosition?, command: Command, depth: Int) {
-        guard let position, depth < Fold.maxDepth else {
+    /// Fires a position if there is one and a level is left for it (Spec 2
+    /// §5: the group's own navigation uses none, any other uses one);
+    /// otherwise `noop`.
+    mutating func fire(_ position: CuePosition?, command: Command, nesting: Nesting) {
+        guard let position, let cueNesting = nesting.firingCue else {
             effects.append(.noop(command))
             return
         }
-        fire(position, depth: depth)
+        fire(position, nesting: cueNesting)
     }
 
     // MARK: - Navigation commands
@@ -172,23 +175,23 @@ extension Fold {
     /// Spec 2 §3 — `next`: "Fires the next or previous cue; crosses item
     /// boundaries; nothing past the end." From a loaded playlist with no cue
     /// fired yet, `next` fires its first cue.
-    mutating func fireFollowing(command: Command, depth: Int) {
+    mutating func fireFollowing(command: Command, nesting: Nesting) {
         if let position = position(of: state.pointer) {
-            fire(following(position), command: command, depth: depth)
+            fire(following(position), command: command, nesting: nesting)
         } else if let pointer = state.pointer, pointer.cueUuid == nil, let playlistUuid = pointer.playlist,
                   let playlist = context.machine.playlist(uuid: playlistUuid) {
-            fire(firstPosition(in: playlist, from: 1), command: command, depth: depth)
+            fire(firstPosition(in: playlist, from: 1), command: command, nesting: nesting)
         } else {
             effects.append(.noop(command))
         }
     }
 
-    mutating func firePreceding(command: Command, depth: Int) {
-        fire(position(of: state.pointer).flatMap { preceding($0) }, command: command, depth: depth)
+    mutating func firePreceding(command: Command, nesting: Nesting) {
+        fire(position(of: state.pointer).flatMap { preceding($0) }, command: command, nesting: nesting)
     }
 
     /// Spec 2 §3 — `cue N`: "Fires cue N of the live list."
-    mutating func fireCue(_ number: Int, command: Command, depth: Int) {
+    mutating func fireCue(_ number: Int, command: Command, nesting: Nesting) {
         guard let pointer = state.pointer, let listUuid = pointer.listUuid else {
             effects.append(.noop(command))
             return
@@ -199,7 +202,7 @@ extension Fold {
         } else if pointer.playlist == nil, let list = list(uuid: listUuid), number >= 1, number <= list.cues.count {
             target = CuePosition(playlist: nil, item: nil, list: list, cueIndex: number - 1)
         }
-        fire(target, command: command, depth: depth)
+        fire(target, command: command, nesting: nesting)
     }
 
     /// The list at playlist item `item` of the live playlist, if any.
@@ -210,35 +213,35 @@ extension Fold {
     }
 
     /// Spec 2 §3 — `item N cue M`: "Fires that cue and makes its item live."
-    mutating func fireItem(_ item: Int, cue number: Int, command: Command, depth: Int) {
+    mutating func fireItem(_ item: Int, cue number: Int, command: Command, nesting: Nesting) {
         guard let (playlist, list) = livePlaylistItem(item), number >= 1, number <= list.cues.count else {
             effects.append(.noop(command))
             return
         }
-        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: number - 1), command: command, depth: depth)
+        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: number - 1), command: command, nesting: nesting)
     }
 
     /// Spec 3 §5 — "Section jumps (`item N section "chorus"`) fire the first
     /// cue whose `section` matches, case-insensitive; no match is `rejected`"
     /// at validation, and a `noop` here.
-    mutating func fireSection(_ item: Int, _ section: String, command: Command, depth: Int) {
+    mutating func fireSection(_ item: Int, _ section: String, command: Command, nesting: Nesting) {
         let wanted = section.lowercased()
         guard let (playlist, list) = livePlaylistItem(item),
               let index = list.cues.firstIndex(where: { $0.section?.lowercased() == wanted }) else {
             effects.append(.noop(command))
             return
         }
-        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: index), command: command, depth: depth)
+        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: index), command: command, nesting: nesting)
     }
 
     /// Spec 2 §3 — `list N cue M`: "Fires that cue in a library master; the
     /// list becomes live with lookahead confined to it."
-    mutating func fireList(_ list: Int, cue number: Int, command: Command, depth: Int) {
+    mutating func fireList(_ list: Int, cue number: Int, command: Command, nesting: Nesting) {
         guard let master = context.library.list(number: list), number >= 1, number <= master.cues.count else {
             effects.append(.noop(command))
             return
         }
-        fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), command: command, depth: depth)
+        fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), command: command, nesting: nesting)
     }
 
     /// Spec 2 §3 — `playlist "TITLE" [DATE]`: "Makes a playlist live at its

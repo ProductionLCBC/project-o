@@ -172,9 +172,7 @@ public final class EngineProcess: @unchecked Sendable {
 
         server.queryHandler = { [weak self] address in self?.answer(query: address) }
         engine.afterBuild = { [server, library, machine] control in
-            let executed = control.lastExecuted
-            guard !executed.isEmpty else { return }
-            server.feedback(OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine))
+            server.afterBuild(control, library: library, machine: machine)
         }
     }
 

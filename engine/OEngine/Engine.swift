@@ -165,8 +165,10 @@ public final class Engine: @unchecked Sendable {
         }
         // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each.
         audio?.start()
-        // The first plan, so the first tick has something to render.
+        // The first plan, so the first tick has something to render; what it
+        // ran gets its feedback and its errors like any other build.
         planRing.publish(control.build(for: 0, now: clock.now()))
+        afterBuild?(control)
         nextFrameToBuild.store(1, ordering: .releasing)
 
         let controlThread = Thread { [self] in

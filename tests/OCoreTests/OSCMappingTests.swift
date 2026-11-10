@@ -62,7 +62,8 @@ final class OSCMappingTests: XCTestCase {
         row(.channelTrack(channel: .number(1), direction: .back), "/o/channel/1/back"),
         row(.channelBuild(channel: .number(1), build: 3), "/o/channel/1/build", [i(3)]),
         row(.outputStack(output: 1, stack: 4), "/o/output/1/stack", [i(4)]),
-        row(.stackBlackout(stack: 2, state: .toggle), "/o/stack/2/blackout", [s("toggle")]),
+        row(.stackBlackout(stack: .number(2), state: .toggle), "/o/stack/2/blackout", [s("toggle")]),
+        row(.stackBlackout(stack: .all, state: .toggle), "/o/stack/all/blackout", [s("toggle")]),
         row(.stackMute(stack: 2, channel: 1, state: .off), "/o/stack/2/mute", [i(1), s("off")]),
         row(.next, "/o/next"),
         row(.previous, "/o/previous"),
@@ -183,6 +184,20 @@ final class OSCMappingTests: XCTestCase {
         XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [s("0:90")])), .badArgument)
         XCTAssertEqual(reason(OSCMessage("/o/popup/3/set", [i(30)])), .badArgument)
         XCTAssertEqual(reason(OSCMessage("/o/register", [s("host"), i(9000)])), .unknownTarget)
+        // Spec 2 §3 — `all` belongs to `stack N blackout`, not to `stack N mute`.
+        XCTAssertEqual(reason(OSCMessage("/o/stack/all/mute", [i(1), s("on")])), .badArgument)
+        XCTAssertEqual(reason(OSCMessage("/o/stack/all/mute", [s("1 on")])), .badArgument)
+        XCTAssertEqual(reason(OSCMessage("/o/output/all/stack", [i(1)])), .badArgument)
+        XCTAssertEqual(reason(OSCMessage("/o/macro/all")), .badArgument)
+    }
+
+    /// Spec 2 §6 — "The address words are case-insensitive like keywords",
+    /// the word `all` included.
+    func test_stackAllBlackoutAddressIsCaseInsensitive() throws {
+        let typed = try OSCMapping.command(from: OSCMessage("/o/stack/all/blackout", [s("on")])).get()
+        let remainder = try OSCMapping.command(from: OSCMessage("/O/Stack/ALL/Blackout", [s("on")])).get()
+        XCTAssertEqual(typed, .stackBlackout(stack: .all, state: .on))
+        XCTAssertEqual(remainder, typed)
     }
 
     /// Spec 2 §6 — "Bundles run as one group, in order, and either all

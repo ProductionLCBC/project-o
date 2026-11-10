@@ -25,8 +25,8 @@ final class SelectionExpansionTests: XCTestCase {
     }
 
     func test_stacksExpandTheSameWay() {
-        let commands = Selection.expand(Set([2, 1])) { Command.stackBlackout(stack: $0, state: .on) }
-        XCTAssertEqual(commands, [.stackBlackout(stack: 1, state: .on), .stackBlackout(stack: 2, state: .on)])
+        let commands = Selection.expand(Set([2, 1])) { Command.stackBlackout(stack: .number($0), state: .on) }
+        XCTAssertEqual(commands, [.stackBlackout(stack: .number(1), state: .on), .stackBlackout(stack: .number(2), state: .on)])
     }
 
     func test_anEmptySelectionIsAnEmptyGroup() {

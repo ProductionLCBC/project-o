@@ -180,7 +180,11 @@ struct CommandParser {
         guard let sample = rows.first else { throw reject(.unknownTarget, "\(target) is not a target") }
         var object: [String: JSONValue] = [:]
 
-        // Spec 2 §3 — "`N` is a channel number or the word `all`."
+        // Spec 2 §3 — "`N` is the target's number; every channel command,
+        // `stack N blackout` and `audio N mute` also take the word `all`."
+        // Whether `all` is allowed is the target's here, and the row's once
+        // the verb names it, below.
+        var saidAll = false
         switch sample.number {
         case .none:
             break
@@ -193,10 +197,11 @@ struct CommandParser {
                 }
                 object[key] = .number(Double(n))
             case .word(let w) where w.lowercased() == "all":
-                guard case .target = sample.number else {
+                guard Vocabulary.takesAll(target: target) else {
                     throw reject(.badArgument, "\(target) takes a number, not all")
                 }
                 object[key] = .string("all")
+                saidAll = true
             default:
                 throw reject(.badArgument, "expected a \(target) number, not \(t.described)")
             }
@@ -212,6 +217,9 @@ struct CommandParser {
                 throw reject(.unknownVerb, "\(w) is not a \(target) verb")
             }
             row = found
+            if saidAll, !row.takesAll {
+                throw reject(.badArgument, "\(target) \(verb) takes a number, not all")
+            }
             switch row.verb {
             case .fromKey(let key, _): object[key] = .string(verb)
             case .lock(let key): object[key] = .bool(verb == "lock")

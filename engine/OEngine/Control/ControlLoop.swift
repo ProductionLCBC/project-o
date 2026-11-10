@@ -5,6 +5,20 @@ import OCore
 import OFormats
 import Synchronization
 
+/// Spec 2 §8 — a group the runner rejected before anything ran: its id, its
+/// source and "the rejection [that] names the command and the reason".
+public struct RejectedGroup: Equatable, Sendable {
+    public var id: GroupID
+    public var source: CommandSource
+    public var rejection: Rejection
+
+    public init(id: GroupID, source: CommandSource, rejection: Rejection) {
+        self.id = id
+        self.source = source
+        self.rejection = rejection
+    }
+}
+
 /// Spec 4 §3 — the control thread "Owns: The live ShowState, the command
 /// queue, the projection, timers, OSC and API I/O. Hands over: A new immutable
 /// ShowState plus the frame plan for the next tick, via one atomic pointer
@@ -43,13 +57,19 @@ public final class ControlLoop: @unchecked Sendable {
     public let stackRings: [Int: [TextureHandle]]
     public let previewTargets: [Int: TextureHandle]
     public private(set) var lastExecuted: [ExecutedCommand] = []
+    /// Spec 2 §8 — the groups this build rejected, with their ids and
+    /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
+    /// back to the sender"). Reset every build, like `lastExecuted`.
+    public private(set) var lastRejected: [RejectedGroup] = []
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
     private let builtAt = Atomic<Int64>(0)
     private var pendingSnapshotWhenReady: Set<Int> = []
     private var slideWarned = false
-    private var mutedOutputs: Set<Int> = []
+    /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
+    /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
+    public private(set) var mutedAudioOutputs: Set<Int> = []
 
     public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -141,6 +161,7 @@ public final class ControlLoop: @unchecked Sendable {
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
+        lastRejected = []
         for group in groups { run(group, frame: frame) }
         syncTransports(frame)
         reconcileGrades(frame)
@@ -254,12 +275,18 @@ public final class ControlLoop: @unchecked Sendable {
         switch CommandRunner.run(group, state: model.state, context: context) {
         case .failure(let rejection):
             rejections.append(rejection)
+            lastRejected.append(RejectedGroup(id: group.id, source: group.source, rejection: rejection))
             log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
         case .success(let outcome):
             model.state = outcome.state
             lastExecuted.append(contentsOf: outcome.executed)
             for executed in outcome.executed {
                 for effect in executed.effects { apply(effect, frame: frame) }
+                // Spec 2 §5 — a macro that cannot run whole "runs nothing and is logged `noop`";
+                // the engine log says why (CLAUDE.md: unknown input is a noop and a log line).
+                if case .macro(let number) = executed.command, let refusal = executed.refusal {
+                    log.warning("macro \(number) ran nothing: \(refusal.message)")
+                }
             }
         }
     }
@@ -319,28 +346,37 @@ public final class ControlLoop: @unchecked Sendable {
                 log.warning("designed slides are v2; a slide write renders nothing")
             }
         case .passthrough(let command):
-            if case .audioMute(let target, let switchState) = command, let audio {
-                // Spec 4 §11 — "audio all mute is one command over every device".
-                let numbers: [Int]
-                switch target {
-                case .number(let n): numbers = [n]
-                case .all: numbers = machine.audioOutputs.map(\.number)
-                }
-                for number in numbers {
-                    let muted: Bool
-                    switch switchState {
-                    case .on: muted = true
-                    case .off: muted = false
-                    case .toggle: muted = !mutedOutputs.contains(number)
-                    }
-                    if muted { mutedOutputs.insert(number) } else { mutedOutputs.remove(number) }
-                    audio.setMuted(muted, output: number)
-                }
+            if case .audioMute(let target, let switchState) = command {
+                audioMute(target, switchState)
             } else {
                 log.info("passthrough \(command.cmd) (handled outside the spike)")
             }
         case .mute, .variable, .boundary, .pointer, .blocked, .applied, .noop:
             break
+        }
+    }
+
+    /// Spec 2 §3 — `audio N mute on | off | toggle`: "Mutes a numbered audio
+    /// output; `audio all` for every one", and "With `all`, `toggle` turns
+    /// every one on unless every one is already on, when it turns them all
+    /// off" (Spec 10 §7). Spec 4 §11 — "`audio all mute` is one command over
+    /// every device". A number that is not an audio output of this machine
+    /// changes nothing; the muted set is kept with or without an audio system.
+    private func audioMute(_ target: Target, _ switchState: SwitchState) {
+        let numbers: [Int]
+        let muted: Bool
+        switch target {
+        case .number(let n):
+            guard machine.audioOutput(n) != nil else { return }
+            numbers = [n]
+            muted = switchState.resolve(current: mutedAudioOutputs.contains(n))
+        case .all:
+            numbers = machine.audioOutputs.map(\.number).sorted()
+            muted = switchState.resolve(all: numbers.map { mutedAudioOutputs.contains($0) })
+        }
+        for number in numbers {
+            if muted { mutedAudioOutputs.insert(number) } else { mutedAudioOutputs.remove(number) }
+            audio?.setMuted(muted, output: number)
         }
     }
 
