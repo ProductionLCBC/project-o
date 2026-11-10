@@ -8,11 +8,24 @@ import Foundation
 
 /// Spec 1 §5 — one whole-file operation of a save. `replace` is atomic in
 /// the adapter: "writes to a temporary file in the same folder, fsyncs, and
-/// renames over the original".
+/// renames over the original". Spec 7 §2 — "Other files are never
+/// replaced": a `move` or a `copy` refuses a name another file holds, and no
+/// move makes a folder on the way.
 public enum FileOperation: Equatable, Sendable {
     case replace(path: String, data: Data)
+    /// A rename that never replaces another file: refused when `to` exists.
     case move(from: String, to: String)
     case remove(path: String)
+    /// Spec 9 §6 — keep a file's bytes at another path, never writing over
+    /// one there ("No save writes over a kept version"); its folders are made.
+    case copy(from: String, to: String)
+    /// Spec 7 §2 — a folder edit's directory work: create (its parent must
+    /// exist), rename or move (refused when the new path exists, unless only
+    /// the case changes) and remove (only when it holds nothing visible;
+    /// hidden files and folders go with it).
+    case makeFolder(path: String)
+    case renameFolder(from: String, to: String)
+    case removeFolder(path: String)
 }
 
 /// Spec 1 §5 — an ordered list of file operations; executing them in order
@@ -103,23 +116,6 @@ public enum Writer {
         }
         plan.operations.append(.replace(path: path, data: data(for: document, extras: extras)))
         return plan
-    }
-
-    /// Spec 1 §4 — "Every List master carries an integer `version` that
-    /// increments on each save. Saving writes the previous document to the
-    /// versions folder (section 5) before overwriting." Returns the list as
-    /// saved, one version on, and the plan: the previous bytes into
-    /// `versions/NNN/vNNNN.json`, a rename if the title changed, the new
-    /// document. A local copy keeps its versions beside the masters' too.
-    public static func saveList(_ list: List, extras: [String: JSONValue] = [:], previous: Data?, currentPath: String?) -> (list: List, plan: WritePlan) {
-        var saved = list
-        saved.version = list.version + 1
-        var plan = WritePlan()
-        if let previous {
-            plan.operations.append(.replace(path: FileLayout.versionPath(list: list.number, version: list.version), data: previous))
-        }
-        plan.operations.append(contentsOf: save(.list(saved), extras: extras, currentPath: currentPath).operations)
-        return (saved, plan)
     }
 
     // MARK: - Whole roots

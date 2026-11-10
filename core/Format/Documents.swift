@@ -259,10 +259,11 @@ public enum FileLayout {
         }
     }
 
-    /// Spec 1 §5 — `versions/042/v0017.json`.
-    public static func versionPath(list number: Int, version: Int) -> String {
+    /// Spec 9 §6 — "Kept versions are filed by list uuid, at
+    /// `library/versions/<list uuid>/vNNNN.json`".
+    public static func versionPath(list uuid: UUID, version: Int) -> String {
         let v = String(version)
-        return "versions/\(self.number(number))/v" + (v.count >= 4 ? v : String(repeating: "0", count: 4 - v.count) + v) + ".json"
+        return "versions/" + uuid.uuidString.lowercased() + "/v" + (v.count >= 4 ? v : String(repeating: "0", count: 4 - v.count) + v) + ".json"
     }
 
     /// Spec 1 §5 — "The loader and the folder watcher ignore a sync tool's
