@@ -23,34 +23,45 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | not started | Next: Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`. The object types are on `main` since Area 2; the stack pass, the +1 slot and the one shared `SlotResolver` since Areas 4 and 5. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
-| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start after Area 9 (`media replace`, `media delete` and the defaults edits ride its edit path). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
-| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | not started | Spec 7 accepted 2026-11-07, its prompt block in `docs/build-order.md`. The runner on `main` logs a fired cue as its own group with `fire`; the control loop fires armed Time triggers as `next`; the thumbnail job projects a list from its top (Area 5). Since Area 15 the runner logs a cue fired inside a cue as its own group. |
+| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start once Area 9 is merged (`media replace`, `media delete` and the defaults edits ride its edit path and its writer). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
+| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | brief waiting for approval | Built on `area/playlists` (211dd4c, pushed) in three stops Adam reviewed in the session (the core changes, the edit path, the live pointer), with the spec corrections from his approved plan (e538f2b); `swift test` green on the branch. The brief is the final message of the Area 9 session, 2026-11-10. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance). `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start after Area 9 (it builds on Area 9's edit path, debounced write and versions). It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it. |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance). `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5; Area 9 adds the pointer's reads, `[Next Title]` among them, in OCore. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start once Area 9 is merged: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, and takes the kept copies when it restores the last state (Area 9's brief). |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), and the app maps keys to commands sent with source `key` (§9). |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`). |
-| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. `stack all blackout` and the all-toggle rule for stacks and audio; macros the same from a key, OSC and a cue, whole or not at all; `/o/error` for every rejected OSC message; the self-firing cue's crash and the gain kept across a list boundary fixed. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 builds. |
+| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run. It runs the shutdown macro on `stop` (Spec 10 §18) and puts the `outputs` and `audio` topics on the API; Area 15 keeps the muted audio outputs in the control loop for them. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run. It runs the shutdown macro on `stop` (Spec 10 §18) and puts the `outputs` and `audio` topics on the API; Area 15 keeps the muted audio outputs in the control loop for them, and Area 9's `library` and `live` events wait in the engine's own publisher. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Nothing is in review; everything is on `main`.** Area 15, macros basic, shipped on
-2026-11-10. Adam approved it as built, and it was merged with `--no-ff` (8ae03ef) and
-pushed, with its spec corrections. Area 6 is next, in its own session. The bench run with a
-card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Area 9 is in review** on `area/playlists` (211dd4c, pushed), its worktree kept for the
+merge. The session built it in three stops, each reviewed by Adam: the core changes, the
+edit path with the writer and changes on disk, and the live pointer; `swift test` is green
+on the branch. On `main` there is this page and nothing of Area 9's code or its spec
+corrections, which merge on Adam's `approved`. Area 6 stays next, in its own session;
+Areas 8 and 12 wait for Area 9's merge. The bench run with a card stays deferred to a window
+Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. The Area 15 brief (the final message of the Area 15 session, 2026-11-10) was
-answered the same day: approved as built, merged (8ae03ef).
+- **Area 9, cues, lists and playlists**: the final message of the Area 9 session
+  (2026-11-10), code on `area/playlists` (211dd4c). It asks for:
+  - the readings made during the build, in the table below. Recommended: as built,
+    including the one that departs from the approved plan's reading 22 (a live reload
+    keeps the order of lists sharing a number, so a sync can't switch which list
+    `list 57 cue 3` fires mid-service);
+  - two known gaps. Recommended: accept them as gaps. A folder operation that fails on disk
+    is only logged, and the library keeps the edit's picture until the next launch. The
+    kept copies at a state restore are taken by Area 12, when it restores the last state;
+  - then `approved`, to merge `area/playlists` with its spec corrections.
 
 ### Decisions
 
@@ -80,9 +91,15 @@ answered the same day: approved as built, merged (8ae03ef).
 
 ### Housekeeping
 
+- **The engine writes edits to the roots it runs on** once Area 9 is merged. Running
+  `oengine` against `tests/fixtures/library-v1` and sending it an edit (a playlist edit,
+  since that fixture's machine is `readOnlyMasters`) changes the fixture in the repository.
+  Soaks send no edits.
+- **A bug outside Area 9:** `OEngineCommandLine.drive` passes `--library` where the machine
+  root goes. To fix in a tooling session.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 15's task is `shipped`.
+  dependencies from the block's "Starts after" line. Area 9's task is `in review`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -106,44 +123,69 @@ answered the same day: approved as built, merged (8ae03ef).
 
 ### Spec interpretations made so far
 
-None outstanding. Area 15's readings were approved as built on 2026-11-10, and are
-recorded here and in its brief. The first five were Adam's answers during the session.
-Earlier areas' readings were approved with their briefs and are in the specs' text or the
-briefs: Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
+Area 9's, outstanding until Adam answers its brief. The readings in the plan he approved on
+2026-11-10 are answered, and the brief restates them; these were made during the build and
+reported at its stops. Earlier areas' readings were approved with their briefs and are in
+the specs' text or the briefs: Area 15's on 2026-11-10, Area 16's on 2026-11-04, Area 5's
+on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
-| Spec 2 §7, and the Area 15 block's "no guards" | What happens to the guards Area 3 built | Left as built: a `when` on a macro's command runs per §7; Area 15 builds nothing for guards (Adam) | Turn guards off in v1, a guarded command a `noop` |
-| Spec 2 §5 and §9 against Spec 3 §8 | The source of a macro's inner lines when a cue runs the macro | The cue's source plus the macro's number; nested macros name the innermost (Adam; §5 and §9 corrected, 1894f17) | The cue's source alone, as on `main` |
-| Spec 2 §5, the depth cap | What uses up the 8 levels, and whether a macro held by a cue is checked | Every macro entered and every cue fired inside a group uses a level, the group's own navigation none; a macro runs whole or not at all from every source (Adam; §5 corrected, 1894f17) | A fresh 8 for every cue; or as on `main` (the cue used a level and a cue's macros were never checked) |
-| Spec 2 §6, "Errors go back to the sender" | Whether a message the engine rejects at validation is answered | Every rejected OSC message or bundle is answered with `/o/error`, at `#bundle` for a bundle (Adam) | Engine log only |
-| Spec 1 §2, a macro's scope | Whether `stack all blackout` makes a macro machine-level | It leaves it portable (Adam; §2 corrected, 1894f17) | Any stack command makes it machine-level |
-| Spec 2 §6, `/o/error` | The reason's form for a rejection at validation | The rejection's message, as the parse errors already send | `code: message`, as the API's rejected result (Spec 2 §9) |
-| Spec 2 §3, `stack all` | Effects and transitions over every stack | Every stack in number order ends at one value; one `blackout` effect per stack that changes, each with the blackout transition of the lowest-numbered output showing it (none for a stack no output shows); one `noop` when none changes | One effect for the whole command with one transition |
-| Spec 2 §5 and Spec 1 §8 | A macro that calls a macro that does not exist | That one line is a `noop` with its reason in the engine log and the rest runs; it counts no level, and the validator lets it through | The validator rejects the outer macro with `noSuchReference` |
-| Spec 1 §8, two macros with one number | Which one runs, and which one the validator checks | The library's first, then the machine's, and within a root the first; the validator now agrees with the runner (it had checked the last) | The validator's old rule, the last in a root |
-| Spec 2 §3 and Spec 4 §11, `audio N mute` | A number that is no audio output, reachable through a macro since a macro's inner commands are not validated | Changes nothing; the muted set is kept even when the engine runs without audio | Record it as muted anyway |
-| Spec 2 §2, rejections | The reason for an unfinished `stack all …` | Named by what is missing: `stack all` and `stack all blackout` are `missingArgument`, `stack all foo` is `unknownVerb`; `stack all mute 1 on` stays `badArgument` | `badArgument` for any `stack all` but a whole blackout command |
-| Spec 3 §5, a boundary's resets | Which line carries the attribute resets a list boundary makes | The navigation's line, with the boundary and the pointer, so the engine applies them | The first line of the cue group |
+| Spec 7 §2, "Other files are never replaced" | A new list whose own file name another file holds | The first free `-2`, `-3` name, as a playlist takes one (Spec 7 §3) | Refuse the create with `duplicate` |
+| Spec 1 §4 and choice E-3 | What "the last copy is more than ten minutes old" measures | The kept versions' file dates against the wall clock | A record of the copies kept, in memory |
+| Spec 1 §8, the report | How it names a playlist | By its title | By its uuid |
+| Spec 5 §4, `section` | Which cues a section block holds | Labels compared ignoring case; a cue with no section is a block of one | Exact case; neighbouring cues with no section form one block |
+| Spec 7 §3, local items | When an edit may add a local item | Only when an undo puts one back; otherwise `notInV1` | Never |
+| Spec 7 §5, `archived true` | On a playlist already archived | A `noop` | Refused with `archived` |
+| Spec 7 §2, folder names | A new folder whose parent is typed in another case | The parent keeps its case: `folder "worship/Hymns" create` makes `Worship/Hymns` | `unknownObject` |
+| Spec 5 §6, check 8 | When an edit a cue holds is checked | When the cue is saved, as if it ran then, without operator lock and library mode, which apply when it fires | Lock and library mode at the save too |
+| Spec 5 §6, check 5 | What a cue may name that this machine lacks | A playlist by title, and stacks, outputs, audio outputs and inputs: a cue is portable | The machine-level numbers only |
+| Spec 7 §2, "a save renames the file" | When a retitled or renumbered list's file is renamed | At its next write | At the edit, as a move |
+| Spec 5 §4, the text form | `section` as a cue's field and as the verb | The word after it decides: `duplicate`, `move N` or `remove` is the verb, a string is the field | Another word for the verb |
+| Spec 5 §3, key bindings | The text address of one binding | `keys DEVICE "KEY"` | `key DEVICE "KEY"` |
+| Spec 5 §3, values | How a structured value is written in the text form | One JSON token | Words per field |
+| Spec 2 §6, `/o/edit` with the words in the address | The case of a path in the address | Kept as sent | Lowercased with the other words |
+| Spec 2 §9, `fire` | A cue that holds only edits | Its first edit line carries the fire record | No fire record |
+| Spec 2 §9, the log in memory | How much of the run it keeps until Area 12 writes the file | The last 10,000 lines | All of it |
+| Spec 5 §5, typing | Events and the revision while someone types | Every keystroke applies at once and sends its own `library` event, so other screens follow; the log line and the undo step fold; over OSC the client is the sender's address and port | One event per run |
+| Spec 5 §2, "within one second of each change" | When the first write of a change goes | At once, then at most once a second | A second after the first change |
+| Spec 5 §2, which documents a group writes | The documents a renumber rewrites | Every document that differs after the group: lists, macros, key bindings and playlists; a local copy is saved where its file is, never renamed | Only the documents the edits name |
+| Spec 5 §2 and plan reading 18 | A file operation that fails | A write is logged once and tried every second, the document named where its file still is; a list move leaves the list where it is, with a `file` event; a folder operation is only logged, and the library keeps the edit's picture until the next launch | Re-read the folders after any failure |
+| Spec 5 §10 | When a change that arrived is caught | When a scan finds it while edits are unwritten, and when the writer is about to overwrite, move or remove a file that changed since it last read it; kept once either way | At scans only |
+| Spec 5 §10, the engine's edits win | The version of the engine's next write when the arriving file's is higher | Above the arriving file's, so versions never run backwards | The engine's own next version |
+| Spec 5 §10, the conflict's name | The time in the name | Local time, `machine/conflicts/2026-11-08-085959-007-doxology.json`, and `-2` within the same second | UTC; or milliseconds |
+| Spec 5 §10 | A file deleted on disk while edits to it are unwritten | The edits win and it is written again: a list after its three-second window, a playlist at once; a change arriving at a file an edit has just deleted goes to `conflicts/` | The deletion wins and the edits are dropped |
+| Spec 7 §2, the three-second window | Writes of a list whose file has gone | Held until the window closes, so a delete then a create stays a move | Written at once at the old path |
+| Spec 7 §3 and plan reading 17 | A local copy whose file goes, or two files holding one | Deleted at once, as a playlist; of two files, the loaded one stays | The three-second window |
+| Spec 7 §2 and plan reading 22 | A list's place among lists sharing its number, after a live reload | Kept: a reload replaces it in place, and a list that arrives goes after them; only a launch re-ranks. This departs from reading 22, which said a reload changes the order | Re-rank on every reload |
+| Spec 5 §2, `changed` | What a reload's event names | Whole objects, with no paths | The fields that changed |
+| Spec 4 §10 and Spec 5 §2 | Thumbnails after a write | The live list warms again when its version changes: about once a second while someone types into it | Only on a fire |
+| Spec 2 §7 and Spec 7 §6, the live guards | `[Live Item]` and `[Live Cue]` when what they name is gone | `[Live Item]` is empty, as for a library list (`/o/live/item` sends 0); `[Live Cue]` is the number of the cue before the place, 0 at the top, as `/o/live/cue` | `[Live Item]` reads 0 |
+| Spec 7 §4 and plan reading 23 | `cue N` after a relaunch with the live item gone | It fires in the live list and keeps the gone item, so `next` and `previous` stay idle until a fire names a place | `cue N` re-anchors the pointer |
+| Spec 7 §4, lookahead | The +1 boxes from a pointer the engine can't place | Empty, as `next` does nothing | The live list from its top |
+| Spec 7 §6, "sent on a fire" | Two fires in one tick | One set of messages per tick, after its commands, at the final position | A set per fire |
+| Spec 7 §6, `/o/live/playlist` | When it goes | With every position update; an empty string for a library list or nothing loaded | Only while a playlist is live |
+| Spec 7 §6 and Spec 10 §3, the `live` event | Its extra fields, and when it goes | `playlistTitle`, `listTitle`, `label`, and `boundary: {"reset": …}` on a fire into another list; also when only a handle or the list's title changes, which the OSC messages don't carry | Only with the OSC messages; `boundary` as a flat field |
+| Spec 7 §6, a pointer the engine can't place | What feedback sends | What can still be found: the item's and cue's positions where they exist, else 0 | 0 throughout |
+| Spec 6 §5, `[Next Title]` | Where Area 9 puts the read | In the live reading in OCore, for Area 11's boxes; it isn't feedback, so a change to it sends nothing | Leave it to Area 11 |
+| Spec 7 §4, the countdown at its time | The state its liveness is read in | The state at the start of the tick, before that tick's queued commands | After them |
+| Spec 7 §4, the copies at a launch or restore | Who takes them | Area 12's restore of the last state, when it puts the pointer back; the engine starts with no pointer until then | Area 9 takes them at every build |
 
 ### Spec corrections proposed
 
-None outstanding. Area 15's corrections went onto `area/macros` (1894f17) from the plan
-Adam approved, and reached `main` with the merge (8ae03ef) on 2026-11-10:
+None new. Area 9's corrections went onto `area/playlists` (e538f2b) from the plan Adam
+approved on 2026-11-10, and reach `main` with the merge:
 
-- **Spec 2 §3, intro.** "`N` is a channel number or the word `all`" becomes "`N` is the
-  target's number; every channel command, `stack N blackout` and `audio N mute` also take
-  the word `all`". The stack row gains "`stack all` for every stack, each with its own
-  output's transition".
-- **Spec 2 §5.**
-  - The `macro` row names the cue's source with the macro's number.
-  - A new paragraph, Macro depth: the levels counted per group, and a macro run whole or
-    not at all.
-- **Spec 2 §6.** The address row `stack all blackout toggle` → `/o/stack/all/blackout`
-  `s:"toggle"`.
-- **Spec 2 §9.** Inner lines carry the cue's source and the macro's number when a cue ran
-  the macro.
-- **Spec 1 §2.** `stack all blackout` names no stack, so it leaves a macro portable.
+- **Spec 1 §4.** A list's version rises on a save that replaces its file; a new list is
+  written at its version; a version already kept is never copied again.
+- **Spec 1 §5.** A playlist keeps its file's name until its title changes.
+- **Spec 5 §2.** A document is written within a second of each change, and at most once a
+  second.
+- **Spec 5 §4.**
+  - What `duplicate`, `archive` and `swap` carry, with the picks printed as one trailing
+    JSON object.
+  - `cueChannel`'s attributes and place, its text form, and its inverse's fallback to an
+    `edit.set` of the cue's whole `commands`.
 
 ## Next
 
@@ -186,14 +228,14 @@ core changes and again after the fixtures. Nothing in app/.
 
 **After Area 6:**
 
-- **Engine-side, no bench run.** Areas 11, 9, 8, 12 and 19 follow in that order, from their
-  blocks in `docs/build-order.md`, which their Build tracker tasks carry verbatim:
+- **Engine-side, no bench run.** Areas 11, 8, 12 and 19 follow, from their blocks in
+  `docs/build-order.md`, which their Build tracker tasks carry verbatim:
   - Area 11 starts after Area 6;
-  - Areas 8 and 12 start after Area 9, whose edit path they extend;
+  - Areas 8 and 12 start once Area 9 is merged, since they extend its edit path and writer;
   - Area 19 starts after Area 12.
 - **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
   follows 14, 17 follows 13 and 14, and 18 follows 17.
 - **The bench run with the card** happens whenever Adam sets a window. It must pass before
   anything in `app/` starts and before Area 7's bench verification.
-- **Spec 5 has no area of its own.** Its engine side lands with Area 9 (the edit path) and
-  Area 12 (edit undo and redo, and the restores).
+- **Spec 5 has no area of its own.** Its engine side lands with Area 9 (the edit path, the
+  writer and changes on disk) and Area 12 (edit undo and redo, and the restores).
