@@ -5,6 +5,20 @@ import OCore
 import OFormats
 import Synchronization
 
+/// Spec 2 §8 — a group the runner rejected before anything ran: its id, its
+/// source and "the rejection [that] names the command and the reason".
+public struct RejectedGroup: Equatable, Sendable {
+    public var id: GroupID
+    public var source: CommandSource
+    public var rejection: Rejection
+
+    public init(id: GroupID, source: CommandSource, rejection: Rejection) {
+        self.id = id
+        self.source = source
+        self.rejection = rejection
+    }
+}
+
 /// Spec 4 §3 — the control thread "Owns: The live ShowState, the command
 /// queue, the projection, timers, OSC and API I/O. Hands over: A new immutable
 /// ShowState plus the frame plan for the next tick, via one atomic pointer
@@ -43,6 +57,10 @@ public final class ControlLoop: @unchecked Sendable {
     public let stackRings: [Int: [TextureHandle]]
     public let previewTargets: [Int: TextureHandle]
     public private(set) var lastExecuted: [ExecutedCommand] = []
+    /// Spec 2 §8 — the groups this build rejected, with their ids and
+    /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
+    /// back to the sender"). Reset every build, like `lastExecuted`.
+    public private(set) var lastRejected: [RejectedGroup] = []
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
@@ -143,6 +161,7 @@ public final class ControlLoop: @unchecked Sendable {
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
+        lastRejected = []
         for group in groups { run(group, frame: frame) }
         syncTransports(frame)
         reconcileGrades(frame)
@@ -256,6 +275,7 @@ public final class ControlLoop: @unchecked Sendable {
         switch CommandRunner.run(group, state: model.state, context: context) {
         case .failure(let rejection):
             rejections.append(rejection)
+            lastRejected.append(RejectedGroup(id: group.id, source: group.source, rejection: rejection))
             log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
         case .success(let outcome):
             model.state = outcome.state

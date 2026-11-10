@@ -152,6 +152,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     public var lastPlan: FramePlan? { renderLoop.lastPlan }
     public var lastExecuted: [ExecutedCommand] { control.lastExecuted }
     public var rejections: [Rejection] { control.rejections }
+    public var lastRejected: [RejectedGroup] { control.lastRejected }
 
     /// The metrics written since the last drain.
     public func drainMetrics() -> [TickRecord] {

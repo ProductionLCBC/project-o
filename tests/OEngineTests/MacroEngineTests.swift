@@ -78,6 +78,87 @@ final class MacroEngineTests: XCTestCase {
         XCTAssertEqual(engine.rejections.last?.reason, .macroCycle)
     }
 
+    // MARK: - From OSC over UDP (Spec 2 §6)
+
+    /// An OSC server on a free port wired to the harness the way the process
+    /// wires it: groups into the queue, feedback and errors after each build.
+    private func startServer() throws -> (OSCServer, UDPTestClient) {
+        let ids = Set(engine.engine.library.mediaIndex.entries.map(\.id))
+        let enqueue: @Sendable (CommandGroup) -> Void = { [weak engine] group in engine?.send(group) }
+        let server = OSCServer(port: 0, targets: [], mediaIDs: ids, log: engine.log, enqueue: enqueue)
+        try server.start()
+        let library = engine.engine.library, machine = engine.engine.machine
+        let afterBuild: @Sendable (ControlLoop) -> Void = { [server, library, machine] control in
+            server.afterBuild(control, library: library, machine: machine)
+        }
+        engine.engine.afterBuild = afterBuild
+        return (server, try UDPTestClient())
+    }
+
+    private func error(from client: UDPTestClient) -> OSCMessage? {
+        guard let data = client.receive(timeout: 2), case .success(.message(let message)) = OSCPacket.decode(data) else { return nil }
+        return message
+    }
+
+    /// `/o/macro/N` runs with source `osc`, and an accepted group brings no error.
+    func test_aMacroOverOSCRunsAndIsNotAnswered() throws {
+        let (server, client) = try startServer()
+        defer { server.stop(); client.close() }
+        try client.send(OSCMessage("/o/macro/20").encoded(), to: server.boundPort)
+        XCTAssertTrue(waitUntil(5) { engine.control.queuedGroups == 1 })
+        engine.tick()
+        XCTAssertEqual(engine.lastExecuted.first?.command, .macro(20))
+        XCTAssertEqual(engine.lastExecuted.first?.source, CommandSource(kind: .osc))
+        XCTAssertNil(client.receive(timeout: 0.3), "nothing comes back for a group that ran")
+        XCTAssertEqual(server.rejected, 0)
+    }
+
+    /// A macro the engine rejects (Spec 2 §8) brings `/o/error` back to the
+    /// sender, naming the address and the reason.
+    func test_aRejectedMacroOverOSCIsAnsweredWithAnError() throws {
+        let (server, client) = try startServer()
+        defer { server.stop(); client.close() }
+        try client.send(OSCMessage("/o/macro/99").encoded(), to: server.boundPort)
+        XCTAssertTrue(waitUntil(5) { engine.control.queuedGroups == 1 })
+        engine.tick()
+        XCTAssertTrue(engine.lastExecuted.isEmpty)
+        let unknown = try XCTUnwrap(error(from: client))
+        XCTAssertEqual(unknown.address, "/o/error")
+        XCTAssertEqual(unknown.arguments.first, .string("/o/macro/99"))
+        guard case .string(let reason)? = unknown.arguments.last else { return XCTFail("a reason") }
+        XCTAssertTrue(reason.contains("macro 99 does not exist"), reason)
+
+        try client.send(OSCMessage("/o/macro/21").encoded(), to: server.boundPort)
+        XCTAssertTrue(waitUntil(5) { engine.control.queuedGroups == 1 })
+        engine.tick()
+        let loop = try XCTUnwrap(error(from: client))
+        XCTAssertEqual(loop.arguments.first, .string("/o/macro/21"))
+        guard case .string(let loopReason)? = loop.arguments.last else { return XCTFail("a reason") }
+        XCTAssertTrue(loopReason.contains("macro 21 → macro 22 → macro 21"), loopReason)
+        XCTAssertEqual(server.rejected, 2)
+    }
+
+    /// Spec 2 §6 — "Bundles run as one group ... and either all validate or
+    /// none run": a bundle holding a bad macro runs nothing and is answered
+    /// at `#bundle`.
+    func test_aBundleWithABadMacroIsAnsweredAtBundle() throws {
+        let (server, client) = try startServer()
+        defer { server.stop(); client.close() }
+        let bundle = OSCBundle(elements: [
+            .message(OSCMessage("/o/channel/2/write", [.string("text \"x\"")])),
+            .message(OSCMessage("/o/macro/21")),
+        ])
+        try client.send(bundle.encoded(), to: server.boundPort)
+        XCTAssertTrue(waitUntil(5) { engine.control.queuedGroups == 1 })
+        engine.tick()
+        XCTAssertTrue(engine.lastExecuted.isEmpty, "none run")
+        XCTAssertEqual(engine.state.channels[2]?.content, .empty)
+        let reply = try XCTUnwrap(error(from: client))
+        XCTAssertEqual(reply.address, "/o/error")
+        XCTAssertEqual(reply.arguments.first, .string("#bundle"))
+        XCTAssertEqual(engine.lastRejected.first?.rejection.index, 1)
+    }
+
     // MARK: - From a cue
 
     /// The doxology's cue 3 clears channel 2, runs macro 1, then writes

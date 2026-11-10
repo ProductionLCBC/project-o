@@ -42,6 +42,12 @@ public final class OSCServer: @unchecked Sendable {
     private let lock = NSLock()
     private var registrations: [OSCPeer: MonotonicTime] = [:]
     private var subscriptions: [OSCPeer: Set<String>] = [:]
+    /// Spec 2 §6 — "Errors go back to the sender": who sent each group still
+    /// waiting for its build, and the address to name, with the order it came
+    /// in so the oldest go first past `pendingLimit`.
+    private var pending: [GroupID: (peer: OSCPeer, address: String, serial: Int)] = [:]
+    private var pendingSerial = 0
+    static let pendingLimit = 256
     public private(set) var boundPort: UInt16 = 0
     private let receivedCount = Atomic<Int64>(0)
     private let rejectedCount = Atomic<Int64>(0)
@@ -152,7 +158,9 @@ public final class OSCServer: @unchecked Sendable {
             }
             switch OSCMapping.command(from: message, options: parseOptions) {
             case .success(let command):
-                enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command]))
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command])
+                remember(group.id, peer: peer, address: message.address)
+                enqueue(group)
             case .failure(let rejection):
                 rejectedCount.add(1, ordering: .relaxed)
                 send(OSCFeedback.error(address: message.address, reason: rejection.message), to: peer)
@@ -161,7 +169,11 @@ public final class OSCServer: @unchecked Sendable {
             // Spec 2 §6 — "Bundles run as one group, in order, and either all validate or none run."
             switch OSCMapping.commands(from: bundle, options: parseOptions) {
             case .success(let commands):
-                enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands))
+                // A bundle with nothing in it runs nothing.
+                guard !commands.isEmpty else { return }
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands)
+                remember(group.id, peer: peer, address: "#bundle")
+                enqueue(group)
             case .failure(let rejection):
                 rejectedCount.add(1, ordering: .relaxed)
                 send(OSCFeedback.error(address: "#bundle", reason: rejection.message), to: peer)
@@ -190,6 +202,49 @@ public final class OSCServer: @unchecked Sendable {
             } else {
                 send(OSCFeedback.error(address: address, reason: "nothing to query at that address"), to: peer)
             }
+        }
+    }
+
+    /// Recorded before the group is queued, so the build that runs it always
+    /// finds its sender.
+    private func remember(_ id: GroupID, peer: OSCPeer, address: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        pendingSerial += 1
+        pending[id] = (peer, address, pendingSerial)
+        if pending.count > Self.pendingLimit, let oldest = pending.min(by: { $0.value.serial < $1.value.serial })?.key {
+            pending.removeValue(forKey: oldest)
+        }
+    }
+
+    // MARK: - After a build
+
+    /// Spec 2 §6 — what OSC does once a build has run the queued groups:
+    /// feedback for the state they changed ("Feedback addresses mirror state,
+    /// not commands"), and "Errors go back to the sender as `/o/error`
+    /// `s:address` `s:reason`" for each group from this server the engine
+    /// rejected (Spec 2 §8), naming the message's address, or `#bundle` for a
+    /// bundle. Runs on the control side, after every build.
+    public func afterBuild(_ control: ControlLoop, library: Library, machine: Machine) {
+        let executed = control.lastExecuted
+        if !executed.isEmpty {
+            feedback(OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine))
+        }
+        let rejected = control.lastRejected
+        guard !(executed.isEmpty && rejected.isEmpty) else { return }
+        var replies: [(peer: OSCPeer, message: OSCMessage)] = []
+        lock.lock()
+        if !pending.isEmpty {
+            for entry in executed { pending.removeValue(forKey: entry.group) }
+            for group in rejected {
+                guard let sender = pending.removeValue(forKey: group.id) else { continue }
+                replies.append((sender.peer, OSCFeedback.error(address: sender.address, reason: group.rejection.message)))
+            }
+        }
+        lock.unlock()
+        for reply in replies {
+            rejectedCount.add(1, ordering: .relaxed)
+            send(reply.message, to: reply.peer)
         }
     }
 
