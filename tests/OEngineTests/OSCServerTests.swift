@@ -71,6 +71,7 @@ final class OSCServerTests: XCTestCase {
         engine.send("list 42 cue 1")
         engine.tick()
         let messages = OSCFeedbackDeriver.messages(for: engine.lastExecuted, state: engine.state, library: engine.engine.library, machine: engine.engine.machine)
+            + (engine.control.lastLiveFeedback?.messages ?? [])
         XCTAssertTrue(messages.contains(OSCFeedback.liveCue(1)), "\(messages.map(\.address))")
         XCTAssertTrue(messages.contains(OSCFeedback.liveLabel("Verse 1")))
         XCTAssertTrue(messages.contains(OSCFeedback.channelState(1, .playing)))

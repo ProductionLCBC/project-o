@@ -124,6 +124,8 @@ public final class Engine: @unchecked Sendable {
     func finishBuild() {
         afterBuild?(control)
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
+        // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
+        if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
         sweepReleases()
         warmThumbnailsIfTheListChanged()

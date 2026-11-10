@@ -115,27 +115,49 @@ public struct LiveSnapshot: Equatable, Sendable {
         return OSCFeedback.liveArmed((armed.itemPosition, armed.cuePosition, Self.inMs(armed, frame: frame, rate: rate)))
     }
 
+    /// Spec 2 §6 — "Any client may ask for a current value with `/o/query`
+    /// ... and receives the feedback message once": the live addresses, nil
+    /// for any other.
+    public func answer(query address: String, frame: Int, rate: FrameRate) -> OSCMessage? {
+        switch address {
+        case "/o/live/playlist": return OSCFeedback.livePlaylist(playlistTitle)
+        case "/o/live/item": return OSCFeedback.liveItem(itemPosition)
+        case "/o/live/cue": return OSCFeedback.liveCue(cuePosition)
+        case "/o/live/label": return OSCFeedback.liveLabel(label)
+        case "/o/live/armed": return armedMessage(frame: frame, rate: rate)
+        default: return nil
+        }
+    }
+
     /// What to send after a build, given the reading last sent: Spec 7 §6 —
     /// "The engine sends them on a fire, a load, an arm and a disarm, and
-    /// after any applied edit group or reload that changes what they carry".
-    /// On a fire, a load or a disarm the four position messages go out, and
-    /// `/o/live/armed` goes "empty first on a fire that used up a trigger,
-    /// then for the new arming"; otherwise each goes out when what it carries
-    /// changed. Nothing when nothing changed.
-    public static func feedback(from old: LiveSnapshot?, to new: LiveSnapshot, moved: Bool, frame: Int, rate: FrameRate) -> [OSCMessage] {
-        var out: [OSCMessage] = []
-        var oldWithout = old
-        oldWithout?.armed = nil
-        var newWithout = new
-        newWithout.armed = nil
-        if moved || oldWithout != newWithout { out += new.positionMessages }
+    /// after any applied edit group or reload that changes what they carry:
+    /// the live item's or cue's number, the playlist's title or the cue's
+    /// label, a removal of what the pointer names, or a countdown that lapses
+    /// or comes back." On a fire, a load or a disarm (`moved`) the four
+    /// position messages go out, and `/o/live/armed` goes "empty first on a
+    /// fire that used up a trigger, then for the new arming"; otherwise each
+    /// goes out when what it carries changed. The `live` event goes "at the
+    /// same moments", and when anything else it carries changed: a handle or
+    /// the list's title (Spec 10 §3). `[Next Title]` is a box's read, not
+    /// feedback.
+    public static func feedback(from old: LiveSnapshot?, to new: LiveSnapshot, moved: Bool, frame: Int, rate: FrameRate)
+        -> (messages: [OSCMessage], event: Bool) {
+        var messages: [OSCMessage] = []
+        let positionsChanged = old.map { ($0.playlistTitle, $0.itemPosition, $0.cuePosition, $0.label, $0.gone) }
+            .map { $0 != (new.playlistTitle, new.itemPosition, new.cuePosition, new.label, new.gone) } ?? true
+        if moved || positionsChanged { messages += new.positionMessages }
         if moved {
-            if old?.armed != nil { out.append(OSCFeedback.liveArmed(nil)) }
-            if new.armed != nil { out.append(new.armedMessage(frame: frame, rate: rate)) }
+            if old?.armed != nil { messages.append(OSCFeedback.liveArmed(nil)) }
+            if new.armed != nil { messages.append(new.armedMessage(frame: frame, rate: rate)) }
         } else if old?.armed != new.armed {
-            out.append(new.armedMessage(frame: frame, rate: rate))
+            messages.append(new.armedMessage(frame: frame, rate: rate))
         }
-        return out
+        var oldCarried = old
+        oldCarried?.nextTitle = nil
+        var newCarried = new
+        newCarried.nextTitle = nil
+        return (messages, !messages.isEmpty || oldCarried != newCarried)
     }
 
     // MARK: - The `live` event (Spec 7 §6, Spec 10 §3)

@@ -5,6 +5,13 @@ import OCore
 import OFormats
 import Synchronization
 
+/// Spec 7 §6 — what one build sends about the live position and the
+/// countdown: the OSC messages in order, and the `live` event.
+public struct LiveFeedback: Sendable {
+    public var messages: [OSCMessage]
+    public var event: JSONValue
+}
+
 /// Spec 2 §8 — a group the runner rejected before anything ran: its id, its
 /// source and "the rejection [that] names the command and the reason".
 public struct RejectedGroup: Equatable, Sendable {
@@ -49,6 +56,15 @@ public final class ControlLoop: @unchecked Sendable {
     /// Whether this build changed the roots: an edit, a reload, or a write
     /// that raised a list's version or renamed a file.
     public private(set) var lastRootsChanged = false
+    /// Spec 7 §4 — the kept copies of the live list and playlist, engine
+    /// memory between builds: the runner takes them at fires and after
+    /// groups, and a reload refreshes them.
+    public private(set) var kept = KeptCopies()
+    /// Spec 7 §6 — the live reading last sent, and what this build sends:
+    /// the `/o/live/…` messages and the `live` event, or nil when nothing
+    /// they carry changed.
+    public private(set) var lastLive: LiveSnapshot
+    public private(set) var lastLiveFeedback: LiveFeedback?
     /// Spec 5 §2 — writing, when the engine runs over roots on disk; nil for
     /// roots built in memory, whose edits are never written.
     private(set) var documents: DocumentStore?
@@ -115,6 +131,7 @@ public final class ControlLoop: @unchecked Sendable {
         }
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
+        lastLive = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: KeptCopies())
         handlePool = (0..<Int32(sources.capacity)).reversed()
         // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, a preview per stack.
         var channelTextures: [Int: TextureHandle] = [:]
@@ -144,6 +161,16 @@ public final class ControlLoop: @unchecked Sendable {
     private let stateLock = NSLock()
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
+    private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
+
+    /// Spec 2 §6 — "Any client may ask for a current value with `/o/query`":
+    /// the live reading after the last build, and that build's frame, for
+    /// readers on other threads.
+    public var publishedLive: (live: LiveSnapshot, frame: Int) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return liveSnapshot ?? (lastLive, 0)
+    }
 
     /// The state after the last build, for readers on other threads (the OSC
     /// query reply, the process summary). `model.state` itself belongs to the
@@ -224,11 +251,19 @@ public final class ControlLoop: @unchecked Sendable {
         commandLog.closeRuns(now: now)
         if let documents {
             let changes = documents.absorbReports(library: &library, machine: &machine, now: now)
-            if !changes.isEmpty { reloaded(changes) }
+            if !changes.isEmpty {
+                reloaded(changes)
+                // Spec 7 §4 — "after every applied edit group, reload or library restore".
+                kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
+            }
         }
         for group in groups { run(group, frame: frame, now: now) }
         // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
-        if let documents, documents.writeDue(library: &library, machine: &machine, now: now) { lastRootsChanged = true }
+        if let documents, documents.writeDue(library: &library, machine: &machine, now: now) {
+            lastRootsChanged = true
+            kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
+        }
+        updateLive(frame: frame)
         syncTransports(frame)
         reconcileGrades(frame)
         let plan = buildPlan(frame)
@@ -238,6 +273,7 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         stateSnapshot = model.state
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
+        liveSnapshot = (lastLive, Int(frame))
         stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
@@ -304,13 +340,20 @@ public final class ControlLoop: @unchecked Sendable {
         }
     }
 
-    /// Spec 3 §5 — the armed trigger fires `next` from the scheduler when the
-    /// clock reaches it; Spec 4 §6 — end of media with `clear` "asks the
-    /// control thread to issue `channel N clear` with source `engine`".
+    /// Spec 7 §4 — "When the engine clock reaches `atFrame`, the engine sends
+    /// `next` if the trigger is live and `disarm` if it isn't, both with
+    /// source `scheduler` ... the engine disarms it at its time with a log
+    /// line, and the operator fires on by hand." Spec 4 §6 — end of media
+    /// with `clear` "asks the control thread to issue `channel N clear` with
+    /// source `engine`".
     private func engineGroups(_ frame: Int64) -> [CommandGroup] {
         var groups: [CommandGroup] = []
         if let armed = model.state.armed, Int64(armed.atFrame) <= frame {
-            groups.append(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .scheduler), commands: [Command.next]))
+            let live = model.state.liveArmed(library: library, machine: machine, kept: kept) != nil
+            if !live {
+                log.warning("the countdown to cue \(armed.cueUuid.uuidString.lowercased()) lapsed: an edit means it is no longer the cue next would fire, so it is disarmed and the operator fires on")
+            }
+            groups.append(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .scheduler), commands: [live ? Command.next : Command.disarm]))
         }
         for channel in model.channels.keys.sorted() {
             guard var rt = model.channels[channel], case .media(var m) = rt.live, !m.missing, m.ready,
@@ -332,7 +375,33 @@ public final class ControlLoop: @unchecked Sendable {
         let state = model.state
         let variables = self.variables
         return ProjectionContext(frame: Int(frame), rate: pacing.masterRate, library: library, machine: machine, missing: missing,
-                                 source: source, variables: { name in variables.value(name, state: state) })
+                                 source: source, variables: { name in variables.value(name, state: state) }, kept: kept)
+    }
+
+    /// Spec 7 §6 — "The engine sends them on a fire, a load, an arm and a
+    /// disarm, and after any applied edit group or reload that changes what
+    /// they carry". The reading after this build against the last one sent;
+    /// a pointer effect is a fire, a load or a disarm.
+    private func updateLive(frame: Int64) {
+        lastLiveFeedback = nil
+        guard !lastExecuted.isEmpty || lastRootsChanged else { return }
+        let live = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: kept)
+        var moved = false
+        var boundary: Bool?
+        for line in lastExecuted {
+            for effect in line.effects {
+                switch effect {
+                case .pointer: moved = true
+                case .boundary(_, let reset): boundary = reset
+                default: break
+                }
+            }
+        }
+        let send = LiveSnapshot.feedback(from: lastLive, to: live, moved: moved, frame: Int(frame), rate: pacing.masterRate)
+        lastLive = live
+        guard send.event else { return }
+        lastLiveFeedback = LiveFeedback(messages: send.messages,
+                                        event: live.event(frame: Int(frame), rate: pacing.masterRate, seq: commandLog.lastSeq, boundary: boundary))
     }
 
     /// Spec 2 §8 — "parse, validate, execute, log": the runner validates and
@@ -353,6 +422,7 @@ public final class ControlLoop: @unchecked Sendable {
             log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
         case .success(let outcome):
             model.state = outcome.state
+            kept = outcome.kept
             lastExecuted.append(contentsOf: outcome.executed)
             let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
             let applied = AppliedEdits.groups(in: logged.map(\.executed))

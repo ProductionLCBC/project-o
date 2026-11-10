@@ -234,9 +234,13 @@ public final class OSCServer: @unchecked Sendable {
     /// bundle. Runs on the control side, after every build.
     public func afterBuild(_ control: ControlLoop, library: Library, machine: Machine) {
         let executed = control.lastExecuted
+        var messages: [OSCMessage] = []
         if !executed.isEmpty {
-            feedback(OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine))
+            messages = OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine)
         }
+        // Spec 7 §6 — the live position and the countdown, from the live reading.
+        messages += control.lastLiveFeedback?.messages ?? []
+        feedback(messages)
         let rejected = control.lastRejected
         guard !(executed.isEmpty && rejected.isEmpty) else { return }
         var replies: [(peer: OSCPeer, message: OSCMessage)] = []
@@ -303,25 +307,14 @@ public final class OSCServer: @unchecked Sendable {
 
 /// Spec 2 §6 — "Feedback addresses mirror state, not commands": the messages
 /// the engine sends after a tick's commands ran, derived from the effects.
+/// The live position and the countdown come from the live reading instead
+/// (Spec 7 §6, `LiveSnapshot`), since an edit or a reload changes them too.
 public enum OSCFeedbackDeriver {
     public static func messages(for executed: [ExecutedCommand], state: ShowState, library: Library, machine: Machine) -> [OSCMessage] {
         var out: [OSCMessage] = []
         for entry in executed {
             for effect in entry.effects {
                 switch effect {
-                case .pointer(_, let new, _):
-                    guard let new, let cueUuid = new.cueUuid, let listUuid = new.listUuid else { continue }
-                    let list = library.list(uuid: listUuid) ?? machine.localList(uuid: listUuid)
-                    let playlist = new.playlist.flatMap { machine.playlist(uuid: $0) }
-                    if let playlist { out.append(OSCFeedback.livePlaylist(playlist.title)) }
-                    // Spec 7 §4 — the pointer names its item by uuid; the feedback sends its position.
-                    if let playlist, let itemUuid = new.itemUuid, let index = playlist.items.firstIndex(where: { $0.uuid == itemUuid }) {
-                        out.append(OSCFeedback.liveItem(index + 1))
-                    }
-                    if let list, let index = list.cues.firstIndex(where: { $0.uuid == cueUuid }) {
-                        out.append(OSCFeedback.liveCue(index + 1))
-                        out.append(OSCFeedback.liveLabel(list.cues[index].label))
-                    }
                 case .transition(let t):
                     out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library)))
                     out.append(OSCFeedback.channelState(t.channel, feedbackState(of: t.to)))

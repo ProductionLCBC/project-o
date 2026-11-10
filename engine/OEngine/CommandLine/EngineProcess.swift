@@ -261,6 +261,9 @@ public final class EngineProcess: @unchecked Sendable {
     /// reading) until the API carries the topic.
     func answer(query address: String) -> OSCMessage? {
         if address == MetricsQuery.address { return MetricsQuery.answer(address, snapshot: metricsSnapshot()) }
+        // Spec 7 §6 — the live position and the countdown, as the last build read them.
+        let published = engine.control.publishedLive
+        if let live = published.live.answer(query: address, frame: published.frame, rate: engine.pacing.masterRate) { return live }
         let state = engine.control.publishedState
         let parts = address.split(separator: "/").map(String.init)
         guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
