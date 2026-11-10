@@ -12,12 +12,18 @@ public struct ValidationContext: Sendable {
     public var machine: Machine
     public var state: ShowState?
     public var source: CommandSource?
+    /// Spec 5 §6, check 5 — a command an edit stores in a portable document:
+    /// "a portable document may name a stack, output, audio output or input
+    /// this machine lacks, since it meets those numbers at other campuses",
+    /// and a playlist title it loads "is looked up when it runs" (Spec 7 §3).
+    public var portable: Bool
 
-    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil) {
+    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil, portable: Bool = false) {
         self.library = library
         self.machine = machine
         self.state = state
         self.source = source
+        self.portable = portable
     }
 }
 
@@ -91,15 +97,17 @@ struct Checker {
         if let target = command.channelTarget, case .number(let n) = target {
             guard library.channel(n) != nil else { throw reject(.noSuchTarget, "channel \(n) does not exist") }
         }
+        // Spec 5 §6 — a portable document may name machine-level numbers this machine lacks.
+        let machineLevel = !context.portable
         switch command {
-        case .outputStack(let output, _):
+        case .outputStack(let output, _) where machineLevel:
             guard machine.output(output) != nil else { throw reject(.noSuchTarget, "output \(output) does not exist") }
-        case .stackBlackout(let target, _):
+        case .stackBlackout(let target, _) where machineLevel:
             // Spec 2 §3 — `stack all` names every stack there is.
             if case .number(let stack) = target {
                 guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
             }
-        case .stackMute(let stack, _, _):
+        case .stackMute(let stack, _, _) where machineLevel:
             guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
         case .cue(let n):
             guard n >= 1 else { throw reject(.noSuchTarget, "cue \(n) does not exist; cues count from 1") }
@@ -110,7 +118,7 @@ struct Checker {
             try liveItem(item, cue: nil, section: section)
         case .listCue(let list, _):
             guard library.list(number: list) != nil else { throw reject(.noSuchTarget, "list \(list) does not exist") }
-        case .playlistLoad(let title):
+        case .playlistLoad(let title) where machineLevel:
             guard machine.playlist(titled: title) != nil else {
                 throw reject(.noSuchTarget, "no playlist \"\(title)\" on this machine")
             }
@@ -118,7 +126,7 @@ struct Checker {
             try slot(timer, count: machine.settings.timers, "timer", reason: .noSuchTarget)
         case .popupSet(let popup, _, _), .popupClear(let popup):
             try slot(popup, count: machine.settings.popups, "popup", reason: .noSuchTarget)
-        case .audioMute(let target, _):
+        case .audioMute(let target, _) where machineLevel:
             if case .number(let n) = target {
                 guard machine.audioOutput(n) != nil else { throw reject(.noSuchTarget, "audio output \(n) does not exist") }
             }
@@ -193,7 +201,7 @@ struct Checker {
             if let t = write.riders.transition { try transition(t.ref) }
             if let t = write.riders.audioTransition { try audioTransition(t.ref) }
             if let g = write.riders.grade { try grade(g.ref) }
-            if case .input(let n) = write.content {
+            if case .input(let n) = write.content, !context.portable {
                 guard machine.input(n) != nil else { throw reject(.noSuchReference, "input \(n) does not exist") }
             }
         case .channelTransition(_, let ref, _):
@@ -202,7 +210,7 @@ struct Checker {
             try audioTransition(ref)
         case .channelGrade(_, let ref, _):
             try grade(ref)
-        case .outputStack(_, let stack):
+        case .outputStack(_, let stack) where !context.portable:
             guard machine.stack(stack) != nil else { throw reject(.noSuchReference, "stack \(stack) does not exist") }
         case .stackMute(_, let channel, _):
             guard library.channel(channel) != nil else { throw reject(.noSuchReference, "channel \(channel) does not exist") }

@@ -91,13 +91,9 @@ public enum SavePlanner {
             } else {
                 plan.operations.append(.move(from: currentPath, to: path))
             }
-        } else if currentPath == nil, others.contains(path.lowercased()) {
-            // A new list never writes over a file it doesn't own: the first
-            // free name, as a playlist takes one (Spec 7 §3).
-            let stem = String(path.dropLast(".json".count))
-            var n = 2
-            while others.contains((stem + "-" + String(n) + ".json").lowercased()) { n += 1 }
-            path = stem + "-" + String(n) + ".json"
+        } else if currentPath == nil {
+            // A new list never writes over a file it doesn't own.
+            path = FileLayout.freeListPath(for: saved, folder: home, taken: taken)
         }
         plan.operations.append(.replace(path: path, data: Writer.data(for: .list(saved), extras: extras)))
         return ListSave(list: saved, path: path, plan: plan, kept: after)

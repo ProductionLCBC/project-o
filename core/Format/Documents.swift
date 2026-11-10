@@ -334,6 +334,20 @@ public enum FileLayout {
         "lists/" + (folder.isEmpty ? "" : folder + "/") + numbered(list.number, list.title) + ".json"
     }
 
+    /// Spec 7 §2 — "Other files are never replaced": the path a new list is
+    /// written at, its own name or, when another file holds that name
+    /// (compared without regard to case), the first free one of `-2`, `-3`
+    /// and so on, as a playlist takes one (Spec 7 §3).
+    public static func freeListPath(for list: List, folder: String, taken: Set<String>) -> String {
+        let path = listPath(for: list, folder: folder)
+        let others = Set(taken.map { $0.lowercased() })
+        guard others.contains(path.lowercased()) else { return path }
+        let stem = String(path.dropLast(".json".count))
+        var n = 2
+        while others.contains((stem + "-" + String(n) + ".json").lowercased()) { n += 1 }
+        return stem + "-" + String(n) + ".json"
+    }
+
     /// The key `documentPaths` uses for a per-object document.
     public static func documentKey(for document: Document) -> String? {
         switch document {
