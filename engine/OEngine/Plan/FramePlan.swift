@@ -235,9 +235,9 @@ public struct BoxTransitionState: Equatable, Codable, Sendable {
 /// Spec 4 §4 — "an ordered list of resolved boxes: for each slot, the preset
 /// layout chosen by the Spec 1 resolution order, with every box already bound
 /// to a concrete source ..., its frame in pixels, its opacity (slot opacity
-/// times mute), its transition state, and its per-box grade." The slot
-/// offset, the binding and the resolved text ride along for the harness,
-/// which checks the +1 slot against the projected state (Spec 4 §15).
+/// times mute), its transition state, and its per-box grade." The box's
+/// offset (Spec 6 §3), the binding and the resolved text ride along for the
+/// harness, which checks the +1 box against the projected state (Spec 4 §15).
 public struct ResolvedBox: Equatable, Codable, Sendable {
     public var channel: Int
     public var offset: Int

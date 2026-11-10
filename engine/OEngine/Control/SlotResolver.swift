@@ -13,8 +13,9 @@ import OCore
 /// source." The binding table of §9: pixels to the channel texture or a
 /// poster, field to the cached line textures, static to the cached textures
 /// of the box's own text with variables resolved; "Fallback boxes draw only
-/// if no earlier box in the same channel's group drew anything"; "A slot's
-/// effective opacity is its opacity times zero when muted".
+/// if no earlier box at the same offset in the same channel's group drew
+/// anything"; "A slot's effective opacity is its opacity times zero when
+/// muted".
 public enum SlotResolver {
     /// Spec 4 §9 — what a pixel box draws: a texture and the part of it the
     /// content occupies (Spec 4 §7, letterboxed), with the content's pixel
@@ -63,28 +64,55 @@ public enum SlotResolver {
         /// Spec 4 §9 — "the preset is the slot's, else the stack default, else
         /// the channel default, else Preset 1".
         public func preset(for slot: StackSlot) -> Preset {
-            library.resolvedPreset(slot.preset ?? stack.defaultPreset ?? library.channel(slot.channel)?.defaultPreset)
+            SlotResolver.preset(for: slot, stack: stack, library: library)
+        }
+
+        /// Spec 4 §9 — "the layout is the preset's entry for this stack
+        /// number, else its `"*"` layout".
+        public func layout(for slot: StackSlot) -> Layout? {
+            SlotResolver.layout(for: slot, stack: stack, library: library)
         }
     }
 
-    /// Resolve one slot's boxes in layout order. `content` is what the slot
-    /// shows (the live state at offset 0, the lookahead for offsets, a
-    /// projected state for a thumbnail); `pixels` is what a pixel box draws
-    /// for that content; `staticText` resolves a static box's variables (the
-    /// control loop gates it, Spec 4 §8); `onTextMiss` hears of every text
-    /// job the cache could not answer ("counts `textLate`").
-    public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot, content: ContentInstance?,
-                               pixels: (StackSlot, ContentInstance?) -> PixelSource?,
+    /// Spec 4 §9 and Spec 6 §2 — "the slot's preset, else the stack's default,
+    /// else the channel's default, else Preset 1".
+    public static func preset(for slot: StackSlot, stack: Stack, library: Library) -> Preset {
+        library.resolvedPreset(slot.preset ?? stack.defaultPreset ?? library.channel(slot.channel)?.defaultPreset)
+    }
+
+    /// Spec 4 §9 and Spec 6 §2 — "then that preset's layout for this stack's
+    /// number, else its `"*"` layout".
+    public static func layout(for slot: StackSlot, stack: Stack, library: Library) -> Layout? {
+        preset(for: slot, stack: stack, library: library).layout(for: stack.number)
+    }
+
+    /// Spec 6 §3 — the offsets a layout's boxes draw at, in order, each once.
+    public static func offsets(of layout: Layout?) -> [Int] {
+        Array(Set(layout?.boxes.map(\.offset) ?? [])).sorted()
+    }
+
+    /// Resolve one slot's boxes in layout order. Spec 6 §2 — "Each box in the
+    /// layout draws the slot's channel at the box's own offset (§3)":
+    /// `content` answers what the slot's channel holds at an offset (the live
+    /// state at 0, the lookahead for later offsets, a projected state for a
+    /// thumbnail); `pixels` is what a pixel box at an offset draws for that
+    /// content; `staticText` resolves a static box's variables (the control
+    /// loop gates it, Spec 4 §8); `onTextMiss` hears of every text job the
+    /// cache could not answer ("counts `textLate`"). Spec 6 §3 — "Fallback
+    /// boxes look only at earlier boxes with the same offset."
+    public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot,
+                               content: (Int) -> ContentInstance?,
+                               pixels: (StackSlot, Int, ContentInstance?) -> PixelSource?,
                                staticText: (BoxKey, Box, String) -> String,
                                onTextMiss: (TextJob) -> Void) -> [SlotBox] {
-        guard let layout = inputs.preset(for: slot).layout(for: inputs.stack.number) else { return [] }
+        guard let layout = inputs.layout(for: slot) else { return [] }
         let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
         var out: [SlotBox] = []
-        var drew = false
+        var drewAt: Set<Int> = []
         for (boxIndex, box) in layout.boxes.enumerated() {
             let key = BoxKey(stack: inputs.stack.number, slot: slotIndex, box: boxIndex)
             let allowed = transitionAllowed(for: box)
-            if box.fallback && drew {
+            if box.fallback && drewAt.contains(box.offset) {
                 out.append(SlotBox(key: key, box: box, resolved: nil, transitionAllowed: allowed))
                 continue
             }
@@ -92,15 +120,15 @@ public enum SlotResolver {
             var resolved: ResolvedBox?
             switch box.binding.kind {
             case .pixels:
-                if let source = pixels(slot, content) {
+                if let source = pixels(slot, box.offset, content(box.offset)) {
                     let fit = box.fit.pixelFit ?? .fit
                     let quad = ControlLoop.fitQuad(texture: source.texture, content: source.content, contentPixels: source.contentPixels,
                                                    into: frameRect, fit: fit, mips: source.mips)
                     resolved = ResolvedBox(channel: slot.channel, frame: frameRect, content: .pixels(quad), opacity: opacity,
-                                           grade: boxGrade(box, library: inputs.library), offset: slot.offset, binding: box.binding)
+                                           grade: boxGrade(box, library: inputs.library), offset: box.offset, binding: box.binding)
                 }
             case .field(let name):
-                if case .text(let t)? = content, let value = t.fields[name], !value.isEmpty {
+                if case .text(let t)? = content(box.offset), let value = t.fields[name], !value.isEmpty {
                     resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
                 }
             case .static(let raw):
@@ -109,7 +137,7 @@ public enum SlotResolver {
                     resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
                 }
             }
-            if resolved != nil { drew = true }
+            if resolved != nil { drewAt.insert(box.offset) }
             out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed))
         }
         return out
@@ -157,6 +185,6 @@ public enum SlotResolver {
             onTextMiss(job)
         }
         return ResolvedBox(channel: slot.channel, frame: frame, content: .lines(lines), opacity: opacity, grade: boxGrade(box, library: inputs.library),
-                           offset: slot.offset, binding: box.binding, text: value)
+                           offset: box.offset, binding: box.binding, text: value)
     }
 }

@@ -113,7 +113,7 @@ final class PreviewPlanTests: XCTestCase {
         var machine = try EngineFixtures.spikeMachine()
         machine.outputs.removeLast()                           // stack 2 feeds no output
         machine.stacks[0].slots = [StackSlot(channel: 2)]       // the main stack samples channel 2 only
-        machine.stacks[1].slots = [StackSlot(channel: 1), StackSlot(channel: 2, offset: 0)]   // the unassigned stack samples both
+        machine.stacks[1].slots = [StackSlot(channel: 1), StackSlot(channel: 2)]   // the unassigned stack samples both
         machine.stacks[1].defaultPreset = nil                   // through preset 1, whose pixel box samples channel 1's picture
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot)
         let backend = try XCTUnwrap(engine.recording)

@@ -42,7 +42,7 @@ public protocol SourceFactory: AnyObject, Sendable {
 }
 
 /// Spec 4 §5 — "Poster frame ... 1 per pool item, loaded on demand. For offset
-/// slots and thumbnails." `.none` when the item has no poster.
+/// boxes and thumbnails." `.none` when the item has no poster.
 public protocol PosterProvider: AnyObject, Sendable {
     func poster(for entry: MediaEntry) -> TextureHandle
 }

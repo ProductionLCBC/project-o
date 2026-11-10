@@ -12,6 +12,7 @@
           "fit": "fit",
           "frame": { "h": 1, "w": 1, "x": 0, "y": 0 },
           "grade": null,
+          "offset": 0,
           "transition": { "ms": null, "ref": 1 }
         },
         {
@@ -20,6 +21,7 @@
           "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
           "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 },
           "grade": null,
+          "offset": 0,
           "textStyle": {
             "alignment": "center",
             "allCaps": false,

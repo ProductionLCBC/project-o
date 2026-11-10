@@ -140,10 +140,12 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.cues[0].trigger, .timecode("01:00:10:00"))
         XCTAssertEqual(library.list(number: 7)?.trackThrough, true)
 
+        // Spec 6 §2, §3 — one slot per channel; the next lyric is a box at +1.
         let confidence = machine.stack(2)
         XCTAssertEqual(confidence?.defaultPreset, 2)
-        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, offset: 0, opacity: 1, mute: false),
-                                           StackSlot(channel: 2, preset: 3, offset: 1, opacity: 1, mute: false)])
+        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, opacity: 1, mute: false)])
+        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.offset), [0, 0, 1])
+        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.binding.kind), [.field(name: "body"), .static(text: "[Time]"), .field(name: "body")])
         XCTAssertEqual(machine.settings.libraryMode, .readOnlyMasters)
         XCTAssertEqual(machine.settings.network.oscInPort, 8000)
         XCTAssertEqual(machine.settings.startupMacro, 2)

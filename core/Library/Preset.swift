@@ -195,8 +195,11 @@ public struct BoxTransition: Codable, Equatable, Sendable {
 
 /// Spec 1 §2 — Box (child of a Preset layout): `binding`, `frame`, `fit`,
 /// `textStyle`, `transition`, `transitionOnVariableChange` ("Default false; a
-/// popup box wants true"), `fallback` ("Renders only if no earlier box drew"),
-/// `grade` ("Per-box output correction, separate from channel grades").
+/// popup box wants true"), `fallback` ("Renders only if no earlier box at the
+/// same offset drew"), `offset` ("integer, −2 to +3, default 0; written on
+/// every box ... Draws the slot's channel as it will be after this many cues
+/// (Spec 6 §3); v1 draws 0 to +3"), `grade` ("Per-box output correction,
+/// separate from channel grades").
 ///
 /// As in the §9 example, a pixels box carries no `textStyle` and no
 /// `transitionOnVariableChange`; text and static boxes carry both.
@@ -208,12 +211,13 @@ public struct Box: Codable, Equatable, Sendable {
     public var transition: BoxTransition
     public var transitionOnVariableChange: Bool
     public var fallback: Bool
+    public var offset: Int
     public var grade: Int?
     public var extra: [String: JSONValue]
 
     public init(binding: Binding, frame: Frame = .full, fit: BoxFit, textStyle: BoxTextStyle? = nil,
                 transition: BoxTransition = BoxTransition(), transitionOnVariableChange: Bool = false,
-                fallback: Bool = false, grade: Int? = nil, extra: [String: JSONValue] = [:]) {
+                fallback: Bool = false, offset: Int = 0, grade: Int? = nil, extra: [String: JSONValue] = [:]) {
         self.binding = binding
         self.frame = frame
         self.fit = fit
@@ -221,12 +225,25 @@ public struct Box: Codable, Equatable, Sendable {
         self.transition = transition
         self.transitionOnVariableChange = transitionOnVariableChange
         self.fallback = fallback
+        self.offset = offset
         self.grade = grade
         self.extra = extra
     }
 
+    /// Spec 6 §3 — "The schema accepts −2 to +3, so v1.5 needs no migration.
+    /// ... Outside −2 to +3, the reference report flags the box and it draws
+    /// nothing."
+    public static let offsetRange = -2...3
+
+    /// Spec 6 §3 — "v1 draws 0 to +3 (P4), and a negative offset draws
+    /// nothing until v1.5 adds the ring buffer."
+    public static let drawnOffsets = 0...3
+
+    /// Spec 6 §3 — whether v1 draws this box at all: 0 to +3 only.
+    public var isDrawnOffset: Bool { Box.drawnOffsets.contains(offset) }
+
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case binding, frame, fit, textStyle, transition, transitionOnVariableChange, fallback, grade
+        case binding, frame, fit, textStyle, transition, transitionOnVariableChange, fallback, offset, grade
     }
 
     public init(from decoder: Decoder) throws {
@@ -238,10 +255,13 @@ public struct Box: Codable, Equatable, Sendable {
         transition = try c.value(.transition, default: BoxTransition())
         transitionOnVariableChange = try c.value(.transitionOnVariableChange, default: false)
         fallback = try c.value(.fallback, default: false)
+        offset = try c.value(.offset, default: 0)
         grade = try c.decodeIfPresent(Int.self, forKey: .grade)
         extra = try decoder.unknownKeys(besides: CodingKeys.known)
     }
 
+    /// Spec 1 §5 — "Catalog objects write every known key", so `offset` is
+    /// written on every box, 0 included (Spec 6 §3).
     public func encode(to encoder: Encoder) throws {
         try encoder.encode(unknownKeys: extra)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -254,6 +274,7 @@ public struct Box: Codable, Equatable, Sendable {
         }
         try c.encode(transition, forKey: .transition)
         try c.encode(fallback, forKey: .fallback)
+        try c.encode(offset, forKey: .offset)
         try c.encodeNullable(grade, forKey: .grade)
     }
 }

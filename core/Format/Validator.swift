@@ -15,8 +15,8 @@ public enum IssueCode: String, Equatable, Sendable {
     // References to numbers that do not exist (§8).
     case missingChannel, missingPreset, missingTextStyle, missingGrade, missingTransition, missingAudioTransition
     case missingMacro, missingList, missingStack, missingOutput, missingAudioOutput, missingInput, missingBuiltIn
-    // Numbers and slots (§8, §9, §3).
-    case duplicateNumber, duplicateSlot, slotOutOfRange
+    // Numbers, slots and boxes (§8, §3, §2; Spec 6 §2, §3).
+    case duplicateNumber, duplicateSlot, slotOutOfRange, boxOffsetOutOfRange
     // Media (§7, §8) and fonts (§7).
     case unknownMedia, missingMedia, fontNotInstalled
     // Commands (§6, Spec 2 §7, Spec 2 §5).
@@ -116,17 +116,19 @@ public enum Validator {
         return report
     }
 
-    /// Spec 1 §9 — the stack rule the loader enforces, and §3's slot ranges.
+    /// Spec 6 §2 and Spec 1 §10 — "A second slot for a channel in a stack is
+    /// ignored and reported", "on every load (Spec 1 §8)"; and §3's opacity
+    /// range.
     static func checkStacks(_ machine: Machine, into report: inout ValidationReport, file: String?) {
         for stack in machine.stacks {
             for index in stack.duplicateSlotIndices {
                 let slot = stack.slots[index]
                 report.add(.warning, .duplicateSlot, file: file, subject: "stack \(stack.number) slot \(index + 1)",
-                           message: "channel \(slot.channel) appears again at offset \(slot.offset); the slot is empty at use")
+                           message: "channel \(slot.channel) already has a slot in this stack; this one is ignored")
             }
             for (index, slot) in stack.slots.enumerated() where !slot.isInRange {
                 report.add(.warning, .slotOutOfRange, file: file, subject: "stack \(stack.number) slot \(index + 1)",
-                           message: "offset \(slot.offset) must be -2 to +3 and opacity \(slot.opacity) 0 to 1")
+                           message: "opacity \(slot.opacity) must be 0 to 1")
             }
         }
     }
@@ -273,6 +275,10 @@ struct Checks {
                     if let style = box.textStyle?.fromStyle { reference(.textStyle, style, from: subject) }
                     reference(.transition, box.transition.ref, from: subject)
                     if let grade = box.grade { reference(.grade, grade, from: subject) }
+                    // Spec 6 §3 — "Outside −2 to +3, the reference report flags the box and it draws nothing."
+                    if !Box.offsetRange.contains(box.offset) {
+                        warn(.boxOffsetOutOfRange, subject, "offset \(box.offset) must be -2 to +3; the box draws nothing")
+                    }
                 }
             }
         }

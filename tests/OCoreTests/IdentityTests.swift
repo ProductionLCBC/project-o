@@ -51,8 +51,8 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(after.filter { $0 == 5 }.count, before.filter { $0 == 2 }.count)
         XCTAssertEqual(after.filter { $0 == 1 }, before.filter { $0 == 1 }, "channel 1 is untouched")
 
-        // The §9 confidence stack: both slots named channel 2.
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [5, 5])
+        // The confidence stack's one slot for channel 2 (Spec 6 §2).
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [5])
         // The macro guard that reads channel 2 follows too (Spec 2 §7 values name channels).
         XCTAssertEqual(library.macro(1)?.commands.first?.when?.variable, "Channel 5 Content")
         // The slide entry's default channel.
@@ -85,7 +85,7 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.channel(2)?.uuid, uuid1)
         XCTAssertEqual(library.channel(1)?.label, "Foreground")
         XCTAssertEqual(machine.stack(1)?.slots.map(\.channel), [2, 1], "slot order is kept; the numbers swap")
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [1, 1])
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [1])
         let verse = library.list(number: 42)?.cues[0].commands.map(\.command)
         XCTAssertEqual(verse?.first?.channelTarget, .number(2), "the background write now names channel 2")
         XCTAssertEqual(verse?.last?.channelTarget, .number(1))
@@ -93,9 +93,11 @@ final class IdentityTests: XCTestCase {
 
     func test_renumberingPresetsTransitionsAndGradesRewritesBoxesOutputsRidersAndIndexDefaults() {
         var (library, machine) = roots
+        machine.stacks[1].slots[0].preset = 3
 
         XCTAssertEqual(Identity.renumber(.preset, from: 3, to: 9, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.preset), [nil, 9])
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.preset), [9])
+        XCTAssertEqual(machine.stack(2)?.defaultPreset, 2)
         XCTAssertEqual(library.presets.map(\.number), [1, 2, 9])
         XCTAssertEqual(library.channel(1)?.defaultPreset, 1)
 

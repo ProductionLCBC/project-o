@@ -48,11 +48,11 @@ struct Nesting: Equatable, Sendable {
     var insideMacro: Nesting { Nesting(levels: levels + 1, own: false) }
 }
 
-/// Spec 3 §7 — "Lookahead for offset slots. Start from the live ShowState and
+/// Spec 3 §7 — "Lookahead for offset boxes. Start from the live ShowState and
 /// fold the next K cues from the pointer, crossing item boundaries and
 /// applying list boundaries exactly as a real fire would, with `frame` held
 /// at the current frame so nothing appears to play." Returns nil past the end
-/// of the playlist, which is what an empty `+K` slot shows.
+/// of the playlist, which is what an empty `+K` box shows.
 public func lookahead(_ state: ShowState, steps: Int, context: ProjectionContext) -> ShowState? {
     var current = state
     guard steps > 0 else { return current }

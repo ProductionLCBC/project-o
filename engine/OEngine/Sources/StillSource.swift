@@ -99,7 +99,7 @@ public final class StillSource: ContentSource, @unchecked Sendable {
 }
 
 /// Spec 4 §5 — "Poster frame: BGRA8Unorm sRGB ... 1 per pool item, loaded on
-/// demand. For offset slots and thumbnails." Loaded with ImageIO into a
+/// demand. For offset boxes and thumbnails." Loaded with ImageIO into a
 /// premultiplied sRGB bitmap and uploaded as an sRGB-typed texture.
 public final class ImagePosterProvider: PosterProvider, @unchecked Sendable {
     private let backend: MetalBackend

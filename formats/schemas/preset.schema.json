@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://project-o.lcbcchurch.com/schemas/preset.schema.json",
   "title": "presets/NNN-slug.json",
-  "description": "Spec 1 §2 — Preset: layouts, a map from stack number (or \"*\") to a layout of boxes and a reserved mask. Box: binding, frame, fit, textStyle, transition, transitionOnVariableChange, fallback, grade.",
+  "description": "Spec 1 §2 — Preset: layouts, a map from stack number (or \"*\") to a layout of boxes and a reserved mask. Box: binding, frame, fit, textStyle, transition, transitionOnVariableChange, fallback, offset (-2..+3, written on every box, Spec 6 §3), grade.",
   "type": "object",
   "required": ["schema", "app", "kind", "number", "label", "uuid", "builtIn", "layouts"],
   "properties": {
@@ -42,7 +42,7 @@
     },
     "box": {
       "type": "object",
-      "required": ["binding", "frame", "fit", "transition", "fallback", "grade"],
+      "required": ["binding", "frame", "fit", "transition", "fallback", "offset", "grade"],
       "properties": {
         "binding": {
           "oneOf": [
@@ -79,6 +79,7 @@
         },
         "transitionOnVariableChange": { "type": "boolean" },
         "fallback": { "type": "boolean" },
+        "offset": { "type": "integer", "minimum": -2, "maximum": 3 },
         "grade": { "type": ["integer", "null"] }
       }
     },

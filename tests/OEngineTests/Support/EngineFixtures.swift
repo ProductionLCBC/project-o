@@ -49,8 +49,8 @@ enum EngineFixtures {
     }
 
     /// Spec 4 §15 — the spike configuration: the fixture's two stacks (main:
-    /// channels 1 and 2; confidence: channel 2 at offset 0 and +1 with the
-    /// plain-text default preset and the static [Time] box), stack 1 on output
+    /// channels 1 and 2; confidence: channel 2 through its default preset's
+    /// body box, static [Time] box and +1 body box), stack 1 on output
     /// 1 and stack 2 on output 2, both displays in the 60 family. `mainSize` is
     /// the main output's format; the spike wants 4096×2160 on the LED wall and
     /// the tests use 1920×1080 unless they say otherwise.

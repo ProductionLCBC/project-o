@@ -10,8 +10,8 @@
       "label": "Main",
       "number": 1,
       "slots": [
-        { "channel": 1, "mute": false, "offset": 0, "opacity": 1, "preset": null },
-        { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null }
+        { "channel": 1, "mute": false, "opacity": 1, "preset": null },
+        { "channel": 2, "mute": false, "opacity": 1, "preset": null }
       ],
       "uuid": "5e5e0000-0000-4000-8000-000000000001"
     },
@@ -22,8 +22,7 @@
       "label": "Confidence",
       "number": 2,
       "slots": [
-        { "channel": 2, "mute": false, "offset": 0, "opacity": 1, "preset": null },
-        { "channel": 2, "mute": false, "offset": 1, "opacity": 1, "preset": 3 }
+        { "channel": 2, "mute": false, "opacity": 1, "preset": null }
       ],
       "uuid": "6f6f0000-0000-4000-8000-000000000002"
     }

@@ -95,11 +95,11 @@ final class PlanBuilderTests: XCTestCase {
         engine.tick()
         let plan = try XCTUnwrap(engine.lastPlan)
         let confidence = try XCTUnwrap(plan.stackPasses.first { $0.stack == 2 })
-        // Stack 2 default preset is 2 (Confidence): a body box and a static [Time] box for the offset-0 slot.
+        // Stack 2 default preset is 2 (Confidence): a body box and a static [Time] box at offset 0.
         let liveBoxes = confidence.boxes.filter { $0.offset == 0 }
         XCTAssertEqual(liveBoxes.map(\.binding), [.field(name: "body"), .static(text: "[Time]")])
         XCTAssertEqual(liveBoxes.last?.text, "10:00 AM", "the static box resolves [Time] with the machine's format and zone")
-        // The +1 slot names preset 3 (Lower third), whose layout for stack 2 is one body box.
+        // Its third box is a body box at +1 in the lower third's look (Spec 6 §3: the offset is the box's).
         let offsetBoxes = confidence.boxes.filter { $0.offset == 1 }
         XCTAssertEqual(offsetBoxes.map(\.binding), [.field(name: "body")])
         XCTAssertEqual(offsetBoxes.first?.frame, PixelRect(x: 0.03 * 1920, y: 0.82 * 1080, width: 0.94 * 1920, height: 0.16 * 1080))
@@ -113,7 +113,7 @@ final class PlanBuilderTests: XCTestCase {
         engine.tick()
         let confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
         XCTAssertEqual(confidence.boxes.filter { $0.offset == 0 }.map(\.binding), [.field(name: "body"), .static(text: "[Time]")])
-        XCTAssertTrue(confidence.boxes.filter { $0.offset == 1 }.isEmpty, "nothing is next, so the slot is empty")
+        XCTAssertTrue(confidence.boxes.filter { $0.offset == 1 }.isEmpty, "nothing is next, so the +1 box is empty")
     }
 
     func test_fallbackBoxDrawsOnlyWhenNoEarlierBoxDrew() throws {
@@ -144,9 +144,9 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertEqual(main.boxes.first { $0.channel == 2 }?.opacity, 0.25)
     }
 
-    // MARK: - Offset slots (§9, Spec 3 §7)
+    // MARK: - Offset boxes (§9, Spec 3 §7, Spec 6 §3)
 
-    func test_plusOneSlotShowsTheNextCuesTextAndEmptyPastTheEnd() throws {
+    func test_plusOneBoxShowsTheNextCuesTextAndEmptyPastTheEnd() throws {
         engine.send("list 42 cue 1")
         engine.tick()
         var confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
@@ -156,12 +156,16 @@ final class PlanBuilderTests: XCTestCase {
         engine.tick()
         confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
         XCTAssertEqual(confidence.boxes.first { $0.offset == 0 }?.text, "Great is Thy faithfulness!\nGreat is Thy faithfulness!")
-        XCTAssertNil(confidence.boxes.first { $0.offset == 1 }, "past the end the slot is empty")
+        XCTAssertNil(confidence.boxes.first { $0.offset == 1 }, "past the end the +1 box is empty")
     }
 
-    func test_plusOneSlotShowsAPosterFrameForMedia() throws {
-        // Cue 1 of list 42 writes dawn to channel 1; a confidence slot for channel 1 at +1 shows its poster.
-        machine.stacks[1].slots.append(StackSlot(channel: 1, preset: 1, offset: 1))
+    /// Spec 6 §3 — "As offset slots did (Spec 4 §9), a pixel box at an offset
+    /// shows the pool item's poster frame".
+    func test_plusOnePixelBoxShowsAPosterFrameForMedia() throws {
+        // Cue 1 of list 42 writes dawn to channel 1; a confidence slot for channel 1 whose preset draws it at +1 shows its poster.
+        library.presets.append(Preset(number: 8, label: "Next picture", uuid: EngineFixtures.uuid("c0de", 8),
+                                      layouts: [.any: Layout(boxes: [Box(binding: .pixels, fit: .pixels(.fit), offset: 1)])]))
+        machine.stacks[1].slots.append(StackSlot(channel: 1, preset: 8))
         engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
         engine.send("playlist \"Sunday\"")
         engine.tick()
@@ -169,7 +173,7 @@ final class PlanBuilderTests: XCTestCase {
         let box = try XCTUnwrap(confidence.boxes.first { $0.channel == 1 && $0.offset == 1 })
         guard case .pixels(let quad) = box.content else { return XCTFail("expected the poster quad") }
         XCTAssertEqual(quad.texture, engine.posterHandle(for: EngineFixtures.dawn))
-        XCTAssertEqual(engine.lastPlan?.channelPasses, [], "an offset slot never costs a channel pass")
+        XCTAssertEqual(engine.lastPlan?.channelPasses, [], "an offset box never costs a channel pass")
     }
 
     // MARK: - Transitions and grades (§7)

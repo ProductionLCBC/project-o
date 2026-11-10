@@ -59,7 +59,7 @@ final class MetalEngineTests: XCTestCase {
                 XCTAssertEqual(stackPass.boxes.first { $0.offset == 1 }?.text, t.fields["body"], "cue \(cue): +1 matches the projection")
                 XCTAssertGreaterThan(lit(region(confidence, lowerThird)), 50, "cue \(cue): the +1 slot is drawn")
             } else {
-                XCTAssertNil(stackPass.boxes.first { $0.offset == 1 }, "cue \(cue): past the end the +1 slot is empty")
+                XCTAssertNil(stackPass.boxes.first { $0.offset == 1 }, "cue \(cue): past the end the +1 box is empty")
                 XCTAssertEqual(lit(region(confidence, lowerThird)), 0, "cue \(cue): nothing drawn past the end")
             }
         }
