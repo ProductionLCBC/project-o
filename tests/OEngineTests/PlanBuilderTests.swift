@@ -163,7 +163,7 @@ final class PlanBuilderTests: XCTestCase {
         // Cue 1 of list 42 writes dawn to channel 1; a confidence slot for channel 1 at +1 shows its poster.
         machine.stacks[1].slots.append(StackSlot(channel: 1, preset: 1, offset: 1))
         engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
-        engine.send("playlist \"Sunday\" 2026-11-01")
+        engine.send("playlist \"Sunday\"")
         engine.tick()
         let confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
         let box = try XCTUnwrap(confidence.boxes.first { $0.channel == 1 && $0.offset == 1 })

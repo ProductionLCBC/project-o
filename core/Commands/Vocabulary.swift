@@ -182,8 +182,8 @@ enum Vocabulary {
                       args: [Arg("section", .string)], lock: .passes, undo: .runtime),
         VocabularyRow("list.goto", target: "list", number: .int("list"), verb: .word("cue"),
                       args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
-        VocabularyRow("playlist.load", target: "playlist",
-                      args: [Arg("title", .string), Arg("date", .optionalString)], lock: .passes, undo: .none),
+        // Spec 7 §3 — "Spec 2 §3 loses its `[DATE]` argument."
+        VocabularyRow("playlist.load", target: "playlist", args: [Arg("title", .string)], lock: .passes, undo: .none),
         // Spec 2 §3, Spec 7 §4 — `disarm`, `/o/disarm`.
         VocabularyRow("playlist.disarm", target: "disarm", lock: .passes, undo: .none),
         // Timers, popups and audio

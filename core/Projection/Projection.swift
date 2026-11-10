@@ -151,8 +151,8 @@ struct Fold {
             fireSection(item, section, command: command, nesting: nesting)
         case .listCue(let list, let position):
             fireList(list, cue: position, command: command, nesting: nesting)
-        case .playlistLoad(let title, let date):
-            loadPlaylist(title, date: date, command: command)
+        case .playlistLoad(let title):
+            loadPlaylist(title, command: command)
         case .disarm:
             disarm(command: command)
 

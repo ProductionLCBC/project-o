@@ -134,7 +134,7 @@ final class LogEntryTests: XCTestCase {
                                  .audioMute(audio: .all, state: .on), .systemClearAll] {
             XCTAssertEqual(runtime.undoClass, .runtime, "\(runtime)")
         }
-        for none: Command in [.channelLock(channel: .number(1), locked: true), .playlistLoad(title: "", date: nil),
+        for none: Command in [.channelLock(channel: .number(1), locked: true), .playlistLoad(title: ""),
                               .timerSet(timer: 1, ms: 0), .timerStart(timer: 1), .timerPause(timer: 1), .timerReset(timer: 1),
                               .macro(1), .undo, .redo, .historyJump(1), .systemPreflight, .systemSnapshot, .unknown(cmd: "x")] {
             XCTAssertEqual(none.undoClass, .none, "\(none)")

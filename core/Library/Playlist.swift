@@ -192,6 +192,21 @@ public struct Playlist: Codable, Equatable, Sendable {
         title.lowercased() + "\u{0}" + (serviceDate ?? "")
     }
 
+    /// Spec 7 §3 — "A playlist's title is its identity on the machine:
+    /// trimmed of spaces at either end, never empty, and unique without regard
+    /// to case." The form two titles are compared in.
+    public static func titleKey(_ title: String) -> String {
+        trimmedTitle(title).lowercased()
+    }
+
+    /// Spec 7 §3 — a title "trimmed of spaces at either end".
+    public static func trimmedTitle(_ title: String) -> String {
+        var scalars = Substring(title).unicodeScalars
+        while let first = scalars.first, first.properties.isWhitespace { scalars.removeFirst() }
+        while let last = scalars.last, last.properties.isWhitespace { scalars.removeLast() }
+        return String(String.UnicodeScalarView(scalars))
+    }
+
     /// Spec 7 §3 — what a save writes for each linked item: the uuid of the
     /// list it finds ("records that list's uuid at the next save") and that
     /// list's number ("the number in the file is corrected at the playlist's

@@ -242,7 +242,7 @@ final class CommandRunnerTests: XCTestCase {
             (F.fresh(), [.listCue(list: 1, cue: 1), .next, .next], .ui),
             (onCue, [.next, .channelGrade(channel: .number(2), ref: 1, ms: nil), .previous], .osc),
             (onCue, [.itemCue(item: 3, cue: 1), .systemClearAll], .ui),
-            (F.fresh(), [.playlistLoad(title: "Sunday", date: nil), .next, .next, .next], .ui),
+            (F.fresh(), [.playlistLoad(title: "Sunday"), .next, .next, .next], .ui),
         ]
         for (state, commands, source) in cases {
             let outcome = try XCTUnwrap(run(group(commands, source), state: state, validate: false))

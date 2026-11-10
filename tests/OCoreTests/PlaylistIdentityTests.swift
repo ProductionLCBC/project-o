@@ -162,6 +162,62 @@ final class PlaylistIdentityTests: XCTestCase {
         XCTAssertEqual(orphan.recordingLinks(in: library), orphan)
     }
 
+    // MARK: - Loading by title
+
+    func load(_ title: String, _ machine: Machine, library: Library? = nil) -> ShowState {
+        let library = library ?? F.load().library
+        let context = ProjectionContext(frame: 0, library: library, machine: machine, source: CommandSource(kind: .osc))
+        return project(ShowState.fresh(library: library, machine: machine), [.playlistLoad(title: title)], context: context).0
+    }
+
+    /// "A playlist's title is its identity on the machine: trimmed of spaces
+    /// at either end, never empty, and unique without regard to case.
+    /// `playlist "TITLE"` therefore names one playlist."
+    func test_playlistTitleLoadsByTitleTrimmedAndIgnoringCase() throws {
+        let (library, machine, _) = F.load()
+        XCTAssertEqual(load("  sunday ", machine).pointer, LivePointer(playlist: F.playlistUuid))
+        XCTAssertNil(load("Sunday Evening", machine).pointer)
+        let validation = ValidationContext(library: library, machine: machine)
+        XCTAssertNil(CommandValidator.validate(.playlistLoad(title: " SUNDAY"), context: validation))
+        XCTAssertEqual(CommandValidator.validate(.playlistLoad(title: "Nope"), context: validation)?.reason, .noSuchTarget)
+    }
+
+    /// "A `playlist.load` stored with a `date`, from before this spec, loads
+    /// by its title and ignores the date." The date stays in the stored
+    /// command as an unknown key (Spec 1 §8).
+    func test_aStoredLoadWithADateLoadsByTitleAndKeepsTheDate() throws {
+        let stored = try JSONCoding.decode(GuardedCommand.self, from: JSONValue.parse(
+            #"{ "cmd": "playlist.load", "date": "2025-01-01", "title": "Sunday" }"#))
+        XCTAssertEqual(stored.command, .playlistLoad(title: "Sunday"))
+        XCTAssertEqual(stored.extra["date"], .string("2025-01-01"))
+        XCTAssertEqual(try JSONCoding.encode(stored)["date"], .string("2025-01-01"))
+        let (_, machine, _) = F.load()
+        XCTAssertEqual(load("Sunday", machine).pointer, LivePointer(playlist: F.playlistUuid))
+    }
+
+    /// "Two playlists with the same title both load. `playlist "TITLE"`
+    /// loads the one whose file has the plain slug, or else the one whose
+    /// path sorts first, which no save changes".
+    func test_twoPlaylistsWithOneTitleLoadThePlainSlugElseThePathThatSortsFirst() throws {
+        var (_, machine, _) = F.load()
+        let other = F.uuid("2b2b", 1)
+        var second = try XCTUnwrap(machine.playlist(uuid: F.playlistUuid))
+        second.uuid = other
+        second.title = "SUNDAY"
+        machine.playlists.append(second)
+        let key = { (uuid: UUID) in "playlist/" + uuid.uuidString.lowercased() }
+
+        machine.documentPaths[key(F.playlistUuid)] = "playlists/2026-11-01-sunday.json"
+        machine.documentPaths[key(other)] = "playlists/sunday.json"
+        XCTAssertEqual(load("Sunday", machine).pointer?.playlist, other, "the plain slug")
+        machine.playlists.reverse()
+        XCTAssertEqual(load("Sunday", machine).pointer?.playlist, other, "whatever the order they loaded in")
+
+        machine.documentPaths[key(other)] = "playlists/2026-11-08-sunday.json"
+        XCTAssertEqual(load("sunday", machine).pointer?.playlist, F.playlistUuid, "else the path that sorts first")
+        XCTAssertEqual(machine.playlist(titled: "Sunday")?.uuid, F.playlistUuid)
+    }
+
     /// Spec 7 §8 — the fixture's playlist has "a `uuid` on every item and a
     /// `listUuid` on every linked one", and they are the uuids the rule
     /// gives, so the same file made by hand loads with the same ones.

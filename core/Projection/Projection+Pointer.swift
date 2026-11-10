@@ -262,15 +262,13 @@ extension Fold {
         effects.append(.pointer(old: state.pointer, new: state.pointer, armed: nil))
     }
 
-    /// Spec 2 §3 — `playlist "TITLE" [DATE]`: "Makes a playlist live at its
-    /// first cue without firing it." The pointer names the playlist and no
-    /// cue, so the first `next` fires cue 1 as a boundary. Spec 1 §3: the
-    /// pair of title and date is unique on a machine, case-insensitive.
-    mutating func loadPlaylist(_ title: String, date: String?, command: Command) {
-        let wanted = title.lowercased()
-        guard let playlist = context.machine.playlists.first(where: {
-            $0.title.lowercased() == wanted && (date == nil || $0.serviceDate == date)
-        }) else {
+    /// Spec 2 §3 — `playlist "TITLE"`: "Makes a playlist live with no cue
+    /// fired; the first `next` fires its first cue (Spec 7 §3–§4)." The
+    /// pointer names the playlist and no cue, so the first `next` is a
+    /// boundary. Spec 7 §3 — by title alone, as `Machine.playlist(titled:)`
+    /// finds it.
+    mutating func loadPlaylist(_ title: String, command: Command) {
+        guard let playlist = context.machine.playlist(titled: title) else {
             effects.append(.noop(command))
             return
         }

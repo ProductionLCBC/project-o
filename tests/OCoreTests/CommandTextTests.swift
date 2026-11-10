@@ -110,8 +110,8 @@ final class CommandTextTests: XCTestCase {
         row("item 4 cue 3", .itemCue(item: 4, cue: 3)),
         row("item 4 section \"chorus\"", .itemSection(item: 4, section: "chorus")),
         row("list 42 cue 3", .listCue(list: 42, cue: 3)),
-        row("playlist \"Sunday\" 2026-11-01", .playlistLoad(title: "Sunday", date: "2026-11-01")),
-        row("playlist \"Sunday\"", .playlistLoad(title: "Sunday", date: nil)),
+        // Spec 7 §3 — "`playlist "TITLE"` therefore names one playlist, and Spec 2 §3 loses its `[DATE]` argument."
+        row("playlist \"Sunday\"", .playlistLoad(title: "Sunday")),
         // Spec 2 §3, Spec 7 §4 — `disarm` clears the armed trigger.
         row("disarm", .disarm),
         // Timers, popups and audio
@@ -400,9 +400,8 @@ final class CommandTextTests: XCTestCase {
             .itemSection(item: 4, section: "chorus"),
             .itemSection(item: 4, section: "Verse \"two\""),
             .listCue(list: 42, cue: 3),
-            .playlistLoad(title: "Sunday", date: "2026-11-01"),
-            .playlistLoad(title: "Sunday", date: nil),
-            .playlistLoad(title: "", date: nil),
+            .playlistLoad(title: "Sunday"),
+            .playlistLoad(title: ""),
             .timerSet(timer: 1, ms: 300_000), .timerSet(timer: 1, ms: 0), .timerSet(timer: 1, ms: 3_723_456),
             .timerStart(timer: 1), .timerPause(timer: 2), .timerReset(timer: 3),
             .popupSet(popup: 3, text: "Nursery", clearAfterMs: 30_000), .popupSet(popup: 3, text: "", clearAfterMs: nil),

@@ -110,10 +110,9 @@ struct Checker {
             try liveItem(item, cue: nil, section: section)
         case .listCue(let list, _):
             guard library.list(number: list) != nil else { throw reject(.noSuchTarget, "list \(list) does not exist") }
-        case .playlistLoad(let title, let date):
-            let wanted = title.lowercased()
-            guard machine.playlists.contains(where: { $0.title.lowercased() == wanted && (date == nil || $0.serviceDate == date) }) else {
-                throw reject(.noSuchTarget, "no playlist \"\(title)\"" + (date.map { " dated \($0)" } ?? "") + " on this machine")
+        case .playlistLoad(let title):
+            guard machine.playlist(titled: title) != nil else {
+                throw reject(.noSuchTarget, "no playlist \"\(title)\" on this machine")
             }
         case .timerSet(let timer, _), .timerStart(let timer), .timerPause(let timer), .timerReset(let timer):
             try slot(timer, count: machine.settings.timers, "timer", reason: .noSuchTarget)

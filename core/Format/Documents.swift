@@ -292,6 +292,19 @@ public enum FileLayout {
         return nil
     }
 
+    /// Spec 7 §3 — "A playlist's file name is a slug of its title ... A title
+    /// with no letters or digits uses the playlist's uuid": the plain name,
+    /// before any `-2` that another playlist's file makes it take.
+    public static func plainPath(forPlaylist playlist: Playlist) -> String {
+        let s = slug(playlist.title)
+        return "playlists/" + (s.isEmpty ? playlist.uuid.uuidString.lowercased() : s) + ".json"
+    }
+
+    /// The key `documentPaths` uses for a playlist's document.
+    public static func documentKey(playlist uuid: UUID) -> String {
+        "playlist/" + uuid.uuidString.lowercased()
+    }
+
     /// The key `documentPaths` uses for a per-object document.
     public static func documentKey(for document: Document) -> String? {
         switch document {

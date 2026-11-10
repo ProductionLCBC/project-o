@@ -127,7 +127,8 @@ public enum Command: Codable, Equatable, Sendable {
     case itemCue(item: Int, cue: Int)
     case itemSection(item: Int, section: String)
     case listCue(list: Int, cue: Int)
-    case playlistLoad(title: String, date: String?)
+    /// Spec 2 §3 as Spec 7 §3 corrected it — `playlist "TITLE"`, by title alone.
+    case playlistLoad(title: String)
     /// Spec 2 §3, Spec 7 §4 — "Clears the armed trigger, so nothing fires on its own".
     case disarm
     // Timers, popups and audio
@@ -339,7 +340,10 @@ public enum Command: Codable, Equatable, Sendable {
         case "playlist.section": self = .itemSection(item: try int("item"), section: try string("section"))
         case "list.goto": self = .listCue(list: try int("list"), cue: try int("cue"))
         case "playlist.load":
-            self = .playlistLoad(title: try string("title"), date: try c.decodeIfPresent(String.self, forKey: Key("date")))
+            // Spec 7 §3 — "A `playlist.load` stored with a `date`, from before
+            // this spec, loads by its title and ignores the date": the date
+            // stays as an unknown key of the stored command (Spec 1 §8).
+            self = .playlistLoad(title: try string("title"))
         case "playlist.disarm": self = .disarm
         case "timer.set": self = .timerSet(timer: try int("timer"), ms: try int("ms"))
         case "timer.start": self = .timerStart(timer: try int("timer"))
@@ -433,9 +437,8 @@ public enum Command: Codable, Equatable, Sendable {
         case .listCue(let list, let cue):
             try c.encode(list, forKey: Key("list"))
             try c.encode(cue, forKey: Key("cue"))
-        case .playlistLoad(let title, let date):
+        case .playlistLoad(let title):
             try c.encode(title, forKey: Key("title"))
-            try c.encodeIfPresent(date, forKey: Key("date"))
         case .timerSet(let timer, let ms):
             try c.encode(timer, forKey: Key("timer"))
             try c.encode(ms, forKey: Key("ms"))

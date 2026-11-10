@@ -163,9 +163,10 @@ final class CommandRejectionTests: XCTestCase {
         accept("macro 2")
         expect("list 99 cue 1", .noSuchTarget, containing: "list 99")
         expect("playlist \"Nope\"", .noSuchTarget)
-        expect("playlist \"Sunday\" 2025-01-01", .noSuchTarget)
+        // Spec 7 §3 — a title is the identity: the date is no longer an argument.
+        expect("playlist \"Sunday\" 2026-11-01", .unexpectedToken)
         accept("playlist \"Sunday\"")
-        accept("playlist \"sunday\" 2026-11-01")
+        accept("playlist \" sunday \"")
         // Live-position targets are checked only when a ShowState is given.
         expect("cue 9", .noSuchTarget, containing: "cue 9", state: Self.liveState)
         accept("cue 4", state: Self.liveState)
