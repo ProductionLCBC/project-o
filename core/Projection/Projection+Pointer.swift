@@ -1,107 +1,24 @@
-// OCore — Spec 3 §5, the live pointer and triggers.
+// OCore — Spec 3 §5, the live pointer and triggers, read from its place
+// (Spec 7 §4).
 
 import Foundation
-
-/// A resolved place in the show: the list, the cue's 0-based index in it,
-/// and, when reached through a playlist, the playlist and 1-based item.
-struct CuePosition {
-    var playlist: Playlist?
-    var item: Int?
-    var list: List
-    var cueIndex: Int
-
-    var cue: Cue { list.cues[cueIndex] }
-
-    var pointer: LivePointer {
-        LivePointer(playlist: playlist?.uuid, item: item, listUuid: list.uuid, cueUuid: cue.uuid)
-    }
-}
 
 extension Fold {
     // MARK: - Resolving lists and positions
 
-    /// Spec 1 §3 — a playlist item is a header, a linked master (by list
-    /// number) or a local copy (by uuid, in the machine root).
-    func list(for item: PlaylistItem) -> List? {
-        switch item.kind {
-        case .header: return nil
-        case .linked(let number): return context.library.list(number: number)
-        case .local(let uuid): return context.machine.localList(uuid: uuid) ?? context.library.list(uuid: uuid)
-        }
+    /// Spec 7 §4 — the place, over the roots and the kept copies the context
+    /// carries (Spec 3 §6).
+    var placer: Placer {
+        Placer(library: context.library, machine: context.machine, kept: context.kept)
     }
 
-    func list(uuid: UUID) -> List? {
-        context.library.list(uuid: uuid) ?? context.machine.localList(uuid: uuid)
-    }
-
-    /// The position the live pointer names, or nil when there is no pointer,
-    /// the pointer names no cue (a loaded playlist), or the cue is gone.
+    /// The position of a cue the pointer names, or nil when there is no
+    /// pointer, the pointer names no cue (a loaded playlist), or its cue
+    /// can't be found in its list or the list's kept copy. The runner reads
+    /// the cue a navigation fired this way.
     func position(of pointer: LivePointer?) -> CuePosition? {
-        guard let pointer, let listUuid = pointer.listUuid, let cueUuid = pointer.cueUuid else { return nil }
-        var playlist: Playlist?
-        var item: Int?
-        var list: List?
-        if let playlistUuid = pointer.playlist, let p = context.machine.playlist(uuid: playlistUuid) {
-            playlist = p
-            if let i = pointer.item, i >= 1, i <= p.items.count, let l = self.list(for: p.items[i - 1]), l.uuid == listUuid {
-                item = i
-                list = l
-            }
-        }
-        if list == nil {
-            guard pointer.playlist == nil, let l = self.list(uuid: listUuid) else { return nil }
-            list = l
-        }
-        guard let resolved = list, let index = resolved.cues.firstIndex(where: { $0.uuid == cueUuid }) else { return nil }
-        return CuePosition(playlist: playlist, item: item, list: resolved, cueIndex: index)
-    }
-
-    /// The first cue of the first item at or after `from` (1-based) that
-    /// resolves to a list with cues, skipping headers.
-    func firstPosition(in playlist: Playlist, from: Int) -> CuePosition? {
-        guard from >= 1 else { return nil }
-        for i in from...max(from, playlist.items.count) where i <= playlist.items.count {
-            if let list = list(for: playlist.items[i - 1]), !list.cues.isEmpty {
-                return CuePosition(playlist: playlist, item: i, list: list, cueIndex: 0)
-            }
-        }
-        return nil
-    }
-
-    /// The last cue of the last item at or before `from` (1-based) that
-    /// resolves to a list with cues, skipping headers.
-    func lastPosition(in playlist: Playlist, upTo from: Int) -> CuePosition? {
-        guard from >= 1, from <= playlist.items.count else { return nil }
-        for i in stride(from: from, through: 1, by: -1) {
-            if let list = list(for: playlist.items[i - 1]), !list.cues.isEmpty {
-                return CuePosition(playlist: playlist, item: i, list: list, cueIndex: list.cues.count - 1)
-            }
-        }
-        return nil
-    }
-
-    /// Spec 3 §5 — "`next` and `previous` operate on playlist positions: the
-    /// cue after or before the pointer's, crossing item boundaries, skipping
-    /// headers, and doing nothing past either end. With a library list live
-    /// (no playlist), they stay inside that list."
-    func following(_ position: CuePosition) -> CuePosition? {
-        if position.cueIndex + 1 < position.list.cues.count {
-            var next = position
-            next.cueIndex += 1
-            return next
-        }
-        guard let playlist = position.playlist, let item = position.item else { return nil }
-        return firstPosition(in: playlist, from: item + 1)
-    }
-
-    func preceding(_ position: CuePosition) -> CuePosition? {
-        if position.cueIndex > 0 {
-            var previous = position
-            previous.cueIndex -= 1
-            return previous
-        }
-        guard let playlist = position.playlist, let item = position.item else { return nil }
-        return lastPosition(in: playlist, upTo: item - 1)
+        guard case .placed(let place) = placer.placement(of: pointer), case .at(let index) = place.cue else { return nil }
+        return CuePosition(playlist: place.playlist, item: place.itemPosition, itemUuid: place.itemUuid, list: place.list, cueIndex: index)
     }
 
     // MARK: - Firing
@@ -120,6 +37,8 @@ extension Fold {
         // differs from the pointer's current one, or when the pointer was
         // empty. At a boundary ... every tracked attribute on every channel
         // resets to default unless the list being entered has `trackThrough`."
+        // Spec 7 §4 — "A list boundary still compares the fired cue's list
+        // with the pointer's `listUuid`, which only a fire changes".
         if old?.listUuid != list.uuid {
             if !list.trackThrough { resetAllAttributes() }
             effects.append(.boundary(list: list.uuid, reset: !list.trackThrough))
@@ -134,7 +53,7 @@ extension Fold {
 
         let new = position.pointer
         state.pointer = new
-        state.armed = arm(after: position)
+        state.armed = arm(after: new, fired: position)
         effects.append(.pointer(old: old, new: new, armed: state.armed))
     }
 
@@ -143,8 +62,10 @@ extension Fold {
     /// set, the shorter wins". A manual fire of any cue disarms whatever was
     /// armed, which this does by replacing `armed` wholesale. A following cue
     /// with a Timecode trigger "ignores Time and advance-after aimed at it".
-    func arm(after position: CuePosition) -> ArmedTrigger? {
-        guard let next = following(position) else { return nil }
+    /// Spec 7 §4 — the following cue is the one `next` fires from the new
+    /// pointer's place, and the trigger names its item.
+    func arm(after pointer: LivePointer, fired: CuePosition) -> ArmedTrigger? {
+        guard let next = placer.next(from: pointer) else { return nil }
         let nextCue = next.cue
         var ms: Int?
         switch nextCue.trigger.kind {
@@ -152,11 +73,11 @@ extension Fold {
         case .timecode: return nil
         case .go: break
         }
-        if let advance = position.cue.advanceAfterMs {
+        if let advance = fired.cue.advanceAfterMs {
             ms = ms.map { min($0, advance) } ?? advance
         }
         guard let delay = ms else { return nil }
-        return ArmedTrigger(cueUuid: nextCue.uuid, atFrame: frame + context.rate.frames(forMs: max(0, delay)))
+        return ArmedTrigger(itemUuid: next.itemUuid, cueUuid: nextCue.uuid, atFrame: frame + context.rate.frames(forMs: max(0, delay)))
     }
 
     /// Fires a position if there is one and a level is left for it (Spec 2
@@ -173,42 +94,43 @@ extension Fold {
     // MARK: - Navigation commands
 
     /// Spec 2 §3 — `next`: "Fires the next or previous cue; crosses item
-    /// boundaries; nothing past the end." From a loaded playlist with no cue
-    /// fired yet, `next` fires its first cue.
+    /// boundaries; nothing past the end." Spec 7 §4 — from a loaded playlist
+    /// "The first cue of the first item with cues", from a fired cue "The
+    /// first cue after the place"; nothing when the pointer can't be placed.
     mutating func fireFollowing(command: Command, nesting: Nesting) {
-        if let position = position(of: state.pointer) {
-            fire(following(position), command: command, nesting: nesting)
-        } else if let pointer = state.pointer, pointer.cueUuid == nil, let playlistUuid = pointer.playlist,
-                  let playlist = context.machine.playlist(uuid: playlistUuid) {
-            fire(firstPosition(in: playlist, from: 1), command: command, nesting: nesting)
-        } else {
-            effects.append(.noop(command))
-        }
+        fire(placer.next(from: state.pointer), command: command, nesting: nesting)
     }
 
+    /// Spec 7 §4 — `previous`: "The last cue before the place"; nothing
+    /// before a cue fires or when the pointer can't be placed.
     mutating func firePreceding(command: Command, nesting: Nesting) {
-        fire(position(of: state.pointer).flatMap { preceding($0) }, command: command, nesting: nesting)
-    }
-
-    /// Spec 2 §3 — `cue N`: "Fires cue N of the live list."
-    mutating func fireCue(_ number: Int, command: Command, nesting: Nesting) {
-        guard let pointer = state.pointer, let listUuid = pointer.listUuid else {
+        guard case .placed(let place) = placer.placement(of: state.pointer) else {
             effects.append(.noop(command))
             return
         }
-        var target: CuePosition?
-        if let live = position(of: pointer), number >= 1, number <= live.list.cues.count {
-            target = CuePosition(playlist: live.playlist, item: live.item, list: live.list, cueIndex: number - 1)
-        } else if pointer.playlist == nil, let list = list(uuid: listUuid), number >= 1, number <= list.cues.count {
-            target = CuePosition(playlist: nil, item: nil, list: list, cueIndex: number - 1)
-        }
-        fire(target, command: command, nesting: nesting)
+        fire(placer.preceding(place), command: command, nesting: nesting)
     }
 
-    /// The list at playlist item `item` of the live playlist, if any.
+    /// Spec 2 §3 — `cue N`: "Fires cue N of the live list." Spec 7 §4 — the
+    /// live list as it is now, or its kept copy once it is gone; the pointer
+    /// keeps its item.
+    mutating func fireCue(_ number: Int, command: Command, nesting: Nesting) {
+        let placement = placer.placement(of: state.pointer)
+        guard let list = placement.liveList, number >= 1, number <= list.cues.count else {
+            effects.append(.noop(command))
+            return
+        }
+        var item: Int?
+        if case .placed(let place) = placement { item = place.itemPosition }
+        fire(CuePosition(playlist: placement.livePlaylist, item: item, itemUuid: state.pointer?.itemUuid, list: list, cueIndex: number - 1),
+             command: command, nesting: nesting)
+    }
+
+    /// The list at item `item` of the live playlist, as it is now or its kept
+    /// copy once it is gone (Spec 7 §4); the item's list as the library has it.
     func livePlaylistItem(_ item: Int) -> (Playlist, List)? {
-        guard let playlistUuid = state.pointer?.playlist, let playlist = context.machine.playlist(uuid: playlistUuid),
-              item >= 1, item <= playlist.items.count, let list = list(for: playlist.items[item - 1]) else { return nil }
+        guard let playlist = placer.placement(of: state.pointer).livePlaylist, item >= 1, item <= playlist.items.count,
+              let list = placer.list(for: playlist.items[item - 1]) else { return nil }
         return (playlist, list)
     }
 
@@ -244,15 +166,26 @@ extension Fold {
         fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), command: command, nesting: nesting)
     }
 
-    /// Spec 2 §3 — `playlist "TITLE" [DATE]`: "Makes a playlist live at its
-    /// first cue without firing it." The pointer names the playlist and no
-    /// cue, so the first `next` fires cue 1 as a boundary. Spec 1 §3: the
-    /// pair of title and date is unique on a machine, case-insensitive.
-    mutating func loadPlaylist(_ title: String, date: String?, command: Command) {
-        let wanted = title.lowercased()
-        guard let playlist = context.machine.playlists.first(where: {
-            $0.title.lowercased() == wanted && (date == nil || $0.serviceDate == date)
-        }) else {
+    /// Spec 7 §4 — "`disarm` is a new runtime command (Spec 2 §3, corrected in
+    /// §9). It clears the armed trigger with a `pointer` effect whose `armed`
+    /// is empty, so nothing fires on its own; with nothing armed it is a
+    /// `noop`." The pointer stays where it is.
+    mutating func disarm(command: Command) {
+        guard state.armed != nil else {
+            effects.append(.noop(command))
+            return
+        }
+        state.armed = nil
+        effects.append(.pointer(old: state.pointer, new: state.pointer, armed: nil))
+    }
+
+    /// Spec 2 §3 — `playlist "TITLE"`: "Makes a playlist live with no cue
+    /// fired; the first `next` fires its first cue (Spec 7 §3–§4)." The
+    /// pointer names the playlist and no cue, so the first `next` is a
+    /// boundary. Spec 7 §3 — by title alone, as `Machine.playlist(titled:)`
+    /// finds it.
+    mutating func loadPlaylist(_ title: String, command: Command) {
+        guard let playlist = context.machine.playlist(titled: title) else {
             effects.append(.noop(command))
             return
         }

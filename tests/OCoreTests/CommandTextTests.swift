@@ -110,8 +110,10 @@ final class CommandTextTests: XCTestCase {
         row("item 4 cue 3", .itemCue(item: 4, cue: 3)),
         row("item 4 section \"chorus\"", .itemSection(item: 4, section: "chorus")),
         row("list 42 cue 3", .listCue(list: 42, cue: 3)),
-        row("playlist \"Sunday\" 2026-11-01", .playlistLoad(title: "Sunday", date: "2026-11-01")),
-        row("playlist \"Sunday\"", .playlistLoad(title: "Sunday", date: nil)),
+        // Spec 7 §3 — "`playlist "TITLE"` therefore names one playlist, and Spec 2 §3 loses its `[DATE]` argument."
+        row("playlist \"Sunday\"", .playlistLoad(title: "Sunday")),
+        // Spec 2 §3, Spec 7 §4 — `disarm` clears the armed trigger.
+        row("disarm", .disarm),
         // Timers, popups and audio
         row("timer 1 set 5:00", .timerSet(timer: 1, ms: 300_000)),
         row("timer 1 start", .timerStart(timer: 1)),
@@ -131,10 +133,11 @@ final class CommandTextTests: XCTestCase {
         row("system clearall", .systemClearAll),
         row("system preflight", .systemPreflight),
         row("system snapshot", .systemSnapshot),
-        // The reserved edit shape
+        // Spec 5 §4 — the edit family; every verb has its rows in EditTextTests.
         row("edit channel 2 label \"Lyrics\"",
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics")))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics"))))),
     ]
+    + EditTextTests.rows.map { row($0.text, .edit($0.edit), canonical: $0.canonical) }
 
     func test_everyVocabularyRowParsesAndPrintsCanonically() {
         for row in vocabulary { check(row) }
@@ -398,9 +401,8 @@ final class CommandTextTests: XCTestCase {
             .itemSection(item: 4, section: "chorus"),
             .itemSection(item: 4, section: "Verse \"two\""),
             .listCue(list: 42, cue: 3),
-            .playlistLoad(title: "Sunday", date: "2026-11-01"),
-            .playlistLoad(title: "Sunday", date: nil),
-            .playlistLoad(title: "", date: nil),
+            .playlistLoad(title: "Sunday"),
+            .playlistLoad(title: ""),
             .timerSet(timer: 1, ms: 300_000), .timerSet(timer: 1, ms: 0), .timerSet(timer: 1, ms: 3_723_456),
             .timerStart(timer: 1), .timerPause(timer: 2), .timerReset(timer: 3),
             .popupSet(popup: 3, text: "Nursery", clearAfterMs: 30_000), .popupSet(popup: 3, text: "", clearAfterMs: nil),
@@ -408,12 +410,12 @@ final class CommandTextTests: XCTestCase {
             .audioMute(audio: .all, state: .on),
             .macro(12), .undo, .redo, .historyJump(5), .historyJump(0),
             .systemClearAll, .systemPreflight, .systemSnapshot,
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
-            .edit(EditCommand(target: "stack", number: 1, field: "gammaBlend", value: .bool(true))),
-            .edit(EditCommand(target: "channel", number: 2, field: "decoderCap", value: .number(3))),
-            .edit(EditCommand(target: "channel", number: 2, field: "audioOutputs", value: .array([.number(1), .number(2)]))),
-            .edit(EditCommand(target: "channel", number: 2, field: "defaults", value: .object(["gain": .number(-6)]))),
-            .edit(EditCommand(target: "channel", number: 2, field: "label", value: nil)),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
+            .edit(EditCommand(.numbered(.stack, 1), .set(path: "gammaBlend", value: .bool(true)))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "decoderCap", value: .number(3)))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "audioOutputs", value: .array([.number(1), .number(2)])))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "defaults", value: .object(["gain": .number(-6)])))),
+            .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .null))),
         ]
         for command in corpus {
             guard let text = CommandText.print(command) else { return XCTFail("no text for \(command)") }

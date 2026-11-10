@@ -148,7 +148,7 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.cues[2].commands[1].command, .macro(5))
 
         XCTAssertEqual(Identity.renumber(.list, from: 42, to: 43, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(machine.playlists[0].items.map(\.kind)[1], .linked(list: 43))
+        XCTAssertEqual(machine.playlist(uuid: F.playlistUuid)?.items.map(\.kind)[1], .linked(list: 43, listUuid: F.listUuid(42)))
         XCTAssertEqual(library.list(number: 43)?.uuid, F.listUuid(42))
         XCTAssertEqual(machine.localLists[0].number, 42, "a local copy is its own document; its number records what it was cut from")
 
@@ -162,6 +162,40 @@ final class IdentityTests: XCTestCase {
     // MARK: - Media identity
 
     /// Spec 1 §4 — "Identical files anywhere under the root resolve to one identity."
+    /// Spec 7 §2 — "Two different lists with the same number both load ...
+    /// Anything that names the number alone ... gets the one that comes first";
+    /// Spec 7 §3 — a link "still finds the list after a renumber or a swap".
+    /// So a renumber moves that first list alone, rewrites the links that
+    /// follow its uuid and the commands that name its number, and leaves the
+    /// other list, and the links that follow it, where they are.
+    func test_renumberingOneOfTwoListsSharingANumberMovesOnlyThatOne() throws {
+        var (library, machine) = roots
+        machine.settings.libraryMode = .writable
+        let first = try XCTUnwrap(library.list(number: 42))
+        var second = first
+        second.uuid = F.uuid("5ec0", 42)
+        second.title = "Great Is Thy Faithfulness (second)"
+        library.lists.append(second)   // after the first: a number reaches the first
+        let p = try XCTUnwrap(machine.playlists.firstIndex { $0.uuid == F.playlistUuid })
+        machine.playlists[p].items.append(.linked(list: 42, listUuid: second.uuid, uuid: F.uuid("4d4d", 6)))
+        machine.keys.append(KeyBinding(device: "keyboard", key: "f1", command: .listCue(list: 42, cue: 1)))
+
+        XCTAssertEqual(Identity.renumber(.list, from: 42, to: 43, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(library.list(uuid: first.uuid)?.number, 43)
+        XCTAssertEqual(library.list(uuid: second.uuid)?.number, 42)
+        XCTAssertEqual(machine.playlists[p].items[1].kind, .linked(list: 43, listUuid: first.uuid))
+        XCTAssertEqual(machine.playlists[p].items[5].kind, .linked(list: 42, listUuid: second.uuid))
+        XCTAssertEqual(machine.keys.last?.command, .listCue(list: 43, cue: 1))
+
+        // A swap exchanges the two lists' numbers, and the links follow their lists.
+        XCTAssertEqual(Identity.swap(.list, 42, 43, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(library.list(uuid: first.uuid)?.number, 42)
+        XCTAssertEqual(library.list(uuid: second.uuid)?.number, 43)
+        XCTAssertEqual(machine.playlists[p].items[1].kind, .linked(list: 42, listUuid: first.uuid))
+        XCTAssertEqual(machine.playlists[p].items[5].kind, .linked(list: 43, listUuid: second.uuid))
+        XCTAssertEqual(machine.keys.last?.command, .listCue(list: 42, cue: 1))
+    }
+
     func test_hashingTheSameBytesAtTwoPathsYieldsOneIndexEntry() throws {
         let bytes = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("backgrounds/cross.png").path))
         let again = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("local/cross-fast.png").path))

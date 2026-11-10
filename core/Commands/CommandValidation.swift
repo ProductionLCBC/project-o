@@ -12,12 +12,24 @@ public struct ValidationContext: Sendable {
     public var machine: Machine
     public var state: ShowState?
     public var source: CommandSource?
+    /// Spec 5 §6, check 5 — a command an edit stores in a portable document:
+    /// "a portable document may name a stack, output, audio output or input
+    /// this machine lacks, since it meets those numbers at other campuses",
+    /// and a playlist title it loads "is looked up when it runs" (Spec 7 §3).
+    public var portable: Bool
+    /// Spec 7 §4 — "The engine passes the copies to the projection and the
+    /// validator alongside the library": `cue N` and `item N` read the live
+    /// list and playlist from them once they are gone.
+    public var kept: KeptCopies
 
-    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil) {
+    public init(library: Library, machine: Machine, state: ShowState? = nil, source: CommandSource? = nil, portable: Bool = false,
+                kept: KeptCopies = KeptCopies()) {
         self.library = library
         self.machine = machine
         self.state = state
         self.source = source
+        self.portable = portable
+        self.kept = kept
     }
 }
 
@@ -43,17 +55,15 @@ public enum CommandValidator {
 
     /// Spec 2 §8 — "A group validates as a whole: one bad command rejects
     /// the group, and the rejection names the command and the reason." The
-    /// group's own source decides the guard rule.
+    /// group's own source decides the guard rule. Every command is checked
+    /// against the one state given; the runner checks each against "the
+    /// state the commands before it leave" as it runs (`CommandRunner`).
     public static func validate(_ group: CommandGroup, context: ValidationContext) -> Rejection? {
         var context = context
         context.source = group.source
         for (index, entry) in group.commands.enumerated() {
-            guard var rejection = validate(entry.command, guard: entry.when, context: context) else { continue }
-            rejection.index = index
-            rejection.text = CommandText.print(entry.command)
-            let name = rejection.text.map { " (\($0))" } ?? ""
-            rejection.message = "command \(index + 1) of \(group.commands.count)\(name): " + rejection.message
-            return rejection
+            guard let rejection = validate(entry.command, guard: entry.when, context: context) else { continue }
+            return rejection.naming(index, of: group.commands)
         }
         return nil
     }
@@ -91,15 +101,17 @@ struct Checker {
         if let target = command.channelTarget, case .number(let n) = target {
             guard library.channel(n) != nil else { throw reject(.noSuchTarget, "channel \(n) does not exist") }
         }
+        // Spec 5 §6 — a portable document may name machine-level numbers this machine lacks.
+        let machineLevel = !context.portable
         switch command {
-        case .outputStack(let output, _):
+        case .outputStack(let output, _) where machineLevel:
             guard machine.output(output) != nil else { throw reject(.noSuchTarget, "output \(output) does not exist") }
-        case .stackBlackout(let target, _):
+        case .stackBlackout(let target, _) where machineLevel:
             // Spec 2 §3 — `stack all` names every stack there is.
             if case .number(let stack) = target {
                 guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
             }
-        case .stackMute(let stack, _, _):
+        case .stackMute(let stack, _, _) where machineLevel:
             guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
         case .cue(let n):
             guard n >= 1 else { throw reject(.noSuchTarget, "cue \(n) does not exist; cues count from 1") }
@@ -110,16 +122,15 @@ struct Checker {
             try liveItem(item, cue: nil, section: section)
         case .listCue(let list, _):
             guard library.list(number: list) != nil else { throw reject(.noSuchTarget, "list \(list) does not exist") }
-        case .playlistLoad(let title, let date):
-            let wanted = title.lowercased()
-            guard machine.playlists.contains(where: { $0.title.lowercased() == wanted && (date == nil || $0.serviceDate == date) }) else {
-                throw reject(.noSuchTarget, "no playlist \"\(title)\"" + (date.map { " dated \($0)" } ?? "") + " on this machine")
+        case .playlistLoad(let title) where machineLevel:
+            guard machine.playlist(titled: title) != nil else {
+                throw reject(.noSuchTarget, "no playlist \"\(title)\" on this machine")
             }
         case .timerSet(let timer, _), .timerStart(let timer), .timerPause(let timer), .timerReset(let timer):
             try slot(timer, count: machine.settings.timers, "timer", reason: .noSuchTarget)
         case .popupSet(let popup, _, _), .popupClear(let popup):
             try slot(popup, count: machine.settings.popups, "popup", reason: .noSuchTarget)
-        case .audioMute(let target, _):
+        case .audioMute(let target, _) where machineLevel:
             if case .number(let n) = target {
                 guard machine.audioOutput(n) != nil else { throw reject(.noSuchTarget, "audio output \(n) does not exist") }
             }
@@ -127,13 +138,10 @@ struct Checker {
             guard MacroCalls.macro(n, library: library, machine: machine) != nil else {
                 throw reject(.noSuchTarget, "macro \(n) does not exist")
             }
-        case .edit(let edit):
-            guard let type = NumberedType(editTarget: edit.target) else {
-                throw reject(.noSuchTarget, "\(edit.target) is not an object type")
-            }
-            guard Identity.exists(type, edit.number, library, machine) else {
-                throw reject(.noSuchTarget, "\(type.displayName) \(edit.number) does not exist")
-            }
+        case .edit:
+            // Spec 5 §6 — an edit is checked by the edit path, in its own order
+            // (`LibraryEditor`), against the library the earlier commands leave.
+            break
         default:
             break
         }
@@ -146,12 +154,16 @@ struct Checker {
         }
     }
 
+    /// Spec 7 §4's place, for the live checks.
+    var placer: Placer { Placer(library: library, machine: machine, kept: context.kept) }
+
     /// Spec 2 §3 — `cue N` "Fires cue N of the live list", checked when a
-    /// state is given.
+    /// state is given. Spec 7 §4 — "Rejected: no list is live" before a cue
+    /// fires; the live list from its kept copy once it is gone; "`cue N` is
+    /// rejected if the live list can't be found".
     func liveCue(_ n: Int) throws {
         guard let state = context.state else { return }
-        guard let listUuid = state.pointer?.listUuid,
-              let list = library.list(uuid: listUuid) ?? machine.localList(uuid: listUuid) else {
+        guard let list = placer.placement(of: state.pointer).liveList else {
             throw reject(.noSuchTarget, "cue \(n): no list is live")
         }
         guard n >= 1, n <= list.cues.count else {
@@ -161,10 +173,11 @@ struct Checker {
 
     /// Spec 2 §3 — `item N cue M` and `item N section "NAME"` in the live
     /// playlist, checked when a state is given. Spec 3 §5 — a section with
-    /// no match "is `rejected`".
+    /// no match "is `rejected`". Spec 7 §4 — the playlist's kept copy stands
+    /// in for it once it is gone.
     func liveItem(_ item: Int, cue: Int?, section: String?) throws {
         guard let state = context.state else { return }
-        guard let playlistUuid = state.pointer?.playlist, let playlist = machine.playlist(uuid: playlistUuid) else {
+        guard let playlist = placer.placement(of: state.pointer).livePlaylist else {
             throw reject(.noSuchTarget, "item \(item): no playlist is live")
         }
         guard item >= 1, item <= playlist.items.count else {
@@ -197,7 +210,7 @@ struct Checker {
             if let t = write.riders.transition { try transition(t.ref) }
             if let t = write.riders.audioTransition { try audioTransition(t.ref) }
             if let g = write.riders.grade { try grade(g.ref) }
-            if case .input(let n) = write.content {
+            if case .input(let n) = write.content, !context.portable {
                 guard machine.input(n) != nil else { throw reject(.noSuchReference, "input \(n) does not exist") }
             }
         case .channelTransition(_, let ref, _):
@@ -206,7 +219,7 @@ struct Checker {
             try audioTransition(ref)
         case .channelGrade(_, let ref, _):
             try grade(ref)
-        case .outputStack(_, let stack):
+        case .outputStack(_, let stack) where !context.portable:
             guard machine.stack(stack) != nil else { throw reject(.noSuchReference, "stack \(stack) does not exist") }
         case .stackMute(_, let channel, _):
             guard library.channel(channel) != nil else { throw reject(.noSuchReference, "channel \(channel) does not exist") }

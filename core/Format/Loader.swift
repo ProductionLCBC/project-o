@@ -10,9 +10,27 @@ import Foundation
 /// The media folder is not part of it.
 public struct RootSnapshot: Equatable, Sendable {
     public var files: [String: Data]
+    /// Spec 7 §2 — the root's folders, empty ones included, as relative paths
+    /// (`lists/Hymns`): the loader "records folders as well as files, so an
+    /// empty folder survives a reload". Dot-folders are not walked.
+    public var folders: Set<String>
+    /// Spec 7 §2 — visible files that aren't documents (a note, a picture),
+    /// which keep a folder from being empty.
+    public var otherFiles: Set<String>
+    /// Spec 7 §2 — each document's modification date, in milliseconds since
+    /// 1970, for the tie-breaks between files that hold one list or playlist.
+    public var modified: [String: Int64]
+    /// Spec 9 §6 — the kept versions under `versions/`, by path, with their
+    /// dates; their bytes aren't read.
+    public var versions: [String: Int64]
 
-    public init(files: [String: Data] = [:]) {
+    public init(files: [String: Data] = [:], folders: Set<String> = [], otherFiles: Set<String> = [],
+                modified: [String: Int64] = [:], versions: [String: Int64] = [:]) {
         self.files = files
+        self.folders = folders
+        self.otherFiles = otherFiles
+        self.modified = modified
+        self.versions = versions
     }
 }
 
@@ -39,7 +57,8 @@ public enum Loader {
         let body = migrated.document.removing("schema").removing("app").removing("kind")
         do {
             let (document, extras) = try decode(kind: header.kind, body: body)
-            return LoadedDocument(kind: header.kind, body: document, extras: extras, migratedFrom: migrated.migratedFrom, path: path)
+            return LoadedDocument(kind: header.kind, body: document, extras: extras, migratedFrom: migrated.migratedFrom, path: path,
+                                  issues: try issues(in: document, body: body, path: path))
         } catch let error as DecodingError {
             throw DocumentFailure.unreadable(path: path, message: JSONCoding.describe(error))
         }
@@ -79,6 +98,18 @@ public enum Loader {
         }
     }
 
+    /// Spec 7 §3 — "An item whose uuid repeats an earlier item's is treated
+    /// as having none, and is reported." The decoded playlist has already
+    /// given such an item a uuid of its own; the report says which one.
+    static func issues(in document: Document, body: JSONValue, path: String) throws -> [ValidationIssue] {
+        guard case .playlist(let playlist) = document else { return [] }
+        let drafts = try JSONCoding.decode([PlaylistItem.Draft].self, from: body["items"] ?? .array([]))
+        return PlaylistItem.assigningUuids(to: drafts, namespace: playlist.uuid).repeated.map { index in
+            ValidationIssue(severity: .warning, code: .repeatedItemUuid, file: path, subject: "playlist \(playlist.title) item \(index + 1)",
+                            message: "repeats the uuid of an earlier item; given one of its own until the next save")
+        }
+    }
+
     // MARK: - Roots
 
     /// Spec 1 §5 — load a library root. Every document that reads installs
@@ -89,6 +120,7 @@ public enum Loader {
     public static func library(from snapshot: RootSnapshot, previous: Library? = nil) -> (library: Library, report: ValidationReport) {
         var library = Library()
         var report = ValidationReport()
+        var lists: [(list: List, path: String)] = []
         for (path, data) in snapshot.files.sorted(by: { $0.key < $1.key }) {
             if FileLayout.isIgnored(path: path) || path.hasPrefix("versions/") { continue }
             guard let expected = FileLayout.expectedKind(forPath: path), expected.belongsToLibrary else {
@@ -97,16 +129,102 @@ public enum Loader {
             }
             do {
                 let loaded = try document(path: path, data: data)
-                install(loaded, into: &library)
+                if case .list(let list) = loaded.body {
+                    lists.append((list, path))
+                } else {
+                    install(loaded, into: &library)
+                }
+                report.add(loaded.issues)
             } catch let failure as DocumentFailure {
                 report.add(failure)
                 if let previous { carryOver(path: path, kind: expected, from: previous, into: &library) }
+                // Spec 7 §2 — a file that didn't load is still a file: it keeps
+                // its folder from being empty and its name from being taken.
+                if path.hasPrefix("lists/") { library.otherFiles.insert(path) }
             } catch {
                 report.add(.error, .unreadableDocument, file: path, subject: path, message: "\(error)")
+                if path.hasPrefix("lists/") { library.otherFiles.insert(path) }
             }
         }
+        // Spec 7 §2 — "The Library window's folder tree is the tree of folders
+        // under `lists/`", empty ones included; dot-folders are not walked.
+        library.folders = snapshot.folders.compactMap { folder in
+            guard folder.hasPrefix("lists/"), !FileLayout.isIgnored(path: folder) else { return nil }
+            return String(folder.dropFirst("lists/".count))
+        }.sorted()
+        library.otherFiles.formUnion(snapshot.otherFiles.filter { $0.hasPrefix("lists/") && !FileLayout.isIgnored(path: $0) })
+        reportCaseClashes(library.folders, into: &report)
+        install(lists: lists, snapshot: snapshot, into: &library, report: &report)
         sort(&library)
         return (library, report)
+    }
+
+    /// Spec 7 §2 — "When two files hold the same list (the same uuid), one
+    /// loads. The engine prefers the file whose name is the one it would write
+    /// for that list, then the higher `version`, then the later modification
+    /// date, then the path that sorts first. The other file is reported." And
+    /// "Two different lists with the same number both load ... Anything that
+    /// names the number alone ... gets the one that comes first in the same
+    /// order": lists sharing a number keep that order until they reload.
+    static func install(lists candidates: [(list: List, path: String)], snapshot: RootSnapshot,
+                        into library: inout Library, report: inout ValidationReport) {
+        func rank(_ candidate: (list: List, path: String)) -> (Int, Int, Int64, String) {
+            Loader.rank(list: candidate.list, path: candidate.path, modified: snapshot.modified[candidate.path] ?? 0)
+        }
+        var groups: [UUID: [(list: List, path: String)]] = [:]
+        var order: [UUID] = []
+        for candidate in candidates {
+            if groups[candidate.list.uuid] == nil { order.append(candidate.list.uuid) }
+            groups[candidate.list.uuid, default: []].append(candidate)
+        }
+        var kept: [(list: List, path: String)] = []
+        for uuid in order {
+            let ranked = (groups[uuid] ?? []).sorted { rank($0) < rank($1) }
+            guard let winner = ranked.first else { continue }
+            kept.append(winner)
+            for loser in ranked.dropFirst() {
+                report.add(.warning, .duplicateFile, file: loser.path, subject: "list \(loser.list.number)",
+                           message: "another file holds this list (\(uuid.uuidString.lowercased())): \(winner.path) is loaded, and this file is never written over")
+                library.otherFiles.insert(loser.path)
+            }
+        }
+        kept.sort { a, b in a.list.number != b.list.number ? a.list.number < b.list.number : rank(a) < rank(b) }
+        for candidate in kept {
+            library.lists.append(candidate.list)
+            library.documentPaths[FileLayout.documentKey(list: candidate.list.uuid)] = candidate.path
+        }
+    }
+
+    /// Spec 7 §2 — the order two files holding one list are preferred in,
+    /// least first: "the file whose name is the one it would write for that
+    /// list, then the higher `version`, then the later modification date,
+    /// then the path that sorts first". A reload ranks them the same way.
+    static func rank(list: List, path: String, modified: Int64) -> (Int, Int, Int64, String) {
+        let name = path.split(separator: "/").last.map(String.init) ?? path
+        let own = name == FileLayout.numbered(list.number, list.title) + ".json"
+        return (own ? 0 : 1, -list.version, -modified, path)
+    }
+
+    /// Spec 7 §3 — "the file named with the plain slug of its title, then the
+    /// later modification date, then the path that sorts first".
+    static func rank(playlist: Playlist, path: String, modified: Int64) -> (Int, Int64, String) {
+        let plain = path == FileLayout.plainPath(forPlaylist: playlist)
+        return (plain ? 0 : 1, -modified, path)
+    }
+
+    /// Spec 7 §2 — "On a case-sensitive volume two folders can differ only by
+    /// case. The tree shows them as one folder, the report names them".
+    static func reportCaseClashes(_ folders: [String], into report: inout ValidationReport) {
+        var first: [String: String] = [:]
+        for folder in folders.sorted() {
+            let key = folder.lowercased()
+            if let earlier = first[key] {
+                report.add(.warning, .folderCaseClash, file: "lists/" + folder, subject: "folder \(folder)",
+                           message: "differs from folder \(earlier) only in case; it shows as one folder, and folder edits to it are refused until one is renamed")
+            } else {
+                first[key] = folder
+            }
+        }
     }
 
     /// Spec 1 §5 — load a machine root, the same way. The loader also applies
@@ -114,6 +232,7 @@ public enum Loader {
     public static func machine(from snapshot: RootSnapshot, previous: Machine? = nil) -> (machine: Machine, report: ValidationReport) {
         var machine = Machine()
         var report = ValidationReport()
+        var playlists: [(playlist: Playlist, path: String)] = []
         for (path, data) in snapshot.files.sorted(by: { $0.key < $1.key }) {
             if FileLayout.isIgnored(path: path) { continue }
             guard let expected = FileLayout.expectedKind(forPath: path), expected.belongsToMachine else {
@@ -122,7 +241,12 @@ public enum Loader {
             }
             do {
                 let loaded = try document(path: path, data: data)
-                install(loaded, into: &machine)
+                if case .playlist(let playlist) = loaded.body {
+                    playlists.append((playlist, path))
+                } else {
+                    install(loaded, into: &machine)
+                }
+                report.add(loaded.issues)
             } catch let failure as DocumentFailure {
                 report.add(failure)
                 if let previous { carryOver(path: path, kind: expected, from: previous, into: &machine) }
@@ -130,9 +254,38 @@ public enum Loader {
                 report.add(.error, .unreadableDocument, file: path, subject: path, message: "\(error)")
             }
         }
+        install(playlists: playlists, snapshot: snapshot, into: &machine, report: &report)
         sort(&machine)
         Validator.checkStacks(machine, into: &report, file: DocumentKind.stacks.fixedPath)
         return (machine, report)
+    }
+
+    /// Spec 7 §3 — "Two files with the same playlist uuid load as one: the
+    /// file named with the plain slug of its title, then the later
+    /// modification date, then the path that sorts first; the other is
+    /// reported."
+    static func install(playlists candidates: [(playlist: Playlist, path: String)], snapshot: RootSnapshot,
+                        into machine: inout Machine, report: inout ValidationReport) {
+        func rank(_ candidate: (playlist: Playlist, path: String)) -> (Int, Int64, String) {
+            Loader.rank(playlist: candidate.playlist, path: candidate.path, modified: snapshot.modified[candidate.path] ?? 0)
+        }
+        var groups: [UUID: [(playlist: Playlist, path: String)]] = [:]
+        var order: [UUID] = []
+        for candidate in candidates {
+            if groups[candidate.playlist.uuid] == nil { order.append(candidate.playlist.uuid) }
+            groups[candidate.playlist.uuid, default: []].append(candidate)
+        }
+        for uuid in order {
+            let ranked = (groups[uuid] ?? []).sorted { rank($0) < rank($1) }
+            guard let winner = ranked.first else { continue }
+            machine.playlists.append(winner.playlist)
+            machine.documentPaths[FileLayout.documentKey(playlist: uuid)] = winner.path
+            for loser in ranked.dropFirst() {
+                report.add(.warning, .duplicateFile, file: loser.path, subject: "playlist \(loser.playlist.title)",
+                           message: "another file holds this playlist (\(uuid.uuidString.lowercased())): \(winner.path) is loaded")
+                machine.otherFiles.insert(loser.path)
+            }
+        }
     }
 
     // MARK: - Installing documents
@@ -246,7 +399,10 @@ public enum Loader {
         library.audioTransitions.sort { $0.number < $1.number }
         library.presets.sort { $0.number < $1.number }
         library.macros.sort { $0.number < $1.number }
-        library.lists.sort { $0.number < $1.number }
+        // Spec 7 §2 — lists sharing a number keep the order they loaded in.
+        library.lists = library.lists.enumerated()
+            .sorted { ($0.element.number, $0.offset) < ($1.element.number, $1.offset) }
+            .map(\.element)
     }
 
     static func sort(_ machine: inout Machine) {

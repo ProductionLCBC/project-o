@@ -158,7 +158,8 @@ public final class OSCServer: @unchecked Sendable {
             }
             switch OSCMapping.command(from: message, options: parseOptions) {
             case .success(let command):
-                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command])
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command],
+                                         client: Self.client(peer))
                 remember(group.id, peer: peer, address: message.address)
                 enqueue(group)
             case .failure(let rejection):
@@ -171,7 +172,8 @@ public final class OSCServer: @unchecked Sendable {
             case .success(let commands):
                 // A bundle with nothing in it runs nothing.
                 guard !commands.isEmpty else { return }
-                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands)
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands,
+                                         client: Self.client(peer))
                 remember(group.id, peer: peer, address: "#bundle")
                 enqueue(group)
             case .failure(let rejection):
@@ -205,6 +207,11 @@ public final class OSCServer: @unchecked Sendable {
         }
     }
 
+    /// Spec 5 §5 — typing folds "from the same client": over OSC, the sender.
+    static func client(_ peer: OSCPeer) -> String {
+        "osc \(peer.host):\(peer.port)"
+    }
+
     /// Recorded before the group is queued, so the build that runs it always
     /// finds its sender.
     private func remember(_ id: GroupID, peer: OSCPeer, address: String) {
@@ -227,9 +234,13 @@ public final class OSCServer: @unchecked Sendable {
     /// bundle. Runs on the control side, after every build.
     public func afterBuild(_ control: ControlLoop, library: Library, machine: Machine) {
         let executed = control.lastExecuted
+        var messages: [OSCMessage] = []
         if !executed.isEmpty {
-            feedback(OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine))
+            messages = OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine)
         }
+        // Spec 7 §6 — the live position and the countdown, from the live reading.
+        messages += control.lastLiveFeedback?.messages ?? []
+        feedback(messages)
         let rejected = control.lastRejected
         guard !(executed.isEmpty && rejected.isEmpty) else { return }
         var replies: [(peer: OSCPeer, message: OSCMessage)] = []
@@ -296,21 +307,14 @@ public final class OSCServer: @unchecked Sendable {
 
 /// Spec 2 §6 — "Feedback addresses mirror state, not commands": the messages
 /// the engine sends after a tick's commands ran, derived from the effects.
+/// The live position and the countdown come from the live reading instead
+/// (Spec 7 §6, `LiveSnapshot`), since an edit or a reload changes them too.
 public enum OSCFeedbackDeriver {
     public static func messages(for executed: [ExecutedCommand], state: ShowState, library: Library, machine: Machine) -> [OSCMessage] {
         var out: [OSCMessage] = []
         for entry in executed {
             for effect in entry.effects {
                 switch effect {
-                case .pointer(_, let new, _):
-                    guard let new, let cueUuid = new.cueUuid, let listUuid = new.listUuid else { continue }
-                    let list = library.list(uuid: listUuid) ?? machine.localList(uuid: listUuid)
-                    if let playlist = new.playlist.flatMap({ machine.playlist(uuid: $0) }) { out.append(OSCFeedback.livePlaylist(playlist.title)) }
-                    if let item = new.item { out.append(OSCFeedback.liveItem(item)) }
-                    if let list, let index = list.cues.firstIndex(where: { $0.uuid == cueUuid }) {
-                        out.append(OSCFeedback.liveCue(index + 1))
-                        out.append(OSCFeedback.liveLabel(list.cues[index].label))
-                    }
                 case .transition(let t):
                     out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library)))
                     out.append(OSCFeedback.channelState(t.channel, feedbackState(of: t.to)))

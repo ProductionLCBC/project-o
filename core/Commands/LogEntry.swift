@@ -44,13 +44,18 @@ public struct LogEntry: Codable, Equatable, Sendable {
 
     /// Spec 2 §9 — the entries of a run, one per executed command, `seq`
     /// counting up from `firstSeq`, `kind` and `undo` from the command's
-    /// vocabulary row. `snapshot` is left for the engine (runtime undo, v1.5).
+    /// vocabulary row, and an applied edit's `inverse` (Spec 5 §1, "the log
+    /// keeps both"). `snapshot` is left for the engine (runtime undo, v1.5).
     public static func entries(for outcome: RunOutcome, firstSeq: Int, ts: String) -> [LogEntry] {
-        outcome.executed.enumerated().map { offset, executed in
-            LogEntry(ts: ts, seq: firstSeq + offset, group: executed.group, source: executed.source,
-                     kind: executed.command.logKind, undo: executed.command.undoClass, result: executed.result,
-                     command: executed.command, text: CommandText.print(executed.command) ?? "", fire: executed.fire)
-        }
+        outcome.executed.enumerated().map { offset, executed in LogEntry(executed, seq: firstSeq + offset, ts: ts) }
+    }
+
+    /// Spec 2 §9 — the entry of one executed command.
+    public init(_ executed: ExecutedCommand, seq: Int, ts: String) {
+        self.init(ts: ts, seq: seq, group: executed.group, source: executed.source,
+                  kind: executed.command.logKind, undo: executed.command.undoClass, result: executed.result,
+                  command: executed.command, text: CommandText.print(executed.command) ?? "", fire: executed.fire,
+                  inverse: executed.inverse)
     }
 
     /// Spec 2 §9 — the entry as one JSON line with sorted keys.

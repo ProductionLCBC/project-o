@@ -44,33 +44,54 @@ public struct FileError: Error, Equatable, Sendable, CustomStringConvertible {
 public enum LocalFiles {
     // MARK: - Reading
 
+    /// Folders at the top of a root that hold no documents the loader reads:
+    /// the media root, the logs, snapshots, black box and thumbnails the
+    /// engine writes, and Spec 5 §10's conflicts, which "the loader ignores".
+    static let unreadFolders: Set<String> = ["media", "logs", "snapshots", "blackbox", "thumbnails", "conflicts"]
+
     /// Spec 1 §5 — every document under a root as the loader sees it: `.json`
     /// files by relative path, skipping the media root, logs and snapshots
     /// (written by the app, read by nothing it depends on), and "a sync tool's
     /// temporary and partial files (names beginning with a dot or ending in
-    /// .tmp)".
+    /// .tmp, anything in a folder whose name begins with a dot, ...)". Spec 7
+    /// §2 — with every folder walked, empty ones too, the visible files that
+    /// aren't documents, and each document's modification date; Spec 9 §6 —
+    /// the kept versions by name and date, without their bytes.
     public static func snapshot(ofRoot root: URL) throws -> RootSnapshot {
-        var files: [String: Data] = [:]
+        var snapshot = RootSnapshot()
         let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey], options: []) else {
-            return RootSnapshot()
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isDirectoryKey, .contentModificationDateKey]
+        guard let enumerator = fm.enumerator(at: root, includingPropertiesForKeys: keys, options: []) else {
+            return snapshot
         }
         let prefix = root.standardizedFileURL.path + "/"
         for case let url as URL in enumerator {
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(prefix) else { continue }
             let relative = String(path.dropFirst(prefix.count))
-            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+            let values = try? url.resourceValues(forKeys: Set(keys))
             if values?.isDirectory == true {
-                if ["media", "logs", "snapshots"].contains(relative) || FileLayout.isIgnored(path: relative) {
+                if unreadFolders.contains(relative) || FileLayout.isIgnored(path: relative) {
                     enumerator.skipDescendants()
+                } else {
+                    snapshot.folders.insert(relative)
                 }
                 continue
             }
-            guard values?.isRegularFile == true, url.pathExtension == "json", !FileLayout.isIgnored(path: relative) else { continue }
-            files[relative] = try Data(contentsOf: url)
+            guard values?.isRegularFile == true, !FileLayout.isIgnored(path: relative) else { continue }
+            let modified = values?.contentModificationDate.map { Int64(($0.timeIntervalSince1970 * 1000).rounded()) } ?? 0
+            guard url.pathExtension == "json" else {
+                snapshot.otherFiles.insert(relative)
+                continue
+            }
+            if relative.hasPrefix("versions/") {
+                snapshot.versions[relative] = modified
+                continue
+            }
+            snapshot.files[relative] = try Data(contentsOf: url)
+            snapshot.modified[relative] = modified
         }
-        return RootSnapshot(files: files)
+        return snapshot
     }
 
     /// Spec 1 §7 — the relative paths of every file under the media root, for
@@ -119,6 +140,14 @@ public enum LocalFiles {
                 try move(root.appendingPathComponent(from), to: root.appendingPathComponent(to))
             case .remove(let path):
                 try remove(root.appendingPathComponent(path))
+            case .copy(let from, let to):
+                try copy(root.appendingPathComponent(from), to: root.appendingPathComponent(to))
+            case .makeFolder(let path):
+                try makeFolder(root.appendingPathComponent(path))
+            case .renameFolder(let from, let to):
+                try renameFolder(root.appendingPathComponent(from), to: root.appendingPathComponent(to))
+            case .removeFolder(let path):
+                try removeFolder(root.appendingPathComponent(path))
             }
         }
     }
@@ -126,7 +155,17 @@ public enum LocalFiles {
     static func replace(_ data: Data, at url: URL, crash: Bool) throws {
         let folder = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        // A name the loader ignores (Spec 1 §5): a leading dot and a .tmp suffix.
+        let temporary = try writeTemporary(data, beside: url)
+        if crash { throw SimulatedCrash() }
+        guard rename(temporary.path, url.path) == 0 else { throw FileError.last("rename", url.path) }
+        syncFolder(folder)
+        sweepTemporaries(for: url)
+    }
+
+    /// The bytes written and synced to a temporary file in `url`'s folder,
+    /// with a name the loader ignores (Spec 1 §5): a leading dot and a .tmp suffix.
+    static func writeTemporary(_ data: Data, beside url: URL) throws -> URL {
+        let folder = url.deletingLastPathComponent()
         let temporary = folder.appendingPathComponent("." + url.lastPathComponent + "." + String(UUID().uuidString.prefix(8)) + ".tmp")
         let fd = open(temporary.path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
         guard fd >= 0 else { throw FileError.last("create", temporary.path) }
@@ -154,10 +193,7 @@ public enum LocalFiles {
             throw error
         }
         close(fd)
-        if crash { throw SimulatedCrash() }
-        guard rename(temporary.path, url.path) == 0 else { throw FileError.last("rename", url.path) }
-        syncFolder(folder)
-        sweepTemporaries(for: url)
+        return temporary
     }
 
     /// A save that completed leaves no temporary of its own document behind:
@@ -171,11 +207,91 @@ public enum LocalFiles {
         }
     }
 
+    /// Spec 7 §2 — "Other files are never replaced": a rename refused when
+    /// the new name is taken, and no folder made on the way.
     static func move(_ from: URL, to: URL) throws {
-        try FileManager.default.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard rename(from.path, to.path) == 0 else { throw FileError.last("move", from.path) }
+        guard renameNoReplace(from.path, to.path) == 0 else { throw FileError.last("move", from.path) }
         syncFolder(from.deletingLastPathComponent())
         syncFolder(to.deletingLastPathComponent())
+    }
+
+    /// A rename that fails with `EEXIST` when the new name is taken.
+    static func renameNoReplace(_ from: String, _ to: String) -> Int32 {
+        #if canImport(Darwin)
+        return renamex_np(from, to, UInt32(RENAME_EXCL))
+        #else
+        // A hard link fails when the name is taken; then the old name goes.
+        guard link(from, to) == 0 else { return -1 }
+        return unlink(from)
+        #endif
+    }
+
+    /// Spec 9 §6 — keep a file's bytes at a new path, "never written over":
+    /// when the path is taken, there is nothing to do. The copy is written
+    /// whole and synced before it takes its name.
+    static func copy(_ from: URL, to: URL) throws {
+        if FileManager.default.fileExists(atPath: to.path) { return }
+        let data: Data
+        do {
+            data = try Data(contentsOf: from)
+        } catch {
+            throw FileError(operation: "copy", path: from.path, reason: "\(error)")
+        }
+        let folder = to.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = try writeTemporary(data, beside: to)
+        if renameNoReplace(temporary.path, to.path) != 0 {
+            let failure = errno
+            unlink(temporary.path)
+            if failure == EEXIST { return }
+            throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)))
+        }
+        syncFolder(folder)
+    }
+
+    /// Spec 7 §2 — `edit folder "PATH" create`: "Its parent must exist".
+    static func makeFolder(_ url: URL) throws {
+        guard mkdir(url.path, 0o755) == 0 else { throw FileError.last("make folder", url.path) }
+        syncFolder(url.deletingLastPathComponent())
+    }
+
+    /// Spec 7 §2 — a folder's rename or move "in one directory rename that
+    /// carries everything in it", refused onto a path that exists unless only
+    /// the case changes.
+    static func renameFolder(_ from: URL, to: URL) throws {
+        let result: Int32
+        if from.path.lowercased() == to.path.lowercased() {
+            result = rename(from.path, to.path)
+        } else {
+            #if canImport(Darwin)
+            result = renamex_np(from.path, to.path, UInt32(RENAME_EXCL))
+            #else
+            if access(to.path, F_OK) == 0 {
+                errno = EEXIST
+                result = -1
+            } else {
+                result = rename(from.path, to.path)
+            }
+            #endif
+        }
+        guard result == 0 else { throw FileError.last("rename folder", from.path) }
+        syncFolder(from.deletingLastPathComponent())
+        syncFolder(to.deletingLastPathComponent())
+    }
+
+    /// Spec 7 §2 — "Deletes the folder when it is empty: no lists, no visible
+    /// files and no folders other than hidden ones. Hidden files and folders
+    /// go with it". A folder already gone is not an error.
+    static func removeFolder(_ url: URL) throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: url.path) else { return }
+        let names = try fm.contentsOfDirectory(atPath: url.path)
+        if names.contains(where: { !$0.hasPrefix(".") }) {
+            throw FileError(operation: "remove folder", path: url.path, reason: "not empty")
+        }
+        for name in names { try fm.removeItem(at: url.appendingPathComponent(name)) }
+        guard rmdir(url.path) == 0 else { throw FileError.last("remove folder", url.path) }
+        syncFolder(url.deletingLastPathComponent())
     }
 
     static func remove(_ url: URL) throws {

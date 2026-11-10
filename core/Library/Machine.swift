@@ -25,6 +25,10 @@ public struct Machine: Equatable, Sendable {
     public var lastState: ShowState?
     public var documentExtras: [DocumentKind: [String: JSONValue]]
     public var documentPaths: [String: String]
+    /// Spec 7 §3 — files under `playlists/` that aren't loaded (the other of
+    /// two files holding one playlist): a new or retitled playlist never takes
+    /// one's name.
+    public var otherFiles: Set<String> = []
 
     public init(stacks: [Stack] = [], outputs: [Output] = [], playlists: [Playlist] = [], localLists: [List] = [],
                 tracking: TrackingSwitches = TrackingSwitches(), decoderCapDefault: Int = 2,
@@ -73,12 +77,38 @@ public struct Machine: Equatable, Sendable {
     public func playlist(uuid: UUID) -> Playlist? { playlists.first { $0.uuid == uuid } }
     public func localList(uuid: UUID) -> List? { localLists.first { $0.uuid == uuid } }
 
+    /// Spec 7 §3 — the playlist `playlist "TITLE"` loads. A title is "trimmed
+    /// of spaces at either end ... and unique without regard to case"; when
+    /// files clash, "`playlist "TITLE"` loads the one whose file has the plain
+    /// slug, or else the one whose path sorts first, which no save changes".
+    /// A playlist not yet written has no path and sorts after those that do.
+    public func playlist(titled title: String) -> Playlist? {
+        let wanted = Playlist.titleKey(title)
+        let matches = playlists.enumerated().filter { Playlist.titleKey($0.element.title) == wanted }
+        guard matches.count > 1 else { return matches.first?.element }
+        func rank(_ entry: (offset: Int, element: Playlist)) -> (Int, String, Int) {
+            let path = documentPaths[FileLayout.documentKey(playlist: entry.element.uuid)]
+            let plain = path == FileLayout.plainPath(forPlaylist: entry.element)
+            return (plain ? 0 : 1, path ?? "\u{10FFFF}", entry.offset)
+        }
+        return matches.min { rank($0) < rank($1) }?.element
+    }
+
     /// Replace the local copy with the same `uuid`, or append it.
     public mutating func replace(localList: List) {
         if let index = localLists.firstIndex(where: { $0.uuid == localList.uuid }) {
             localLists[index] = localList
         } else {
             localLists.append(localList)
+        }
+    }
+
+    /// Replace the playlist with the same `uuid`, or append it.
+    public mutating func replace(playlist: Playlist) {
+        if let index = playlists.firstIndex(where: { $0.uuid == playlist.uuid }) {
+            playlists[index] = playlist
+        } else {
+            playlists.append(playlist)
         }
     }
 }

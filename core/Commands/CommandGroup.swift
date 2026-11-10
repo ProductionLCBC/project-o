@@ -42,22 +42,27 @@ public struct FireRecord: Codable, Equatable, Sendable {
 }
 
 /// Spec 2 §5 — a group: the commands submitted together, the source they
-/// share (Spec 2 §5's table) and, for a cue group, the fire record.
+/// share (Spec 2 §5's table) and, for a cue group, the fire record. `client`
+/// names who sent it, for Spec 5 §5's typing ("Edits that set the same text,
+/// from the same client, fold into one edit per second"): the OSC sender, an
+/// API connection, a name in the harness. It is never logged.
 public struct CommandGroup: Equatable, Sendable {
     public var id: GroupID
     public var source: CommandSource
     public var commands: [GuardedCommand]
     public var fire: FireRecord?
+    public var client: String?
 
-    public init(id: GroupID, source: CommandSource, commands: [GuardedCommand], fire: FireRecord? = nil) {
+    public init(id: GroupID, source: CommandSource, commands: [GuardedCommand], fire: FireRecord? = nil, client: String? = nil) {
         self.id = id
         self.source = source
         self.commands = commands
         self.fire = fire
+        self.client = client
     }
 
-    public init(id: GroupID, source: CommandSource, commands: [Command], fire: FireRecord? = nil) {
-        self.init(id: id, source: source, commands: commands.map { GuardedCommand($0) }, fire: fire)
+    public init(id: GroupID, source: CommandSource, commands: [Command], fire: FireRecord? = nil, client: String? = nil) {
+        self.init(id: id, source: source, commands: commands.map { GuardedCommand($0) }, fire: fire, client: client)
     }
 }
 

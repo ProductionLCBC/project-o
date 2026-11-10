@@ -353,7 +353,7 @@ final class ProjectionTableTests: XCTestCase {
     /// 400}. After manual fire: `armed` cleared.
     func test_row20_timeTriggerArmsAndManualFireDisarms() {
         let (afterOne, oneEffects) = run(F.fresh(), [.listCue(list: 4, cue: 1)], frame: 100)
-        let expectedArmed = ArmedTrigger(cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 400)
+        let expectedArmed = ArmedTrigger(itemUuid: nil, cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 400)
         XCTAssertEqual(afterOne.armed, expectedArmed)
         XCTAssertEqual(afterOne.pointer, F.pointer(list: 4, cue: 1))
         XCTAssertEqual(oneEffects.last, .pointer(old: nil, new: afterOne.pointer, armed: expectedArmed))
@@ -370,12 +370,12 @@ final class ProjectionTableTests: XCTestCase {
         var library = F.library
         library.lists = library.lists.map { $0.number == 4 ? F.triggerList(advanceAfterMs: 8000) : $0 }
         let (state, _) = run(F.fresh(), [.listCue(list: 4, cue: 1)], frame: 100, library: library)
-        XCTAssertEqual(state.armed, ArmedTrigger(cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 400))
+        XCTAssertEqual(state.armed, ArmedTrigger(itemUuid: nil, cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 400))
 
         // And the other way round: advance-after shorter than Time.
         library.lists = library.lists.map { $0.number == 4 ? F.triggerList(advanceAfterMs: 2000) : $0 }
         let (state2, _) = run(F.fresh(), [.listCue(list: 4, cue: 1)], frame: 100, library: library)
-        XCTAssertEqual(state2.armed, ArmedTrigger(cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 220))
+        XCTAssertEqual(state2.armed, ArmedTrigger(itemUuid: nil, cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 220))
     }
 
     /// Row 22 — Channel 1 playing A: `channel 1 stop`. `transport: stopped`,

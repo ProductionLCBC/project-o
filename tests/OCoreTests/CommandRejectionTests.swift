@@ -19,7 +19,7 @@ final class CommandRejectionTests: XCTestCase {
     static var machine: Machine { loaded.machine }
 
     /// A pointer on list 42 (item 2 of the fixture playlist), cue 1.
-    static let livePointer = LivePointer(playlist: F.playlistUuid, item: 2, listUuid: F.listUuid(42), cueUuid: F.list42Cues[0])
+    static let livePointer = LivePointer(playlist: F.playlistUuid, itemUuid: F.sundayItems[1], listUuid: F.listUuid(42), cueUuid: F.list42Cues[0])
 
     static var liveState: ShowState {
         var state = ShowState.fresh(library: library, machine: machine)
@@ -163,9 +163,10 @@ final class CommandRejectionTests: XCTestCase {
         accept("macro 2")
         expect("list 99 cue 1", .noSuchTarget, containing: "list 99")
         expect("playlist \"Nope\"", .noSuchTarget)
-        expect("playlist \"Sunday\" 2025-01-01", .noSuchTarget)
+        // Spec 7 §3 — a title is the identity: the date is no longer an argument.
+        expect("playlist \"Sunday\" 2026-11-01", .unexpectedToken)
         accept("playlist \"Sunday\"")
-        accept("playlist \"sunday\" 2026-11-01")
+        accept("playlist \" sunday \"")
         // Live-position targets are checked only when a ShowState is given.
         expect("cue 9", .noSuchTarget, containing: "cue 9", state: Self.liveState)
         accept("cue 4", state: Self.liveState)
@@ -181,8 +182,10 @@ final class CommandRejectionTests: XCTestCase {
         noPlaylist.pointer = nil
         expect("cue 1", .noSuchTarget, state: noPlaylist)
         expect("item 2 cue 1", .noSuchTarget, state: noPlaylist)
-        expect("edit channel 9 label \"x\"", .noSuchTarget)
-        expect("edit nothing 1 label \"x\"", .noSuchTarget)
+        // Spec 5 §3 — an edit names an object type the edit path knows; whether
+        // the object exists is the edit path's to check, in Spec 5 §6's order
+        // (EditRejectionTests), not this validator's.
+        expect("edit nothing 1 label \"x\"", .unknownTarget)
         accept("edit channel 2 label \"x\"")
     }
 

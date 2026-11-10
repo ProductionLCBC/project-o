@@ -57,7 +57,7 @@ final class CueAddressingTests: XCTestCase {
     /// moment of use.
     func test_listAndItemAddressesResolveAfterEachEdit() throws {
         var (library, machine) = fresh()
-        let playlist = try XCTUnwrap(machine.playlists.first)
+        let playlist = try XCTUnwrap(machine.playlist(uuid: F.playlistUuid))
         // Items: 1 header, 2 linked 42, 3 the local copy of 42, 4 header, 5 linked 7.
 
         XCTAssertEqual(CueAddressing.cue(list: 42, cue: 3, in: library)?.uuid, F.list42Cues[2])

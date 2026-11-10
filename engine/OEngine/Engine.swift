@@ -12,8 +12,12 @@ import Synchronization
 /// master clock, the control thread building the next plan, the sinks on
 /// their own cadence, the watchdog and the black box on utility threads.
 public final class Engine: @unchecked Sendable {
-    public let library: Library
-    public let machine: Machine
+    /// The roots as the edits so far left them (Spec 5 §2), on the control
+    /// side; other threads read `control.publishedRoots`.
+    public var library: Library { control.library }
+    public var machine: Machine { control.machine }
+    /// Spec 2 §9 — the engine's own publisher, until the API exists (Area 19).
+    public let publisher = EnginePublisher()
     public let pacing: Pacing
     public let backend: any RenderBackend
     public let clock: any MasterClock
@@ -56,13 +60,14 @@ public final class Engine: @unchecked Sendable {
         }
     }
     private var lastLiveList: UUID?
+    private var lastLiveVersion: Int?
+    /// Signalled by the control thread when it leaves its loop.
+    private let controlDone = DispatchSemaphore(value: 0)
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
                 text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
-        self.library = library
-        self.machine = machine
         self.pacing = try Pacing(machine: machine)
         self.backend = backend
         self.clock = clock
@@ -107,21 +112,37 @@ public final class Engine: @unchecked Sendable {
         if buildPlan {
             recoverIfNeeded()
             planRing.publish(control.build(for: time.tick, now: time.reference))
-            afterBuild?(control)
-            sweepReleases()
-            warmThumbnailsIfTheListChanged()
+            finishBuild()
         }
         render.tick(time)
     }
 
+    /// The control side's work once a plan is published: OSC's feedback and
+    /// replies, the `library` events of the build (Spec 5 §2), the thumbnail
+    /// job given the edited library, the deferred releases, and the warm of a
+    /// newly live list.
+    func finishBuild() {
+        afterBuild?(control)
+        for event in control.lastLibraryEvents { publisher.publish(event.json) }
+        // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
+        if let live = control.lastLiveFeedback { publisher.publish(live.event) }
+        if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
+        sweepReleases()
+        warmThumbnailsIfTheListChanged()
+    }
+
     /// Spec 4 §10 and the Area 5 reading approved on 2026-11-03: "when the
     /// live list changes, the engine queues that list's cues for the
-    /// thumbnail stack". Control side, after a build.
+    /// thumbnail stack". Control side, after a build. Spec 5 §2 — "The cue's
+    /// thumbnail is redrawn because its library version changes": a write
+    /// that raised the live list's version warms it again.
     func warmThumbnailsIfTheListChanged() {
         let uuid = control.model.state.pointer?.listUuid
-        guard uuid != lastLiveList else { return }
+        let list = uuid.flatMap { library.list(uuid: $0) ?? machine.localList(uuid: $0) }
+        guard uuid != lastLiveList || list?.version != lastLiveVersion else { return }
         lastLiveList = uuid
-        guard let thumbnails, let uuid, let list = library.list(uuid: uuid) ?? machine.localList(uuid: uuid) else { return }
+        lastLiveVersion = list?.version
+        guard let thumbnails, let list else { return }
         thumbnails.warm(list: list)
     }
 
@@ -168,10 +189,11 @@ public final class Engine: @unchecked Sendable {
         // The first plan, so the first tick has something to render; what it
         // ran gets its feedback and its errors like any other build.
         planRing.publish(control.build(for: 0, now: clock.now()))
-        afterBuild?(control)
+        finishBuild()
         nextFrameToBuild.store(1, ordering: .releasing)
 
         let controlThread = Thread { [self] in
+            defer { controlDone.signal() }
             while running.load(ordering: .relaxed) {
                 controlSignal.wait()
                 guard running.load(ordering: .relaxed) else { break }
@@ -180,9 +202,7 @@ public final class Engine: @unchecked Sendable {
                     recoverIfNeeded()
                     let started = MonotonicClock.now()
                     planRing.publish(control.build(for: frame, now: clock.now()))
-                    afterBuild?(control)
-                    sweepReleases()
-                    warmThumbnailsIfTheListChanged()
+                    finishBuild()
                     let took = MonotonicClock.now() - started
                     if took > pacing.tickNanoseconds {
                         // Spec 4 §3 — a build past the tick means the render thread reused a plan; say which one.
@@ -249,11 +269,17 @@ public final class Engine: @unchecked Sendable {
         guard running.exchange(false, ordering: .acquiringAndReleasing) else { return }
         scheduler?.stop()
         controlSignal.signal()
+        // Spec 9 §4 — with the control thread out of its loop, every unwritten edit is written.
+        if controlThread != nil, controlDone.wait(timeout: .now() + 2) == .success {
+            control.flushDocuments(now: clock.now())
+        }
         watchdog.stop()
         pressure.stop()
         thermal.stop()
         recorder?.stop()
         audio?.stop()
+        // Spec 5 §5 — an open typing run writes its line before the engine stops.
+        control.commandLog.flush()
         for sink in sinks.values { sink.stop() }
         controlThread = nil
         readbackThread = nil

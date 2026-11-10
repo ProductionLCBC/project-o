@@ -135,12 +135,15 @@ enum Fixtures {
 
     /// Items: 1 header, 2 L1, 3 L2, 4 header, 5 L3 (rows 16 and 17).
     static let playlist = Playlist(uuid: playlistUuid, title: "Sunday", serviceDate: "2026-11-01", items: [
-        .header(label: "Welcome"),
-        .linked(list: 1),
-        .linked(list: 2),
-        .header(label: "Sermon"),
-        .linked(list: 3),
+        .header(label: "Welcome", uuid: itemUuid(1)),
+        .linked(list: 1, listUuid: listUuid(1), uuid: itemUuid(2)),
+        .linked(list: 2, listUuid: listUuid(2), uuid: itemUuid(3)),
+        .header(label: "Sermon", uuid: itemUuid(4)),
+        .linked(list: 3, listUuid: listUuid(3), uuid: itemUuid(5)),
     ])
+
+    /// Spec 7 §3 — the uuid of the playlist's item at a 1-based position.
+    static func itemUuid(_ position: Int) -> UUID { uuid(6000 + position) }
 
     static let machine = Machine(
         stacks: [
@@ -168,13 +171,13 @@ enum Fixtures {
                           source: CommandSource(kind: source), variables: variables)
     }
 
-    /// A pointer on a cue of the playlist.
+    /// A pointer on a cue of the playlist, its item at a 1-based position.
     static func pointer(item: Int, list: Int, cue: Int) -> LivePointer {
-        LivePointer(playlist: playlistUuid, item: item, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
+        LivePointer(playlist: playlistUuid, itemUuid: itemUuid(item), listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
     }
 
     /// A pointer on a cue of a library list fired directly.
     static func pointer(list: Int, cue: Int) -> LivePointer {
-        LivePointer(playlist: nil, item: nil, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
+        LivePointer(playlist: nil, itemUuid: nil, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
     }
 }

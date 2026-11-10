@@ -23,7 +23,8 @@ public enum ProcessError: Error, CustomStringConvertible {
     }
 }
 
-/// Spec 1 §2 — the two roots loaded through OFormats, with their reports.
+/// Spec 1 §2 — the two roots loaded through OFormats, with their reports and
+/// the snapshots they were loaded from, which the writer starts from (Spec 5 §2).
 public struct LoadedRoots: Sendable {
     public var library: Library
     public var machine: Machine
@@ -32,13 +33,18 @@ public struct LoadedRoots: Sendable {
     public var mediaRoot: URL
     public var libraryReport: ValidationReport
     public var machineReport: ValidationReport
+    public var librarySnapshot: RootSnapshot
+    public var machineSnapshot: RootSnapshot
 
     public static func load(libraryRoot: URL, machineRoot: URL) throws -> LoadedRoots {
-        let (library, libraryReport) = Loader.library(from: try LocalFiles.snapshot(ofRoot: libraryRoot))
-        let (machine, machineReport) = Loader.machine(from: try LocalFiles.snapshot(ofRoot: machineRoot))
+        let librarySnapshot = try LocalFiles.snapshot(ofRoot: libraryRoot)
+        let machineSnapshot = try LocalFiles.snapshot(ofRoot: machineRoot)
+        let (library, libraryReport) = Loader.library(from: librarySnapshot)
+        let (machine, machineReport) = Loader.machine(from: machineSnapshot)
         let mediaRoot = URL(fileURLWithPath: machine.settings.mediaRoot, relativeTo: machineRoot).standardizedFileURL
         return LoadedRoots(library: library, machine: machine, libraryRoot: libraryRoot, machineRoot: machineRoot, mediaRoot: mediaRoot,
-                           libraryReport: libraryReport, machineReport: machineReport)
+                           libraryReport: libraryReport, machineReport: machineReport,
+                           librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
     }
 
     public var issueLines: [String] { libraryReport.lines + machineReport.lines }
@@ -72,6 +78,8 @@ public final class EngineProcess: @unchecked Sendable {
     public let audio: AudioSystem?
     public let displaySinks: [DisplaySink]
     public let deckLinkSinks: [DeckLinkSink]
+    /// Spec 1 §8 — documents that change on disk under the engine are reloaded.
+    public let watcher: DiskWatcher
     private let startedAt = MonotonicClock.now()
 
     @MainActor
@@ -154,6 +162,11 @@ public final class EngineProcess: @unchecked Sendable {
         engine = try Engine(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
                             variables: variables, audio: system, log: log)
+        // Spec 5 §2 — edits are written to the roots they were loaded from.
+        engine.control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
+                                       librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+        let control = engine.control
+        watcher = DiskWatcher(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot) { control.requestScan() }
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
             engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,
@@ -171,8 +184,9 @@ public final class EngineProcess: @unchecked Sendable {
         blackBox = options.blackBoxFolder.map { BlackBox(folder: $0) }
 
         server.queryHandler = { [weak self] address in self?.answer(query: address) }
-        engine.afterBuild = { [server, library, machine] control in
-            server.afterBuild(control, library: library, machine: machine)
+        // Spec 5 §2 — feedback reads the roots as the edits left them.
+        engine.afterBuild = { [server] control in
+            server.afterBuild(control, library: control.library, machine: control.machine)
         }
     }
 
@@ -200,6 +214,9 @@ public final class EngineProcess: @unchecked Sendable {
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
         }
+        // Spec 1 §8 — the watcher, and one scan for anything that changed between the load and the watch.
+        if !watcher.start() { log.error("the folder watcher did not start: changes on disk are read at the next launch") }
+        engine.control.requestScan()
         let engine = self.engine
         let textCache = self.textCache
         let audio = self.audio
@@ -234,6 +251,7 @@ public final class EngineProcess: @unchecked Sendable {
     }
 
     public func stop() {
+        watcher.stop()
         engine.stop()
         osc?.stop()
     }
@@ -243,6 +261,9 @@ public final class EngineProcess: @unchecked Sendable {
     /// reading) until the API carries the topic.
     func answer(query address: String) -> OSCMessage? {
         if address == MetricsQuery.address { return MetricsQuery.answer(address, snapshot: metricsSnapshot()) }
+        // Spec 7 §6 — the live position and the countdown, as the last build read them.
+        let published = engine.control.publishedLive
+        if let live = published.live.answer(query: address, frame: published.frame, rate: engine.pacing.masterRate) { return live }
         let state = engine.control.publishedState
         let parts = address.split(separator: "/").map(String.init)
         guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
@@ -254,8 +275,9 @@ public final class EngineProcess: @unchecked Sendable {
         case ("channel", "state"):
             return state.channels[number].map { OSCFeedback.channelState(number, OSCFeedbackDeriver.feedbackState(of: $0.content)) }
         case ("channel", "content"):
+            let library = engine.control.publishedRoots.library
             return state.channels[number].map {
-                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: roots.library))
+                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: library))
             }
         case ("lock", ""):
             return state.channels[number].map { OSCFeedback.lock(number, locked: $0.lock) }

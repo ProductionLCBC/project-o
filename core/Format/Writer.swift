@@ -8,11 +8,24 @@ import Foundation
 
 /// Spec 1 §5 — one whole-file operation of a save. `replace` is atomic in
 /// the adapter: "writes to a temporary file in the same folder, fsyncs, and
-/// renames over the original".
+/// renames over the original". Spec 7 §2 — "Other files are never
+/// replaced": a `move` or a `copy` refuses a name another file holds, and no
+/// move makes a folder on the way.
 public enum FileOperation: Equatable, Sendable {
     case replace(path: String, data: Data)
+    /// A rename that never replaces another file: refused when `to` exists.
     case move(from: String, to: String)
     case remove(path: String)
+    /// Spec 9 §6 — keep a file's bytes at another path, never writing over
+    /// one there ("No save writes over a kept version"); its folders are made.
+    case copy(from: String, to: String)
+    /// Spec 7 §2 — a folder edit's directory work: create (its parent must
+    /// exist), rename or move (refused when the new path exists, unless only
+    /// the case changes) and remove (only when it holds nothing visible;
+    /// hidden files and folders go with it).
+    case makeFolder(path: String)
+    case renameFolder(from: String, to: String)
+    case removeFolder(path: String)
 }
 
 /// Spec 1 §5 — an ordered list of file operations; executing them in order
@@ -87,32 +100,22 @@ public enum Writer {
 
     /// Spec 1 §5 — save one document: rename its file to match its number and
     /// label if it moved ("renames the file to match on save"), then replace
-    /// it atomically.
+    /// it atomically. Spec 7 §3 — a playlist "keeps [its name] until the title
+    /// changes", so a save writes it where its file is; the edit that changes
+    /// its title names its new file.
     public static func save(_ document: Document, extras: [String: JSONValue] = [:], currentPath: String? = nil) -> WritePlan {
         var plan = WritePlan()
-        let path = FileLayout.path(for: document)
+        var path = FileLayout.path(for: document)
+        if case .playlist = document, let currentPath { path = currentPath }
+        // Spec 7 §2 — "a save renames the file within its folder".
+        if case .list(let list) = document, !list.isLocalCopy, let currentPath {
+            path = FileLayout.listPath(for: list, folder: FileLayout.folder(ofListPath: currentPath))
+        }
         if let currentPath, currentPath != path {
             plan.operations.append(.move(from: currentPath, to: path))
         }
         plan.operations.append(.replace(path: path, data: data(for: document, extras: extras)))
         return plan
-    }
-
-    /// Spec 1 §4 — "Every List master carries an integer `version` that
-    /// increments on each save. Saving writes the previous document to the
-    /// versions folder (section 5) before overwriting." Returns the list as
-    /// saved, one version on, and the plan: the previous bytes into
-    /// `versions/NNN/vNNNN.json`, a rename if the title changed, the new
-    /// document. A local copy keeps its versions beside the masters' too.
-    public static func saveList(_ list: List, extras: [String: JSONValue] = [:], previous: Data?, currentPath: String?) -> (list: List, plan: WritePlan) {
-        var saved = list
-        saved.version = list.version + 1
-        var plan = WritePlan()
-        if let previous {
-            plan.operations.append(.replace(path: FileLayout.versionPath(list: list.number, version: list.version), data: previous))
-        }
-        plan.operations.append(contentsOf: save(.list(saved), extras: extras, currentPath: currentPath).operations)
-        return (saved, plan)
     }
 
     // MARK: - Whole roots
@@ -133,8 +136,12 @@ public enum Writer {
         put(.mediaIndex(library.mediaIndex))
         for preset in library.presets { put(.preset(preset)) }
         for macro in library.macros { put(.macro(macro)) }
-        for list in library.lists { put(.list(list)) }
-        return RootSnapshot(files: files)
+        for list in library.lists {
+            // Spec 7 §2 — a list is written in its folder.
+            let folder = library.folder(ofList: list.uuid) ?? ""
+            files[FileLayout.listPath(for: list, folder: folder)] = data(for: .list(list))
+        }
+        return RootSnapshot(files: files, folders: Set(library.folders.map { "lists/" + $0 }))
     }
 
     /// Every document of a machine root at its canonical path, as bytes.
@@ -152,7 +159,11 @@ public enum Writer {
         put(.keys(machine.keys))
         put(.mediaLocal(machine.mediaLocal))
         for macro in machine.macros { put(.macro(macro)) }
-        for playlist in machine.playlists { put(.playlist(playlist)) }
+        for playlist in machine.playlists {
+            // Spec 7 §3 — a playlist is written where its file is.
+            let path = machine.documentPaths[FileLayout.documentKey(playlist: playlist.uuid)] ?? FileLayout.path(for: .playlist(playlist))
+            files[path] = data(for: .playlist(playlist))
+        }
         for list in machine.localLists { put(.list(list)) }
         if let state = machine.lastState { put(.state(state)) }
         return RootSnapshot(files: files)

@@ -25,8 +25,11 @@ index also lists `backgrounds/mountains.mp4`, which does not exist: the missing 
 `machine/` is the machine root: settings, stacks (the §9 main and confidence stacks), two
 outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
 entry, the machine index with a path override, the machine-level macro 2 (Preshow, which names a
-stack and an output), a dated playlist, a local copy of list 42 with provenance, and
-`state/last.json`.
+stack and an output), three playlists named from their titles (Spec 7 §8: "Sunday", dated, in
+`sunday.json`; "Sunday Night", which links list 42 twice, for the pointer tests; and "Sunday
+2026-11-01", the archived copy of "Sunday"), each item with the uuid Spec 7 §3's `KIND:KEY:N`
+rule gives it and each linked item with its list's uuid, a local copy of list 42 with
+provenance, and `state/last.json`.
 
 Identities are fixed: UUIDs are `XXXXXXXX-0000-4000-8000-NNNNNNNNNNNN` with a readable prefix
 and the object's number at the end; media ids are the real SHA-256 of the files.

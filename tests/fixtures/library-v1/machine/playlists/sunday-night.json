@@ -1,0 +1,16 @@
+{
+  "app": "0.1.0",
+  "archived": false,
+  "items": [
+    { "kind": "header", "label": "Evening", "uuid": "2c1a7ad9-af8d-5747-8a1b-29001e675ce3" },
+    { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "f5ddefa0-c441-5343-9e77-91de5edd9942" },
+    { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "2737e45b-7e33-53d9-945c-f40180531b1d" },
+    { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "48e0a1dc-d221-5b6b-a50f-d253edc1eef1" }
+  ],
+  "kind": "playlist",
+  "schema": 1,
+  "serviceDate": null,
+  "serviceTime": "18:00",
+  "title": "Sunday Night",
+  "uuid": "b1a70000-0000-4000-8000-000000000010"
+}

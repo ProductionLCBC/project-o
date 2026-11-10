@@ -41,8 +41,25 @@ enum FixtureLibrary {
         return out.sorted { $0.0 < $1.0 }
     }
 
+    /// The root as the loader takes it: its documents and, as Spec 7 §2 asks,
+    /// its folders, empty ones included (OFormats' `LocalFiles.snapshot` does
+    /// the same on a real root; OCore's tests can't depend on it).
     static func snapshot(of root: URL) -> RootSnapshot {
-        RootSnapshot(files: Dictionary(uniqueKeysWithValues: documents(under: root).map { ($0.path, $0.data) }))
+        var snapshot = RootSnapshot(files: Dictionary(uniqueKeysWithValues: documents(under: root).map { ($0.path, $0.data) }))
+        let prefix = root.standardizedFileURL.path + "/"
+        guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { return snapshot }
+        for case let url as URL in enumerator {
+            let path = url.standardizedFileURL.path
+            guard path.hasPrefix(prefix) else { continue }
+            let relative = String(path.dropFirst(prefix.count))
+            guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            if relative == "media" || FileLayout.isIgnored(path: relative) {
+                enumerator.skipDescendants()
+            } else {
+                snapshot.folders.insert(relative)
+            }
+        }
+        return snapshot
     }
 
     static var librarySnapshot: RootSnapshot { snapshot(of: libraryRoot) }
@@ -90,6 +107,14 @@ enum FixtureLibrary {
     static let list7Cues = [uuid("55ee", 1), uuid("66ff", 2), uuid("77aa", 3)]
     static let localCopyUuid = uuid("10ca1", 42)
     static let playlistUuid = uuid("b1a7", 1)
+    /// Spec 7 §8 — "Sunday Night", which links list 42 twice, and the
+    /// archived copy of "Sunday", "Sunday 2026-11-01".
+    static let sundayNightUuid = uuid("b1a7", 0x10)
+    static let archivedSundayUuid = uuid("b1a7", 0x11)
+    /// Spec 7 §3 — the Sunday playlist's items by position, carrying the
+    /// uuids `KIND:KEY:N` gives them.
+    static let sundayItems: [UUID] = ["header:Welcome:0", "linked:42:0", "local:10ca1000-0000-4000-8000-00000000002a:0",
+                                      "header:Response:0", "linked:7:0"].map { UUID.v5(namespace: playlistUuid, name: $0) }
     static let slideUuid = uuid("51de", 1)
 
     static let dawn = "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527"

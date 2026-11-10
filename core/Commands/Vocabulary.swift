@@ -73,7 +73,7 @@ struct VocabularyRow: Sendable {
         case optionalKeywordSeconds(String)
         /// Spec 2 §2 — `write CONTENT [riders]`, parsed and printed by hand.
         case write
-        /// Spec 2 §3 — `edit TARGET N FIELD VALUE`, reserved.
+        /// Spec 5 §4 — `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`.
         case edit
     }
 
@@ -182,8 +182,10 @@ enum Vocabulary {
                       args: [Arg("section", .string)], lock: .passes, undo: .runtime),
         VocabularyRow("list.goto", target: "list", number: .int("list"), verb: .word("cue"),
                       args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
-        VocabularyRow("playlist.load", target: "playlist",
-                      args: [Arg("title", .string), Arg("date", .optionalString)], lock: .passes, undo: .none),
+        // Spec 7 §3 — "Spec 2 §3 loses its `[DATE]` argument."
+        VocabularyRow("playlist.load", target: "playlist", args: [Arg("title", .string)], lock: .passes, undo: .none),
+        // Spec 2 §3, Spec 7 §4 — `disarm`, `/o/disarm`.
+        VocabularyRow("playlist.disarm", target: "disarm", lock: .passes, undo: .none),
         // Timers, popups and audio
         VocabularyRow("timer.set", target: "timer", number: .int("timer"), verb: .word("set"),
                       args: [Arg("ms", .duration(.clock))], lock: .passes, undo: .none),
@@ -203,9 +205,10 @@ enum Vocabulary {
         VocabularyRow("system.clearAll", target: "system", verb: .word("clearall"), lock: .passes, undo: .runtime),
         VocabularyRow("system.preflight", target: "system", verb: .word("preflight"), lock: .passes, undo: .none),
         VocabularyRow("system.snapshot", target: "system", verb: .word("snapshot"), lock: .passes, undo: .none),
-        // The reserved edit shape
-        VocabularyRow("edit", target: "edit", args: [Arg("", .edit)], lock: .passes, undo: .edit),
     ]
+    // Spec 5 §4 — the edit family: "`cmd` is `edit.` plus the verb", every
+    // one an edit command (undo class `edit`), with its own parser and printer.
+    + EditAction.commandNames.map { VocabularyRow($0, target: "edit", args: [Arg("", .edit)], lock: .passes, undo: .edit) }
 
     static let byCmd: [String: VocabularyRow] = Dictionary(uniqueKeysWithValues: rows.map { ($0.cmd, $0) })
     static let byTarget: [String: [VocabularyRow]] = Dictionary(grouping: rows, by: \.target)

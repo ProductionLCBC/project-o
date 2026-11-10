@@ -1,0 +1,17 @@
+{
+  "app": "0.1.0",
+  "archived": true,
+  "items": [
+    { "kind": "header", "label": "Welcome", "uuid": "72e356be-7e43-5f75-9cf4-b0dc70d68087" },
+    { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "cebae757-017d-525e-87f1-0ef754c42ad8" },
+    { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a", "uuid": "9e1e888d-08f7-5918-93db-9b030feabf66" },
+    { "kind": "header", "label": "Response", "uuid": "10f7b33a-6ce4-539d-bbf0-17776e24de88" },
+    { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "d0b826d9-12a4-5ca9-93e2-08524cadda50" }
+  ],
+  "kind": "playlist",
+  "schema": 1,
+  "serviceDate": "2026-11-01",
+  "serviceTime": null,
+  "title": "Sunday 2026-11-01",
+  "uuid": "b1a70000-0000-4000-8000-000000000011"
+}

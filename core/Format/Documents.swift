@@ -150,13 +150,18 @@ public struct LoadedDocument: Equatable, Sendable {
     public var extras: [String: JSONValue]
     public var migratedFrom: Int?
     public var path: String
+    /// Spec 1 §8 — what reading the document found worth reporting, such as
+    /// a playlist item whose uuid repeats an earlier one's (Spec 7 §3).
+    public var issues: [ValidationIssue]
 
-    public init(kind: DocumentKind, body: Document, extras: [String: JSONValue] = [:], migratedFrom: Int? = nil, path: String) {
+    public init(kind: DocumentKind, body: Document, extras: [String: JSONValue] = [:], migratedFrom: Int? = nil, path: String,
+                issues: [ValidationIssue] = []) {
         self.kind = kind
         self.body = body
         self.extras = extras
         self.migratedFrom = migratedFrom
         self.path = path
+        self.issues = issues
     }
 }
 
@@ -248,29 +253,24 @@ public enum FileLayout {
         case .preset(let p): return "presets/\(numbered(p.number, p.label)).json"
         case .macro(let m): return "macros/\(numbered(m.number, m.label)).json"
         case .list(let l): return (l.isLocalCopy ? "lists-local/" : "lists/") + numbered(l.number, l.title) + ".json"
-        case .playlist(let p):
-            let s = slug(p.title)
-            if let date = p.serviceDate, !date.isEmpty {
-                return "playlists/" + date + (s.isEmpty ? "" : "-" + s) + ".json"
-            }
-            return "playlists/" + (s.isEmpty ? p.uuid.uuidString.lowercased() : s) + ".json"
+        case .playlist(let p): return plainPath(forPlaylist: p)
         default:
             return document.kind.fixedPath ?? document.kind.fileStem + ".json"
         }
     }
 
-    /// Spec 1 §5 — `versions/042/v0017.json`.
-    public static func versionPath(list number: Int, version: Int) -> String {
+    /// Spec 9 §6 — "Kept versions are filed by list uuid, at
+    /// `library/versions/<list uuid>/vNNNN.json`".
+    public static func versionPath(list uuid: UUID, version: Int) -> String {
         let v = String(version)
-        return "versions/\(self.number(number))/v" + (v.count >= 4 ? v : String(repeating: "0", count: 4 - v.count) + v) + ".json"
+        return "versions/" + uuid.uuidString.lowercased() + "/v" + (v.count >= 4 ? v : String(repeating: "0", count: 4 - v.count) + v) + ".json"
     }
 
     /// Spec 1 §5 — "The loader and the folder watcher ignore a sync tool's
     /// temporary and partial files (names beginning with a dot or ending in
-    /// .tmp)".
+    /// .tmp, anything in a folder whose name begins with a dot, ...)".
     public static func isIgnored(path: String) -> Bool {
-        let name = path.split(separator: "/").last.map(String.init) ?? path
-        return name.hasPrefix(".") || name.hasSuffix(".tmp")
+        path.split(separator: "/").contains { $0.hasPrefix(".") || $0.hasSuffix(".tmp") }
     }
 
     /// The kind a path's place in a root implies, or nil for a path the
@@ -285,6 +285,67 @@ public enum FileLayout {
         if path.hasPrefix("lists/") || path.hasPrefix("lists-local/") || path.hasPrefix("versions/") { return .list }
         if path.hasPrefix("playlists/") { return .playlist }
         return nil
+    }
+
+    /// Spec 7 §3 — "A playlist's file name is a slug of its title ... A title
+    /// with no letters or digits uses the playlist's uuid": the plain name,
+    /// before any `-2` that another playlist's file makes it take.
+    public static func plainPath(forPlaylist playlist: Playlist) -> String {
+        let s = slug(playlist.title)
+        return "playlists/" + (s.isEmpty ? playlist.uuid.uuidString.lowercased() : s) + ".json"
+    }
+
+    /// Spec 7 §3 — the file a playlist is given when it is made or retitled:
+    /// its plain name, or "When that name belongs to another playlist's file,
+    /// the engine takes the first free one of `sunday-2.json`,
+    /// `sunday-3.json` and so on". `taken` holds the other files' paths.
+    public static func playlistPath(for playlist: Playlist, taken: Set<String>) -> String {
+        let plain = plainPath(forPlaylist: playlist)
+        guard taken.contains(plain) else { return plain }
+        let stem = String(plain.dropLast(".json".count))
+        var n = 2
+        while taken.contains(stem + "-" + String(n) + ".json") { n += 1 }
+        return stem + "-" + String(n) + ".json"
+    }
+
+    /// The key `documentPaths` uses for a playlist's document.
+    public static func documentKey(playlist uuid: UUID) -> String {
+        "playlist/" + uuid.uuidString.lowercased()
+    }
+
+    /// The key `documentPaths` uses for a master's document.
+    public static func documentKey(list uuid: UUID) -> String {
+        "list/" + uuid.uuidString.lowercased()
+    }
+
+    /// Spec 7 §2 — "`lists/Worship/Hymns/042-great-is-thy-faithfulness.json`
+    /// is list 42 in the folder "Worship/Hymns", and a file directly in
+    /// `lists/` is in no folder": the folder under `lists/`, "" at the top.
+    public static func folder(ofListPath path: String) -> String {
+        guard path.hasPrefix("lists/") else { return "" }
+        var parts = path.dropFirst("lists/".count).split(separator: "/", omittingEmptySubsequences: false)
+        parts.removeLast()
+        return parts.joined(separator: "/")
+    }
+
+    /// Spec 7 §2 — a master's file in a folder: its number and a slug of its
+    /// title, "and a save renames the file within its folder".
+    public static func listPath(for list: List, folder: String) -> String {
+        "lists/" + (folder.isEmpty ? "" : folder + "/") + numbered(list.number, list.title) + ".json"
+    }
+
+    /// Spec 7 §2 — "Other files are never replaced": the path a new list is
+    /// written at, its own name or, when another file holds that name
+    /// (compared without regard to case), the first free one of `-2`, `-3`
+    /// and so on, as a playlist takes one (Spec 7 §3).
+    public static func freeListPath(for list: List, folder: String, taken: Set<String>) -> String {
+        let path = listPath(for: list, folder: folder)
+        let others = Set(taken.map { $0.lowercased() })
+        guard others.contains(path.lowercased()) else { return path }
+        let stem = String(path.dropLast(".json".count))
+        var n = 2
+        while others.contains((stem + "-" + String(n) + ".json").lowercased()) { n += 1 }
+        return stem + "-" + String(n) + ".json"
     }
 
     /// The key `documentPaths` uses for a per-object document.

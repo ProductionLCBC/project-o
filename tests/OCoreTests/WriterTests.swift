@@ -21,13 +21,14 @@ final class WriterTests: XCTestCase {
         XCTAssertEqual(FileLayout.slug(String(repeating: "x", count: 100)).count, 60, "slugs are bounded")
 
         let (library, machine, _) = F.load()
+        guard let sunday = machine.playlist(uuid: F.playlistUuid) else { return XCTFail("the fixture's Sunday") }
         XCTAssertEqual(FileLayout.path(for: .preset(library.presets[2])), "presets/003-lower-third.json")
         XCTAssertEqual(FileLayout.path(for: .list(library.lists[1])), "lists/042-great-is-thy-faithfulness.json")
         XCTAssertEqual(FileLayout.path(for: .list(machine.localLists[0])), "lists-local/042-great-is-thy-faithfulness-manheim.json")
         XCTAssertEqual(FileLayout.path(for: .macro(library.macros[0])), "macros/001-welcome.json")
         XCTAssertEqual(FileLayout.path(for: .macro(machine.macros[0])), "macros/002-preshow.json")
-        XCTAssertEqual(FileLayout.path(for: .playlist(machine.playlists[0])), "playlists/2026-11-01-sunday.json")
-        var undated = machine.playlists[0]
+        XCTAssertEqual(FileLayout.path(for: .playlist(sunday)), "playlists/sunday.json")
+        var undated = sunday
         undated.serviceDate = nil
         undated.title = "Sunday Night"
         XCTAssertEqual(FileLayout.path(for: .playlist(undated)), "playlists/sunday-night.json")
@@ -35,7 +36,7 @@ final class WriterTests: XCTestCase {
         unlabeled.label = ""
         unlabeled.number = 1234
         XCTAssertEqual(FileLayout.path(for: .preset(unlabeled)), "presets/1234.json")
-        XCTAssertEqual(FileLayout.versionPath(list: 42, version: 16), "versions/042/v0016.json")
+        XCTAssertEqual(FileLayout.versionPath(list: F.listUuid(42), version: 16), "versions/a9f00000-0000-4000-8000-00000000002a/v0016.json")
         XCTAssertEqual(FileLayout.path(for: .channels([])), "channels.json")
         XCTAssertEqual(FileLayout.path(for: .mediaLocal(MediaLocalIndex())), "media-local.json")
         XCTAssertEqual(FileLayout.path(for: .state(ShowState())), "state/last.json")
@@ -58,35 +59,6 @@ final class WriterTests: XCTestCase {
         XCTAssertEqual(unchanged.operations, [.replace(path: "presets/003-lower-third.json", data: Writer.data(for: .preset(library.presets[2])))])
         let first = Writer.save(.preset(preset), currentPath: nil)
         XCTAssertEqual(first.operations.map(\.isReplace), [true], "a new document has nothing to rename")
-    }
-
-    /// Spec 1 §4 — "Every List master carries an integer `version` that
-    /// increments on each save. Saving writes the previous document to the
-    /// versions folder before overwriting, which is the whole version-history
-    /// mechanism."
-    func test_savingAListBumpsTheVersionAndKeepsThePreviousDocument() throws {
-        let (library, _, _) = F.load()
-        let previous = try XCTUnwrap(F.librarySnapshot.files["lists/042-great-is-thy-faithfulness.json"])
-        var list = library.lists[1]
-        list.cues[0].label = "Verse 1 (edited)"
-        let saved = Writer.saveList(list, previous: previous, currentPath: "lists/042-great-is-thy-faithfulness.json")
-        XCTAssertEqual(saved.list.version, 18)
-        XCTAssertEqual(saved.plan.operations.count, 2)
-        XCTAssertEqual(saved.plan.operations[0], .replace(path: "versions/042/v0017.json", data: previous))
-        guard case .replace(let path, let data) = saved.plan.operations[1] else { return XCTFail("\(saved.plan)") }
-        XCTAssertEqual(path, "lists/042-great-is-thy-faithfulness.json")
-        let tree = try JSONValue.parse(data)
-        XCTAssertEqual(tree["version"], .number(18))
-        XCTAssertEqual(tree["cues"]?[0]?["label"], .string("Verse 1 (edited)"))
-
-        let firstSave = Writer.saveList(list, previous: nil, currentPath: nil)
-        XCTAssertEqual(firstSave.plan.operations.count, 1, "a new master has no previous version to keep")
-        XCTAssertEqual(firstSave.list.version, 18)
-
-        list.title = "Great Is Thy Faithfulness (new)"
-        let renamed = Writer.saveList(list, previous: previous, currentPath: "lists/042-great-is-thy-faithfulness.json")
-        XCTAssertEqual(renamed.plan.operations.map(\.isReplace), [true, false, true])
-        XCTAssertEqual(renamed.plan.operations[1], .move(from: "lists/042-great-is-thy-faithfulness.json", to: "lists/042-great-is-thy-faithfulness-new.json"))
     }
 
     /// The plan is data: executing it in order is the adapter's whole job, and

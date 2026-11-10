@@ -71,8 +71,8 @@ final class OSCMappingTests: XCTestCase {
         row(.itemCue(item: 4, cue: 3), "/o/item/4/cue", [i(3)]),
         row(.itemSection(item: 4, section: "chorus"), "/o/item/4/section", [s("chorus")]),
         row(.listCue(list: 42, cue: 3), "/o/list/42/cue", [i(3)]),
-        row(.playlistLoad(title: "Sunday", date: "2026-11-01"), "/o/playlist", [s("Sunday"), s("2026-11-01")]),
-        row(.playlistLoad(title: "Sunday", date: nil), "/o/playlist", [s("Sunday")]),
+        row(.playlistLoad(title: "Sunday"), "/o/playlist", [s("Sunday")]),
+        row(.disarm, "/o/disarm"),
         row(.timerSet(timer: 1, ms: 300_000), "/o/timer/1/set", [i(300)]),
         row(.timerSet(timer: 1, ms: 1500), "/o/timer/1/set", [f(1.5)]),
         row(.timerStart(timer: 1), "/o/timer/1/start"),
@@ -91,9 +91,11 @@ final class OSCMappingTests: XCTestCase {
         row(.systemClearAll, "/o/system/clearall"),
         row(.systemPreflight, "/o/system/preflight"),
         row(.systemSnapshot, "/o/system/snapshot"),
-        row(.edit(EditCommand(target: "channel", number: 2, field: "label", value: .string("Lyrics"))),
+        row(.edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             "/o/edit", [s("channel 2 label \"Lyrics\"")]),
     ]
+    // Spec 5 §2 — every edit verb as `/o/edit` with the rest of its text form.
+    + EditTextTests.rows.map { row(.edit($0.edit), "/o/edit", [s(String($0.canonical.dropFirst("edit ".count)))]) }
 
     func test_everyRowMapsToItsAddressAndBack() {
         var seen: Set<String> = []
@@ -134,7 +136,13 @@ final class OSCMappingTests: XCTestCase {
         same(OSCMessage("/o/channel/2/gain", [i(-6)]), OSCMessage("/o/channel/2/gain", [.double(-6)]))
         same(OSCMessage("/o/stack/2/mute", [s("1 off")]), OSCMessage("/o/stack/2/mute", [i(1), s("off")]))
         same(OSCMessage("/o/item/4/section", [s("\"chorus\"")]), OSCMessage("/o/item/4/section", [s("chorus")]))
-        same(OSCMessage("/o/playlist", [s("\"Sunday\" 2026-11-01")]), OSCMessage("/o/playlist", [s("Sunday"), s("2026-11-01")]))
+        same(OSCMessage("/o/playlist", [s("\"Sunday\"")]), OSCMessage("/o/playlist", [s("Sunday")]))
+        // Spec 7 §3 — the date is no longer an argument of `playlist "TITLE"`.
+        if case .failure(let rejection) = OSCMapping.command(from: OSCMessage("/o/playlist", [s("Sunday"), s("2026-11-01")]), options: ParseOptions()) {
+            XCTAssertEqual(rejection.reason, .unexpectedToken)
+        } else {
+            XCTFail("a playlist load with a date is refused")
+        }
         same(OSCMessage("/o/cue", [s("7")]), OSCMessage("/o/cue", [i(7)]))
         same(OSCMessage("/o/next", [s("")]), OSCMessage("/o/next"))
         same(OSCMessage("/o/channel/2/write", [s("media \(Self.dawn) loop transition 2 1.0 once")]),

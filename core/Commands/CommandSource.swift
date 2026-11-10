@@ -14,6 +14,19 @@ public enum SourceKind: String, Codable, Equatable, Sendable {
     public var isSubjectToLock: Bool {
         self == .cue || self == .timeline
     }
+
+    /// Spec 5 §2 — "A failing edit doesn't stop the cue. A cue, macro, key
+    /// binding or scheduler entry may run an edit that lock, library mode or a
+    /// since-changed library refuses. That edit yields `blocked` with its
+    /// reason ... Edits sent from the UI, the API, the command bar or OSC are
+    /// rejected as usual". MIDI and Stream Deck are key bindings; startup and
+    /// shutdown are macros.
+    public var holdsEdits: Bool {
+        switch self {
+        case .cue, .timeline, .macro, .key, .midi, .streamdeck, .scheduler, .startup, .shutdown: return true
+        case .ui, .osc, .commandbar, .api, .restore, .engine: return false
+        }
+    }
 }
 
 /// Spec 2 §9 — the `source` record of a log entry: `{kind, list, cue,

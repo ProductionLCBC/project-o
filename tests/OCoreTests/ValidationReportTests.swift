@@ -17,6 +17,11 @@ final class ValidationReportTests: XCTestCase {
         Validator.validate(library: library, machine: machine, environment: environment)
     }
 
+    /// Where the fixture's "Sunday" sits among its playlists.
+    private func sunday(_ machine: Machine) -> Int {
+        machine.playlists.firstIndex { $0.uuid == F.playlistUuid } ?? 0
+    }
+
     private func only(_ code: IssueCode, in report: ValidationReport, file: StaticString = #filePath, line: UInt = #line) -> ValidationIssue? {
         XCTAssertEqual(report.issues.map(\.code), [code], report.lines.joined(separator: "\n"), file: file, line: line)
         return report.issues.first
@@ -171,9 +176,9 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(only(.missingMacro, in: report(library, machine))?.subject, "machine startupMacro")
         machine.settings.startupMacro = 2
 
-        machine.playlists[0].items.append(PlaylistItem.linked(list: 99))
-        XCTAssertEqual(only(.missingList, in: report(library, machine))?.subject, "playlist Sunday 2026-11-01 item 6")
-        machine.playlists[0].items.removeLast()
+        machine.playlists[sunday(machine)].items.append(PlaylistItem.linked(list: 99, uuid: F.uuid("4d4d", 99)))
+        XCTAssertEqual(only(.missingList, in: report(library, machine))?.subject, "playlist Sunday item 6")
+        machine.playlists[sunday(machine)].items.removeLast()
 
         machine.audioOutputs[1].device = .sdiOutput(4)
         XCTAssertEqual(only(.missingOutput, in: report(library, machine))?.subject, "audio output 2")
@@ -225,16 +230,21 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertTrue(issue?.message.contains("macro 1 → macro 2 → macro 1") == true, issue?.message ?? "")
     }
 
-    /// Spec 1 §3 — "the pair of title and date must be unique on a machine (case-insensitive)".
+    /// Spec 1 §3 — "The playlist's name is its title, unique on a machine
+    /// ignoring case; its date is optional metadata and never part of its name
+    /// (Spec 7 §3)."
     func test_aPlaylistNameClashIsReportedOnce() {
-        var (library, machine) = fresh()
-        var twin = machine.playlists[0]
+        let (library, loaded) = fresh()
+        var machine = loaded
+        var twin = machine.playlists[sunday(machine)]
         twin.uuid = F.uuid("b1a7", 2)
         twin.title = "SUNDAY"
         machine.playlists.append(twin)
-        XCTAssertEqual(only(.playlistNameClash, in: report(library, machine))?.subject, "playlist SUNDAY 2026-11-01")
-        machine.playlists[1].serviceDate = nil
-        XCTAssertEqual(report(library, machine).issues, [], "a different date is a different name")
+        XCTAssertEqual(only(.playlistNameClash, in: report(library, machine))?.subject, "playlist SUNDAY")
+        machine.playlists[machine.playlists.count - 1].serviceDate = nil
+        XCTAssertEqual(only(.playlistNameClash, in: report(library, machine))?.subject, "playlist SUNDAY", "a date is never part of the name")
+        machine.playlists[machine.playlists.count - 1].title = "Sunday Morning"
+        XCTAssertEqual(report(library, machine).issues, [])
     }
 
     // MARK: - §6 commands
