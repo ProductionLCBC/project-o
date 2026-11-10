@@ -73,6 +73,7 @@ final class OSCMappingTests: XCTestCase {
         row(.listCue(list: 42, cue: 3), "/o/list/42/cue", [i(3)]),
         row(.playlistLoad(title: "Sunday", date: "2026-11-01"), "/o/playlist", [s("Sunday"), s("2026-11-01")]),
         row(.playlistLoad(title: "Sunday", date: nil), "/o/playlist", [s("Sunday")]),
+        row(.disarm, "/o/disarm"),
         row(.timerSet(timer: 1, ms: 300_000), "/o/timer/1/set", [i(300)]),
         row(.timerSet(timer: 1, ms: 1500), "/o/timer/1/set", [f(1.5)]),
         row(.timerStart(timer: 1), "/o/timer/1/start"),

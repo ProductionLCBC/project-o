@@ -123,7 +123,7 @@ struct Runner {
         fold.apply(command, source: source, nesting: nesting)
         let (after, effects) = (fold.state, fold.effects)
 
-        if let (position, pointer) = firedCue(after: after, effects: effects, context: projectionContext),
+        if let (position, pointer) = firedCue(after: after, effects: effects, context: projectionContext, command: command),
            let cueNesting = nesting.firingCue {
             // Spec 2 §9 — the navigation's line, then the cue's commands as a
             // cue group. The navigation's line carries only its own fire's
@@ -157,8 +157,11 @@ struct Runner {
     /// The cue a navigation command fired and its `pointer` effect. A fire
     /// sets the pointer after its cue's commands ran, so the command's own
     /// fire is the last pointer effect; earlier ones are cues its cue fired.
-    func firedCue(after: ShowState, effects: [Effect], context: ProjectionContext) -> (CuePosition, Effect)? {
-        guard let last = effects.last(where: { if case .pointer = $0 { return true } else { return false } }),
+    /// Only navigation fires: a `disarm` or a load moves no cue, though its
+    /// `pointer` effect names the live one.
+    func firedCue(after: ShowState, effects: [Effect], context: ProjectionContext, command: Command) -> (CuePosition, Effect)? {
+        guard command.isNavigation,
+              let last = effects.last(where: { if case .pointer = $0 { return true } else { return false } }),
               case .pointer(_, let new?, _) = last, new.cueUuid != nil,
               let position = Fold(state: after, context: context).position(of: new) else { return nil }
         return (position, last)

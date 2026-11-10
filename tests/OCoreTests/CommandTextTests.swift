@@ -112,6 +112,8 @@ final class CommandTextTests: XCTestCase {
         row("list 42 cue 3", .listCue(list: 42, cue: 3)),
         row("playlist \"Sunday\" 2026-11-01", .playlistLoad(title: "Sunday", date: "2026-11-01")),
         row("playlist \"Sunday\"", .playlistLoad(title: "Sunday", date: nil)),
+        // Spec 2 §3, Spec 7 §4 — `disarm` clears the armed trigger.
+        row("disarm", .disarm),
         // Timers, popups and audio
         row("timer 1 set 5:00", .timerSet(timer: 1, ms: 300_000)),
         row("timer 1 start", .timerStart(timer: 1)),

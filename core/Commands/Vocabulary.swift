@@ -184,6 +184,8 @@ enum Vocabulary {
                       args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
         VocabularyRow("playlist.load", target: "playlist",
                       args: [Arg("title", .string), Arg("date", .optionalString)], lock: .passes, undo: .none),
+        // Spec 2 §3, Spec 7 §4 — `disarm`, `/o/disarm`.
+        VocabularyRow("playlist.disarm", target: "disarm", lock: .passes, undo: .none),
         // Timers, popups and audio
         VocabularyRow("timer.set", target: "timer", number: .int("timer"), verb: .word("set"),
                       args: [Arg("ms", .duration(.clock))], lock: .passes, undo: .none),

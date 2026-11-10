@@ -249,6 +249,19 @@ extension Fold {
         fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), command: command, nesting: nesting)
     }
 
+    /// Spec 7 §4 — "`disarm` is a new runtime command (Spec 2 §3, corrected in
+    /// §9). It clears the armed trigger with a `pointer` effect whose `armed`
+    /// is empty, so nothing fires on its own; with nothing armed it is a
+    /// `noop`." The pointer stays where it is.
+    mutating func disarm(command: Command) {
+        guard state.armed != nil else {
+            effects.append(.noop(command))
+            return
+        }
+        state.armed = nil
+        effects.append(.pointer(old: state.pointer, new: state.pointer, armed: nil))
+    }
+
     /// Spec 2 §3 — `playlist "TITLE" [DATE]`: "Makes a playlist live at its
     /// first cue without firing it." The pointer names the playlist and no
     /// cue, so the first `next` fires cue 1 as a boundary. Spec 1 §3: the

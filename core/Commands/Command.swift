@@ -128,6 +128,8 @@ public enum Command: Codable, Equatable, Sendable {
     case itemSection(item: Int, section: String)
     case listCue(list: Int, cue: Int)
     case playlistLoad(title: String, date: String?)
+    /// Spec 2 §3, Spec 7 §4 — "Clears the armed trigger, so nothing fires on its own".
+    case disarm
     // Timers, popups and audio
     case timerSet(timer: Int, ms: Int)
     case timerStart(timer: Int)
@@ -178,6 +180,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .itemSection: return "playlist.section"
         case .listCue: return "list.goto"
         case .playlistLoad: return "playlist.load"
+        case .disarm: return "playlist.disarm"
         case .timerSet: return "timer.set"
         case .timerStart: return "timer.start"
         case .timerPause: return "timer.pause"
@@ -206,7 +209,7 @@ public enum Command: Codable, Equatable, Sendable {
         "channel.write", "channel.clear", "channel.reset", "channel.transition", "channel.audioTransition", "channel.grade",
         "channel.gain", "channel.transport", "channel.endBehavior", "channel.lock", "channel.freeze", "channel.track",
         "channel.build", "output.stack", "stack.blackout", "stack.mute", "playlist.next", "playlist.previous",
-        "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "timer.set", "timer.start",
+        "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "playlist.disarm", "timer.set", "timer.start",
         "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "history.undo",
         "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot", "edit",
         "next", "previous", "cue", "undo", "redo", "macro",
@@ -215,6 +218,16 @@ public enum Command: Codable, Equatable, Sendable {
     public var isUnknown: Bool {
         if case .unknown = self { return true }
         return false
+    }
+
+    /// Spec 2 §3 — the navigation that fires a cue: `next`, `previous`, `cue
+    /// N`, `item N cue M`, `item N section`, `list N cue M`. Spec 2 §9 logs it
+    /// as the navigation's line, then the cue's commands as their own group.
+    public var isNavigation: Bool {
+        switch self {
+        case .next, .previous, .cue, .itemCue, .itemSection, .listCue: return true
+        default: return false
+        }
     }
 
     public var isInvalid: Bool {
@@ -327,6 +340,7 @@ public enum Command: Codable, Equatable, Sendable {
         case "list.goto": self = .listCue(list: try int("list"), cue: try int("cue"))
         case "playlist.load":
             self = .playlistLoad(title: try string("title"), date: try c.decodeIfPresent(String.self, forKey: Key("date")))
+        case "playlist.disarm": self = .disarm
         case "timer.set": self = .timerSet(timer: try int("timer"), ms: try int("ms"))
         case "timer.start": self = .timerStart(timer: try int("timer"))
         case "timer.pause": self = .timerPause(timer: try int("timer"))
@@ -406,7 +420,7 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(stack, forKey: Key("stack"))
             try c.encode(channel, forKey: Key("channel"))
             try c.encode(state, forKey: Key("state"))
-        case .next, .previous, .undo, .redo, .systemClearAll, .systemPreflight, .systemSnapshot, .unknown, .invalid:
+        case .next, .previous, .disarm, .undo, .redo, .systemClearAll, .systemPreflight, .systemSnapshot, .unknown, .invalid:
             break
         case .cue(let n):
             try c.encode(n, forKey: Key("cue"))
@@ -524,7 +538,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .edit(var e):
             if let type = NumberedType(editTarget: e.target) { e.number = transform(type, e.number) }
             return .edit(e)
-        case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .timerSet, .timerStart, .timerPause, .timerReset,
+        case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .disarm, .timerSet, .timerStart, .timerPause, .timerReset,
              .popupSet, .popupClear, .undo, .redo, .historyJump, .systemClearAll, .systemPreflight, .systemSnapshot,
              .unknown, .invalid:
             return self

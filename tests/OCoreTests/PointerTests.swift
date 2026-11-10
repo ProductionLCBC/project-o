@@ -71,4 +71,36 @@ final class PointerTests: XCTestCase {
         (state, _) = project(state, [.listCue(list: 4, cue: 1)], context: context)
         XCTAssertEqual(state.armed, ArmedTrigger(itemUuid: nil, cueUuid: F.cueUuid(list: 4, cue: 2), atFrame: 400))
     }
+
+    /// Spec 7 §4 — "`disarm` ... clears the armed trigger with a `pointer`
+    /// effect whose `armed` is empty, so nothing fires on its own; with
+    /// nothing armed it is a `noop`."
+    func test_disarmClearsTheArmedTriggerAndIsANoopWithNothingArmed() {
+        let context = context(frame: 100)
+        let (armed, _) = project(F.fresh(), [.listCue(list: 4, cue: 1)], context: context)
+        XCTAssertNotNil(armed.armed)
+        let (disarmed, effects) = project(armed, [.disarm], context: context)
+        XCTAssertNil(disarmed.armed)
+        XCTAssertEqual(disarmed.pointer, armed.pointer, "the pointer stays where it was")
+        XCTAssertEqual(effects, [.pointer(old: armed.pointer, new: armed.pointer, armed: nil)])
+        XCTAssertEqual(disarmed.channels, armed.channels)
+
+        let (again, noop) = project(disarmed, [.disarm], context: context)
+        XCTAssertEqual(again, disarmed)
+        XCTAssertEqual(noop, [.noop(.disarm)])
+    }
+
+    /// The runner logs a `disarm` as itself: its `pointer` effect names the
+    /// live cue, but it fires nothing, so no cue group follows and the cue's
+    /// writes don't run again on air.
+    func test_theRunnerCountsOnlyNavigationAsAFire() throws {
+        let context = context(frame: 100)
+        let (armed, _) = project(F.fresh(), [.listCue(list: 4, cue: 1)], context: context)
+        let group = CommandGroup(id: GroupID("g-00000001"), source: CommandSource(kind: .osc), commands: [GuardedCommand(.disarm)])
+        let outcome = try CommandRunner.run(group, state: armed, context: context).get()
+        XCTAssertEqual(outcome.executed.map(\.command), [.disarm])
+        XCTAssertEqual(outcome.executed.first?.result, .ok)
+        XCTAssertNil(outcome.executed.first?.fire)
+        XCTAssertNil(outcome.state.armed)
+    }
 }
