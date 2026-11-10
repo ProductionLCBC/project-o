@@ -820,7 +820,9 @@ public final class ControlLoop: @unchecked Sendable {
         var channelPasses: [Int: ChannelPass?] = [:]
         /// The channels a stack that is not aux-only asked a pass for (Spec 4 §4 step 5).
         var liveChannels: Set<Int> = []
-        var lookahead: [Int: ShowState?] = [:]
+        /// Spec 3 §7 — the states after the next 1, 2, … cues, each folded from
+        /// the one before; nil from the first step past the end.
+        var lookahead: [ShowState?] = []
         var jobs: [TextJob] = []
         var dueStackSizes: [Int: [PixelSize]] = [:]
     }
@@ -856,10 +858,13 @@ public final class ControlLoop: @unchecked Sendable {
             for stack in machine.stacks where !assignedStacks.contains(stack.number) { auxOnlyStacks.insert(stack.number) }
         }
         let rendering = dueStacks.union(auxOnlyStacks)
-        // Which stacks sample each channel, for mip generation below half scale.
+        // Which stacks sample each channel, for mip generation below half scale: the slots whose
+        // layout has a pixel box at offset 0, the only box that samples the channel texture (Spec 6 §3).
         for stack in machine.stacks where rendering.contains(stack.number) {
             let size = geometry.stackSize(stack.number)
             for slot in stack.effectiveSlots(library: library) {
+                let layout = SlotResolver.layout(for: slot, stack: stack, library: library)
+                guard layout?.boxes.contains(where: { $0.offset == 0 && !$0.binding.isText }) == true else { continue }
                 scratch.dueStackSizes[slot.channel, default: []].append(size)
             }
         }
@@ -979,13 +984,20 @@ public final class ControlLoop: @unchecked Sendable {
         }
     }
 
-    /// Spec 3 §7 — lookahead for offset boxes, once per offset per build.
+    /// Spec 3 §7 — "Lookahead for offset boxes. Start from the live ShowState
+    /// and fold the next K cues from the pointer": the state a box at +K
+    /// draws, nil past the end of the playlist. Folded once per build, each
+    /// step from the one before, only as far as a due box asks (+3, and +4 for
+    /// the text one cue beyond, Spec 6 §3).
     private func lookaheadState(_ steps: Int, frame: Int64, scratch: inout BuildScratch) -> ShowState? {
-        if let cached = scratch.lookahead[steps] { return cached }
+        guard steps > 0 else { return model.state }
+        if steps <= scratch.lookahead.count { return scratch.lookahead[steps - 1] }
         let context = projectionContext(frame: frame, source: CommandSource(kind: .engine))
-        let state = lookahead(model.state, steps: steps, context: context)
-        scratch.lookahead[steps] = state
-        return state
+        while scratch.lookahead.count < steps {
+            let previous: ShowState? = scratch.lookahead.isEmpty ? model.state : scratch.lookahead[scratch.lookahead.count - 1]
+            scratch.lookahead.append(previous.flatMap { lookahead($0, steps: 1, context: context) })
+        }
+        return scratch.lookahead[steps - 1]
     }
 
     /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top". The
@@ -1000,23 +1012,21 @@ public final class ControlLoop: @unchecked Sendable {
         for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
             // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each
             // offset box, the text one cue beyond its offset".
-            for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where offset >= 0 {
-                if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch), case .text(let t)? = after.channels[slot.channel]?.content {
-                    prefetchText(inputs: inputs, slot: slot, offset: offset, fields: t.fields)
+            for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
+                if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch) {
+                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after)
                 }
             }
             let results = SlotResolver.resolve(
                 inputs, slotIndex: slotIndex, slot: slot,
-                content: { offset in
-                    // Spec 6 §3 — "At 0 the box draws its slot's channel as it is now. At +K it draws the channel as
-                    // it will be once the next K cues have fired"; negative offsets are v1.5.
-                    if offset == 0 { return model.state.channels[slot.channel]?.content }
-                    guard offset > 0 else { return nil }
-                    return lookaheadState(offset, frame: frame, scratch: &scratch)?.channels[slot.channel]?.content
-                },
+                // Spec 6 §3 — "At 0 the box draws its slot's channel as it is now. At +K it draws the channel as
+                // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
+                state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
                 pixels: { slot, offset, content in pixelSource(for: slot, offset: offset, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
-                staticText: { key, box, raw in
-                    let resolvedNow = variables.resolve(raw, state: model.state)
+                staticText: { key, box, raw, shown in
+                    // Spec 6 §5 — a static box's values read the state being drawn: the live state, or the
+                    // lookahead state of an offset box.
+                    let resolvedNow = variables.resolve(raw, state: shown)
                     guard VariableProvider.containsVariables(raw) else { return resolvedNow }
                     return adoptedVariableValue(key, resolved: resolvedNow, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
                 },
@@ -1057,11 +1067,13 @@ public final class ControlLoop: @unchecked Sendable {
 
     /// Spec 6 §3 — "The engine rasterizes the text one cue beyond each offset
     /// box ahead of time ... so a `next` never waits on text": the field boxes
-    /// at `offset` with the text the slot's channel will hold one cue later.
-    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, fields: [String: String]) {
+    /// at `offset` with the text the slot's channel will hold one cue later,
+    /// `state`.
+    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState) {
         guard let layout = inputs.layout(for: slot) else { return }
         for box in layout.boxes where box.offset == offset {
-            guard case .field(let name) = box.binding.kind, let value = fields[name], !value.isEmpty else { continue }
+            guard case .field(let name) = box.binding.kind,
+                  let value = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !value.isEmpty else { continue }
             let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height)
             if text.entry(for: job) == nil { text.request(job) }
         }

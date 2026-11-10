@@ -23,9 +23,9 @@ final class ThumbnailTests: XCTestCase {
         if let folder { try? FileManager.default.removeItem(at: folder) }
     }
 
-    func service(library: Library? = nil) throws -> ThumbnailService {
+    func service(library: Library? = nil, machine: Machine? = nil) throws -> ThumbnailService {
         let library = try library ?? EngineFixtures.library()
-        let machine = try EngineFixtures.spikeMachine()
+        let machine = try machine ?? EngineFixtures.spikeMachine()
         let log = EngineLog(category: "test-thumbnails")
         return try ThumbnailService(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, backend: metal,
                                     posters: ImagePosterProvider(backend: metal, mediaRoot: EngineFixtures.mediaRoot, log: log),
@@ -136,6 +136,29 @@ final class ThumbnailTests: XCTestCase {
         var retitled = list
         retitled.title = "Another title"
         XCTAssertEqual(LibraryVersion.hash(library: library, list: retitled), base, "the list's text is not in the hash; its version is")
+    }
+
+    /// Spec 6 §3 — "In a projected state, such as a thumbnail or the cue
+    /// inspector's canvas (Spec 3 §7's cue view), a +K box folds the next K cues
+    /// of the same list from the cue being drawn. That fold has no playlist, so
+    /// past the list's end the box draws nothing." Spec 6 §11: "In a thumbnail,
+    /// a +1 box shows the list's next cue, and nothing past its last."
+    func test_aPlusOneBoxInAThumbnailShowsTheListsNextCueAndNothingPastItsLast() throws {
+        var machine = try EngineFixtures.spikeMachine()
+        machine.settings.thumbnailStack = 2   // preset 2: a body box, the [Time] box and a body box at +1
+        let service = try service(machine: machine)
+        let list = try list42(service)
+        let roots = (library: service.library, machine: service.machine)
+        let states = service.projectedStates(of: list, through: list.cues.count - 1, roots: roots)
+        let first = service.stackPass(states: states, index: 0, roots: roots, list: list)
+        XCTAssertEqual(first.boxes.first { $0.offset == 1 }?.text, "There is no shadow\nof turning with Thee", "cue 2's text, ahead of cue 1")
+        XCTAssertEqual(first.boxes.first { $0.offset == 0 && $0.binding.isText && $0.text?.contains("faithfulness") == true }?.text,
+                       "Great is Thy faithfulness,\nO God my Father")
+        let last = service.stackPass(states: states, index: list.cues.count - 1, roots: roots, list: list)
+        XCTAssertNil(last.boxes.first { $0.offset == 1 }, "past the list's last cue the +1 box draws nothing")
+        let rendered = try service.render(cue: 1, of: list)
+        XCTAssertEqual(rendered.outcome, .rendered)
+        XCTAssertGreaterThan(lit(try XCTUnwrap(rendered.frame), Frame(x: 0.03, y: 0.82, w: 0.6, h: 0.16)), 30, "the +1 lyric is drawn")
     }
 
     /// Spec 4 §8 — "Thumbnails use the same rasterizer at thumbnail scale so a

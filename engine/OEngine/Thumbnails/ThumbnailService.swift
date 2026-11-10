@@ -185,7 +185,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         nextPoolSlot = (nextPoolSlot + 1) % pool.count
         lock.unlock()
         let states = projectedStates(of: list, through: position - 1 + furthestOffset(library: roots.library), roots: roots)
-        let pass = stackPass(states: states, index: position - 1, roots: roots)
+        let pass = stackPass(states: states, index: position - 1, roots: roots, list: list)
         guard backend.renderOffline(pass, into: target) else {
             countFailure()
             throw ThumbnailError.renderDidNotComplete
@@ -283,8 +283,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// at thumbnail scale. Spec 6 §3 — "In a projected state, such as a
     /// thumbnail ..., a +K box folds the next K cues of the same list from the
     /// cue being drawn. That fold has no playlist, so past the list's end the
-    /// box draws nothing": offset boxes from the states after this cue.
-    func stackPass(states: [ShowState], index: Int, roots: (library: Library, machine: Machine)) -> StackPass {
+    /// box draws nothing": offset boxes from the states after this cue, of
+    /// `list`, the list the states were folded from.
+    func stackPass(states: [ShowState], index: Int, roots: (library: Library, machine: Machine), list: List) -> StackPass {
         let library = roots.library
         let state = states[min(index, states.count - 1)]
         let eager = EagerTextProvider(cache: textCache)
@@ -292,12 +293,12 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stackObject.effectiveSlots(library: library).enumerated() {
             let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot,
-                                               content: { offset in
+                                               state: { offset in
                                                    guard offset >= 0, index + offset < states.count else { return nil }
-                                                   return states[index + offset].channels[slot.channel]?.content
+                                                   return states[index + offset]
                                                },
                                                pixels: { _, _, content in self.posterSource(for: content, roots: roots) },
-                                               staticText: { _, _, raw in self.variables.resolve(raw, state: state) },
+                                               staticText: { _, _, raw, shown in self.variables.resolve(raw, state: shown) },
                                                onTextMiss: { _ in })
             boxes.append(contentsOf: results.compactMap(\.resolved))
         }

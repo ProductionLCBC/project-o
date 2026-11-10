@@ -93,17 +93,24 @@ public enum SlotResolver {
 
     /// Resolve one slot's boxes in layout order. Spec 6 §2 — "Each box in the
     /// layout draws the slot's channel at the box's own offset (§3)":
-    /// `content` answers what the slot's channel holds at an offset (the live
-    /// state at 0, the lookahead for later offsets, a projected state for a
-    /// thumbnail); `pixels` is what a pixel box at an offset draws for that
-    /// content; `staticText` resolves a static box's variables (the control
-    /// loop gates it, Spec 4 §8); `onTextMiss` hears of every text job the
-    /// cache could not answer ("counts `textLate`"). Spec 6 §3 — "Fallback
-    /// boxes look only at earlier boxes with the same offset."
+    /// `state` answers the state a box at an offset draws (the live state at
+    /// 0, the lookahead for later offsets, a projected state for a thumbnail),
+    /// or nil where the lookahead does not reach; `pixels` is what a pixel box
+    /// at an offset draws for the channel's content there; `staticText`
+    /// resolves a static box's variables in that state (the control loop gates
+    /// it, Spec 4 §8); `onTextMiss` hears of every text job the cache could not
+    /// answer ("counts `textLate`").
+    ///
+    /// Spec 6 §3 — "v1 draws 0 to +3 (P4), and a negative offset draws nothing
+    /// until v1.5 adds the ring buffer. Outside −2 to +3, the reference report
+    /// flags the box and it draws nothing"; "past the playlist's end the box
+    /// draws nothing, whatever its binding"; "At an offset, a static box draws
+    /// only while the lookahead reaches that far"; "Fallback boxes look only at
+    /// earlier boxes with the same offset."
     public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot,
-                               content: (Int) -> ContentInstance?,
+                               state: (Int) -> ShowState?,
                                pixels: (StackSlot, Int, ContentInstance?) -> PixelSource?,
-                               staticText: (BoxKey, Box, String) -> String,
+                               staticText: (BoxKey, Box, String, ShowState) -> String,
                                onTextMiss: (TextJob) -> Void) -> [SlotBox] {
         guard let layout = inputs.layout(for: slot) else { return [] }
         let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
@@ -112,7 +119,7 @@ public enum SlotResolver {
         for (boxIndex, box) in layout.boxes.enumerated() {
             let key = BoxKey(stack: inputs.stack.number, slot: slotIndex, box: boxIndex)
             let allowed = transitionAllowed(for: box)
-            if box.fallback && drewAt.contains(box.offset) {
+            guard box.isDrawnOffset, !(box.fallback && drewAt.contains(box.offset)), let shown = state(box.offset) else {
                 out.append(SlotBox(key: key, box: box, resolved: nil, transitionAllowed: allowed))
                 continue
             }
@@ -120,7 +127,7 @@ public enum SlotResolver {
             var resolved: ResolvedBox?
             switch box.binding.kind {
             case .pixels:
-                if let source = pixels(slot, box.offset, content(box.offset)) {
+                if let source = pixels(slot, box.offset, shown.channels[slot.channel]?.content) {
                     let fit = box.fit.pixelFit ?? .fit
                     let quad = ControlLoop.fitQuad(texture: source.texture, content: source.content, contentPixels: source.contentPixels,
                                                    into: frameRect, fit: fit, mips: source.mips)
@@ -128,11 +135,11 @@ public enum SlotResolver {
                                            grade: boxGrade(box, library: inputs.library), offset: box.offset, binding: box.binding)
                 }
             case .field(let name):
-                if case .text(let t)? = content(box.offset), let value = t.fields[name], !value.isEmpty {
+                if let value = fieldValue(name, channel: slot.channel, state: shown, inputs: inputs), !value.isEmpty {
                     resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
                 }
             case .static(let raw):
-                let value = staticText(key, box, raw)
+                let value = staticText(key, box, raw, shown)
                 if !value.isEmpty {
                     resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
                 }
@@ -141,6 +148,15 @@ public enum SlotResolver {
             out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed))
         }
         return out
+    }
+
+    /// Spec 6 §3 — "Field boxes draw a field of the channel's text content: the
+    /// write's `fields` map, under the box's name (Spec 1 §2)"; "A field box
+    /// draws only for text content. On media or an empty channel it draws
+    /// nothing". Nil when there is nothing to draw; an empty value hides the box.
+    public static func fieldValue(_ name: String, channel: Int, state: ShowState, inputs: Inputs) -> String? {
+        guard case .text(let content)? = state.channels[channel]?.content else { return nil }
+        return content.fields[name]
     }
 
     /// Spec 4 §8 — "Boxes with `transitionOnVariableChange` run their box
