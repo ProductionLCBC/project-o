@@ -171,13 +171,13 @@ enum Fixtures {
                           source: CommandSource(kind: source), variables: variables)
     }
 
-    /// A pointer on a cue of the playlist.
+    /// A pointer on a cue of the playlist, its item at a 1-based position.
     static func pointer(item: Int, list: Int, cue: Int) -> LivePointer {
-        LivePointer(playlist: playlistUuid, item: item, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
+        LivePointer(playlist: playlistUuid, itemUuid: itemUuid(item), listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
     }
 
     /// A pointer on a cue of a library list fired directly.
     static func pointer(list: Int, cue: Int) -> LivePointer {
-        LivePointer(playlist: nil, item: nil, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
+        LivePointer(playlist: nil, itemUuid: nil, listUuid: listUuid(list), cueUuid: cueUuid(list: list, cue: cue))
     }
 }

@@ -2,54 +2,61 @@
 
 import Foundation
 
-/// Spec 3 §5 — "The pointer is `{playlist, item, listUuid, cueUuid}` or, when
-/// a master was fired directly from the library, `{list, cueUuid}` with no
-/// playlist. It names the last cue fired, not a cursor."
+/// Spec 3 §5 — "The pointer is `{playlist, itemUuid, listUuid, cueUuid}`,
+/// where `itemUuid` is the playlist item's uuid, or, when a master was fired
+/// directly from the library, `{listUuid, cueUuid}` with no playlist (Spec 7
+/// §4). It names the last cue fired, not a cursor."
 ///
-/// Reading of the spec: `playlist.load` makes a playlist live "without
-/// firing it", which is a pointer with the playlist set and no list or cue,
-/// so the first `next` fires cue 1 and is a boundary. `item` is the 1-based
-/// playlist position.
+/// Reading of the spec: `playlist.load` makes a playlist live "with no cue
+/// fired", which is a pointer with the playlist set and no list or cue, so the
+/// first `next` fires its first cue and is a boundary. Spec 7 §4 — the item
+/// is named "under the new key `itemUuid` so that an older state file can't be
+/// misread": an older file's `item`, a position, is not read.
 public struct LivePointer: Codable, Equatable, Sendable {
     public var playlist: UUID?
-    public var item: Int?
+    public var itemUuid: UUID?
     public var listUuid: UUID?
     public var cueUuid: UUID?
 
-    public init(playlist: UUID? = nil, item: Int? = nil, listUuid: UUID? = nil, cueUuid: UUID? = nil) {
+    public init(playlist: UUID? = nil, itemUuid: UUID? = nil, listUuid: UUID? = nil, cueUuid: UUID? = nil) {
         self.playlist = playlist
-        self.item = item
+        self.itemUuid = itemUuid
         self.listUuid = listUuid
         self.cueUuid = cueUuid
     }
 
-    private enum CodingKeys: String, CodingKey { case playlist, item, listUuid, cueUuid }
+    private enum CodingKeys: String, CodingKey { case playlist, itemUuid, listUuid, cueUuid }
 
     /// Spec 1 §9 — UUIDs are written lowercase.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(playlist?.uuidString.lowercased(), forKey: .playlist)
-        try c.encodeIfPresent(item, forKey: .item)
+        try c.encodeIfPresent(itemUuid?.uuidString.lowercased(), forKey: .itemUuid)
         try c.encodeIfPresent(listUuid?.uuidString.lowercased(), forKey: .listUuid)
         try c.encodeIfPresent(cueUuid?.uuidString.lowercased(), forKey: .cueUuid)
     }
 }
 
-/// Spec 3 §5 — "`armed = {cue: next, at: fireFrame + ms}`". The scheduler
-/// fires it by sending `next`, since a manual fire disarms whatever is armed.
+/// Spec 3 §5 — "`armed = {item, cue: next, at: fireFrame + ms}`"; Spec 7 §4 —
+/// "The armed trigger gains the item's uuid beside the cue's, `{itemUuid,
+/// cueUuid, atFrame}`, so a song linked twice arms the right copy." No item
+/// when a library list is live.
 public struct ArmedTrigger: Codable, Equatable, Sendable {
+    public var itemUuid: UUID?
     public var cueUuid: UUID
     public var atFrame: Int
-    public init(cueUuid: UUID, atFrame: Int) {
+    public init(itemUuid: UUID?, cueUuid: UUID, atFrame: Int) {
+        self.itemUuid = itemUuid
         self.cueUuid = cueUuid
         self.atFrame = atFrame
     }
 
-    private enum CodingKeys: String, CodingKey { case cueUuid, atFrame }
+    private enum CodingKeys: String, CodingKey { case itemUuid, cueUuid, atFrame }
 
     /// Spec 1 §9 — UUIDs are written lowercase.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(itemUuid?.uuidString.lowercased(), forKey: .itemUuid)
         try c.encode(cueUuid.uuidString.lowercased(), forKey: .cueUuid)
         try c.encode(atFrame, forKey: .atFrame)
     }

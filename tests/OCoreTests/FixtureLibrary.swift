@@ -90,6 +90,10 @@ enum FixtureLibrary {
     static let list7Cues = [uuid("55ee", 1), uuid("66ff", 2), uuid("77aa", 3)]
     static let localCopyUuid = uuid("10ca1", 42)
     static let playlistUuid = uuid("b1a7", 1)
+    /// Spec 7 §3 — the Sunday playlist's items by position, carrying the
+    /// uuids `KIND:KEY:N` gives them.
+    static let sundayItems: [UUID] = ["header:Welcome:0", "linked:42:0", "local:10ca1000-0000-4000-8000-00000000002a:0",
+                                      "header:Response:0", "linked:7:0"].map { UUID.v5(namespace: playlistUuid, name: $0) }
     static let slideUuid = uuid("51de", 1)
 
     static let dawn = "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527"

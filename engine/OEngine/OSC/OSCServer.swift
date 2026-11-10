@@ -305,8 +305,12 @@ public enum OSCFeedbackDeriver {
                 case .pointer(_, let new, _):
                     guard let new, let cueUuid = new.cueUuid, let listUuid = new.listUuid else { continue }
                     let list = library.list(uuid: listUuid) ?? machine.localList(uuid: listUuid)
-                    if let playlist = new.playlist.flatMap({ machine.playlist(uuid: $0) }) { out.append(OSCFeedback.livePlaylist(playlist.title)) }
-                    if let item = new.item { out.append(OSCFeedback.liveItem(item)) }
+                    let playlist = new.playlist.flatMap { machine.playlist(uuid: $0) }
+                    if let playlist { out.append(OSCFeedback.livePlaylist(playlist.title)) }
+                    // Spec 7 §4 — the pointer names its item by uuid; the feedback sends its position.
+                    if let playlist, let itemUuid = new.itemUuid, let index = playlist.items.firstIndex(where: { $0.uuid == itemUuid }) {
+                        out.append(OSCFeedback.liveItem(index + 1))
+                    }
                     if let list, let index = list.cues.firstIndex(where: { $0.uuid == cueUuid }) {
                         out.append(OSCFeedback.liveCue(index + 1))
                         out.append(OSCFeedback.liveLabel(list.cues[index].label))

@@ -19,7 +19,7 @@ final class CommandRejectionTests: XCTestCase {
     static var machine: Machine { loaded.machine }
 
     /// A pointer on list 42 (item 2 of the fixture playlist), cue 1.
-    static let livePointer = LivePointer(playlist: F.playlistUuid, item: 2, listUuid: F.listUuid(42), cueUuid: F.list42Cues[0])
+    static let livePointer = LivePointer(playlist: F.playlistUuid, itemUuid: F.sundayItems[1], listUuid: F.listUuid(42), cueUuid: F.list42Cues[0])
 
     static var liveState: ShowState {
         var state = ShowState.fresh(library: library, machine: machine)

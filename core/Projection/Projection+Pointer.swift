@@ -12,8 +12,14 @@ struct CuePosition {
 
     var cue: Cue { list.cues[cueIndex] }
 
+    /// Spec 7 §3 — the uuid of the item at `item`, the pointer's handle on it.
+    var itemUuid: UUID? {
+        guard let playlist, let item, item >= 1, item <= playlist.items.count else { return nil }
+        return playlist.items[item - 1].uuid
+    }
+
     var pointer: LivePointer {
-        LivePointer(playlist: playlist?.uuid, item: item, listUuid: list.uuid, cueUuid: cue.uuid)
+        LivePointer(playlist: playlist?.uuid, itemUuid: itemUuid, listUuid: list.uuid, cueUuid: cue.uuid)
     }
 }
 
@@ -40,8 +46,10 @@ extension Fold {
         var list: List?
         if let playlistUuid = pointer.playlist, let p = context.machine.playlist(uuid: playlistUuid) {
             playlist = p
-            if let i = pointer.item, i >= 1, i <= p.items.count, let l = self.list(for: p.items[i - 1]), l.uuid == listUuid {
-                item = i
+            // Spec 7 §4 — the pointer follows its item by uuid, wherever it now is.
+            if let itemUuid = pointer.itemUuid, let index = p.items.firstIndex(where: { $0.uuid == itemUuid }),
+               let l = self.list(for: p.items[index]), l.uuid == listUuid {
+                item = index + 1
                 list = l
             }
         }
@@ -153,7 +161,7 @@ extension Fold {
             ms = ms.map { min($0, advance) } ?? advance
         }
         guard let delay = ms else { return nil }
-        return ArmedTrigger(cueUuid: nextCue.uuid, atFrame: frame + context.rate.frames(forMs: max(0, delay)))
+        return ArmedTrigger(itemUuid: next.itemUuid, cueUuid: nextCue.uuid, atFrame: frame + context.rate.frames(forMs: max(0, delay)))
     }
 
     /// Fires a position if there is one and a level is left for it (Spec 2

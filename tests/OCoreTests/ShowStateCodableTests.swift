@@ -46,9 +46,34 @@ final class ShowStateCodableTests: XCTestCase {
         state.outputs[1] = 2
         state.stacks[1] = StackState(blackout: true, muted: [2, 1])
         state.pointer = F.pointer(item: 2, list: 1, cue: 2)
-        state.armed = ArmedTrigger(cueUuid: F.cueUuid(list: 1, cue: 3), atFrame: 900)
+        state.armed = ArmedTrigger(itemUuid: F.itemUuid(2), cueUuid: F.cueUuid(list: 1, cue: 3), atFrame: 900)
         state.popups = [3: "Nursery: please come to room 12"]
         _ = try roundTrip(state)
+    }
+
+    /// Spec 7 §4 — "Only the item changes: it was a position and is now the
+    /// item's uuid (L3), under the new key `itemUuid` so that an older state
+    /// file can't be misread." The armed trigger "gains the item's uuid
+    /// beside the cue's, `{itemUuid, cueUuid, atFrame}`".
+    func test_thePointerNamesItsItemByUuidUnderANewKey() throws {
+        var state = F.fresh()
+        state.pointer = F.pointer(item: 2, list: 1, cue: 2)
+        state.armed = ArmedTrigger(itemUuid: F.itemUuid(2), cueUuid: F.cueUuid(list: 1, cue: 3), atFrame: 900)
+        let tree = try JSONValue.parse(roundTrip(state))
+        XCTAssertEqual(tree["pointer"]?["itemUuid"]?.stringValue, F.itemUuid(2).uuidString.lowercased())
+        XCTAssertNil(tree["pointer"]?["item"])
+        XCTAssertEqual(tree["armed"]?["itemUuid"]?.stringValue, F.itemUuid(2).uuidString.lowercased())
+
+        // An older state file's pointer named its item by position: the key is not read.
+        let older = """
+            { "channels": {}, "outputs": {}, "stacks": {}, "popups": {},
+              "pointer": { "playlist": "\(F.playlistUuid.uuidString.lowercased())", "item": 2,
+                           "listUuid": "\(F.listUuid(1).uuidString.lowercased())", "cueUuid": "\(F.cueUuid(list: 1, cue: 2).uuidString.lowercased())" },
+              "armed": { "cueUuid": "\(F.cueUuid(list: 1, cue: 3).uuidString.lowercased())", "atFrame": 900 } }
+            """
+        let decoded = try JSONDecoder().decode(ShowState.self, from: Data(older.utf8))
+        XCTAssertEqual(decoded.pointer, LivePointer(playlist: F.playlistUuid, itemUuid: nil, listUuid: F.listUuid(1), cueUuid: F.cueUuid(list: 1, cue: 2)))
+        XCTAssertEqual(decoded.armed, ArmedTrigger(itemUuid: nil, cueUuid: F.cueUuid(list: 1, cue: 3), atFrame: 900))
     }
 
     func test_inputAndEmptyContentRoundTrip() throws {

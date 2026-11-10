@@ -75,7 +75,7 @@ extension Fold {
             return state.stacks[n].map { $0.blackout ? "on" : "off" }
         case ("live", nil, _) where words.count == 2:
             switch words[1].lowercased() {
-            case "item": return state.pointer?.item.map(String.init)
+            case "item": return position(of: state.pointer)?.item.map(String.init)
             case "cue": return position(of: state.pointer).map { String($0.cueIndex + 1) }
             case "title": return position(of: state.pointer)?.list.title
             default: return context.variables(name)
