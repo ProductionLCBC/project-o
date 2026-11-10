@@ -1,7 +1,8 @@
 // OCore — Spec 2 §3, the v1 vocabulary as command objects (Spec 1 §6).
 
-/// Spec 2 §3 — "`N` is a channel number or the word `all`." Also used for
-/// `audio N mute` / `audio all`. Encoded as the number or the string `"all"`.
+/// Spec 2 §3 — "`N` is the target's number; every channel command, `stack N
+/// blackout` and `audio N mute` also take the word `all`, for every channel,
+/// stack or audio output." Encoded as the number or the string `"all"`.
 public enum Target: Codable, Equatable, Sendable {
     case number(Int)
     case all
@@ -28,6 +29,26 @@ public enum Target: Codable, Equatable, Sendable {
 /// Spec 2 §3 — `on`, `off`, `toggle` for blackout, mute and freeze.
 public enum SwitchState: String, Codable, Equatable, Sendable {
     case on, off, toggle
+
+    /// Spec 2 §3 — `on`, `off` or `toggle` on one target: the value it ends at.
+    public func resolve(current: Bool) -> Bool {
+        switch self {
+        case .on: return true
+        case .off: return false
+        case .toggle: return !current
+        }
+    }
+
+    /// Spec 2 §3 — "With `all`, `toggle` turns every one on unless every one
+    /// is already on, when it turns them all off." The one value every target
+    /// of an `all` command ends at, given their current values.
+    public func resolve(all currents: [Bool]) -> Bool {
+        switch self {
+        case .on: return true
+        case .off: return false
+        case .toggle: return !currents.allSatisfy { $0 }
+        }
+    }
 }
 
 /// Spec 2 §3 — `channel N play`, `pause`, `stop` (`channel.transport`).
@@ -97,7 +118,7 @@ public enum Command: Codable, Equatable, Sendable {
     case channelBuild(channel: Target, build: Int)
     // Stacks and outputs
     case outputStack(output: Int, stack: Int)
-    case stackBlackout(stack: Int, state: SwitchState)
+    case stackBlackout(stack: Target, state: SwitchState)
     case stackMute(stack: Int, channel: Int, state: SwitchState)
     // Playlist and library navigation
     case next
@@ -294,7 +315,7 @@ public enum Command: Codable, Equatable, Sendable {
         case "channel.build": self = .channelBuild(channel: try target("channel"), build: try int("build"))
         case "output.stack": self = .outputStack(output: try int("output"), stack: try int("stack"))
         case "stack.blackout":
-            self = .stackBlackout(stack: try int("stack"), state: try c.decode(SwitchState.self, forKey: Key("state")))
+            self = .stackBlackout(stack: try target("stack"), state: try c.decode(SwitchState.self, forKey: Key("state")))
         case "stack.mute":
             self = .stackMute(stack: try int("stack"), channel: try int("channel"),
                               state: try c.decode(SwitchState.self, forKey: Key("state")))
@@ -493,7 +514,8 @@ public enum Command: Codable, Equatable, Sendable {
         case .channelBuild(let ch, let build): return .channelBuild(channel: target(.channel, ch), build: build)
         case .outputStack(let output, let stack):
             return .outputStack(output: transform(.output, output), stack: transform(.stack, stack))
-        case .stackBlackout(let stack, let state): return .stackBlackout(stack: transform(.stack, stack), state: state)
+        // Spec 1 §2 — `stack all` names no stack, so it is never a reference.
+        case .stackBlackout(let stack, let state): return .stackBlackout(stack: target(.stack, stack), state: state)
         case .stackMute(let stack, let channel, let state):
             return .stackMute(stack: transform(.stack, stack), channel: transform(.channel, channel), state: state)
         case .listCue(let list, let cue): return .listCue(list: transform(.list, list), cue: cue)

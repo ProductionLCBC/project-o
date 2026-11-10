@@ -128,7 +128,7 @@ final class LogEntryTests: XCTestCase {
                                  .channelGrade(channel: .number(1), ref: 1, ms: nil), .channelTransport(channel: .number(1), mode: .play),
                                  .channelEndBehavior(channel: .number(1), mode: .hold), .channelFreeze(channel: .number(1), state: .on),
                                  .channelTrack(channel: .number(1), direction: .skip), .channelBuild(channel: .number(1), build: 1),
-                                 .outputStack(output: 1, stack: 1), .stackBlackout(stack: 1, state: .on), .stackMute(stack: 1, channel: 1, state: .on),
+                                 .outputStack(output: 1, stack: 1), .stackBlackout(stack: .number(1), state: .on), .stackMute(stack: 1, channel: 1, state: .on),
                                  .next, .previous, .cue(1), .itemCue(item: 1, cue: 1), .itemSection(item: 1, section: "a"),
                                  .listCue(list: 1, cue: 1), .popupSet(popup: 1, text: "", clearAfterMs: nil), .popupClear(popup: 1),
                                  .audioMute(audio: .all, state: .on), .systemClearAll] {

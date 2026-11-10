@@ -83,17 +83,117 @@ final class ProjectionSupplementaryTests: XCTestCase {
     }
 
     func test_stackBlackoutTogglesWithTheShowingOutputsBlackoutTransition() {
-        let (on, onEffects) = run(F.fresh(), [.stackBlackout(stack: 1, state: .toggle)])
+        let (on, onEffects) = run(F.fresh(), [.stackBlackout(stack: .number(1), state: .toggle)])
         XCTAssertEqual(on.stacks[1]?.blackout, true)
         XCTAssertEqual(onEffects, [.blackout(stack: 1, old: false, new: true, transition: 3)])
 
-        let (still, stillEffects) = run(on, [.stackBlackout(stack: 1, state: .on)])
+        let (still, stillEffects) = run(on, [.stackBlackout(stack: .number(1), state: .on)])
         XCTAssertEqual(still, on)
-        XCTAssertEqual(stillEffects, [.noop(.stackBlackout(stack: 1, state: .on))])
+        XCTAssertEqual(stillEffects, [.noop(.stackBlackout(stack: .number(1), state: .on))])
 
-        let (off, offEffects) = run(on, [.stackBlackout(stack: 1, state: .off)])
+        let (off, offEffects) = run(on, [.stackBlackout(stack: .number(1), state: .off)])
         XCTAssertEqual(off.stacks[1]?.blackout, false)
         XCTAssertEqual(offEffects, [.blackout(stack: 1, old: true, new: false, transition: 3)])
+    }
+
+    // MARK: - Spec 2 §3, `stack all blackout` and toggle with `all`
+
+    /// Spec 2 §3 — "With `all`, `toggle` turns every one on unless every one
+    /// is already on, when it turns them all off": the rule on its own.
+    func test_switchStateWithAllTurnsEveryOneOnUnlessEveryOneIsOn() {
+        XCTAssertEqual(SwitchState.toggle.resolve(current: false), true)
+        XCTAssertEqual(SwitchState.toggle.resolve(current: true), false)
+        XCTAssertEqual(SwitchState.on.resolve(current: true), true)
+        XCTAssertEqual(SwitchState.off.resolve(current: false), false)
+        XCTAssertEqual(SwitchState.toggle.resolve(all: [false, false]), true)
+        XCTAssertEqual(SwitchState.toggle.resolve(all: [true, false]), true, "some on: all on")
+        XCTAssertEqual(SwitchState.toggle.resolve(all: [true, true]), false, "every one on: all off")
+        XCTAssertEqual(SwitchState.on.resolve(all: [true, true]), true)
+        XCTAssertEqual(SwitchState.off.resolve(all: [false, true]), false)
+    }
+
+    /// Spec 2 §3 — `stack all blackout toggle` with none on turns every stack
+    /// on, each with the blackout transition of the output showing it.
+    func test_stackAllBlackoutToggleFromNoneOn() {
+        let command = Command.stackBlackout(stack: .all, state: .toggle)
+        let (on, effects) = run(F.fresh(), [command])
+        XCTAssertEqual(on.stacks[1]?.blackout, true)
+        XCTAssertEqual(on.stacks[2]?.blackout, true)
+        XCTAssertEqual(effects, [.blackout(stack: 1, old: false, new: true, transition: 3),
+                                 .blackout(stack: 2, old: false, new: true, transition: 2)])
+    }
+
+    /// With some on, toggle turns all on, and only the stacks that change have
+    /// an effect, so a stack blacked out on purpose is never brought back.
+    func test_stackAllBlackoutToggleFromSomeOn() {
+        var before = F.fresh()
+        before.stacks[1]?.blackout = true
+        let (after, effects) = run(before, [.stackBlackout(stack: .all, state: .toggle)])
+        XCTAssertEqual(after.stacks[1]?.blackout, true)
+        XCTAssertEqual(after.stacks[2]?.blackout, true)
+        XCTAssertEqual(effects, [.blackout(stack: 2, old: false, new: true, transition: 2)])
+    }
+
+    /// With every one on, toggle turns them all off.
+    func test_stackAllBlackoutToggleFromAllOn() {
+        var before = F.fresh()
+        before.stacks[1]?.blackout = true
+        before.stacks[2]?.blackout = true
+        let (after, effects) = run(before, [.stackBlackout(stack: .all, state: .toggle)])
+        XCTAssertEqual(after.stacks[1]?.blackout, false)
+        XCTAssertEqual(after.stacks[2]?.blackout, false)
+        XCTAssertEqual(effects, [.blackout(stack: 1, old: true, new: false, transition: 3),
+                                 .blackout(stack: 2, old: true, new: false, transition: 2)])
+    }
+
+    func test_stackAllBlackoutOnAndOffAndNoop() {
+        var before = F.fresh()
+        before.stacks[2]?.blackout = true
+        let (on, onEffects) = run(before, [.stackBlackout(stack: .all, state: .on)])
+        XCTAssertEqual(onEffects, [.blackout(stack: 1, old: false, new: true, transition: 3)])
+        let (off, offEffects) = run(on, [.stackBlackout(stack: .all, state: .off)])
+        XCTAssertEqual(off, F.fresh())
+        XCTAssertEqual(offEffects.count, 2)
+        let (same, sameEffects) = run(off, [.stackBlackout(stack: .all, state: .off)])
+        XCTAssertEqual(same, off)
+        XCTAssertEqual(sameEffects, [.noop(.stackBlackout(stack: .all, state: .off))], "nothing changed: one noop")
+    }
+
+    /// A stack no output shows blacks out with no transition, as `stack N` does;
+    /// a machine with no stacks answers `noop`.
+    func test_stackAllBlackoutCoversUnassignedStacksAndEmptyMachines() {
+        var machine = F.machine
+        machine.stacks.append(Stack(number: 3, slots: [StackSlot(channel: 1)]))
+        let fresh = ShowState.fresh(library: F.library, machine: machine)
+        let (after, effects) = project(fresh, [.stackBlackout(stack: .all, state: .on)],
+                                       context: F.context(frame: 1, machine: machine))
+        XCTAssertEqual(effects.last, .blackout(stack: 3, old: false, new: true, transition: nil))
+        XCTAssertEqual(after.stacks.values.filter(\.blackout).count, 3)
+
+        var bare = F.machine
+        bare.stacks = []
+        let empty = ShowState.fresh(library: F.library, machine: bare)
+        let (_, none) = project(empty, [.stackBlackout(stack: .all, state: .toggle)], context: F.context(frame: 1, machine: bare))
+        XCTAssertEqual(none, [.noop(.stackBlackout(stack: .all, state: .toggle))])
+    }
+
+    /// Spec 2 §7 — `[Stack N Blackout]` reads each stack after `stack all`.
+    func test_stackBlackoutGuardReadsAfterStackAll() {
+        let macro = Macro(number: 9, commands: [
+            GuardedCommand(.stackBlackout(stack: .all, state: .on)),
+            GuardedCommand(F.write(2, text: "dark"), when: Guard(variable: "Stack 2 Blackout", op: .is, value: "on")),
+        ])
+        var library = F.library
+        library.macros.append(macro)
+        let (after, _) = project(F.fresh(), [.macro(9)], context: F.context(frame: 1, library: library))
+        XCTAssertEqual(after.channels[2]?.content, text("dark"))
+    }
+
+    /// Spec 1 §2 — "`stack all blackout` names no stack, so it leaves a macro
+    /// portable"; a numbered stack makes it machine-level.
+    func test_stackAllLeavesAMacroPortable() {
+        XCTAssertFalse(Macro(number: 9, commands: [GuardedCommand(.stackBlackout(stack: .all, state: .toggle))]).isMachineLevel)
+        XCTAssertTrue(Macro(number: 9, commands: [GuardedCommand(.stackBlackout(stack: .number(1), state: .toggle))]).isMachineLevel)
     }
 
     func test_stackMuteIsPerChannelSlot() {

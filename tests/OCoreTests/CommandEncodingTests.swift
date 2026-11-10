@@ -92,6 +92,19 @@ final class CommandEncodingTests: XCTestCase {
         XCTAssertNil(fine.invalidReason)
     }
 
+    /// Spec 2 §3 — `stack all blackout`: the stack is the word `"all"` in the
+    /// object form, as `audio all` and `channel all` are, and a numbered stack
+    /// still reads and writes as a number.
+    func test_stackAllBlackoutObjectForm() throws {
+        let all: JSONValue = .object(["cmd": .string("stack.blackout"), "stack": .string("all"), "state": .string("toggle")])
+        let command = try JSONCoding.decode(Command.self, from: all)
+        XCTAssertEqual(command, .stackBlackout(stack: .all, state: .toggle))
+        XCTAssertEqual(try JSONCoding.encode(command), all)
+        let one: JSONValue = .object(["cmd": .string("stack.blackout"), "stack": .number(1), "state": .string("off")])
+        XCTAssertEqual(try JSONCoding.decode(Command.self, from: one), .stackBlackout(stack: .number(1), state: .off))
+        XCTAssertEqual(try JSONCoding.encode(Command.stackBlackout(stack: .number(1), state: .off)), one)
+    }
+
     /// Spec 1 §8 — a known command object keeps keys it did not recognise.
     func test_aKnownCommandKeepsUnknownKeys() throws {
         let object: JSONValue = .object(["cmd": .string("channel.clear"), "channel": .number(2), "zz": .array([.number(1)])])

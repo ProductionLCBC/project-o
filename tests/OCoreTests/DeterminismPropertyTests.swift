@@ -45,7 +45,7 @@ final class DeterminismPropertyTests: XCTestCase {
         case 13: return .listCue(list: Int.random(in: 1...7, using: &rng), cue: Int.random(in: 1...3, using: &rng))
         case 14: return .itemCue(item: Int.random(in: 1...5, using: &rng), cue: Int.random(in: 1...2, using: &rng))
         case 15: return .outputStack(output: Int.random(in: 1...2, using: &rng), stack: Int.random(in: 1...2, using: &rng))
-        case 16: return .stackBlackout(stack: 1, state: .toggle)
+        case 16: return .stackBlackout(stack: .number(1), state: .toggle)
         case 17: return .stackMute(stack: 1, channel: Int.random(in: 1...2, using: &rng), state: .toggle)
         case 18: return .popupSet(popup: 1, text: "hello", clearAfterMs: nil)
         case 19: return .macro(Int.random(in: 1...2, using: &rng))

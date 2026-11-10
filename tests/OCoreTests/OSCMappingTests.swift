@@ -62,7 +62,7 @@ final class OSCMappingTests: XCTestCase {
         row(.channelTrack(channel: .number(1), direction: .back), "/o/channel/1/back"),
         row(.channelBuild(channel: .number(1), build: 3), "/o/channel/1/build", [i(3)]),
         row(.outputStack(output: 1, stack: 4), "/o/output/1/stack", [i(4)]),
-        row(.stackBlackout(stack: 2, state: .toggle), "/o/stack/2/blackout", [s("toggle")]),
+        row(.stackBlackout(stack: .number(2), state: .toggle), "/o/stack/2/blackout", [s("toggle")]),
         row(.stackMute(stack: 2, channel: 1, state: .off), "/o/stack/2/mute", [i(1), s("off")]),
         row(.next, "/o/next"),
         row(.previous, "/o/previous"),

@@ -413,7 +413,7 @@ final class ProjectionTableTests: XCTestCase {
             F.write(1, media: F.mediaB, riders: Riders(transition: TransitionRider(ref: 2, ms: nil, scope: .once))),
             .channelGrade(channel: .number(2), ref: 6, ms: 1000),
             .next,
-            .stackBlackout(stack: 1, state: .toggle),
+            .stackBlackout(stack: .number(1), state: .toggle),
             .popupSet(popup: 1, text: "Nursery", clearAfterMs: 30_000),
             .timerSet(timer: 1, ms: 1000),
             .next,

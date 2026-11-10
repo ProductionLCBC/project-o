@@ -94,7 +94,12 @@ struct Checker {
         switch command {
         case .outputStack(let output, _):
             guard machine.output(output) != nil else { throw reject(.noSuchTarget, "output \(output) does not exist") }
-        case .stackBlackout(let stack, _), .stackMute(let stack, _, _):
+        case .stackBlackout(let target, _):
+            // Spec 2 §3 — `stack all` names every stack there is.
+            if case .number(let stack) = target {
+                guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
+            }
+        case .stackMute(let stack, _, _):
             guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
         case .cue(let n):
             guard n >= 1 else { throw reject(.noSuchTarget, "cue \(n) does not exist; cues count from 1") }
