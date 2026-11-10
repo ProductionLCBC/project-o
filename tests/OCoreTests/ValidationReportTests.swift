@@ -171,7 +171,7 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(only(.missingMacro, in: report(library, machine))?.subject, "machine startupMacro")
         machine.settings.startupMacro = 2
 
-        machine.playlists[0].items.append(PlaylistItem.linked(list: 99))
+        machine.playlists[0].items.append(PlaylistItem.linked(list: 99, uuid: F.uuid("4d4d", 99)))
         XCTAssertEqual(only(.missingList, in: report(library, machine))?.subject, "playlist Sunday 2026-11-01 item 6")
         machine.playlists[0].items.removeLast()
 

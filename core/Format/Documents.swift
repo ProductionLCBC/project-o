@@ -150,13 +150,18 @@ public struct LoadedDocument: Equatable, Sendable {
     public var extras: [String: JSONValue]
     public var migratedFrom: Int?
     public var path: String
+    /// Spec 1 §8 — what reading the document found worth reporting, such as
+    /// a playlist item whose uuid repeats an earlier one's (Spec 7 §3).
+    public var issues: [ValidationIssue]
 
-    public init(kind: DocumentKind, body: Document, extras: [String: JSONValue] = [:], migratedFrom: Int? = nil, path: String) {
+    public init(kind: DocumentKind, body: Document, extras: [String: JSONValue] = [:], migratedFrom: Int? = nil, path: String,
+                issues: [ValidationIssue] = []) {
         self.kind = kind
         self.body = body
         self.extras = extras
         self.migratedFrom = migratedFrom
         self.path = path
+        self.issues = issues
     }
 }
 

@@ -25,7 +25,7 @@ extension Fold {
     func list(for item: PlaylistItem) -> List? {
         switch item.kind {
         case .header: return nil
-        case .linked(let number): return context.library.list(number: number)
+        case .linked(let number, _): return context.library.list(number: number)
         case .local(let uuid): return context.machine.localList(uuid: uuid) ?? context.library.list(uuid: uuid)
         }
     }

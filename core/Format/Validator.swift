@@ -21,8 +21,8 @@ public enum IssueCode: String, Equatable, Sendable {
     case unknownMedia, missingMedia, fontNotInstalled
     // Commands (§6, Spec 2 §7, Spec 2 §5).
     case unknownCommand, invalidCommand, guardOnCue, macroCycle
-    // Playlists (§3).
-    case playlistNameClash
+    // Playlists (§3; Spec 7 §3).
+    case playlistNameClash, repeatedItemUuid
 }
 
 /// One line of the report.
@@ -66,6 +66,11 @@ public struct ValidationReport: Equatable, Sendable {
     mutating func add(_ severity: IssueSeverity, _ code: IssueCode, file: String? = nil, subject: String, message: String) {
         let issue = ValidationIssue(severity: severity, code: code, file: file, subject: subject, message: message)
         if !issues.contains(issue) { issues.append(issue) }
+    }
+
+    /// Lines found while reading documents (`LoadedDocument.issues`).
+    mutating func add(_ found: [ValidationIssue]) {
+        for issue in found where !issues.contains(issue) { issues.append(issue) }
     }
 
     mutating func add(_ failure: DocumentFailure) {
@@ -327,7 +332,7 @@ struct Checks {
             for (index, item) in playlist.items.enumerated() {
                 switch item.kind {
                 case .header: break
-                case .linked(let list): reference(.list, list, from: "\(name) item \(index + 1)")
+                case .linked(let list, _): reference(.list, list, from: "\(name) item \(index + 1)")
                 case .local(let uuid):
                     if machine.localList(uuid: uuid) == nil, library.list(uuid: uuid) == nil {
                         warn(.missingList, "\(name) item \(index + 1)", "local copy \(uuid.uuidString.lowercased()) is not in lists-local")

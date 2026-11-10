@@ -148,7 +148,7 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.cues[2].commands[1].command, .macro(5))
 
         XCTAssertEqual(Identity.renumber(.list, from: 42, to: 43, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(machine.playlists[0].items.map(\.kind)[1], .linked(list: 43))
+        XCTAssertEqual(machine.playlists[0].items.map(\.kind)[1], .linked(list: 43, listUuid: F.listUuid(42)))
         XCTAssertEqual(library.list(number: 43)?.uuid, F.listUuid(42))
         XCTAssertEqual(machine.localLists[0].number, 42, "a local copy is its own document; its number records what it was cut from")
 

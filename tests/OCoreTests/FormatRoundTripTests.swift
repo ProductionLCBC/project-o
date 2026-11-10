@@ -150,7 +150,8 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(machine.localLists.first?.provenance,
                        LocalProvenance(masterUuid: F.listUuid(42), masterVersion: 16, detachedAt: "2026-10-25T14:03:22Z"))
         XCTAssertEqual(machine.playlists.first?.items.map(\.kind),
-                       [.header(label: "Welcome"), .linked(list: 42), .local(F.localCopyUuid), .header(label: "Response"), .linked(list: 7)])
+                       [.header(label: "Welcome"), .linked(list: 42, listUuid: F.listUuid(42)), .local(F.localCopyUuid),
+                        .header(label: "Response"), .linked(list: 7, listUuid: F.listUuid(7))])
     }
 }
 

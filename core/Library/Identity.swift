@@ -187,7 +187,9 @@ public enum Identity {
         }
         for p in machine.playlists.indices {
             for i in machine.playlists[p].items.indices {
-                if case .linked(let n) = machine.playlists[p].items[i].kind { machine.playlists[p].items[i].kind = .linked(list: number(n, .list)) }
+                if case .linked(let n, let listUuid) = machine.playlists[p].items[i].kind {
+                    machine.playlists[p].items[i].kind = .linked(list: number(n, .list), listUuid: listUuid)
+                }
             }
         }
         machine.settings.thumbnailStack = number(machine.settings.thumbnailStack, .stack)
@@ -221,7 +223,7 @@ public enum CueAddressing {
         guard item >= 1, item <= playlist.items.count else { return nil }
         switch playlist.items[item - 1].kind {
         case .header: return nil
-        case .linked(let number): return library.list(number: number)
+        case .linked(let number, _): return library.list(number: number)
         case .local(let uuid): return machine.localList(uuid: uuid) ?? library.list(uuid: uuid)
         }
     }

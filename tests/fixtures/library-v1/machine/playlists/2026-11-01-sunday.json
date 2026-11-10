@@ -2,15 +2,16 @@
   "app": "0.1.0",
   "archived": false,
   "items": [
-    { "kind": "header", "label": "Welcome" },
-    { "kind": "linked", "list": 42 },
-    { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a" },
-    { "kind": "header", "label": "Response" },
-    { "kind": "linked", "list": 7 }
+    { "kind": "header", "label": "Welcome", "uuid": "2de885a8-d9df-55fd-930f-aea46bbde287" },
+    { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "ae3aafe3-4744-5aa5-ab4a-37d19b07310e" },
+    { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a", "uuid": "31845941-cc66-5ef9-be93-51543ea04243" },
+    { "kind": "header", "label": "Response", "uuid": "76f0f264-3333-5f94-ab02-b814ad12cbf8" },
+    { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "22c65e63-afbb-56ce-b638-3e9bb342e0b9" }
   ],
   "kind": "playlist",
   "schema": 1,
   "serviceDate": "2026-11-01",
+  "serviceTime": null,
   "title": "Sunday",
   "uuid": "b1a70000-0000-4000-8000-000000000001"
 }

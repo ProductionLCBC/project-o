@@ -39,7 +39,8 @@ public enum Loader {
         let body = migrated.document.removing("schema").removing("app").removing("kind")
         do {
             let (document, extras) = try decode(kind: header.kind, body: body)
-            return LoadedDocument(kind: header.kind, body: document, extras: extras, migratedFrom: migrated.migratedFrom, path: path)
+            return LoadedDocument(kind: header.kind, body: document, extras: extras, migratedFrom: migrated.migratedFrom, path: path,
+                                  issues: try issues(in: document, body: body, path: path))
         } catch let error as DecodingError {
             throw DocumentFailure.unreadable(path: path, message: JSONCoding.describe(error))
         }
@@ -79,6 +80,18 @@ public enum Loader {
         }
     }
 
+    /// Spec 7 §3 — "An item whose uuid repeats an earlier item's is treated
+    /// as having none, and is reported." The decoded playlist has already
+    /// given such an item a uuid of its own; the report says which one.
+    static func issues(in document: Document, body: JSONValue, path: String) throws -> [ValidationIssue] {
+        guard case .playlist(let playlist) = document else { return [] }
+        let drafts = try JSONCoding.decode([PlaylistItem.Draft].self, from: body["items"] ?? .array([]))
+        return PlaylistItem.assigningUuids(to: drafts, namespace: playlist.uuid).repeated.map { index in
+            ValidationIssue(severity: .warning, code: .repeatedItemUuid, file: path, subject: "playlist \(playlist.title) item \(index + 1)",
+                            message: "repeats the uuid of an earlier item; given one of its own until the next save")
+        }
+    }
+
     // MARK: - Roots
 
     /// Spec 1 §5 — load a library root. Every document that reads installs
@@ -98,6 +111,7 @@ public enum Loader {
             do {
                 let loaded = try document(path: path, data: data)
                 install(loaded, into: &library)
+                report.add(loaded.issues)
             } catch let failure as DocumentFailure {
                 report.add(failure)
                 if let previous { carryOver(path: path, kind: expected, from: previous, into: &library) }
@@ -123,6 +137,7 @@ public enum Loader {
             do {
                 let loaded = try document(path: path, data: data)
                 install(loaded, into: &machine)
+                report.add(loaded.issues)
             } catch let failure as DocumentFailure {
                 report.add(failure)
                 if let previous { carryOver(path: path, kind: expected, from: previous, into: &machine) }
