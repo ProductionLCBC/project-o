@@ -62,7 +62,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 
 **Audio Transition**: `type` (`cut`, `crossfade`, `fadeThroughSilence`), `ms`, `easing`, `offsetMs` (signed; measured from the trigger).
 
-**Macro**: `commands` (array of command objects, see section 6), `color`, `tileLabel`. `scope` is computed, not stored: a macro that references a stack or output is machine-level and is written to the machine root instead of the library. A guard that names a stack or output (`[Output N Stack]`, `[Stack N Blackout]`) counts as a reference.
+**Macro**: `commands` (array of command objects, see section 6), `color`, `tileLabel`. `scope` is computed, not stored: a macro that references a stack or output is machine-level and is written to the machine root instead of the library. A guard that names a stack or output (`[Output N Stack]`, `[Stack N Blackout]`) counts as a reference. `stack all blackout` names no stack, so it leaves a macro portable, as `channel all` and `audio all` do.
 
 **List** (a master): `title`, `author`, `copyright`, `ccli`, `trackThrough` (bool), `version` (integer, incremented on every save), `cues` (ordered array), `timeline` (*reserved*). Its folder in the library is the folder under `lists/` that its file is in (section 5, Spec 7 §2). A local copy is the same document with `provenance` `{masterUuid, masterVersion, detachedAt}` and lives in the machine root.
 

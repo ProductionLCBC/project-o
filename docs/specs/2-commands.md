@@ -76,7 +76,7 @@ macro 12
 
 ## 3. The v1 vocabulary
 
-The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable; *edit* commands carry their inverse and are undone by edit undo (Spec 5 §8). `N` is a channel number or the word `all`. With `all`, `toggle` turns every one on unless every one is already on, when it turns them all off (Spec 10 §7).
+The complete runtime vocabulary for v1. **Lock** says what happens when the target channel is locked: *blocked* means the command is refused when its source is a cue or a timeline and runs from any other source; *passes* means lock never applies. **Undo** is the history class: *runtime* commands snapshot channel state before they run (undo restores it, from v1.5), *none* are logged but not undoable; *edit* commands carry their inverse and are undone by edit undo (Spec 5 §8). `N` is the target's number; every channel command, `stack N blackout` and `audio N mute` also take the word `all`, for every channel, stack or audio output. With `all`, `toggle` turns every one on unless every one is already on, when it turns them all off (Spec 10 §7).
 
 **Channels**
 
@@ -102,7 +102,7 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | Text form | Object | Effect | Lock | Undo |
 | --- | --- | --- | --- | --- |
 | `output N stack M` | `output.stack` | Switches the output's live stack with its switch transition | passes | runtime |
-| `stack N blackout on`, `off`, `toggle` | `stack.blackout` | Mutes every slot with the output's blackout transition; video only | passes | runtime |
+| `stack N blackout on`, `off`, `toggle` | `stack.blackout` | Mutes every slot with the output's blackout transition; video only; `stack all` for every stack, each with its own output's transition | passes | runtime |
 | `stack N mute CHANNEL on`, `off`, `toggle` | `stack.mute` | Mutes one channel's slot in that stack | passes | runtime |
 
 **Playlist and library navigation**
@@ -186,7 +186,7 @@ Every command enters through one of these paths and is tagged with its source fo
 | `key` | The app maps a key (with device) to one command through the key-binding table (Spec 10 §9); the scheduler is the same table keyed by day and time | Bindings are absolute: `channel 2 pause`, never "pause selected" |
 | `osc` | OSC messages mapped one-to-one by the address scheme in section 6 | The primary external control path |
 | `midi`, `streamdeck` | The binding table with a device column; a note, CC or button maps to one command | MIDI is v1.5 if cheap |
-| `macro` | A macro's commands run in order; each inner command is logged with source `macro` and the macro number | A macro can call another macro; depth is capped at 8 and cycles are rejected at save |
+| `macro` | A macro's commands run in order; each inner command is logged with source `macro` and the macro number, or, in a macro a cue runs, with the cue's source and the macro number (Spec 3 §8) | A macro can call another macro; depth is capped at 8 and cycles are rejected at save (macro depth, below) |
 | `cue` | Firing a cue runs its commands in order with source `cue`, the list and cue uuid | Subject to channel lock |
 | `timeline` | v2; same rules as `cue` | Subject to channel lock |
 | `scheduler` | Time-of-day entries in the binding table | Runs with source `scheduler` |
@@ -201,6 +201,8 @@ One more source, `engine`, covers commands the engine issues to itself: the end-
 
 **Groups.** Commands submitted together (a cue's commands, a macro's, a UI expansion) carry a shared `group` id in their log entries, so undo treats them as one step and the history view shows them as one row that expands.
 
+**Macro depth.** A macro can call another macro up to 8 deep. Every macro entered and every cue fired inside one group uses up one of the 8 levels; the cue that the group's own navigation fires (`next`, `cue N`, …) does not, so a cue's macros nest as deep as a key's. A macro runs whole or not at all: submitted directly, as from a key, OSC, the UI or the API, one that loops or nests too deep is rejected (§8); held by a cue, or reached where fewer levels are left, it runs nothing and is logged `noop`.
+
 ## 6. OSC
 
 The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the arguments are the rest of the command. Anyone who can read the vocabulary table can write the OSC without a second document.
@@ -214,6 +216,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `channel 2 clear` | `/o/channel/2/clear` (no arguments) |
 | `output 1 stack 4` | `/o/output/1/stack` `i:4` |
 | `stack 2 blackout toggle` | `/o/stack/2/blackout` `s:"toggle"` |
+| `stack all blackout toggle` | `/o/stack/all/blackout` `s:"toggle"` |
 | `next` | `/o/next` |
 | `cue 7` | `/o/cue` `i:7` |
 | `item 4 cue 3` | `/o/item/4/cue` `i:3` |
@@ -304,7 +307,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
   "fire": { "listTitle": "Great Is Thy Faithfulness", "ccli": "18723" } }
 ```
 
-`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime`, `edit` or `note` (Spec 9 §2); edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number; a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) reaches the log as a note the app sends (Spec 9 §2).
+`fire` appears only on the first command of a cue group and snapshots the list's title and CCLI number at fire time, since masters change later; CCLI reporting is a query over these lines. `kind` is `runtime`, `edit` or `note` (Spec 9 §2); edit entries carry `inverse`, another command object, and `undo: "edit"`. `group` is `g-` and eight hex characters, made by the engine. A macro's own line is logged with `undo: "none"`, followed by each inner command under the same group with source `macro` and the macro's number (with the cue's source and the macro's number when a cue ran the macro, so lock still applies, Spec 3 §8); a cue fired by `next` or any other navigation is logged as the navigation line, then the cue's commands as their own cue group. A command rejected at the API or command-bar boundary is answered with result `rejected` and a `reason` of the form `code: message`; it never reaches the runtime log. Navigation that only browses (not in the vocabulary above, UI-only) reaches the log as a note the app sends (Spec 9 §2).
 
 **API envelope.** The WebSocket API carries the same objects. A client sends a request and receives a response with the same `id`; the engine pushes `event` messages for state changes to subscribed clients. A connection carries answers and events in the order the engine produces them, so an answer reflects every event sent before it; an event carries the `seq` of the log line that caused it, or of the last line logged before it. The operator app is a client of the same API over the engine's local socket (Spec 10 §2). Until the API server exists (Area 19), the engine's areas publish their events and answer their queries and requests through the engine's own publisher, which their tests read in-process.
 
