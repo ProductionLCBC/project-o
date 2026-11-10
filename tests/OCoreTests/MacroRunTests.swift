@@ -282,6 +282,7 @@ final class MacroRunTests: XCTestCase {
         XCTAssertEqual(blocked[3].source, CommandSource(kind: .cue, list: F.listUuid(8), cue: F.cueUuid(list: 8, cue: 1), macro: 2))
 
         let open = try XCTUnwrap(run(group([.listCue(list: 8, cue: 1)], .key)))
-        XCTAssertEqual(open.state.channels[2]?.provenance, .cue(F.cueUuid(list: 8, cue: 1)))
+        XCTAssertEqual(open.state.channels[2]?.provenance, .cue(F.cueUuid(list: 8, cue: 1), list: F.listUuid(8)),
+                       "a write by a macro that a cue ran records that cue and its list (Spec 6 §5)")
     }
 }

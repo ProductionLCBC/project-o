@@ -49,37 +49,74 @@ public struct ChannelAttributes: Codable, Equatable, Sendable {
     }
 }
 
-/// Spec 3 §2 — `provenance`: "the cue uuid that wrote it, or `restored`, or
-/// `ui`". Any non-cue source is recorded by its kind, so Spec 3's `ui` is
-/// `.source(.ui)`.
+/// Spec 3 §2 — `provenance`: "the cue uuid that wrote it and the uuid of the
+/// list it was fired from, also for a write by a macro the cue ran; or
+/// `restored`, keeping the cue and list it had; or the source kind, such as
+/// `ui`". Spec 3's `ui` is `.source(.ui)`.
+///
+/// The list is optional so a state written before Spec 6 (a cue with no list)
+/// still reads; Spec 6 §5's "the list" then falls back to the pointer's.
 public enum Provenance: Codable, Equatable, Sendable {
-    case cue(UUID)
-    case restored
+    case cue(UUID, list: UUID?)
+    case restored(cue: UUID?, list: UUID?)
     case source(SourceKind)
 
-    private enum CodingKeys: String, CodingKey { case kind, cue, source }
+    /// Spec 3 §2 — the cue that wrote the content, if a cue did (kept through
+    /// a restore).
+    public var cue: UUID? {
+        switch self {
+        case .cue(let cue, _): return cue
+        case .restored(let cue, _): return cue
+        case .source: return nil
+        }
+    }
+
+    /// Spec 3 §2 — "the uuid of the list it was fired from" (kept through a
+    /// restore).
+    public var list: UUID? {
+        switch self {
+        case .cue(_, let list): return list
+        case .restored(_, let list): return list
+        case .source: return nil
+        }
+    }
+
+    /// Spec 3 §8 — "marks every restored channel's `provenance` as
+    /// `restored`, keeping the cue and list it had". Content no cue wrote is
+    /// restored with neither.
+    public static func restored(from previous: Provenance?) -> Provenance {
+        .restored(cue: previous?.cue, list: previous?.list)
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, cue, list, source }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(String.self, forKey: .kind)
         switch kind {
-        case "cue": self = .cue(try c.decode(UUID.self, forKey: .cue))
-        case "restored": self = .restored
+        case "cue": self = .cue(try c.decode(UUID.self, forKey: .cue), list: try c.decodeIfPresent(UUID.self, forKey: .list))
+        case "restored":
+            self = .restored(cue: try c.decodeIfPresent(UUID.self, forKey: .cue), list: try c.decodeIfPresent(UUID.self, forKey: .list))
         case "source": self = .source(try c.decode(SourceKind.self, forKey: .source))
         default:
             throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown provenance \(kind)")
         }
     }
 
+    /// Spec 1 §9 — UUIDs are written lowercase; the cue and list are written
+    /// only when known, so `{"kind": "restored"}` and an older
+    /// `{"cue": …, "kind": "cue"}` keep their shape.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .cue(let uuid):
+        case .cue(let cue, let list):
             try c.encode("cue", forKey: .kind)
-            // Spec 1 §9 — UUIDs are written lowercase.
-            try c.encode(uuid.uuidString.lowercased(), forKey: .cue)
-        case .restored:
+            try c.encode(cue.uuidString.lowercased(), forKey: .cue)
+            if let list { try c.encode(list.uuidString.lowercased(), forKey: .list) }
+        case .restored(let cue, let list):
             try c.encode("restored", forKey: .kind)
+            if let cue { try c.encode(cue.uuidString.lowercased(), forKey: .cue) }
+            if let list { try c.encode(list.uuidString.lowercased(), forKey: .list) }
         case .source(let s):
             try c.encode("source", forKey: .kind)
             try c.encode(s, forKey: .source)

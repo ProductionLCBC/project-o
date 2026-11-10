@@ -203,15 +203,18 @@ struct Fold {
         context.library.channel(channel)?.defaults ?? ChannelDefaults()
     }
 
-    /// Spec 3 §2 — `provenance`: "the cue uuid that wrote it, or `restored`,
-    /// or `ui`".
+    /// Spec 3 §2 — `provenance`: "the cue uuid that wrote it and the uuid of
+    /// the list it was fired from, also for a write by a macro the cue ran"
+    /// (a cue's macros keep its source's list and cue, `CommandSource.inMacro`);
+    /// "or `restored`, keeping the cue and list it had; or the source kind,
+    /// such as `ui`".
     func provenance(_ source: CommandSource) -> Provenance {
         switch source.kind {
         case .cue, .timeline:
-            if let cue = source.cue { return .cue(cue) }
+            if let cue = source.cue { return .cue(cue, list: source.list) }
             return .source(source.kind)
         case .restore:
-            return .restored
+            return .restored(cue: source.cue, list: source.list)
         default:
             return .source(source.kind)
         }

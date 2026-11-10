@@ -82,6 +82,12 @@ extension Fold {
     /// Reading of the spec: an identical-content write still applies its
     /// riders (§9 row 5 writes `text "y"` over `y` with `grade 6 once`), so
     /// only a write that changes nothing at all is a `noop`.
+    ///
+    /// Spec 3 §4 (corrected by Spec 6 §10) — "If the fields and the
+    /// provenance are identical to the current ones, the result is `noop`: no
+    /// state change, no transition. Identical fields from another cue or list
+    /// update the provenance alone, with no transition (Spec 6 §5)." That
+    /// update is an `applied` effect: state changed, nothing to animate.
     mutating func write(_ number: Int, _ write: ChannelWrite, command: Command, source: CommandSource) -> Bool {
         guard var channel = state.channels[number] else { return false }
         if isBlocked(channel, source: source) {
@@ -92,6 +98,7 @@ extension Fold {
         var newContent: ContentInstance?
         var restart = false
         var buildChange: (from: Int?, to: Int?)?
+        var provenanceOnly = false
 
         switch write.content {
         case .media(let m):
@@ -112,10 +119,13 @@ extension Fold {
                 startedAtFrame: frame, transport: .playing,
                 endBehavior: loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
         case .text(let fields):
-            // Spec 3 §4 — Text: "If the fields are identical to the current
-            // text, the result is `noop`. Fields not written are absent."
+            // Spec 3 §4 — Text: "If the fields and the provenance are identical
+            // to the current ones, the result is `noop` ... Identical fields
+            // from another cue or list update the provenance alone, with no
+            // transition. Fields not written are absent."
             if case .text(let t) = current, t.fields == fields {
                 newContent = nil
+                provenanceOnly = channel.provenance != provenance(source)
             } else {
                 newContent = .text(TextInstance(fields: fields))
             }
@@ -172,6 +182,12 @@ extension Fold {
         } else if let change = buildChange {
             channel.provenance = provenance(source)
             effects.append(.build(channel: number, from: change.from, to: change.to))
+            acted = true
+        } else if provenanceOnly {
+            // Spec 6 §5 — "Song B's copyright slide therefore never shows song
+            // A's title just because their fields match."
+            channel.provenance = provenance(source)
+            effects.append(.applied(command))
             acted = true
         }
         effects.append(contentsOf: riderEffects)
