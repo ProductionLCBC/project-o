@@ -46,6 +46,12 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 5 §2 — the `library` events of this build, in order, for the
     /// engine to publish once the plan is built. Reset every build.
     public private(set) var lastLibraryEvents: [LibraryEvent] = []
+    /// Whether this build changed the roots: an edit, a reload, or a write
+    /// that raised a list's version or renamed a file.
+    public private(set) var lastRootsChanged = false
+    /// Spec 5 §2 — writing, when the engine runs over roots on disk; nil for
+    /// roots built in memory, whose edits are never written.
+    private(set) var documents: DocumentStore?
     public let pacing: Pacing
     public let geometry: MachineGeometry
     let backend: any RenderBackend
@@ -160,6 +166,28 @@ public final class ControlLoop: @unchecked Sendable {
         queue.enqueue(group)
     }
 
+    /// Spec 5 §2 — "The engine writes a changed document": the roots the
+    /// library and machine were loaded from, with the snapshots they were
+    /// loaded from, so the writer knows what the files hold. Called once,
+    /// before the engine starts.
+    public func attachDocuments(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot) {
+        let variables = self.variables
+        let writer = DocumentWriter(libraryRoot: libraryRoot, machineRoot: machineRoot, librarySnapshot: librarySnapshot,
+                                    machineSnapshot: machineSnapshot, fileStamp: { variables.fileStamp() })
+        documents = DocumentStore(writer: writer, library: library, machine: machine, kept: KeptVersions.reading(librarySnapshot.versions),
+                                  log: log, wallMilliseconds: { variables.wallMilliseconds })
+    }
+
+    /// Spec 9 §4 — before the engine stops, every unwritten edit is written,
+    /// and the writer finishes. On the control side, with the control thread
+    /// stopped.
+    public func flushDocuments(now: MonotonicTime) {
+        guard let documents else { return }
+        documents.writeDue(library: &library, machine: &machine, now: now, everything: true)
+        documents.writer.waitUntilIdle()
+        _ = documents.absorbReports(library: &library, machine: &machine, now: now)
+    }
+
     public var queuedGroups: Int { queue.count }
 
     /// The instance handles a channel holds: its live media and an outgoing one.
@@ -184,9 +212,16 @@ public final class ControlLoop: @unchecked Sendable {
         lastExecuted = []
         lastRejected = []
         lastLibraryEvents = []
+        lastRootsChanged = false
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
+        if let documents {
+            let changes = documents.absorbReports(library: &library, machine: &machine, now: now)
+            if !changes.isEmpty { reloaded(changes) }
+        }
         for group in groups { run(group, frame: frame, now: now) }
+        // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
+        if let documents, documents.writeDue(library: &library, machine: &machine, now: now) { lastRootsChanged = true }
         syncTransports(frame)
         reconcileGrades(frame)
         let plan = buildPlan(frame)
@@ -195,7 +230,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
-        if !lastLibraryEvents.isEmpty || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
+        if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
@@ -315,8 +350,11 @@ public final class ControlLoop: @unchecked Sendable {
             let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
             let applied = AppliedEdits.groups(in: logged.map(\.executed))
             if !applied.isEmpty {
+                let before = (library: library, machine: machine)
                 library = outcome.library
                 machine = outcome.machine
+                lastRootsChanged = true
+                documents?.noteEdits(before: before, library: library, machine: machine, executed: outcome.executed, now: now)
                 for edits in applied {
                     revision += 1
                     let seq = logged.filter { $0.executed.group == edits.group }.map(\.seq).max() ?? commandLog.lastSeq
@@ -338,6 +376,15 @@ public final class ControlLoop: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    /// Spec 5 §2 — "goes up by one for every ... reload from disk", and one
+    /// `library` event with cause `file`, no group and no source, carrying
+    /// the `seq` of the last line logged before it (Spec 2 §9).
+    private func reloaded(_ changes: [LibraryChange]) {
+        revision += 1
+        lastRootsChanged = true
+        lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .file, changed: changes, seq: commandLog.lastSeq))
     }
 
     // MARK: - Effects to runtimes (Spec 3 §6, "Who acts": the engine)

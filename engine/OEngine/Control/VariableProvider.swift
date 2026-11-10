@@ -47,6 +47,20 @@ public final class VariableProvider: @unchecked Sendable {
         return stampFormatter.string(from: now)
     }
 
+    /// Spec 5 §10 — a conflict file is "named with the time and the file's
+    /// name": the machine's local time, `2026-11-08-085959`, as Spec 9 names
+    /// its snapshots.
+    public func fileStamp() -> String {
+        let now = wallClock()
+        lock.lock()
+        defer { lock.unlock() }
+        let format = stampFormatter.dateFormat
+        stampFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
+        let out = stampFormatter.string(from: now)
+        stampFormatter.dateFormat = format
+        return out
+    }
+
     /// The wall clock in milliseconds since 1970: Spec 1 §4's ten-minute rule
     /// compares it with the dates of the kept versions' files.
     public var wallMilliseconds: Int64 {

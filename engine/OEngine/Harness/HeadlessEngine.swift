@@ -149,6 +149,19 @@ public final class HeadlessEngine: @unchecked Sendable {
         engine.enqueue(group)
     }
 
+    /// Spec 5 §2 — write edits to the roots on disk the library and machine
+    /// were loaded from (`LoadedRoots`), as the engine process does.
+    public func attachDocuments(_ roots: LoadedRoots) {
+        control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
+                                librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+    }
+
+    /// The writer's queue has done everything queued so far; the next tick
+    /// reads what it reported.
+    public func waitForWrites() {
+        control.documents?.writer.waitUntilIdle()
+    }
+
     /// One master tick.
     public func tick() {
         clock.advance()

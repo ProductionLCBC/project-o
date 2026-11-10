@@ -23,7 +23,8 @@ public enum ProcessError: Error, CustomStringConvertible {
     }
 }
 
-/// Spec 1 §2 — the two roots loaded through OFormats, with their reports.
+/// Spec 1 §2 — the two roots loaded through OFormats, with their reports and
+/// the snapshots they were loaded from, which the writer starts from (Spec 5 §2).
 public struct LoadedRoots: Sendable {
     public var library: Library
     public var machine: Machine
@@ -32,13 +33,18 @@ public struct LoadedRoots: Sendable {
     public var mediaRoot: URL
     public var libraryReport: ValidationReport
     public var machineReport: ValidationReport
+    public var librarySnapshot: RootSnapshot
+    public var machineSnapshot: RootSnapshot
 
     public static func load(libraryRoot: URL, machineRoot: URL) throws -> LoadedRoots {
-        let (library, libraryReport) = Loader.library(from: try LocalFiles.snapshot(ofRoot: libraryRoot))
-        let (machine, machineReport) = Loader.machine(from: try LocalFiles.snapshot(ofRoot: machineRoot))
+        let librarySnapshot = try LocalFiles.snapshot(ofRoot: libraryRoot)
+        let machineSnapshot = try LocalFiles.snapshot(ofRoot: machineRoot)
+        let (library, libraryReport) = Loader.library(from: librarySnapshot)
+        let (machine, machineReport) = Loader.machine(from: machineSnapshot)
         let mediaRoot = URL(fileURLWithPath: machine.settings.mediaRoot, relativeTo: machineRoot).standardizedFileURL
         return LoadedRoots(library: library, machine: machine, libraryRoot: libraryRoot, machineRoot: machineRoot, mediaRoot: mediaRoot,
-                           libraryReport: libraryReport, machineReport: machineReport)
+                           libraryReport: libraryReport, machineReport: machineReport,
+                           librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
     }
 
     public var issueLines: [String] { libraryReport.lines + machineReport.lines }
@@ -154,6 +160,9 @@ public final class EngineProcess: @unchecked Sendable {
         engine = try Engine(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
                             variables: variables, audio: system, log: log)
+        // Spec 5 §2 — edits are written to the roots they were loaded from.
+        engine.control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
+                                       librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
             engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,

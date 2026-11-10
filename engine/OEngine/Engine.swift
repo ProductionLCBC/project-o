@@ -60,6 +60,9 @@ public final class Engine: @unchecked Sendable {
         }
     }
     private var lastLiveList: UUID?
+    private var lastLiveVersion: Int?
+    /// Signalled by the control thread when it leaves its loop.
+    private let controlDone = DispatchSemaphore(value: 0)
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
@@ -120,23 +123,24 @@ public final class Engine: @unchecked Sendable {
     /// newly live list.
     func finishBuild() {
         afterBuild?(control)
-        let events = control.lastLibraryEvents
-        if !events.isEmpty {
-            for event in events { publisher.publish(event.json) }
-            thumbnails?.update(library: control.library, machine: control.machine)
-        }
+        for event in control.lastLibraryEvents { publisher.publish(event.json) }
+        if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
     }
 
     /// Spec 4 §10 and the Area 5 reading approved on 2026-11-03: "when the
     /// live list changes, the engine queues that list's cues for the
-    /// thumbnail stack". Control side, after a build.
+    /// thumbnail stack". Control side, after a build. Spec 5 §2 — "The cue's
+    /// thumbnail is redrawn because its library version changes": a write
+    /// that raised the live list's version warms it again.
     func warmThumbnailsIfTheListChanged() {
         let uuid = control.model.state.pointer?.listUuid
-        guard uuid != lastLiveList else { return }
+        let list = uuid.flatMap { library.list(uuid: $0) ?? machine.localList(uuid: $0) }
+        guard uuid != lastLiveList || list?.version != lastLiveVersion else { return }
         lastLiveList = uuid
-        guard let thumbnails, let uuid, let list = library.list(uuid: uuid) ?? machine.localList(uuid: uuid) else { return }
+        lastLiveVersion = list?.version
+        guard let thumbnails, let list else { return }
         thumbnails.warm(list: list)
     }
 
@@ -187,6 +191,7 @@ public final class Engine: @unchecked Sendable {
         nextFrameToBuild.store(1, ordering: .releasing)
 
         let controlThread = Thread { [self] in
+            defer { controlDone.signal() }
             while running.load(ordering: .relaxed) {
                 controlSignal.wait()
                 guard running.load(ordering: .relaxed) else { break }
@@ -262,6 +267,10 @@ public final class Engine: @unchecked Sendable {
         guard running.exchange(false, ordering: .acquiringAndReleasing) else { return }
         scheduler?.stop()
         controlSignal.signal()
+        // Spec 9 §4 — with the control thread out of its loop, every unwritten edit is written.
+        if controlThread != nil, controlDone.wait(timeout: .now() + 2) == .success {
+            control.flushDocuments(now: clock.now())
+        }
         watchdog.stop()
         pressure.stop()
         thermal.stop()
