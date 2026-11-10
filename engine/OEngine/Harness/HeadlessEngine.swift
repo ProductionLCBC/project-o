@@ -112,18 +112,37 @@ public final class HeadlessEngine: @unchecked Sendable {
     // MARK: - Driving
 
     /// Spec 2 §8 — a command in its text form, landing on the next tick.
-    /// Rejections are kept, never trapped on (CLAUDE.md).
+    /// Rejections are kept, never trapped on (CLAUDE.md). Spec 5 §3 — the
+    /// harness, like the command bar, expands an edit's short forms against
+    /// the library as it is now; `client` names the sender for typing (§5).
     @discardableResult
-    public func send(_ text: String, source: SourceKind = .osc) -> Rejection? {
+    public func send(_ text: String, source: SourceKind = .osc, client: String? = nil) -> Rejection? {
         let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
-        switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids)) {
+        switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
         case .success(let guarded):
-            engine.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: source), commands: [guarded]))
+            engine.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: source), commands: [guarded], client: client))
             return nil
         case .failure(let rejection):
             log.warning("harness: could not parse '\(text)': \(rejection.message)")
             return rejection
         }
+    }
+
+    /// Several commands in their text forms as one group (Spec 2 §8, Spec 5 §5).
+    @discardableResult
+    public func send(group texts: [String], source: SourceKind = .osc, client: String? = nil) -> Rejection? {
+        let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
+        var commands: [GuardedCommand] = []
+        for text in texts {
+            switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
+            case .success(let guarded): commands.append(guarded)
+            case .failure(let rejection):
+                log.warning("harness: could not parse '\(text)': \(rejection.message)")
+                return rejection
+            }
+        }
+        engine.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: source), commands: commands, client: client))
+        return nil
     }
 
     public func send(_ group: CommandGroup) {

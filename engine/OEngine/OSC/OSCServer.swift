@@ -158,7 +158,8 @@ public final class OSCServer: @unchecked Sendable {
             }
             switch OSCMapping.command(from: message, options: parseOptions) {
             case .success(let command):
-                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command])
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command],
+                                         client: Self.client(peer))
                 remember(group.id, peer: peer, address: message.address)
                 enqueue(group)
             case .failure(let rejection):
@@ -171,7 +172,8 @@ public final class OSCServer: @unchecked Sendable {
             case .success(let commands):
                 // A bundle with nothing in it runs nothing.
                 guard !commands.isEmpty else { return }
-                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands)
+                let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: commands,
+                                         client: Self.client(peer))
                 remember(group.id, peer: peer, address: "#bundle")
                 enqueue(group)
             case .failure(let rejection):
@@ -203,6 +205,11 @@ public final class OSCServer: @unchecked Sendable {
                 send(OSCFeedback.error(address: address, reason: "nothing to query at that address"), to: peer)
             }
         }
+    }
+
+    /// Spec 5 §5 — typing folds "from the same client": over OSC, the sender.
+    static func client(_ peer: OSCPeer) -> String {
+        "osc \(peer.host):\(peer.port)"
     }
 
     /// Recorded before the group is queued, so the build that runs it always

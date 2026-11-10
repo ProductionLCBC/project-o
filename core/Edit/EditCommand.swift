@@ -6,7 +6,7 @@ import Foundation
 /// within its list or playlist, or by channel within a stack." The object
 /// form names the type in `object` and "its number or uuid sits in a field
 /// named after the type, with its parent's beside it" (Spec 5 §4).
-public enum EditAddress: Equatable, Sendable {
+public enum EditAddress: Hashable, Sendable {
     /// `list 42`; no number in `edit list create` until the engine picks one (Spec 7 §2).
     case list(Int?)
     /// `list 42 cue 22bb…`: "a cue, within its list".

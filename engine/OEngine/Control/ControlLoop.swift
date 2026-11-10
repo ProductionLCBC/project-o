@@ -31,8 +31,21 @@ public struct RejectedGroup: Equatable, Sendable {
 /// plan. In production it runs on the control thread while the render thread
 /// encodes the previous tick; the harness calls it synchronously.
 public final class ControlLoop: @unchecked Sendable {
-    public let library: Library
-    public let machine: Machine
+    /// Spec 5 §2 — "The engine holds the loaded documents of both roots ...
+    /// An edit changes the document in memory". The control thread's own;
+    /// other threads read `publishedRoots`.
+    public private(set) var library: Library
+    public private(set) var machine: Machine
+    /// Spec 5 §2 — "The engine keeps one library revision per run. It starts
+    /// at 1 at launch and goes up by one for every applied edit group, every
+    /// reload from disk and every unlock".
+    public private(set) var revision = 1
+    /// Spec 2 §9 — every executed command's line, in memory (Area 12 writes
+    /// the day's file); Spec 5 §5 — typing's runs.
+    public let commandLog = CommandLog()
+    /// Spec 5 §2 — the `library` events of this build, in order, for the
+    /// engine to publish once the plan is built. Reset every build.
+    public private(set) var lastLibraryEvents: [LibraryEvent] = []
     public let pacing: Pacing
     public let geometry: MachineGeometry
     let backend: any RenderBackend
@@ -124,6 +137,7 @@ public final class ControlLoop: @unchecked Sendable {
 
     private let stateLock = NSLock()
     private var stateSnapshot = ShowState()
+    private var rootsSnapshot: (library: Library, machine: Machine)?
 
     /// The state after the last build, for readers on other threads (the OSC
     /// query reply, the process summary). `model.state` itself belongs to the
@@ -132,6 +146,13 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return stateSnapshot
+    }
+
+    /// The roots after the last build, for readers on other threads.
+    public var publishedRoots: (library: Library, machine: Machine) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return rootsSnapshot ?? (library, machine)
     }
 
     /// Spec 2 §8 — groups land on the next tick boundary.
@@ -162,7 +183,10 @@ public final class ControlLoop: @unchecked Sendable {
         groups += queue.drain()
         lastExecuted = []
         lastRejected = []
-        for group in groups { run(group, frame: frame) }
+        lastLibraryEvents = []
+        // Spec 5 §5 — a typing run "closes one second later": its one line.
+        commandLog.closeRuns(now: now)
+        for group in groups { run(group, frame: frame, now: now) }
         syncTransports(frame)
         reconcileGrades(frame)
         let plan = buildPlan(frame)
@@ -171,6 +195,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
+        if !lastLibraryEvents.isEmpty || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
@@ -269,23 +294,47 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 2 §8 — "parse, validate, execute, log": the runner validates and
-    /// folds the group; every effect then reaches the runtimes.
-    private func run(_ group: CommandGroup, frame: Int64) {
+    /// folds the group; every effect then reaches the runtimes. Spec 5 §2 —
+    /// the edits it applied change the roots the next group reads, and each
+    /// log group of applied edits raises the revision by one and makes one
+    /// `library` event carrying the `seq` of its last line.
+    private func run(_ group: CommandGroup, frame: Int64, now: MonotonicTime) {
         let context = projectionContext(frame: frame, source: group.source)
-        switch CommandRunner.run(group, state: model.state, context: context) {
+        // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
+        let editing = EditContext(today: variables.date())
+        switch CommandRunner.run(group, state: model.state, context: context, editing: editing) {
         case .failure(let rejection):
+            // Spec 5 §5 — "any other command from that client closes the run early".
+            if let client = group.client { commandLog.closeRun(of: client) }
             rejections.append(rejection)
             lastRejected.append(RejectedGroup(id: group.id, source: group.source, rejection: rejection))
             log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
         case .success(let outcome):
             model.state = outcome.state
             lastExecuted.append(contentsOf: outcome.executed)
+            let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
+            let applied = AppliedEdits.groups(in: logged.map(\.executed))
+            if !applied.isEmpty {
+                library = outcome.library
+                machine = outcome.machine
+                for edits in applied {
+                    revision += 1
+                    let seq = logged.filter { $0.executed.group == edits.group }.map(\.seq).max() ?? commandLog.lastSeq
+                    lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .edit, group: edits.group, source: edits.source,
+                                                          changed: edits.changed, seq: seq))
+                }
+            }
             for executed in outcome.executed {
                 for effect in executed.effects { apply(effect, frame: frame) }
                 // Spec 2 §5 — a macro that cannot run whole "runs nothing and is logged `noop`";
                 // the engine log says why (CLAUDE.md: unknown input is a noop and a log line).
                 if case .macro(let number) = executed.command, let refusal = executed.refusal {
                     log.warning("macro \(number) ran nothing: \(refusal.message)")
+                }
+                // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason".
+                if case .edit = executed.command, executed.result == .blocked, let refusal = executed.refusal {
+                    let text = CommandText.print(executed.command) ?? executed.command.cmd
+                    log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
                 }
             }
         }

@@ -171,8 +171,9 @@ public final class EngineProcess: @unchecked Sendable {
         blackBox = options.blackBoxFolder.map { BlackBox(folder: $0) }
 
         server.queryHandler = { [weak self] address in self?.answer(query: address) }
-        engine.afterBuild = { [server, library, machine] control in
-            server.afterBuild(control, library: library, machine: machine)
+        // Spec 5 §2 — feedback reads the roots as the edits left them.
+        engine.afterBuild = { [server] control in
+            server.afterBuild(control, library: control.library, machine: control.machine)
         }
     }
 
@@ -254,8 +255,9 @@ public final class EngineProcess: @unchecked Sendable {
         case ("channel", "state"):
             return state.channels[number].map { OSCFeedback.channelState(number, OSCFeedbackDeriver.feedbackState(of: $0.content)) }
         case ("channel", "content"):
+            let library = engine.control.publishedRoots.library
             return state.channels[number].map {
-                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: roots.library))
+                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: library))
             }
         case ("lock", ""):
             return state.channels[number].map { OSCFeedback.lock(number, locked: $0.lock) }

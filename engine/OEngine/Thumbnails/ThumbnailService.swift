@@ -60,8 +60,10 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     }
 
     public let name = "thumbnails"
-    public let library: Library
-    public let machine: Machine
+    /// Spec 5 §2 — the roots as the edits left them: "The cue's thumbnail is
+    /// redrawn because its library version changes (Spec 4 §10)". Read under
+    /// the lock; a render reads them once.
+    private var roots: (library: Library, machine: Machine)
     /// Spec 1 §3 — the machine's `thumbnailStack`.
     public let stack: Int
     public let size: PixelSize
@@ -84,8 +86,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
 
     public init(library: Library, machine: Machine, mediaRoot: URL?, backend: MetalBackend, posters: any PosterProvider, variables: VariableProvider,
                 cacheFolder: URL, log: EngineLog, poolSize: Int = 32, textCacheBytes: Int = 64 * 1024 * 1024, memoryBytes: Int = 32 * 1024 * 1024) throws {
-        self.library = library
-        self.machine = machine
+        roots = (library, machine)
         self.backend = backend
         self.posters = posters
         self.variables = variables
@@ -116,6 +117,27 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     }
 
     // MARK: - Reading
+
+    public var library: Library {
+        lock.lock()
+        defer { lock.unlock() }
+        return roots.library
+    }
+
+    public var machine: Machine {
+        lock.lock()
+        defer { lock.unlock() }
+        return roots.machine
+    }
+
+    /// Spec 5 §2 — the engine hands over the roots after an applied edit.
+    /// The stack, its size and its textures are the machine's at launch:
+    /// stacks are edited with Area 14.
+    public func update(library: Library, machine: Machine) {
+        lock.lock()
+        roots = (library, machine)
+        lock.unlock()
+    }
 
     public var statistics: Statistics {
         lock.lock()
@@ -148,7 +170,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     public func render(cue position: Int, of list: List) throws -> Result {
         guard position >= 1, position <= list.cues.count else { throw ThumbnailError.noSuchCue(position) }
         let cue = list.cues[position - 1]
-        let version = LibraryVersion.hash(library: library, list: list)
+        let roots = (library: library, machine: machine)
+        let version = LibraryVersion.hash(library: roots.library, list: list)
         let key = ThumbnailKey(cue: cue.uuid, stack: stack, version: version)
         if let found = cache.lookup(key) {
             lock.lock()
@@ -161,8 +184,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let target = pool[nextPoolSlot]
         nextPoolSlot = (nextPoolSlot + 1) % pool.count
         lock.unlock()
-        let states = projectedStates(of: list, through: position - 1 + furthestOffset)
-        let pass = stackPass(states: states, index: position - 1)
+        let states = projectedStates(of: list, through: position - 1 + furthestOffset, roots: roots)
+        let pass = stackPass(states: states, index: position - 1, roots: roots)
         guard backend.renderOffline(pass, into: target) else {
             countFailure()
             throw ThumbnailError.renderDidNotComplete
@@ -232,7 +255,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// thumbnails": tracked state from the top of the list, starting empty,
     /// the state after each cue in turn, so cue 1's background shows on every
     /// later thumbnail.
-    func projectedStates(of list: List, through index: Int) -> [ShowState] {
+    func projectedStates(of list: List, through index: Int, roots: (library: Library, machine: Machine)) -> [ShowState] {
+        let (library, machine) = roots
         var state = ShowState.fresh(library: library, machine: machine)
         var out: [ShowState] = []
         for (i, cue) in list.cues.enumerated() where i <= index {
@@ -251,7 +275,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// rasterized text": the slots resolved as the live plan resolves them,
     /// pixel boxes bound to posters, text through the thumbnail's own cache
     /// at thumbnail scale, offset slots from the states after this cue.
-    func stackPass(states: [ShowState], index: Int) -> StackPass {
+    func stackPass(states: [ShowState], index: Int, roots: (library: Library, machine: Machine)) -> StackPass {
+        let library = roots.library
         let state = states[min(index, states.count - 1)]
         let eager = EagerTextProvider(cache: textCache)
         let inputs = SlotResolver.Inputs(library: library, stack: stackObject, size: size, muted: state.stacks[stack]?.muted ?? [], text: eager)
@@ -262,7 +287,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
                 content = states[index + slot.offset].channels[slot.channel]?.content
             }
             let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot, content: content,
-                                               pixels: { _, content in self.posterSource(for: content) },
+                                               pixels: { _, content in self.posterSource(for: content, roots: roots) },
                                                staticText: { _, _, raw in self.variables.resolve(raw, state: state) },
                                                onTextMiss: { _ in })
             boxes.append(contentsOf: results.compactMap(\.resolved))
@@ -271,9 +296,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     }
 
     /// Spec 4 §5 — "Poster frame ... For offset slots and thumbnails".
-    private func posterSource(for content: ContentInstance?) -> SlotResolver.PixelSource? {
+    private func posterSource(for content: ContentInstance?, roots: (library: Library, machine: Machine)) -> SlotResolver.PixelSource? {
         guard let media = content?.media, !media.missing, !missing.contains(media.ref),
-              let entry = MediaResolver.resolve(media.ref, library: library, machine: machine)?.entry else { return nil }
+              let entry = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine)?.entry else { return nil }
         let poster = posters.poster(for: entry)
         guard !poster.isNone else { return nil }
         return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))

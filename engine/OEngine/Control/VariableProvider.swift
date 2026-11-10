@@ -14,6 +14,7 @@ import OCore
 public final class VariableProvider: @unchecked Sendable {
     private let formatter: DateFormatter
     private let dateFormatter: DateFormatter
+    private let stampFormatter: DateFormatter
     private let wallClock: @Sendable () -> Date
     private let lock = NSLock()
     private var cachedSecond: Int64 = .min
@@ -30,7 +31,26 @@ public final class VariableProvider: @unchecked Sendable {
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.timeZone = zone
         dateFormatter.dateFormat = "yyyy-MM-dd"
+        stampFormatter = DateFormatter()
+        stampFormatter.locale = Locale(identifier: "en_US_POSIX")
+        stampFormatter.timeZone = zone
+        stampFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSxxxxx"
         self.wallClock = wallClock
+    }
+
+    /// Spec 2 §9 — a log line's `ts`, "2026-11-01T09:14:03.117-05:00": the
+    /// machine's local time with milliseconds and its offset.
+    public func timestamp() -> String {
+        let now = wallClock()
+        lock.lock()
+        defer { lock.unlock() }
+        return stampFormatter.string(from: now)
+    }
+
+    /// The wall clock in milliseconds since 1970: Spec 1 §4's ten-minute rule
+    /// compares it with the dates of the kept versions' files.
+    public var wallMilliseconds: Int64 {
+        Int64((wallClock().timeIntervalSince1970 * 1000).rounded(.down))
     }
 
     public convenience init(settings: MachineSettings, wallClock: @escaping @Sendable () -> Date = { Date() }) {
