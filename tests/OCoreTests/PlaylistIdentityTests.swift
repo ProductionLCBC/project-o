@@ -104,6 +104,64 @@ final class PlaylistIdentityTests: XCTestCase {
         XCTAssertNil(try self.playlist(document(items: "")).0.serviceTime)
     }
 
+    // MARK: - Linked items find their list by uuid
+
+    /// "A linked item finds its list by `listUuid`, so it still finds the list
+    /// after a renumber or a swap made on another machine, and the number in
+    /// the file is corrected at the playlist's next save."
+    func test_aLinkedItemFindsItsListByUuidAfterARenumberMadeElsewhere() throws {
+        var (library, machine, _) = F.load()
+        let index = try XCTUnwrap(library.lists.firstIndex { $0.number == 42 })
+        library.lists[index].number = 57   // as a sync would deliver it, the playlist untouched
+        let sunday = try XCTUnwrap(machine.playlist(uuid: F.playlistUuid))
+        XCTAssertEqual(library.list(for: sunday.items[1].kind)?.uuid, F.listUuid(42))
+        XCTAssertEqual(CueAddressing.list(forItem: 2, in: sunday, library: library, machine: machine)?.number, 57)
+
+        let recorded = sunday.recordingLinks(in: library)
+        XCTAssertEqual(recorded.items[1].kind, .linked(list: 57, listUuid: F.listUuid(42)))
+        machine.replace(playlist: recorded)
+        XCTAssertEqual(machine.playlist(uuid: F.playlistUuid)?.items[1].kind, .linked(list: 57, listUuid: F.listUuid(42)))
+    }
+
+    /// "When no list has that uuid, the item is missing, even if another list
+    /// now has its number", and `next` skips it (choice Q-4).
+    func test_aLinkedItemIsMissingWhenOnlyItsNumberSurvives() throws {
+        var (library, machine, _) = F.load()
+        let index = try XCTUnwrap(library.lists.firstIndex { $0.number == 42 })
+        var stranger = library.lists[index]
+        stranger.uuid = F.uuid("bad0", 42)
+        library.lists[index] = stranger   // list 42 is now another list
+        machine.settings.libraryMode = .writable
+        let sunday = try XCTUnwrap(machine.playlist(uuid: F.playlistUuid))
+        XCTAssertNil(library.list(for: sunday.items[1].kind))
+        XCTAssertNil(CueAddressing.list(forItem: 2, in: sunday, library: library, machine: machine))
+
+        let report = Validator.validate(library: library, machine: machine)
+        XCTAssertEqual(report.issues(.missingList).map(\.subject), ["playlist Sunday 2026-11-01 item 2"])
+
+        // From the playlist loaded, `next` skips the missing item to the local copy.
+        var state = ShowState.fresh(library: library, machine: machine)
+        state.pointer = LivePointer(playlist: F.playlistUuid)
+        let context = ProjectionContext(frame: 0, library: library, machine: machine, source: CommandSource(kind: .osc))
+        let (after, _) = project(state, [.next], context: context)
+        XCTAssertEqual(after.pointer?.listUuid, F.localCopyUuid)
+    }
+
+    /// "An item without a `listUuid`, from a hand-made file, finds its list
+    /// by number and records that list's uuid at the next save."
+    func test_anItemWithoutAListUuidFindsItsListByNumberAndRecordsIt() throws {
+        let (library, _, _) = F.load()
+        let (handMade, _) = try playlist(document(items: #"{ "kind": "linked", "list": 7, "uuid": "4d4d0000-0000-4000-8000-000000000007" }"#))
+        XCTAssertEqual(library.list(for: handMade.items[0].kind)?.uuid, F.listUuid(7))
+        let recorded = handMade.recordingLinks(in: library)
+        XCTAssertEqual(recorded.items[0].kind, .linked(list: 7, listUuid: F.listUuid(7)))
+        let saved = try JSONValue.parse(Writer.data(for: .playlist(recorded)))
+        XCTAssertEqual(saved["items"]?[0]?["listUuid"]?.stringValue, F.listUuid(7).uuidString.lowercased())
+        // One whose number names no list stays as it is.
+        let (orphan, _) = try playlist(document(items: #"{ "kind": "linked", "list": 99, "uuid": "4d4d0000-0000-4000-8000-000000000099" }"#))
+        XCTAssertEqual(orphan.recordingLinks(in: library), orphan)
+    }
+
     /// Spec 7 §8 — the fixture's playlist has "a `uuid` on every item and a
     /// `listUuid` on every linked one", and they are the uuids the rule
     /// gives, so the same file made by hand loads with the same ones.

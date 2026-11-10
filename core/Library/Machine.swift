@@ -81,4 +81,13 @@ public struct Machine: Equatable, Sendable {
             localLists.append(localList)
         }
     }
+
+    /// Replace the playlist with the same `uuid`, or append it.
+    public mutating func replace(playlist: Playlist) {
+        if let index = playlists.firstIndex(where: { $0.uuid == playlist.uuid }) {
+            playlists[index] = playlist
+        } else {
+            playlists.append(playlist)
+        }
+    }
 }

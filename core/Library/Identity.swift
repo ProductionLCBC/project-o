@@ -35,12 +35,15 @@ public enum RenumberOutcome: Equatable, Sendable {
 /// already taken offers a swap, which renumbers both objects and rewrites both
 /// sets of references. The `uuid` never changes."
 public enum Identity {
+    /// Spec 7 §2 — a list is renumbered alone: of two lists sharing a number,
+    /// the one that number reaches, the first.
     public static func renumber(_ type: NumberedType, from: Int, to: Int, library: inout Library, machine: inout Machine) -> RenumberOutcome {
         guard to >= 1 else { return .invalidNumber }
         guard exists(type, from, library, machine) else { return .noSuchObject }
         if from == to { return .renumbered }
         guard !exists(type, to, library, machine) else { return .numberTaken }
-        apply(type, map: [from: to], library: &library, machine: &machine)
+        let lists = library.list(number: from).map { [$0.uuid: to] } ?? [:]
+        apply(type, map: [from: to], lists: type == .list ? lists : [:], library: &library, machine: &machine)
         return .renumbered
     }
 
@@ -48,7 +51,11 @@ public enum Identity {
         guard a >= 1, b >= 1 else { return .invalidNumber }
         guard exists(type, a, library, machine), exists(type, b, library, machine) else { return .noSuchObject }
         if a == b { return .renumbered }
-        apply(type, map: [a: b, b: a], library: &library, machine: &machine)
+        var lists: [UUID: Int] = [:]
+        if type == .list, let listA = library.list(number: a), let listB = library.list(number: b) {
+            lists = [listA.uuid: b, listB.uuid: a]
+        }
+        apply(type, map: [a: b, b: a], lists: lists, library: &library, machine: &machine)
         return .renumbered
     }
 
@@ -99,8 +106,18 @@ public enum Identity {
     }
 
     /// Renumber the objects of one type by `map` and rewrite every reference
-    /// to them in both roots.
-    static func apply(_ type: NumberedType, map: [Int: Int], library: inout Library, machine: inout Machine) {
+    /// to them in both roots. Lists are renumbered by uuid (`lists`, Spec 7
+    /// §2), and a playlist link follows the list it finds, by its uuid or, in
+    /// a hand-made file, by number (Spec 7 §3); commands name numbers, so
+    /// they follow `map`.
+    static func apply(_ type: NumberedType, map: [Int: Int], lists: [UUID: Int] = [:], library: inout Library, machine: inout Machine) {
+        // Which list each playlist link finds before anything moves.
+        let linkTargets: [[UUID?]] = machine.playlists.map { playlist in
+            playlist.items.map { item in
+                guard case .linked = item.kind else { return nil }
+                return library.list(for: item.kind)?.uuid
+            }
+        }
         let transform: (NumberedType, Int) -> Int = { found, n in found == type ? (map[n] ?? n) : n }
         func number(_ n: Int, _ t: NumberedType) -> Int { transform(t, n) }
         func rewrite(_ entries: inout [GuardedCommand]) {
@@ -121,7 +138,15 @@ public enum Identity {
         case .macro:
             library.macros = renumbered(library.macros, map) { $0.number } set: { $0.number = $1 }
             machine.macros = renumbered(machine.macros, map) { $0.number } set: { $0.number = $1 }
-        case .list: library.lists = renumbered(library.lists, map) { $0.number } set: { $0.number = $1 }
+        case .list:
+            // Spec 7 §2 — the lists this edit reaches, in the order they loaded in.
+            var moved = library.lists
+            for i in moved.indices {
+                if let to = lists[moved[i].uuid] { moved[i].number = to }
+            }
+            library.lists = moved.enumerated()
+                .sorted { ($0.element.number, $0.offset) < ($1.element.number, $1.offset) }
+                .map(\.element)
         case .stack: machine.stacks = renumbered(machine.stacks, map) { $0.number } set: { $0.number = $1 }
         case .output: machine.outputs = renumbered(machine.outputs, map) { $0.number } set: { $0.number = $1 }
         case .audioOutput: machine.audioOutputs = renumbered(machine.audioOutputs, map) { $0.number } set: { $0.number = $1 }
@@ -185,10 +210,12 @@ public enum Identity {
         for a in machine.audioOutputs.indices {
             if case .sdiOutput(let n) = machine.audioOutputs[a].device { machine.audioOutputs[a].device = .sdiOutput(number(n, .output)) }
         }
-        for p in machine.playlists.indices {
-            for i in machine.playlists[p].items.indices {
-                if case .linked(let n, let listUuid) = machine.playlists[p].items[i].kind {
-                    machine.playlists[p].items[i].kind = .linked(list: number(n, .list), listUuid: listUuid)
+        if type == .list {
+            for p in machine.playlists.indices {
+                for i in machine.playlists[p].items.indices {
+                    guard case .linked(_, let listUuid) = machine.playlists[p].items[i].kind,
+                          let target = linkTargets[p][i], let to = lists[target] else { continue }
+                    machine.playlists[p].items[i].kind = .linked(list: to, listUuid: listUuid)
                 }
             }
         }
@@ -221,11 +248,15 @@ public enum CueAddressing {
     /// with that uuid). Headers name none.
     public static func list(forItem item: Int, in playlist: Playlist, library: Library, machine: Machine) -> List? {
         guard item >= 1, item <= playlist.items.count else { return nil }
-        switch playlist.items[item - 1].kind {
-        case .header: return nil
-        case .linked(let number, _): return library.list(number: number)
-        case .local(let uuid): return machine.localList(uuid: uuid) ?? library.list(uuid: uuid)
-        }
+        return list(for: playlist.items[item - 1].kind, library: library, machine: machine)
+    }
+
+    /// Spec 7 §3 — the list an item names: a linked master by its uuid, or by
+    /// number when it has none (`Library.list(for:)`), or a local copy by uuid
+    /// in the machine root, falling back to a master with that uuid.
+    public static func list(for kind: PlaylistItem.Kind, library: Library, machine: Machine) -> List? {
+        if case .local(let uuid) = kind { return machine.localList(uuid: uuid) ?? library.list(uuid: uuid) }
+        return library.list(for: kind)
     }
 
     public static func cue(item: Int, cue position: Int, in playlist: Playlist, library: Library, machine: Machine) -> Cue? {

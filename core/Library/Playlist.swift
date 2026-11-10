@@ -192,6 +192,19 @@ public struct Playlist: Codable, Equatable, Sendable {
         title.lowercased() + "\u{0}" + (serviceDate ?? "")
     }
 
+    /// Spec 7 §3 — what a save writes for each linked item: the uuid of the
+    /// list it finds ("records that list's uuid at the next save") and that
+    /// list's number ("the number in the file is corrected at the playlist's
+    /// next save"). An item whose list is missing stays as it is.
+    public func recordingLinks(in library: Library) -> Playlist {
+        var copy = self
+        for index in copy.items.indices {
+            guard case .linked = copy.items[index].kind, let list = library.list(for: copy.items[index].kind) else { continue }
+            copy.items[index].kind = .linked(list: list.number, listUuid: list.uuid)
+        }
+        return copy
+    }
+
     private enum CodingKeys: String, CodingKey, CaseIterable { case uuid, title, serviceDate, serviceTime, archived, items }
 
     public init(from decoder: Decoder) throws {

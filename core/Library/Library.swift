@@ -81,8 +81,26 @@ public struct Library: Equatable, Sendable {
     public func audioTransition(_ number: Int) -> AudioTransition? { audioTransitions.first { $0.number == number } }
     public func preset(_ number: Int) -> Preset? { presets.first { $0.number == number } }
     public func macro(_ number: Int) -> Macro? { macros.first { $0.number == number } }
+    /// Spec 7 §2 — "Anything that names the number alone ... gets the one that
+    /// comes first" of two lists sharing it, in the order they loaded in.
     public func list(number: Int) -> List? { lists.first { $0.number == number } }
     public func list(uuid: UUID) -> List? { lists.first { $0.uuid == uuid } }
+
+    /// Spec 7 §3 — the master a linked item names: "A linked item finds its
+    /// list by `listUuid` ... When no list has that uuid, the item is missing,
+    /// even if another list now has its number. An item without a `listUuid`,
+    /// from a hand-made file, finds its list by number." Headers name none; a
+    /// local item's copy lives in the machine root (`CueAddressing`), so here
+    /// it finds only a master with that uuid.
+    public func list(for kind: PlaylistItem.Kind) -> List? {
+        switch kind {
+        case .header: return nil
+        case .linked(let number, let listUuid):
+            if let listUuid { return list(uuid: listUuid) }
+            return list(number: number)
+        case .local(let uuid): return list(uuid: uuid)
+        }
+    }
 
     /// Spec 1 §2 and §8 — "Falls back to Preset 1 if missing"; a library
     /// without a preset 1 on disk falls back to the built-in one. The degrade

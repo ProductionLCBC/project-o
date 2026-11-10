@@ -332,7 +332,13 @@ struct Checks {
             for (index, item) in playlist.items.enumerated() {
                 switch item.kind {
                 case .header: break
-                case .linked(let list, _): reference(.list, list, from: "\(name) item \(index + 1)")
+                case .linked(let list, let listUuid?):
+                    // Spec 7 §3 — "When no list has that uuid, the item is
+                    // missing, even if another list now has its number."
+                    if library.list(uuid: listUuid) == nil {
+                        warn(.missingList, "\(name) item \(index + 1)", "list \(list) (\(listUuid.uuidString.lowercased())) does not exist")
+                    }
+                case .linked(let list, nil): reference(.list, list, from: "\(name) item \(index + 1)")
                 case .local(let uuid):
                     if machine.localList(uuid: uuid) == nil, library.list(uuid: uuid) == nil {
                         warn(.missingList, "\(name) item \(index + 1)", "local copy \(uuid.uuidString.lowercased()) is not in lists-local")

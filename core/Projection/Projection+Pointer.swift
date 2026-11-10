@@ -20,14 +20,11 @@ struct CuePosition {
 extension Fold {
     // MARK: - Resolving lists and positions
 
-    /// Spec 1 §3 — a playlist item is a header, a linked master (by list
-    /// number) or a local copy (by uuid, in the machine root).
+    /// Spec 1 §3, Spec 7 §3 — a playlist item is a header, a linked master
+    /// (by its list's uuid, or by number when it has none) or a local copy
+    /// (by uuid, in the machine root).
     func list(for item: PlaylistItem) -> List? {
-        switch item.kind {
-        case .header: return nil
-        case .linked(let number, _): return context.library.list(number: number)
-        case .local(let uuid): return context.machine.localList(uuid: uuid) ?? context.library.list(uuid: uuid)
-        }
+        CueAddressing.list(for: item.kind, library: context.library, machine: context.machine)
     }
 
     func list(uuid: UUID) -> List? {
