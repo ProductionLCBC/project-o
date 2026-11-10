@@ -4,7 +4,10 @@ import Foundation
 
 /// Spec 2 §8 and §9 — one executed command: where it ran (group and
 /// source), what it was, its result, the effects the projection emitted for
-/// it, and the fire record when it opened a cue group.
+/// it, and the fire record when it opened a cue group. `refusal` says why a
+/// `macro N` ran nothing (Spec 2 §5: it loops, nests deeper than the levels
+/// left, or does not exist), for the engine's log; the command log's line is
+/// the same either way.
 public struct ExecutedCommand: Equatable, Sendable {
     public var group: GroupID
     public var source: CommandSource
@@ -12,15 +15,17 @@ public struct ExecutedCommand: Equatable, Sendable {
     public var result: CommandResult
     public var effects: [Effect]
     public var fire: FireRecord?
+    public var refusal: Rejection?
 
     public init(group: GroupID, source: CommandSource, command: Command, result: CommandResult,
-                effects: [Effect], fire: FireRecord? = nil) {
+                effects: [Effect], fire: FireRecord? = nil, refusal: Rejection? = nil) {
         self.group = group
         self.source = source
         self.command = command
         self.result = result
         self.effects = effects
         self.fire = fire
+        self.refusal = refusal
     }
 }
 
@@ -159,14 +164,17 @@ struct Runner {
         return (position, last)
     }
 
-    /// Spec 2 §3 — `macro N`; Spec 2 §5 — "depth is capped at 8"; Spec 3 §8
-    /// — the cue source is inherited. The macro's own line is `ok` when any
-    /// inner command did something, else `noop`; an unknown macro is `noop`.
+    /// Spec 2 §3 — `macro N`; Spec 2 §5 — "A macro runs whole or not at
+    /// all": one that loops, nests deeper than the levels left here, or does
+    /// not exist runs nothing, its line `noop` with the refusal; Spec 2 §9 and
+    /// Spec 3 §8 — the inner commands' source. The macro's own line is `ok`
+    /// when any inner command did something, else `noop`.
     mutating func runMacro(_ number: Int, command: Command, group: GroupID, source: CommandSource, fire: FireRecord?,
                            nesting: Nesting, makeGroupID: () -> GroupID) {
-        guard nesting.levelsLeft > 0, let macro = context.library.macro(number) ?? context.machine.macro(number) else {
+        let refusal = MacroCalls.check(number, levels: nesting.levelsLeft, library: context.library, machine: context.machine)
+        guard refusal == nil, let macro = MacroCalls.macro(number, library: context.library, machine: context.machine) else {
             executed.append(ExecutedCommand(group: group, source: source, command: command, result: .noop,
-                                            effects: [.noop(command)], fire: fire))
+                                            effects: [.noop(command)], fire: fire, refusal: refusal))
             return
         }
         let inner = source.inMacro(number)

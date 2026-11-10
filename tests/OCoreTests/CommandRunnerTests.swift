@@ -149,13 +149,15 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertEqual(fromKey.executed[1].source, CommandSource(kind: .macro, macro: 2))
     }
 
-    /// Spec 2 §5 — "depth is capped at 8": a macro that calls itself stops.
-    func test_macroDepthIsCapped() throws {
+    /// Spec 2 §5 — "A macro runs whole or not at all": a macro that calls
+    /// itself runs nothing, and its one line says why.
+    func test_aMacroThatCallsItselfRunsNothing() throws {
         var library = F.library
-        library.macros.append(Macro(number: 3, commands: [GuardedCommand(.macro(3))]))
+        library.macros.append(Macro(number: 3, commands: [GuardedCommand(F.write(1, text: "x")), GuardedCommand(.macro(3))]))
         let outcome = try XCTUnwrap(run(group([.macro(3)]), state: F.fresh(), library: library, validate: false))
-        XCTAssertEqual(outcome.executed.count, 9)
-        XCTAssertTrue(outcome.executed.allSatisfy { $0.command == .macro(3) && $0.result == .noop })
+        XCTAssertEqual(outcome.executed.map(\.command), [.macro(3)])
+        XCTAssertEqual(results(outcome), [.noop])
+        XCTAssertEqual(outcome.executed[0].refusal?.reason, .macroCycle)
         XCTAssertEqual(outcome.state, F.fresh())
     }
 
@@ -163,6 +165,15 @@ final class CommandRunnerTests: XCTestCase {
         let outcome = try XCTUnwrap(run(group([.macro(99)]), state: F.fresh(), validate: false))
         XCTAssertEqual(results(outcome), [.noop])
         XCTAssertEqual(outcome.executed[0].effects, [.noop(.macro(99))])
+        XCTAssertEqual(outcome.executed[0].refusal?.reason, .noSuchTarget)
+    }
+
+    /// A macro that changes nothing ran whole: `noop`, with no refusal.
+    func test_aMacroThatChangesNothingHasNoRefusal() throws {
+        let first = try XCTUnwrap(run(group([.macro(2)]), state: F.fresh()))
+        let again = try XCTUnwrap(run(group([.macro(2)]), state: first.state))
+        XCTAssertEqual(results(again), [.noop, .noop])
+        XCTAssertNil(again.executed[0].refusal)
     }
 
     /// A guard on a command submitted outside a macro is honoured too: a

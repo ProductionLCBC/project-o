@@ -102,6 +102,94 @@ final class MacroRunTests: XCTestCase {
         XCTAssertEqual(Set(lines.map(\.group.rawValue)), ["g-1"])
     }
 
+    // MARK: - Spec 2 §5, whole or not at all
+
+    /// Macros 60 → … → 67 nest 8 deep and write channel 3; 70 → … → 78 nest
+    /// 9; 80 and 81 call each other; 85 calls macro 99, which does not exist,
+    /// then writes channel 1; 90 fires list 12's cue 3. List 12: cue 1 runs
+    /// macro 70, cue 2 macro 80, cue 3 macro 60, cue 4 macro 85.
+    static var wholeLibrary: Library {
+        var library = Self.library
+        for n in 60...67 { library.macros.append(Macro(number: n, commands: [GuardedCommand(n == 67 ? F.write(3, text: "eight") : .macro(n + 1))])) }
+        for n in 70...78 { library.macros.append(Macro(number: n, commands: [GuardedCommand(n == 78 ? F.write(3, text: "nine") : .macro(n + 1))])) }
+        library.macros.append(Macro(number: 80, commands: [GuardedCommand(F.write(1, text: "loop")), GuardedCommand(.macro(81))]))
+        library.macros.append(Macro(number: 81, commands: [GuardedCommand(.macro(80))]))
+        library.macros.append(Macro(number: 85, commands: [GuardedCommand(.macro(99)), GuardedCommand(F.write(1, text: "after"))]))
+        library.macros.append(Macro(number: 90, commands: [GuardedCommand(.listCue(list: 12, cue: 3))]))
+        library.lists.append(List(uuid: F.listUuid(12), number: 12, title: "Depth", cues: [
+            F.cue(list: 12, 1, commands: [.macro(70)]),
+            F.cue(list: 12, 2, commands: [.macro(80)]),
+            F.cue(list: 12, 3, commands: [.macro(60)]),
+            F.cue(list: 12, 4, commands: [.macro(85)]),
+        ]))
+        return library
+    }
+
+    private func rejection(_ commands: [Command], _ source: SourceKind) -> Rejection? {
+        let context = F.context(frame: 100, library: Self.wholeLibrary, machine: Self.machine)
+        if case .failure(let rejection) = CommandRunner.run(group(commands, source), state: F.fresh(), context: context) { return rejection }
+        return nil
+    }
+
+    /// From a key or OSC a macro that nests too deep, or loops, is rejected
+    /// before anything runs (Spec 2 §8); one that fits runs to its end.
+    func test_submittedDirectlyAMacroThatCannotRunWholeIsRejected() throws {
+        for kind: SourceKind in [.key, .osc] {
+            XCTAssertEqual(rejection([.macro(70)], kind)?.reason, .macroDepth, "\(kind)")
+            XCTAssertEqual(rejection([.macro(80)], kind)?.reason, .macroCycle, "\(kind)")
+            let eight = try XCTUnwrap(run(group([.macro(60)], kind), library: Self.wholeLibrary))
+            XCTAssertEqual(eight.executed.count, 9)
+            XCTAssertEqual(eight.executed.last?.command, F.write(3, text: "eight"))
+        }
+    }
+
+    /// Held by a cue, the same macros run nothing: the macro's line is `noop`
+    /// and says why, and nothing inner is logged.
+    func test_heldByACueAMacroThatCannotRunWholeRunsNothing() throws {
+        let deep = try XCTUnwrap(run(group([.listCue(list: 12, cue: 1)], .key), library: Self.wholeLibrary))
+        XCTAssertEqual(deep.executed.map(\.command), [.listCue(list: 12, cue: 1), .macro(70)])
+        XCTAssertEqual(deep.executed.map(\.result), [.ok, .noop])
+        XCTAssertEqual(deep.executed[1].refusal?.reason, .macroDepth)
+        XCTAssertEqual(deep.executed[1].refusal?.message, "macro 70 nests 9 macros deep; the cap is 8")
+        XCTAssertEqual(deep.state.channels[3]?.content, .empty)
+
+        let loop = try XCTUnwrap(run(group([.listCue(list: 12, cue: 2)], .key), library: Self.wholeLibrary))
+        XCTAssertEqual(loop.executed.map(\.command), [.listCue(list: 12, cue: 2), .macro(80)])
+        XCTAssertEqual(loop.executed[1].refusal?.reason, .macroCycle)
+        XCTAssertEqual(loop.executed[1].refusal?.message, "macros call each other in a loop: macro 80 → macro 81 → macro 80")
+        XCTAssertEqual(loop.state.channels[1]?.content, .empty, "not even the write before the loop")
+
+        let eight = try XCTUnwrap(run(group([.listCue(list: 12, cue: 3)], .key), library: Self.wholeLibrary))
+        XCTAssertEqual(eight.executed.last?.command, F.write(3, text: "eight"), "a cue the operator fired leaves all 8 levels")
+        XCTAssertEqual(eight.executed.last?.source, CommandSource(kind: .cue, list: F.listUuid(12), cue: F.cueUuid(list: 12, cue: 3), macro: 67))
+
+        let (projected, _) = project(F.fresh(), [.listCue(list: 12, cue: 2)],
+                                     context: F.context(frame: 100, source: .key, library: Self.wholeLibrary, machine: Self.machine))
+        XCTAssertEqual(loop.state, projected, "the projection refuses it the same way")
+    }
+
+    /// Spec 2 §5 — a cue fired from inside a macro gets only the levels left:
+    /// macro 90 (a level) fires cue 3 (a level), so its 8-deep chain has 6.
+    func test_inACueAMacroFiredTheChainHasOnlyTheLevelsLeft() throws {
+        let outcome = try XCTUnwrap(run(group([.macro(90)], .key), library: Self.wholeLibrary))
+        XCTAssertEqual(outcome.executed.map(\.command), [.macro(90), .listCue(list: 12, cue: 3), .macro(60)])
+        XCTAssertEqual(outcome.executed.last?.result, .noop)
+        XCTAssertEqual(outcome.executed.last?.refusal?.message, "macro 60 nests 8 macros deep; 6 levels of the 8 are left here")
+        let (projected, _) = project(F.fresh(), [.macro(90)],
+                                     context: F.context(frame: 100, source: .key, library: Self.wholeLibrary, machine: Self.machine))
+        XCTAssertEqual(outcome.state, projected)
+    }
+
+    /// A call to a macro that does not exist is one `noop` line with its
+    /// reason, and the rest of the macro runs (Spec 1 §8, a broken reference).
+    func test_aCallToAMissingMacroIsOneNoopLine() throws {
+        let outcome = try XCTUnwrap(run(group([.listCue(list: 12, cue: 4)], .key), library: Self.wholeLibrary))
+        XCTAssertEqual(outcome.executed.map(\.command), [.listCue(list: 12, cue: 4), .macro(85), .macro(99), F.write(1, text: "after")])
+        XCTAssertEqual(outcome.executed.map(\.result), [.ok, .ok, .noop, .ok])
+        XCTAssertEqual(outcome.executed[2].refusal?.reason, .noSuchTarget)
+        XCTAssertNil(outcome.executed[1].refusal)
+    }
+
     // MARK: - Spec 2 §5, the one check
 
     private func validate(_ number: Int, library: Library, machine: Machine = F.machine) -> Rejection? {
