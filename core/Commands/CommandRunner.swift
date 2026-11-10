@@ -163,9 +163,7 @@ struct Runner {
                                             effects: [.noop(command)], fire: fire))
             return
         }
-        let inner = source.kind.isSubjectToLock
-            ? source
-            : CommandSource(kind: .macro, list: source.list, cue: source.cue, playlist: source.playlist, macro: number)
+        let inner = source.inMacro(number)
         let index = executed.count
         executed.append(ExecutedCommand(group: group, source: source, command: command, result: .noop, effects: [], fire: fire))
         for entry in macro.commands {

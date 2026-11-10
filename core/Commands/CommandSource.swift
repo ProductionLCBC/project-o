@@ -35,6 +35,15 @@ public struct CommandSource: Codable, Equatable, Sendable {
         self.macro = macro
     }
 
+    /// Spec 2 §9 — the source of a macro's inner commands: "source `macro`
+    /// and the macro's number (with the cue's source and the macro's number
+    /// when a cue ran the macro, so lock still applies, Spec 3 §8)". Nested
+    /// macros name the innermost; the list and cue a cue gave stay, so a
+    /// write's provenance still names its cue (Spec 3 §2).
+    public func inMacro(_ number: Int) -> CommandSource {
+        CommandSource(kind: kind.isSubjectToLock ? kind : .macro, list: list, cue: cue, playlist: playlist, macro: number)
+    }
+
     private enum CodingKeys: String, CodingKey { case kind, list, cue, playlist, macro }
 
     public init(from decoder: Decoder) throws {

@@ -12,12 +12,7 @@ extension Fold {
             effects.append(.noop(command))
             return
         }
-        let inner: CommandSource
-        if source.kind.isSubjectToLock {
-            inner = source
-        } else {
-            inner = CommandSource(kind: .macro, list: source.list, cue: source.cue, playlist: source.playlist, macro: number)
-        }
+        let inner = source.inMacro(number)
         let before = effects.count
         for guarded in macro.commands {
             // Spec 2 §7 — "Guards are evaluated at the moment the command

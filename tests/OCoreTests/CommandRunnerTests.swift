@@ -131,7 +131,8 @@ final class CommandRunnerTests: XCTestCase {
     }
 
     /// Spec 3 §8 — "A macro fired by a cue inherits `cue` as its source kind,
-    /// so lock cannot be dodged by wrapping a write in a macro."
+    /// so lock cannot be dodged by wrapping a write in a macro." Spec 2 §9 —
+    /// its inner commands carry "the cue's source and the macro's number".
     func test_aMacroFiredByACueInheritsTheCueSource() throws {
         var locked = F.fresh()
         locked.channels[2]?.lock = true
@@ -139,7 +140,8 @@ final class CommandRunnerTests: XCTestCase {
         let outcome = try XCTUnwrap(run(group([.macro(2)], .cue, list: list, cue: cue, playlist: F.playlistUuid), state: locked))
         XCTAssertEqual(outcome.executed.map(\.command), [.macro(2), F.write(2, text: "from macro")])
         XCTAssertEqual(results(outcome), [.ok, .blocked])
-        XCTAssertEqual(outcome.executed[1].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid))
+        XCTAssertEqual(outcome.executed[0].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid))
+        XCTAssertEqual(outcome.executed[1].source, CommandSource(kind: .cue, list: list, cue: cue, playlist: F.playlistUuid, macro: 2))
         XCTAssertEqual(outcome.state.channels[2]?.content, .empty)
 
         let fromKey = try XCTUnwrap(run(group([.macro(2)], .key), state: locked))
