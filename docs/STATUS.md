@@ -21,16 +21,16 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 holds; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
-| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | not started | Next, once Area 15 is merged (both change the projection in `core/`): Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`. The object types are on `main` since Area 2; the stack pass, the +1 slot and the one shared `SlotResolver` since Areas 4 and 5. |
+| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | not started | Next: Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`. The object types are on `main` since Area 2; the stack pass, the +1 slot and the one shared `SlotResolver` since Areas 4 and 5. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start after Area 9 (`media replace`, `media delete` and the defaults edits ride its edit path). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
-| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | not started | Spec 7 accepted 2026-11-07, its prompt block in `docs/build-order.md`. The runner on `main` logs a fired cue as its own group with `fire`; the control loop fires armed Time triggers as `next`; the thumbnail job projects a list from its top (Area 5). Area 15's branch makes the runner log a cue fired inside a cue as its own group. |
+| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | not started | Spec 7 accepted 2026-11-07, its prompt block in `docs/build-order.md`. The runner on `main` logs a fired cue as its own group with `fire`; the control loop fires armed Time triggers as `next`; the thumbnail job projects a list from its top (Area 5). Since Area 15 the runner logs a cue fired inside a cue as its own group. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, to start after Area 6 (its context values read Area 6's provenance). `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`, to start after Area 9 (it builds on Area 9's edit path, debounced write and versions). It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), and the app maps keys to commands sent with source `key` (§9). |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on its branch). |
-| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | brief waiting for approval | 2026-11-10, `area/macros` (908c3f7, pushed): `stack all blackout` and `audio all mute toggle` with the all-toggle rule; macros run the same from a key, OSC and a cue, whole or not at all, with the macro's number on every inner line; `/o/error` for every rejected OSC message; two runner bugs on `main` fixed (a self-firing cue's crash, the gain kept across a list boundary). Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrected on the branch. `swift test` green. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`). |
+| 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. `stack all blackout` and the all-toggle rule for stacks and audio; macros the same from a key, OSC and a cue, whole or not at all; `/o/error` for every rejected OSC message; the self-firing cue's crash and the gain kept across a list boundary fixed. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. |
@@ -40,25 +40,17 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 15, macros basic, is in review on `area/macros`** (908c3f7, pushed, not merged).
-The session on 2026-11-10 built it from the plan Adam approved, with his answers to seven
-readings. The brief is the session's final message. Its spec corrections are committed on
-the branch and reach `main` with the merge. Everything else is on `main`. The bench run
-with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Nothing is in review; everything is on `main`.** Area 15, macros basic, shipped on
+2026-11-10. Adam approved it as built, and it was merged with `--no-ff` (8ae03ef) and
+pushed, with its spec corrections. Area 6 is next, in its own session. The bench run with a
+card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 15 — Macros, basic**, the final message of the Area 15 session (2026-11-10).
-  It asks for three things:
-  - the spec corrections on the branch (below), with the readings in the table;
-  - the two fixes to the runner on `main` that the area includes: a cue whose own commands
-    fire it again no longer crashes the engine, and a list boundary's attribute resets now
-    reach the engine, so gain resets;
-  - leaving `channel all freeze toggle` per channel until live inputs (v1.5).
-
-  Recommended: `approved` as built.
+None. The Area 15 brief (the final message of the Area 15 session, 2026-11-10) was
+answered the same day: approved as built, merged (8ae03ef).
 
 ### Decisions
 
@@ -90,8 +82,7 @@ with a card stays deferred to a window Adam sets aside; it gates `app/` and Area
 
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 15's task is `in review` with
-  this session linked.
+  dependencies from the block's "Starts after" line. Area 15's task is `shipped`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -109,23 +100,24 @@ with a card stays deferred to a window Adam sets aside; it gates `app/` and Area
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
-- **`main` is ahead of `origin/main`** by the status and docs commits since the last push;
-  push it when Adam asks.
+- **One card test skips in the main checkout.** `EmbeddedAudioFeedTests`' unavailable-sink
+  test skips wherever `vendor/DeckLinkSDK` is present ("a card may be present"). A fresh
+  worktree has no SDK and runs it.
 
 ### Spec interpretations made so far
 
-Area 15's readings, waiting on the brief. The first five are Adam's answers in the session
-(2026-11-08 and 2026-11-10). Earlier areas' readings were approved with their briefs and
-are in the specs' text or the briefs: Area 16's on 2026-11-04, Area 5's on 2026-11-03,
-and Area 4's in 7032182.
+None outstanding. Area 15's readings were approved as built on 2026-11-10, and are
+recorded here and in its brief. The first five were Adam's answers during the session.
+Earlier areas' readings were approved with their briefs and are in the specs' text or the
+briefs: Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
 | Spec 2 §7, and the Area 15 block's "no guards" | What happens to the guards Area 3 built | Left as built: a `when` on a macro's command runs per §7; Area 15 builds nothing for guards (Adam) | Turn guards off in v1, a guarded command a `noop` |
-| Spec 2 §5 and §9 against Spec 3 §8 | The source of a macro's inner lines when a cue runs the macro | The cue's source plus the macro's number; nested macros name the innermost (Adam; §5 and §9 corrected on the branch) | The cue's source alone, as on `main` |
-| Spec 2 §5, the depth cap | What uses up the 8 levels, and whether a macro held by a cue is checked | Every macro entered and every cue fired inside a group uses a level, the group's own navigation none; a macro runs whole or not at all from every source (Adam; §5 corrected on the branch) | A fresh 8 for every cue; or as on `main` (the cue used a level and a cue's macros were never checked) |
+| Spec 2 §5 and §9 against Spec 3 §8 | The source of a macro's inner lines when a cue runs the macro | The cue's source plus the macro's number; nested macros name the innermost (Adam; §5 and §9 corrected, 1894f17) | The cue's source alone, as on `main` |
+| Spec 2 §5, the depth cap | What uses up the 8 levels, and whether a macro held by a cue is checked | Every macro entered and every cue fired inside a group uses a level, the group's own navigation none; a macro runs whole or not at all from every source (Adam; §5 corrected, 1894f17) | A fresh 8 for every cue; or as on `main` (the cue used a level and a cue's macros were never checked) |
 | Spec 2 §6, "Errors go back to the sender" | Whether a message the engine rejects at validation is answered | Every rejected OSC message or bundle is answered with `/o/error`, at `#bundle` for a bundle (Adam) | Engine log only |
-| Spec 1 §2, a macro's scope | Whether `stack all blackout` makes a macro machine-level | It leaves it portable (Adam; §2 corrected on the branch) | Any stack command makes it machine-level |
+| Spec 1 §2, a macro's scope | Whether `stack all blackout` makes a macro machine-level | It leaves it portable (Adam; §2 corrected, 1894f17) | Any stack command makes it machine-level |
 | Spec 2 §6, `/o/error` | The reason's form for a rejection at validation | The rejection's message, as the parse errors already send | `code: message`, as the API's rejected result (Spec 2 §9) |
 | Spec 2 §3, `stack all` | Effects and transitions over every stack | Every stack in number order ends at one value; one `blackout` effect per stack that changes, each with the blackout transition of the lowest-numbered output showing it (none for a stack no output shows); one `noop` when none changes | One effect for the whole command with one transition |
 | Spec 2 §5 and Spec 1 §8 | A macro that calls a macro that does not exist | That one line is a `noop` with its reason in the engine log and the rest runs; it counts no level, and the validator lets it through | The validator rejects the outer macro with `noSuchReference` |
@@ -136,8 +128,8 @@ and Area 4's in 7032182.
 
 ### Spec corrections proposed
 
-Committed on `area/macros` (1894f17) from the plan Adam approved on 2026-11-10; they reach
-`main` with the merge:
+None outstanding. Area 15's corrections went onto `area/macros` (1894f17) from the plan
+Adam approved, and reached `main` with the merge (8ae03ef) on 2026-11-10:
 
 - **Spec 2 §3, intro.** "`N` is a channel number or the word `all`" becomes "`N` is the
   target's number; every channel command, `stack N blackout` and `audio N mute` also take
@@ -155,9 +147,8 @@ Committed on `area/macros` (1894f17) from the plan Adam approved on 2026-11-10; 
 
 ## Next
 
-**Area 6 — Stacks and presets** (branch `area/presets`), once Area 15 is merged, since both
-change the projection in `core/`. It runs in its own session from the common preamble in
-`docs/build-order.md` and its own block there, verbatim:
+**Area 6 — Stacks and presets** (branch `area/presets`). It runs in its own session from
+the common preamble in `docs/build-order.md` and its own block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from

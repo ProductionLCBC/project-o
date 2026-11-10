@@ -4,6 +4,7 @@ One line per session, newest first: an area's line when it reaches review or shi
 
 ## Unreleased
 
+- 2026-11-10 — Area 15, macros basic, shipped on Adam's `approved`, as built with every reading in the brief. `area/macros` was merged into `main` with `--no-ff` (8ae03ef), carrying its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17). `swift test` is green on the merged tree; its one skip is the card test, which skips where the DeckLink SDK is present. Pushed; the branch was deleted at both ends, the worktree removed, and the task marked `shipped`. Next: Area 6, stacks and presets, in its own session.
 - 2026-11-10 — Area 15, macros basic, in review on `area/macros` (908c3f7, pushed). Spec 2 §3, §5, §6, §9 and Spec 1 §2 were corrected first, from the plan Adam approved with his answers to seven readings. What the area adds:
   - `stack all blackout on | off | toggle` in the vocabulary and at `/o/stack/all/blackout`. With `all`, `toggle` turns every one on unless every one is already on, and `audio all mute toggle` now follows the same rule.
   - Macros from either root run the same from a key, OSC and a cue. Inner lines carry the macro's number, with the cue's source when a cue ran the macro.
