@@ -102,6 +102,61 @@ final class MacroRunTests: XCTestCase {
         XCTAssertEqual(Set(lines.map(\.group.rawValue)), ["g-1"])
     }
 
+    // MARK: - Spec 2 §5, the one check
+
+    private func validate(_ number: Int, library: Library, machine: Machine = F.machine) -> Rejection? {
+        CommandValidator.validate(.macro(number), context: ValidationContext(library: library, machine: machine))
+    }
+
+    /// One number names one macro: the library's before the machine's, and
+    /// within a root the first with that number, as the runner looks it up.
+    func test_theCheckLooksMacrosUpAsTheRunnerDoes() {
+        var library = F.library
+        library.macros.append(Macro(number: 7, commands: [GuardedCommand(.macro(7))]))
+        library.macros.append(Macro(number: 7, commands: [GuardedCommand(F.write(1, text: "second"))]))
+        XCTAssertEqual(validate(7, library: library)?.reason, .macroCycle, "the first macro 7 is the one that runs")
+        XCTAssertEqual(MacroCalls.macro(7, library: library, machine: F.machine)?.commands.first?.command, .macro(7))
+
+        var machine = F.machine
+        machine.macros.append(Macro(number: 8, commands: [GuardedCommand(.macro(8))]))
+        library.macros.append(Macro(number: 8, commands: [GuardedCommand(F.write(1, text: "library"))]))
+        XCTAssertNil(validate(8, library: library, machine: machine), "the library's macro 8 runs, not the machine's")
+    }
+
+    /// The check works each macro's depth out once: a chain where every macro
+    /// calls the next twice costs as many steps as it has macros, not 2^n.
+    func test_theCheckCostsOneStepPerMacro() {
+        var library = F.library
+        for n in 100...130 {
+            let next = GuardedCommand(n == 130 ? F.write(1, text: "end") : .macro(n + 1))
+            library.macros.append(Macro(number: n, commands: [next, next]))
+        }
+        let started = Date()
+        XCTAssertEqual(MacroCalls.check(100, levels: 8, library: library, machine: F.machine)?.reason, .macroDepth)
+        XCTAssertEqual(MacroCalls.check(123, levels: 8, library: library, machine: F.machine), nil)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 0.5)
+    }
+
+    /// The messages name the loop and the depth; a call to a macro that does
+    /// not exist counts no level.
+    func test_theCheckNamesTheLoopAndTheDepth() {
+        var library = F.library
+        library.macros.append(Macro(number: 40, commands: [GuardedCommand(.macro(41))]))
+        library.macros.append(Macro(number: 41, commands: [GuardedCommand(.macro(42))]))
+        library.macros.append(Macro(number: 42, commands: [GuardedCommand(.macro(40))]))
+        library.macros.append(Macro(number: 43, commands: [GuardedCommand(.macro(99)), GuardedCommand(F.write(1, text: "x"))]))
+        let loop = MacroCalls.check(40, levels: 8, library: library, machine: F.machine)
+        XCTAssertEqual(loop?.reason, .macroCycle)
+        XCTAssertEqual(loop?.message, "macros call each other in a loop: macro 40 → macro 41 → macro 42 → macro 40")
+        XCTAssertNil(MacroCalls.check(43, levels: 1, library: library, machine: F.machine), "macro 99 counts no level")
+        XCTAssertEqual(MacroCalls.check(99, levels: 8, library: library, machine: F.machine)?.reason, .noSuchTarget)
+        let deep = MacroCalls.check(31, levels: 1, library: Self.library, machine: F.machine)
+        XCTAssertEqual(deep?.reason, .macroDepth)
+        XCTAssertEqual(deep?.message, "macro 31 nests 2 macros deep; 1 level of the 8 is left here")
+        XCTAssertEqual(MacroCalls.check(31, levels: 0, library: Self.library, machine: F.machine)?.reason, .macroDepth)
+        XCTAssertNil(MacroCalls.check(31, levels: 2, library: Self.library, machine: F.machine))
+    }
+
     // MARK: - From a cue
 
     /// A cue fired by `list N cue M` or `next`: the navigation's line, then the

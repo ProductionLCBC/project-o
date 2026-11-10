@@ -124,7 +124,9 @@ struct Checker {
                 guard machine.audioOutput(n) != nil else { throw reject(.noSuchTarget, "audio output \(n) does not exist") }
             }
         case .macro(let n):
-            guard library.macro(n) != nil || machine.macro(n) != nil else { throw reject(.noSuchTarget, "macro \(n) does not exist") }
+            guard MacroCalls.macro(n, library: library, machine: machine) != nil else {
+                throw reject(.noSuchTarget, "macro \(n) does not exist")
+            }
         case .edit(let edit):
             guard let type = NumberedType(editTarget: edit.target) else {
                 throw reject(.noSuchTarget, "\(edit.target) is not an object type")
@@ -292,31 +294,17 @@ struct Checker {
 
     // MARK: - "macro depth and cycles"
 
-    /// Spec 2 §5 — "A macro can call another macro; depth is capped at 8 and
-    /// cycles are rejected at save." Checked for the macro being run, over the
-    /// macros of both roots.
+    /// Spec 2 §5 — "A macro can call another macro up to 8 deep ... A macro
+    /// runs whole or not at all: submitted directly, as from a key, OSC, the
+    /// UI or the API, one that loops or nests too deep is rejected (§8)."
+    /// Checked for the macro being run, over the macros of both roots, by the
+    /// same check the projection makes where a macro is entered.
     func macros(_ command: Command) throws {
         guard case .macro(let number) = command else { return }
-        var byNumber: [Int: Macro] = [:]
-        for macro in machine.macros + library.macros { byNumber[macro.number] = macro }
-        var path: [Int] = []
-        var deepest = 0
-        func walk(_ n: Int) throws {
-            if let at = path.firstIndex(of: n) {
-                let loop = (path[at...] + [n]).map { "macro \($0)" }.joined(separator: " → ")
-                throw reject(.macroCycle, "macros call each other in a loop: \(loop)")
-            }
-            guard let macro = byNumber[n] else { return }
-            path.append(n)
-            deepest = max(deepest, path.count)
-            for entry in macro.commands {
-                if case .macro(let inner) = entry.command { try walk(inner) }
-            }
-            path.removeLast()
-        }
-        try walk(number)
-        guard deepest <= Fold.maxDepth else {
-            throw reject(.macroDepth, "macro \(number) nests \(deepest) macros deep; the cap is \(Fold.maxDepth)")
+        // An unknown macro is the target check's to name (noSuchTarget, above).
+        if let refusal = MacroCalls.check(number, levels: MacroCalls.maxDepth, library: library, machine: machine),
+           refusal.reason != .noSuchTarget {
+            throw refusal
         }
     }
 

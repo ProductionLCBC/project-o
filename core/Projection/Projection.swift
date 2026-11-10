@@ -42,9 +42,10 @@ struct Fold {
     var effects: [Effect] = []
     let context: ProjectionContext
 
-    /// Spec 2 §5 — a macro can call a macro; "depth is capped at 8". The same
-    /// cap bounds a cue whose commands fire cues.
-    static let maxDepth = 8
+    /// Spec 2 §5 — "A macro can call another macro up to 8 deep. Every macro
+    /// entered and every cue fired inside one group uses up one of the 8
+    /// levels."
+    static let maxDepth = MacroCalls.maxDepth
 
     init(state: ShowState, context: ProjectionContext) {
         self.state = state
