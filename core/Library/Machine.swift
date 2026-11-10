@@ -25,6 +25,10 @@ public struct Machine: Equatable, Sendable {
     public var lastState: ShowState?
     public var documentExtras: [DocumentKind: [String: JSONValue]]
     public var documentPaths: [String: String]
+    /// Spec 7 §3 — files under `playlists/` that aren't loaded (the other of
+    /// two files holding one playlist): a new or retitled playlist never takes
+    /// one's name.
+    public var otherFiles: Set<String> = []
 
     public init(stacks: [Stack] = [], outputs: [Output] = [], playlists: [Playlist] = [], localLists: [List] = [],
                 tracking: TrackingSwitches = TrackingSwitches(), decoderCapDefault: Int = 2,

@@ -22,7 +22,10 @@ public enum IssueCode: String, Equatable, Sendable {
     // Commands (§6, Spec 2 §7, Spec 2 §5).
     case unknownCommand, invalidCommand, guardOnCue, macroCycle
     // Playlists (§3; Spec 7 §3).
-    case playlistNameClash, repeatedItemUuid
+    case playlistNameClash, repeatedItemUuid, missingPlaylist
+    // Files and folders (Spec 7 §2–§3): two files holding one list or
+    // playlist, two folders that differ only in case.
+    case duplicateFile, folderCaseClash
 }
 
 /// One line of the report.
@@ -322,12 +325,15 @@ struct Checks {
         }
     }
 
+    /// Spec 1 §3, Spec 7 §3 — "Two playlists with the same title both load.
+    /// ... the report names the clash until one is renamed"; the date is
+    /// never part of a playlist's name.
     mutating func playlists(_ machine: Machine) {
-        var names: Set<String> = []
+        var titles: Set<String> = []
         for playlist in machine.playlists {
-            let name = "playlist \(playlist.title)" + (playlist.serviceDate.map { " " + $0 } ?? "")
-            if !names.insert(playlist.nameKey).inserted {
-                warn(.playlistNameClash, name, "another playlist has this title and date; names are unique per machine")
+            let name = "playlist \(playlist.title)"
+            if !titles.insert(Playlist.titleKey(playlist.title)).inserted {
+                warn(.playlistNameClash, name, "another playlist has this title; `playlist \"TITLE\"` loads only one of them until one is renamed")
             }
             for (index, item) in playlist.items.enumerated() {
                 switch item.kind {
@@ -383,6 +389,12 @@ struct Checks {
         }
         if let ref = command.mediaRef, MediaResolver.resolve(ref, library: library, machine: machine) == nil {
             warn(.unknownMedia, subject, "\(ref) is in neither media index")
+        }
+        // Spec 7 §3 — "A title held in a macro, a key binding, a scheduler entry
+        // or a cue is looked up when it runs ... and the reference report flags
+        // one that names no playlist."
+        if case .playlistLoad(let title) = command, let machine, machine.playlist(titled: title) == nil {
+            warn(.missingPlaylist, commandSubject, "names no playlist: \"\(title)\"")
         }
     }
 

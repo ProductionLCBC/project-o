@@ -139,7 +139,7 @@ final class PlaylistIdentityTests: XCTestCase {
         // Every item that linked list 42: Sunday's, Sunday Night's two and the archived copy's.
         let report = Validator.validate(library: library, machine: machine)
         XCTAssertEqual(report.issues(.missingList).count, 4)
-        XCTAssertTrue(report.issues(.missingList).map(\.subject).contains("playlist Sunday 2026-11-01 item 2"))
+        XCTAssertTrue(report.issues(.missingList).map(\.subject).contains("playlist Sunday item 2"))
 
         // From the playlist loaded, `next` skips the missing item to the local copy.
         var state = ShowState.fresh(library: library, machine: machine)
@@ -218,6 +218,57 @@ final class PlaylistIdentityTests: XCTestCase {
         machine.documentPaths[key(other)] = "playlists/2026-11-08-sunday.json"
         XCTAssertEqual(load("sunday", machine).pointer?.playlist, F.playlistUuid, "else the path that sorts first")
         XCTAssertEqual(machine.playlist(titled: "Sunday")?.uuid, F.playlistUuid)
+    }
+
+    // MARK: - Clashes on disk
+
+    /// "Two files with the same playlist uuid load as one: the file named with
+    /// the plain slug of its title, then the later modification date, then the
+    /// path that sorts first; the other is reported."
+    func test_twoFilesHoldingOnePlaylistLoadAsOne() throws {
+        let sunday = try XCTUnwrap(F.machineSnapshot.files["playlists/sunday.json"])
+        var snapshot = F.machineSnapshot
+        snapshot.files["playlists/sunday copy.json"] = sunday
+        var (machine, report) = Loader.machine(from: snapshot)
+        XCTAssertEqual(machine.playlists.filter { $0.uuid == F.playlistUuid }.count, 1)
+        XCTAssertEqual(machine.documentPaths[FileLayout.documentKey(playlist: F.playlistUuid)], "playlists/sunday.json")
+        XCTAssertEqual(report.issues(.duplicateFile).map(\.file), ["playlists/sunday copy.json"])
+
+        // Neither has the plain slug: the later date, then the path that sorts first.
+        snapshot.files["playlists/2026-11-01-sunday.json"] = snapshot.files.removeValue(forKey: "playlists/sunday.json")
+        snapshot.modified["playlists/2026-11-01-sunday.json"] = 1_000
+        snapshot.modified["playlists/sunday copy.json"] = 2_000
+        (machine, report) = Loader.machine(from: snapshot)
+        XCTAssertEqual(machine.documentPaths[FileLayout.documentKey(playlist: F.playlistUuid)], "playlists/sunday copy.json")
+        snapshot.modified["playlists/sunday copy.json"] = 1_000
+        (machine, report) = Loader.machine(from: snapshot)
+        XCTAssertEqual(machine.documentPaths[FileLayout.documentKey(playlist: F.playlistUuid)], "playlists/2026-11-01-sunday.json")
+    }
+
+    /// "Two playlists with the same title both load. ... the report names the
+    /// clash until one is renamed"; a date doesn't make another name.
+    func test_twoPlaylistsWithOneTitleBothLoadAndAreReported() throws {
+        let (library, loaded, _) = F.load()
+        var machine = loaded
+        var twin = try XCTUnwrap(machine.playlist(uuid: F.playlistUuid))
+        twin.uuid = F.uuid("2b2b", 1)
+        twin.title = "SUNDAY"
+        twin.serviceDate = "2026-11-08"
+        machine.playlists.append(twin)
+        let report = Validator.validate(library: library, machine: machine)
+        XCTAssertEqual(report.issues(.playlistNameClash).map(\.subject), ["playlist SUNDAY"])
+    }
+
+    /// Spec 1 §8 — the report names "a playlist load that names no playlist":
+    /// "a title held in a macro, a key binding, a scheduler entry or a cue is
+    /// looked up when it runs, so a rename never rewrites one, and the
+    /// reference report flags one that names no playlist."
+    func test_aPlaylistLoadThatNamesNoPlaylistIsReported() throws {
+        var (library, machine, _) = F.load()
+        library.macros[0].commands.append(GuardedCommand(.playlistLoad(title: "Easter")))
+        machine.keys.append(KeyBinding(device: "keyboard", key: "f2", command: .playlistLoad(title: "sunday night")))
+        let report = Validator.validate(library: library, machine: machine)
+        XCTAssertEqual(report.issues(.missingPlaylist).map(\.subject), ["macro 1 command \(library.macros[0].commands.count)"])
     }
 
     // MARK: - Files
