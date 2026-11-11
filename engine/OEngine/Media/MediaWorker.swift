@@ -48,17 +48,22 @@ public final class MediaWorker: @unchecked Sendable {
         public var freeBytes: @Sendable (URL) -> Int64?
         /// Spec 4 §10 — background work waits while the render thread is skipping aux passes.
         public var blocked: @Sendable () -> Bool
+        /// Tests only: runs with a file's source once it is hashed, before its
+        /// copy is made (Spec 8 §11, "a file changed mid-import is refused").
+        public var beforeCopy: (@Sendable (URL) -> Void)?
 
         public init(now: @escaping @Sendable () -> Date = { Date() },
                     schedule: (@Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void)? = nil,
                     probe: any MediaProbe = AVMediaProbe(),
                     freeBytes: @escaping @Sendable (URL) -> Int64? = MediaWorker.freeBytes,
-                    blocked: @escaping @Sendable () -> Bool = { false }) {
+                    blocked: @escaping @Sendable () -> Bool = { false },
+                    beforeCopy: (@Sendable (URL) -> Void)? = nil) {
             self.now = now
             self.schedule = schedule
             self.probe = probe
             self.freeBytes = freeBytes
             self.blocked = blocked
+            self.beforeCopy = beforeCopy
         }
 
         /// The engine's own: the real clock, a timer, AVFoundation, the volume's free space.
@@ -132,6 +137,7 @@ public final class MediaWorker: @unchecked Sendable {
     private var walkQueued = false
     private var walkScheduled = false
     private var hashes = 0
+    private var submissions = 0
 
     /// How many files the worker has hashed, for the tests of the cache (Spec 8 §11).
     public var hashCount: Int {
@@ -192,7 +198,7 @@ public final class MediaWorker: @unchecked Sendable {
         walkQueued = true
         lock.unlock()
         guard !queued else { return }
-        queue.async { [self] in
+        enqueue { [self] in
             lock.lock()
             walkQueued = false
             lock.unlock()
@@ -202,12 +208,12 @@ public final class MediaWorker: @unchecked Sendable {
 
     /// Spec 8 §3 — `media import "PATH"`, the job its result named.
     public func importPath(job: String, path: String) {
-        queue.async { [self] in runImport(job: job, path: path) }
+        enqueue { [self] in runImport(job: job, path: path) }
     }
 
     /// Spec 8 §4 — write the cache the control thread applied.
     public func persist(_ cache: MediaCache) {
-        queue.async { [self] in
+        enqueue { [self] in
             guard let machineRoot else { return }
             let path = DocumentKind.mediaCache.fixedPath ?? "media-cache.json"
             do {
@@ -220,7 +226,7 @@ public final class MediaWorker: @unchecked Sendable {
 
     /// Spec 8 §3 — "empties the folder at launch".
     public func emptyStaging() {
-        queue.async { [self] in
+        enqueue { [self] in
             guard let staging, let items = try? FileManager.default.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil) else { return }
             for item in items { try? FileManager.default.removeItem(at: item) }
         }
@@ -229,7 +235,7 @@ public final class MediaWorker: @unchecked Sendable {
     /// Spec 8 §4 — the posters of the entries the launch pruned. Only files
     /// in a `.posters/` folder are ever removed.
     public func removePosters(_ locations: [MediaLocation]) {
-        queue.async { [self] in
+        enqueue { [self] in
             for location in locations where location.path.hasPrefix(".posters/") {
                 guard let url = folders.url(for: location) else { continue }
                 try? FileManager.default.removeItem(at: url)
@@ -246,9 +252,28 @@ public final class MediaWorker: @unchecked Sendable {
         return out
     }
 
-    /// Wait until the worker has done everything asked so far.
+    /// Wait until the worker has done everything asked so far, and what that
+    /// work asked for in turn (an import in place asks for a walk).
     public func waitUntilIdle() {
-        queue.sync {}
+        while true {
+            let before = submitted
+            queue.sync {}
+            if submitted == before { return }
+        }
+    }
+
+    /// Everything the worker does goes through here, one piece at a time.
+    private func enqueue(_ work: @escaping @Sendable () -> Void) {
+        lock.lock()
+        submissions += 1
+        lock.unlock()
+        queue.async(execute: work)
+    }
+
+    private var submitted: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return submissions
     }
 
     private func report(_ report: Report) {
@@ -532,6 +557,7 @@ public final class MediaWorker: @unchecked Sendable {
         if !sameVolume, let free = seams.freeBytes(root), free - Int64(before.size) < Self.reserve {
             return done(.refused(.diskFull, nil))
         }
+        seams.beforeCopy?(url)
         event(job, file, "copying", progress: 0)
         do {
             try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)

@@ -78,12 +78,20 @@ final class MediaFixture {
     var machineMedia: URL { machineRoot.appendingPathComponent("media") }
     var control: ControlLoop { engine.control }
 
+    /// Runs between a file's hash and its copy (`MediaWorker.Seams.beforeCopy`).
+    let beforeCopy: (@Sendable (URL) -> Void)?
+    /// Where media may live, when the test says (Spec 8 §2, M-8).
+    let places: MediaPlaces?
+
     /// `prepare` changes the copy before it loads; `configure` the machine.
-    init(writable: Bool = true, prepare: (MediaFixture) throws -> Void = { _ in }, configure: (inout Machine) -> Void = { _ in }) throws {
+    init(writable: Bool = true, places: MediaPlaces? = nil, beforeCopy: (@Sendable (URL) -> Void)? = nil,
+         prepare: (MediaFixture) throws -> Void = { _ in }, configure: (inout Machine) -> Void = { _ in }) throws {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-media-\(UUID().uuidString)")
         staging = folder.appendingPathComponent("Staging")
         clock = MediaTestClock()
         free = FreeSpace()
+        self.places = places
+        self.beforeCopy = beforeCopy
         try FileManager.default.copyItem(at: EngineFixtures.fixtureRoot, to: folder)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         try prepare(self)
@@ -97,7 +105,7 @@ final class MediaFixture {
     /// Spec 8 §4 — a launch on the copy: the roots and the cache read, the
     /// worker attached, the launch walk taken in.
     func launch(writable: Bool = true, configure: (inout Machine) -> Void = { _ in }) throws {
-        let roots = try LoadedRoots.load(libraryRoot: libraryRoot, machineRoot: machineRoot)
+        let roots = try LoadedRoots.load(libraryRoot: libraryRoot, machineRoot: machineRoot, places: places)
         var machine = roots.machine
         machine.outputs = try EngineFixtures.spikeMachine().outputs
         machine.settings.libraryMode = writable ? .writable : .readOnlyMasters
@@ -113,8 +121,54 @@ final class MediaFixture {
         let free = self.free
         worker = try engine.attachMediaWorker(machineRoot: machineRoot, staging: staging,
                                               seams: MediaWorker.Seams(now: { clock.now() }, probe: FakeMediaProbe(),
-                                                                       freeBytes: { _ in free.bytes }))
+                                                                       freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy))
         settle()
+    }
+
+    // MARK: - Import (Spec 8 §3)
+
+    /// A file put in the staging folder, as the app stages a drop.
+    @discardableResult
+    func stage(_ path: String, _ bytes: String) throws -> URL {
+        let target = staging.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(bytes.utf8).write(to: target)
+        return target
+    }
+
+    /// `media import "PATH"`, sent and settled; the rejection when it is rejected.
+    @discardableResult
+    func importPath(_ url: URL, source: SourceKind = .ui) -> Rejection? {
+        run("media import \"\(url.standardizedFileURL.path)\"", source: source)
+    }
+
+    /// A command sent and settled; its parse rejection, or the rejection of
+    /// its group when the tick that ran it rejected it (Spec 2 §8).
+    @discardableResult
+    func run(_ text: String, source: SourceKind = .ui) -> Rejection? {
+        let before = control.rejections.count
+        if let rejection = engine.send(text, source: source) { return rejection }
+        settle()
+        return control.rejections.count > before ? control.rejections.last : nil
+    }
+
+    /// The `media` topic's events of one job, in order.
+    func events(ofJob job: String) -> [[String: JSONValue]] {
+        mediaEvents.filter { $0["job"] == .string(job) }
+    }
+
+    /// Every job id the `media` topic named, in order.
+    var jobs: [String] {
+        var out: [String] = []
+        for event in mediaEvents {
+            if let job = event["job"]?.stringValue, !out.contains(job) { out.append(job) }
+        }
+        return out
+    }
+
+    /// The final outcome events (`state: done`), in order.
+    var outcomes: [[String: JSONValue]] {
+        mediaEvents.filter { $0["state"] == .string("done") && $0["op"] == .string("import") }
     }
 
     /// Queued commands run, the worker finishes, a tick takes in what it
