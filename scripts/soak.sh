@@ -11,6 +11,14 @@
 # first minute, zero audio underruns, zero watchdog recoveries, memory flat
 # within 5% after minute ten). Exit 1 on any failure. The default run is the
 # three hours of Spec 4 §15; --minutes 1 is the smoke run.
+#
+# The engine runs on temporary clones of both roots, never on them in place
+# (Spec 8 §9: a launch walks the media and can write the indexes and the
+# cache), with libraryMode set to writable in the clone: the spike's index
+# names its generated media by fixed ids, and on a writable machine the launch
+# walk lands each generated file on its fixed id as a re-export (Spec 8 §4,
+# choice M-2), so the cues play it with their defaults. The clones are APFS
+# clones, which take no time or space, and are removed when the run ends.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -41,4 +49,18 @@ if [[ ! -f "$library/media/clapper/clapper.mov" ]]; then
   "$oengine" make-fixtures "$library/media"
 fi
 
-exec "$oengine" soak --library "$library" --machine "$machine" --scenario "$scenario" "${extra[@]}"
+# Spec 8 §9 — the run's own copies of the roots, side by side as library/ and
+# machine/, so a relative mediaRoot (the spike's ../library/media) finds the
+# clone's media.
+work="$(mktemp -d "${TMPDIR:-/tmp}/oengine-soak.XXXXXX")"
+cp -cR "$library" "$work/library"
+cp -cR "$machine" "$work/machine"
+sed -i '' 's/"libraryMode": "readOnlyMasters"/"libraryMode": "writable"/' "$work/machine/machine.json"
+echo "soak.sh: running on clones of the roots in $work, libraryMode writable" >&2
+
+set +e
+"$oengine" soak --library "$work/library" --machine "$work/machine" --scenario "$scenario" "${extra[@]+"${extra[@]}"}"
+status=$?
+set -e
+rm -rf "$work"
+exit "$status"

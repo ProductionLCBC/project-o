@@ -69,5 +69,13 @@ roots are in canonical form and covered by the round-trip and schema tests like 
 the round-trip test checks that the shared documents still match. A bench machine that holds an
 older copy of these roots needs a fresh copy from here (Spec 6 §9 changed the stacks and presets).
 
+Run the spike through `scripts/soak.sh`, never with `oengine` on these roots in place. Since Area 8
+the engine walks the media at launch (Spec 8 §4), and an item is present only when its file holds
+its id (Spec 8 §2): the generated files' hashes aren't the index's fixed ids, so on the spike's
+`readOnlyMasters` machine every item would turn missing once the walk had hashed it. `soak.sh`
+runs on APFS clones of both roots, with `libraryMode` set to `writable` in the clone, where the
+launch walk lands each generated file on its fixed id as a re-export (Spec 8 §4, choice M-2): the
+cues keep playing it, with their defaults. The clones are removed when the run ends.
+
 `../soak/spike.json` is the Spec 4 §15 script: the list on repeat with `next` every five seconds,
 a stack switch and a blackout every ten minutes. Large soak media stays on the test bench.

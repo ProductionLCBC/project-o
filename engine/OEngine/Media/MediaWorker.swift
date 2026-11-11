@@ -104,6 +104,18 @@ public final class MediaWorker: @unchecked Sendable {
             case .absolute: return nil
             }
         }
+
+        /// The entry whose path each location is, for a whole walk at once.
+        func holders() -> [MediaLocation: MediaEntry] {
+            var out: [MediaLocation: MediaEntry] = [:]
+            for e in library.entries where !e.isDeleted {
+                if let location = MediaLocation(.mediaRoot, e.path), out[location] == nil { out[location] = e }
+            }
+            for e in machine.entries where !e.isDeleted {
+                if let location = MediaLocation(.machineMedia, e.path), out[location] == nil { out[location] = e }
+            }
+            return out
+        }
     }
 
     /// What the worker hands the control thread.
@@ -317,6 +329,7 @@ public final class MediaWorker: @unchecked Sendable {
         report(.event(["op": .string("walk"), "state": .string("started"), "files": .number(Double(stats.count))]))
 
         var found: [MediaLocation: MediaFound] = [:]
+        let holders = snap.holders()
         var settles: Double?
         let locations = stats.keys.sorted()
         var lastProgress = Date.distantPast
@@ -328,7 +341,7 @@ public final class MediaWorker: @unchecked Sendable {
                 settles = min(settles ?? .infinity, modified + Self.settle)
                 continue
             }
-            if let result = identify(location, url: url, stat: stat, snap: snap) {
+            if let result = identify(location, url: url, stat: stat, snap: snap, holders: holders) {
                 found[location] = result
             }
             if Date().timeIntervalSince(lastProgress) > 0.5 {
@@ -384,12 +397,13 @@ public final class MediaWorker: @unchecked Sendable {
     /// otherwise from the entry's own size and date when they match,
     /// otherwise by hashing the file"; and the file is read when no index
     /// holds its id or its entry lacks metadata. Nil when it can't be read.
-    private func identify(_ location: MediaLocation, url: URL, stat: MediaFileStat, snap: Snapshot) -> MediaFound? {
+    private func identify(_ location: MediaLocation, url: URL, stat: MediaFileStat, snap: Snapshot,
+                          holders: [MediaLocation: MediaEntry]) -> MediaFound? {
         var known = memo[location].flatMap { $0.stat == stat ? $0 : nil }
         if known?.notYet == true { return .pending }
         var id = known?.id
         if id == nil { id = snap.cache.hash(at: location, size: stat.size, modified: stat.modified) }
-        if id == nil, let entry = snap.entry(at: location), entry.size == stat.size, entry.modified == stat.modified { id = entry.id }
+        if id == nil, let entry = holders[location], entry.size == stat.size, entry.modified == stat.modified { id = entry.id }
         if id == nil {
             countHash()
             guard let hashed = MediaHashing.identity(of: url) else {
@@ -546,7 +560,8 @@ public final class MediaWorker: @unchecked Sendable {
             log.warning("media import of \(file): the \(folder.rawValue) folder isn't read here, so nothing can be imported into it")
             return done(.refused(.readOnlyLibrary, nil))
         }
-        var taken = Set(names(under: root))
+        let directory = [snap.importFolder, subfolder].filter { !$0.isEmpty }.joined(separator: "/")
+        var taken = Set(names(in: root, directory: MediaLocation(folder, directory) != nil ? directory : ""))
         let index = folder == .mediaRoot ? snap.library.entries.map(\.path) : snap.machine.entries.map(\.path)
         taken.formUnion(index.filter { !$0.isEmpty })
         taken.formUnion(claimed.filter { $0.folder == folder }.map(\.path))
@@ -599,8 +614,8 @@ public final class MediaWorker: @unchecked Sendable {
                 target = nextURL
                 continue
             default:
-                try? FileManager.default.removeItem(at: hidden)
-                if moved { _ = LocalFiles.moveMedia(hidden, to: url) }
+                // A moved staged file goes back where it was; a copy of ours is removed.
+                if moved { _ = LocalFiles.moveMedia(hidden, to: url) } else { try? FileManager.default.removeItem(at: hidden) }
                 return done(.refused(.changed, nil))
             }
             break
@@ -647,17 +662,13 @@ public final class MediaWorker: @unchecked Sendable {
         return running.finish()
     }
 
-    /// Every file path under a folder, relative to it, hidden ones included,
-    /// for numbered names: "A name that a file holds".
-    private func names(under root: URL) -> [String] {
-        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
-        let base = root.standardizedFileURL.path + "/"
-        var out: [String] = []
-        for case let item as URL in walker {
-            let full = item.standardizedFileURL.path
-            if full.hasPrefix(base) { out.append(String(full.dropFirst(base.count))) }
-        }
-        return out
+    /// The names in the folder a copy goes into, as paths relative to the
+    /// media folder, hidden ones included, for numbered names: "A name that a
+    /// file holds".
+    private func names(in root: URL, directory: String) -> [String] {
+        let folder = directory.isEmpty ? root : root.appendingPathComponent(directory)
+        let prefix = directory.isEmpty ? "" : directory + "/"
+        return ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).map { prefix + $0 }
     }
 
     private func removeEmptyFolders(_ folder: URL) {
