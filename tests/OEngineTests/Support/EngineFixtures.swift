@@ -49,9 +49,10 @@ enum EngineFixtures {
     }
 
     /// Spec 4 §15 — the spike configuration: the fixture's two stacks (main:
-    /// channels 1 and 2; confidence: channel 2 through its default preset's
-    /// body box, static [Time] box and +1 body box), stack 1 on output
-    /// 1 and stack 2 on output 2, both displays in the 60 family. `mainSize` is
+    /// channels 1 and 2; confidence, Spec 6 §9: channel 2 through Preset 1's
+    /// "2" layout, a body box and a +1 body box, and channel 3 through the
+    /// Clock preset's static [Time] box), stack 1 on output 1 and stack 2 on
+    /// output 2, both displays in the 60 family. `mainSize` is
     /// the main output's format; the spike wants 4096×2160 on the LED wall and
     /// the tests use 1920×1080 unless they say otherwise.
     static func spikeMachine(mainSize: Size = .hd, rate: FrameRate = .fps60) throws -> Machine {

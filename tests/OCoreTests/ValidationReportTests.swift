@@ -90,7 +90,7 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(issue?.subject, "stack 1 slot 3")
         XCTAssertEqual(machine.stack(1)?.effectiveSlots(library: library).map(\.channel), [1, 2])
         XCTAssertEqual(machine.stack(1)?.effectiveSlots(library: library).map(\.opacity), [1, 1], "the first slot for channel 2 is the one used")
-        XCTAssertEqual(machine.stack(2)?.effectiveSlots(library: library).count, 1)
+        XCTAssertEqual(machine.stack(2)?.effectiveSlots(library: library).map(\.channel), [2, 3])
     }
 
     /// "duplicate numbers within a type" → one line; lookup keeps the first.

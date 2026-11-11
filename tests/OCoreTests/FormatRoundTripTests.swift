@@ -59,12 +59,12 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(report.issues, [])
         XCTAssertEqual(library.info.uuid, F.libraryUuid)
         XCTAssertEqual(library.info.name, "LCBC Library")
-        XCTAssertEqual(library.channels.map(\.number), [1, 2])
+        XCTAssertEqual(library.channels.map(\.number), [1, 2, 3])
         XCTAssertEqual(library.textStyles.map(\.number), [1, 2])
         XCTAssertEqual(library.grades.map(\.number), [1])
         XCTAssertEqual(library.transitions.map(\.number), [1, 2, 3])
         XCTAssertEqual(library.audioTransitions.map(\.number), [1, 2, 3])
-        XCTAssertEqual(library.presets.map(\.number), [1, 2, 3])
+        XCTAssertEqual(library.presets.map(\.number), [1, 2, 3, 4])
         XCTAssertEqual(library.macros.map(\.number), [1])
         XCTAssertEqual(library.lists.map(\.number), [7, 42])
         XCTAssertEqual(library.mediaIndex.entries.map(\.id), [F.dawn, F.mountains, F.cross, F.welcomeSlide].sorted())
@@ -118,7 +118,7 @@ final class FormatRoundTripTests: XCTestCase {
 
         let preset = library.preset(1)
         XCTAssertEqual(preset?.builtIn, true)
-        XCTAssertEqual(preset?.layouts.keys.sorted(), [.any])
+        XCTAssertEqual(preset?.layouts.keys.sorted(), [.any, .stack(2)], "Spec 6 §3 — the confidence layout beside \"*\"")
         XCTAssertEqual(preset?.layouts[.any]?.boxes.count, 2)
         XCTAssertEqual(preset?.layouts[.any]?.boxes[0].binding.kind, .pixels)
         XCTAssertEqual(preset?.layouts[.any]?.boxes[1].binding.kind, .field(name: "body"))
@@ -140,12 +140,13 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.cues[0].trigger, .timecode("01:00:10:00"))
         XCTAssertEqual(library.list(number: 7)?.trackThrough, true)
 
-        // Spec 6 §2, §3 — one slot per channel; the next lyric is a box at +1.
+        // Spec 6 §9 — the confidence stack: channels 2 and 3, no default preset; the next lyric is a box at +1
+        // of Preset 1's "2" layout, and the clock is the Clock preset's static box.
         let confidence = machine.stack(2)
-        XCTAssertEqual(confidence?.defaultPreset, 2)
-        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, opacity: 1, mute: false)])
-        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.offset), [0, 0, 1])
-        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.binding.kind), [.field(name: "body"), .static(text: "[Time]"), .field(name: "body")])
+        XCTAssertNil(confidence?.defaultPreset)
+        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, opacity: 1, mute: false), StackSlot(channel: 3, preset: nil, opacity: 1, mute: false)])
+        XCTAssertEqual(preset?.layouts[.stack(2)]?.boxes.map(\.offset), [0, 1])
+        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.binding.kind), [.static(text: "[Time]")])
         XCTAssertEqual(machine.settings.libraryMode, .readOnlyMasters)
         XCTAssertEqual(machine.settings.network.oscInPort, 8000)
         XCTAssertEqual(machine.settings.startupMacro, 2)

@@ -90,22 +90,41 @@ final class PlanBuilderTests: XCTestCase {
 
     // MARK: - Slot resolution (§9)
 
+    /// Spec 4 §9, Spec 6 §2 — "the slot's preset, else the stack's default,
+    /// else the channel's default, else Preset 1; then that preset's layout for
+    /// this stack's number, else its `"*"` layout." On the first-run stacks
+    /// (Spec 6 §9) neither stack has a default preset.
     func test_slotPresetOutranksStackDefaultOutranksChannelDefault() throws {
         engine.send("list 42 cue 1")   // channel 1 gets dawn, channel 2 the first verse; cue 2 is next
         engine.tick()
-        let plan = try XCTUnwrap(engine.lastPlan)
-        let confidence = try XCTUnwrap(plan.stackPasses.first { $0.stack == 2 })
-        // Stack 2 default preset is 2 (Confidence): a body box and a static [Time] box at offset 0.
-        let liveBoxes = confidence.boxes.filter { $0.offset == 0 }
-        XCTAssertEqual(liveBoxes.map(\.binding), [.field(name: "body"), .static(text: "[Time]")])
-        XCTAssertEqual(liveBoxes.last?.text, "10:00 AM", "the static box resolves [Time] with the machine's format and zone")
-        // Its third box is a body box at +1 in the lower third's look (Spec 6 §3: the offset is the box's).
-        let offsetBoxes = confidence.boxes.filter { $0.offset == 1 }
-        XCTAssertEqual(offsetBoxes.map(\.binding), [.field(name: "body")])
-        XCTAssertEqual(offsetBoxes.first?.frame, PixelRect(x: 0.03 * 1920, y: 0.82 * 1080, width: 0.94 * 1920, height: 0.16 * 1080))
-        // The main stack has no default preset: channel 2's default preset 1 applies, and its body box draws for text.
-        let main = try XCTUnwrap(plan.stackPasses.first { $0.stack == 1 })
+        var confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
+        // Channel 2's default, Preset 1, by its layout for stack 2: the current body box and the +1 box.
+        XCTAssertEqual(confidence.boxes.filter { $0.channel == 2 }.map(\.offset), [0, 1])
+        XCTAssertEqual(confidence.boxes.first { $0.channel == 2 && $0.offset == 1 }?.frame,
+                       PixelRect(x: 0.03 * 1920, y: 0.7 * 1080, width: 0.94 * 1920, height: 0.27 * 1080))
+        // Channel 3's default, preset 2, the Clock: its static box draws on an empty channel.
+        XCTAssertEqual(confidence.boxes.filter { $0.channel == 3 }.map(\.binding), [.static(text: "[Time]")])
+        XCTAssertEqual(confidence.boxes.first { $0.channel == 3 }?.text, "10:00 AM", "the static box resolves [Time] with the machine's format and zone")
+        // The main stack: channel 2's default preset 1 by its "*" layout, whose body box draws for text.
+        let main = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 1 })
         XCTAssertEqual(main.boxes.filter { $0.channel == 2 }.map(\.binding), [.field(name: "body")])
+
+        // A stack default outranks the channels' own: preset 3, the lower third, by its layout for stack 2.
+        machine.stacks[1].defaultPreset = 3
+        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine.send("list 42 cue 1")
+        engine.tick()
+        confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
+        XCTAssertEqual(confidence.boxes.filter { $0.channel == 2 }.map(\.frame),
+                       [PixelRect(x: 0.03 * 1920, y: 0.82 * 1080, width: 0.94 * 1920, height: 0.16 * 1080)])
+        XCTAssertTrue(confidence.boxes.filter { $0.channel == 3 }.isEmpty, "the lower third has no static box")
+
+        // A slot's preset outranks the stack default: the clock's slot names the Clock again.
+        machine.stacks[1].slots[1].preset = 2
+        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine.tick()
+        confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
+        XCTAssertEqual(confidence.boxes.filter { $0.channel == 3 }.map(\.binding), [.static(text: "[Time]")])
     }
 
     func test_plusOneSlotIsEmptyWithNoListLive() throws {

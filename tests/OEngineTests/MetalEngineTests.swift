@@ -4,8 +4,10 @@ import OCore
 
 /// Spec 4 §15 — the engine over the Metal backend with the real sources,
 /// posters and text cache, driven by the software clock: "The confidence
-/// stack's +1 slot is correct on every `next`, checked by the capture against
-/// the projected state."
+/// stack's +1 box is correct on every `next`, checked by the capture against
+/// the projected state." Spec 6 §11 — "The capture matches the projected
+/// state on every `next` (the spike's check, now on boxes)", and a golden for
+/// the confidence stack.
 final class MetalEngineTests: XCTestCase {
     var engine: HeadlessEngine!
 
@@ -30,18 +32,19 @@ final class MetalEngineTests: XCTestCase {
 
     func lit(_ pixels: [LinearPixel]) -> Int { pixels.filter { $0.r + $0.g + $0.b > 0.3 }.count }
 
-    func test_plusOneSlotFollowsTheProjectedStateOnEveryNext() throws {
+    func test_plusOneBoxFollowsTheProjectedStateOnEveryNext() throws {
         engine.send("list 42 cue 1")
         engine.tick()
         engine.tick()   // the text rasterized on the first tick draws on the second
         var confidence = try XCTUnwrap(engine.captured(output: 2))
         XCTAssertEqual(confidence.width, 1920)
-        // Preset 3's layout for stack 2 is the lower third: cue 2's text shows there while cue 1 is live.
-        // The static [Time] box sits at the right end of that band, so only the left part is measured.
-        let lowerThird = Frame(x: 0.03, y: 0.82, w: 0.6, h: 0.16)
-        let body = Frame(x: 0.03, y: 0.05, w: 0.94, h: 0.75)
-        XCTAssertGreaterThan(lit(region(confidence, lowerThird)), 50, "the +1 slot shows the next verse")
-        XCTAssertGreaterThan(lit(region(confidence, body)), 50, "the live slot shows this verse")
+        // Preset 1's "2" layout: the current cue's body box above, cue 2's text in the +1 box below it, and the
+        // Clock preset's [Time] box in the top right corner, clear of both.
+        let lowerThird = Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27)
+        let body = Frame(x: 0.03, y: 0.11, w: 0.94, h: 0.56)
+        XCTAssertGreaterThan(lit(region(confidence, lowerThird)), 50, "the +1 box shows the next verse")
+        XCTAssertGreaterThan(lit(region(confidence, body)), 50, "the live box shows this verse")
+        XCTAssertGreaterThan(lit(region(confidence, Frame(x: 0.69, y: 0.01, w: 0.28, h: 0.09))), 20, "the time")
         let plan = try XCTUnwrap(engine.lastPlan)
         let stack2 = try XCTUnwrap(plan.stackPasses.first { $0.stack == 2 })
         let projected = try XCTUnwrap(lookahead(engine.state, steps: 1, context: engine.control.projectionContext(frame: engine.frame, source: CommandSource(kind: .engine))))
@@ -57,7 +60,7 @@ final class MetalEngineTests: XCTestCase {
             let ahead = lookahead(engine.state, steps: 1, context: engine.control.projectionContext(frame: engine.frame, source: CommandSource(kind: .engine)))
             if let ahead, case .text(let t)? = ahead.channels[2]?.content {
                 XCTAssertEqual(stackPass.boxes.first { $0.offset == 1 }?.text, t.fields["body"], "cue \(cue): +1 matches the projection")
-                XCTAssertGreaterThan(lit(region(confidence, lowerThird)), 50, "cue \(cue): the +1 slot is drawn")
+                XCTAssertGreaterThan(lit(region(confidence, lowerThird)), 50, "cue \(cue): the +1 box is drawn")
             } else {
                 XCTAssertNil(stackPass.boxes.first { $0.offset == 1 }, "cue \(cue): past the end the +1 box is empty")
                 XCTAssertEqual(lit(region(confidence, lowerThird)), 0, "cue \(cue): nothing drawn past the end")

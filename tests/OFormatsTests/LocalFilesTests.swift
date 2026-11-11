@@ -64,7 +64,7 @@ final class LocalFilesTests: XCTestCase {
         let snapshot = try LocalFiles.snapshot(ofRoot: root)
         let expected = Set([
             "library.json", "channels.json", "text-styles.json", "grades.json", "transitions.json", "audio-transitions.json",
-            "presets/001-default.json", "presets/002-confidence.json", "presets/003-lower-third.json",
+            "presets/001-default.json", "presets/002-clock.json", "presets/003-lower-third.json", "presets/004-credits.json",
             "macros/001-welcome.json", "lists/007-doxology.json", "lists/Hymns/042-great-is-thy-faithfulness.json",
             "media-index.json",
         ])
@@ -189,11 +189,11 @@ final class LocalFilesTests: XCTestCase {
         var preset = try XCTUnwrap(loaded.library.preset(3))
         preset.label = "Lower third, wide"
         try LocalFiles.execute(Writer.save(.preset(preset), currentPath: "presets/003-lower-third.json"), in: root)
-        XCTAssertEqual(names(in: root.appendingPathComponent("presets")), ["001-default.json", "002-confidence.json", "003-lower-third-wide.json"])
+        XCTAssertEqual(names(in: root.appendingPathComponent("presets")), ["001-default.json", "002-clock.json", "003-lower-third-wide.json", "004-credits.json"])
         XCTAssertEqual(read("presets/003-lower-third-wide.json", in: root), Writer.data(for: .preset(preset)))
 
         try LocalFiles.execute(WritePlan(operations: [.remove(path: "presets/003-lower-third-wide.json")]), in: root)
-        XCTAssertEqual(names(in: root.appendingPathComponent("presets")), ["001-default.json", "002-confidence.json"])
+        XCTAssertEqual(names(in: root.appendingPathComponent("presets")), ["001-default.json", "002-clock.json", "004-credits.json"])
         XCTAssertNoThrow(try LocalFiles.execute(WritePlan(operations: [.remove(path: "presets/gone.json")]), in: root), "removing what is not there is not an error")
 
         try LocalFiles.execute(WritePlan(operations: [.replace(path: "new/folder/doc.json", data: Data("{}\n".utf8))]), in: root)

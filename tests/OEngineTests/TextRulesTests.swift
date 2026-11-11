@@ -18,9 +18,10 @@ final class VariableBoxGateTests: XCTestCase {
         let box = Box(binding: .static(text: "[Popup 1]"), frame: Frame(x: 0.1, y: 0.8, w: 0.8, h: 0.15),
                       fit: .text(TextFit(policy: .shrinkToFit, maxLines: 2, minSize: 20)), textStyle: BoxTextStyle(),
                       transition: BoxTransition(ref: 2, ms: 500), transitionOnVariableChange: transitionOnChange)
-        library.presets.append(Preset(number: 4, label: "Caption", uuid: EngineFixtures.uuid("c0de", 4), layouts: [.any: Layout(boxes: [box])]))
+        // Numbered 8: the fixture's preset 4 is Credits (Spec 6 §9).
+        library.presets.append(Preset(number: 8, label: "Caption", uuid: EngineFixtures.uuid("c0de", 8), layouts: [.any: Layout(boxes: [box])]))
         var machine = try EngineFixtures.spikeMachine()
-        machine.stacks[0].slots[1].preset = 4
+        machine.stacks[0].slots[1].preset = 8
         return try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, wallClock: { clock.now })
     }
 
@@ -75,12 +76,22 @@ final class VariableBoxGateTests: XCTestCase {
         XCTAssertEqual(captionBox(engine)?.text, "d", "after a clear the next value shows at once")
     }
 
-    /// The confidence stack's `[Time]` box has `transitionOnVariableChange`
-    /// and a 120 ms dissolve: on the minute the new raster dissolves in.
+    /// A `[Time]` box with `transitionOnVariableChange` and a 120 ms dissolve:
+    /// on the minute the new raster dissolves in. The first-run Clock preset
+    /// swaps (Spec 6 §9), so the clock's slot on stack 2 takes a copy of it
+    /// that asks to dissolve.
     func test_theTimeBoxDissolvesOnTheMinuteWhenAsked() throws {
         let clock = VariableRasterTests.MovingClock()
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(),
-                                        mediaRoot: EngineFixtures.mediaRoot, wallClock: { clock.now })
+        var library = try EngineFixtures.library()
+        var dissolving = try XCTUnwrap(library.preset(2))
+        dissolving.number = 8
+        dissolving.uuid = EngineFixtures.uuid("c0de", 8)
+        dissolving.layouts[.any]?.boxes[0].transition = BoxTransition(ref: 2, ms: 120)
+        dissolving.layouts[.any]?.boxes[0].transitionOnVariableChange = true
+        library.presets.append(dissolving)
+        var machine = try EngineFixtures.spikeMachine()
+        machine.stacks[1].slots[1].preset = 8
+        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, wallClock: { clock.now })
         func timeBox() -> ResolvedBox? {
             engine.lastPlan?.stackPasses.first { $0.stack == 2 }?.boxes.first { if case .static = $0.binding.kind { return true } else { return false } }
         }

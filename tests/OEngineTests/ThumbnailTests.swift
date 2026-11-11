@@ -148,16 +148,15 @@ final class ThumbnailTests: XCTestCase {
     /// wrote the content: in a thumbnail, the list being drawn.
     func test_aFieldBoxInAThumbnailFallsBackToTheListsMetadata() throws {
         var library = try EngineFixtures.library()
-        library.presets.append(FieldBoxTests.credits)
         library.lists.append(FieldBoxTests.slideA)
         var machine = try EngineFixtures.spikeMachine()
         machine.settings.thumbnailStack = 2
-        machine.stacks[1].slots[0].preset = FieldBoxTests.credits.number
+        machine.stacks[1].slots[0].preset = 4   // the fixture's Credits
         let service = try service(library: library, machine: machine)
         let list = FieldBoxTests.slideA
         let roots = (library: service.library, machine: service.machine)
         let pass = service.stackPass(states: service.projectedStates(of: list, through: 0, roots: roots), index: 0, roots: roots, list: list)
-        XCTAssertEqual(pass.boxes.compactMap(\.text), ["Song A", "Author A", "Copyright A", "1001"])
+        XCTAssertEqual(pass.boxes.filter { $0.channel == 2 }.compactMap(\.text), ["Song A", "Author A", "Copyright A", "1001"])
     }
 
     /// Spec 6 §3 — "In a projected state, such as a thumbnail or the cue
@@ -167,7 +166,7 @@ final class ThumbnailTests: XCTestCase {
     /// a +1 box shows the list's next cue, and nothing past its last."
     func test_aPlusOneBoxInAThumbnailShowsTheListsNextCueAndNothingPastItsLast() throws {
         var machine = try EngineFixtures.spikeMachine()
-        machine.settings.thumbnailStack = 2   // preset 2: a body box, the [Time] box and a body box at +1
+        machine.settings.thumbnailStack = 2   // Preset 1's "2" layout: a body box and a body box at +1
         let service = try service(machine: machine)
         let list = try list42(service)
         let roots = (library: service.library, machine: service.machine)
@@ -180,7 +179,7 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertNil(last.boxes.first { $0.offset == 1 }, "past the list's last cue the +1 box draws nothing")
         let rendered = try service.render(cue: 1, of: list)
         XCTAssertEqual(rendered.outcome, .rendered)
-        XCTAssertGreaterThan(lit(try XCTUnwrap(rendered.frame), Frame(x: 0.03, y: 0.82, w: 0.6, h: 0.16)), 30, "the +1 lyric is drawn")
+        XCTAssertGreaterThan(lit(try XCTUnwrap(rendered.frame), Frame(x: 0.03, y: 0.7, w: 0.6, h: 0.27)), 30, "the +1 lyric is drawn")
     }
 
     /// Spec 4 §8 — "Thumbnails use the same rasterizer at thumbnail scale so a

@@ -13,11 +13,6 @@ import OCore
 final class FieldBoxTests: XCTestCase {
     typealias S = StageFixtures
 
-    /// The four metadata boxes, as the fixture's preset 4 (Credits) will hold
-    /// them (Spec 6 §9); numbered 9 here so it never meets the fixture's.
-    static let credits = S.preset(9, "Credits", boxes: [S.body(0, y: 0.1, name: "title"), S.body(0, y: 0.3, name: "author"),
-                                                        S.body(0, y: 0.5, name: "copyright"), S.body(0, y: 0.7, name: "ccli")])
-
     static let songA = S.list(60, title: "Song A", author: "Author A", copyright: "Copyright A", ccli: "1001", cues: [
         [S.fields([:])], [S.fields(["title": "Its own title"])], [S.media()], [S.fields(["title": ""])],
     ])
@@ -29,15 +24,28 @@ final class FieldBoxTests: XCTestCase {
         .linked(list: 63, listUuid: S.listUuid(63), uuid: EngineFixtures.uuid("17e0", 2)),
     ])
 
-    func engine(_ preset: Preset = FieldBoxTests.credits) throws -> HeadlessEngine {
-        try S.engine(preset: preset, lists: [Self.songA, Self.slideA, Self.slideB], playlists: [Self.run])
+    /// Stack 2's slot for channel 2 under `preset`, or under the fixture's
+    /// preset 4, Credits, which holds `title`, `author`, `copyright` and
+    /// `ccli` boxes "for the P12 tests" (Spec 6 §9).
+    func engine(_ preset: Preset? = nil) throws -> HeadlessEngine {
+        try S.engine(preset: preset, lists: [Self.songA, Self.slideA, Self.slideB], playlists: [Self.run]) { library, machine in
+            if preset == nil { machine.stacks[1].slots[0].preset = 4 }
+        }
+    }
+
+    func test_theFixturesCreditsPresetHoldsTheFourListFields() throws {
+        let credits = try XCTUnwrap(EngineFixtures.library().preset(4))
+        XCTAssertEqual(credits.label, "Credits")
+        XCTAssertEqual(credits.layouts[.any]?.boxes.map(\.binding.kind), List.metadataFields.map { Binding.Kind.field(name: $0) })
     }
 
     /// The text each field box of stack 2 draws for channel 2, by field name.
+    /// A box that stopped drawing and is dissolving out (the Credits boxes
+    /// dissolve) carries no text and is not counted.
     func fields(_ engine: HeadlessEngine, offset: Int = 0) -> [String: String] {
         var out: [String: String] = [:]
         for box in engine.boxes(stack: 2, channel: 2) where box.offset == offset {
-            if case .field(let name) = box.binding.kind { out[name] = box.text ?? "" }
+            if case .field(let name) = box.binding.kind, let text = box.text { out[name] = text }
         }
         return out
     }
@@ -160,11 +168,11 @@ final class StaticBoxTests: XCTestCase {
 
     func test_aStaticBoxHidesWhenItsSlotIsMuted() throws {
         let engine = try engine()
-        engine.send("stack 2 mute 2 on")
+        engine.send("stack 2 mute 3 on")   // the clock channel's slot (Spec 6 §9)
         engine.tick()
         XCTAssertEqual(clock(engine)?.opacity, 0)
-        XCTAssertFalse(engine.lastPlan?.stackPasses.first { $0.stack == 2 }?.drawnBoxes.contains { $0.binding.isText } ?? true, "nothing of the slot is drawn")
-        engine.send("stack 2 mute 2 off")
+        XCTAssertFalse(engine.lastPlan?.stackPasses.first { $0.stack == 2 }?.drawnBoxes.contains { $0.channel == 3 } ?? true, "nothing of the slot is drawn")
+        engine.send("stack 2 mute 3 off")
         engine.tick()
         XCTAssertEqual(clock(engine)?.opacity, 1)
     }

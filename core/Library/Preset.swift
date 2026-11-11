@@ -311,9 +311,10 @@ public struct Layout: Codable, Equatable, Sendable {
 }
 
 /// Spec 1 §2 — Preset: `number`, `label`, `uuid`, `builtIn`, `layouts`.
-/// "Preset 1 is built in with a single `\"*\"` layout: one pixel box filling
-/// the frame, then a fallback body box." Spec 1 §9: "built in, copyable, not
-/// deletable."
+/// "Preset 1 is built in and editable, and can't be deleted, renumbered or
+/// swapped (Spec 5 §6). Its `\"*\"` layout is one pixel box filling the frame,
+/// then a fallback body box; its `\"2\"` layout is the confidence stack's: a
+/// body box for the current cue and one at +1 for the next (Spec 6 §3)."
 public struct Preset: Codable, Equatable, Sendable {
     public var number: Int
     public var label: String
@@ -337,17 +338,36 @@ public struct Preset: Codable, Equatable, Sendable {
         layouts[.stack(stack)] ?? layouts[.any]
     }
 
-    /// Spec 1 §2 and §9 — the built-in Preset 1 as the app writes it on a
-    /// fresh install, used when a library has no preset 1 on disk (§8).
+    /// Spec 1 §2 and §9, Spec 6 §3 and §9 — the built-in Preset 1 as the app
+    /// writes it on a fresh install (`library/presets/001-default.json`), used
+    /// when a library has no preset 1 on disk (§8). `"*"`: "a pixel box filling
+    /// the frame, then a fallback body box". `"2"`, the confidence layout:
+    /// "a body box for the current cue in the upper part of the frame, and a
+    /// smaller grey body box at +1 below it".
     public static let builtInDefault = Preset(
         number: 1, label: "Default", uuid: UUID(uuidString: "c0de0000-0000-4000-8000-000000000001") ?? UUID(), builtIn: true,
-        layouts: [.any: Layout(boxes: [
-            Box(binding: .pixels, frame: .full, fit: .pixels(.fit), transition: BoxTransition(ref: 1)),
-            Box(binding: .field(name: "body"), frame: Frame(x: 0.05, y: 0.1, w: 0.9, h: 0.8),
-                fit: .text(TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24)),
-                textStyle: BoxTextStyle(values: TextStyleValues(shadow: Shadow(x: 0, y: 2, blur: 8, color: Color(r: 0, g: 0, b: 0, a: 0.6))), fromStyle: 1),
-                transition: BoxTransition(ref: 2, ms: 250), fallback: true),
-        ])])
+        layouts: [
+            .any: Layout(boxes: [
+                Box(binding: .pixels, frame: .full, fit: .pixels(.fit), transition: BoxTransition(ref: 1)),
+                Box(binding: .field(name: "body"), frame: Frame(x: 0.05, y: 0.1, w: 0.9, h: 0.8),
+                    fit: .text(TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24)),
+                    textStyle: BoxTextStyle(values: TextStyleValues(shadow: Shadow(x: 0, y: 2, blur: 8, color: Color(r: 0, g: 0, b: 0, a: 0.6))), fromStyle: 1),
+                    transition: BoxTransition(ref: 2, ms: 250), fallback: true),
+            ]),
+            .stack(2): Layout(boxes: [
+                Box(binding: .field(name: "body"), frame: Frame(x: 0.03, y: 0.11, w: 0.94, h: 0.56),
+                    fit: .text(TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24)),
+                    textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 64), alignment: .left, verticalAlignment: .top), fromStyle: 1),
+                    transition: BoxTransition(ref: 1)),
+                // "The +1 box matches the first apart from offset 1, its frame (y 0.7, h 0.27), the maxLines policy
+                // with 3 lines, a grey colour (0.7) and a size of 40 points."
+                Box(binding: .field(name: "body"), frame: Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27),
+                    fit: .text(TextFit(policy: .maxLines, maxLines: 3, minSize: 24)),
+                    textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 40), color: Color(r: 0.7, g: 0.7, b: 0.7),
+                                                                    alignment: .left, verticalAlignment: .top), fromStyle: 1),
+                    transition: BoxTransition(ref: 1), offset: 1),
+            ]),
+        ])
 
     private enum CodingKeys: String, CodingKey, CaseIterable { case number, label, uuid, builtIn, layouts }
 

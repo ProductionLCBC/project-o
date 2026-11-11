@@ -51,14 +51,14 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(after.filter { $0 == 5 }.count, before.filter { $0 == 2 }.count)
         XCTAssertEqual(after.filter { $0 == 1 }, before.filter { $0 == 1 }, "channel 1 is untouched")
 
-        // The confidence stack's one slot for channel 2 (Spec 6 §2).
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [5])
+        // The confidence stack's slot for channel 2, beside the clock's (Spec 6 §9).
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [5, 3])
         // The macro guard that reads channel 2 follows too (Spec 2 §7 values name channels).
         XCTAssertEqual(library.macro(1)?.commands.first?.when?.variable, "Channel 5 Content")
         // The slide entry's default channel.
         XCTAssertEqual(library.mediaIndex.entry(F.welcomeSlide)?.defaults.defaultChannel, 5)
         // The library stays in number order.
-        XCTAssertEqual(library.channels.map(\.number), [1, 5])
+        XCTAssertEqual(library.channels.map(\.number), [1, 3, 5])
     }
 
     func test_renumberingToATakenNumberIsRefused() {
@@ -85,7 +85,7 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.channel(2)?.uuid, uuid1)
         XCTAssertEqual(library.channel(1)?.label, "Foreground")
         XCTAssertEqual(machine.stack(1)?.slots.map(\.channel), [2, 1], "slot order is kept; the numbers swap")
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [1])
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.channel), [1, 3])
         let verse = library.list(number: 42)?.cues[0].commands.map(\.command)
         XCTAssertEqual(verse?.first?.channelTarget, .number(2), "the background write now names channel 2")
         XCTAssertEqual(verse?.last?.channelTarget, .number(1))
@@ -96,9 +96,10 @@ final class IdentityTests: XCTestCase {
         machine.stacks[1].slots[0].preset = 3
 
         XCTAssertEqual(Identity.renumber(.preset, from: 3, to: 9, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(machine.stack(2)?.slots.map(\.preset), [9])
-        XCTAssertEqual(machine.stack(2)?.defaultPreset, 2)
-        XCTAssertEqual(library.presets.map(\.number), [1, 2, 9])
+        XCTAssertEqual(machine.stack(2)?.slots.map(\.preset), [9, nil])
+        XCTAssertNil(machine.stack(2)?.defaultPreset)
+        XCTAssertEqual(library.presets.map(\.number), [1, 2, 4, 9])
+        XCTAssertEqual(library.channel(3)?.defaultPreset, 2, "the clock channel's default preset is not preset 3")
         XCTAssertEqual(library.channel(1)?.defaultPreset, 1)
 
         XCTAssertEqual(Identity.renumber(.transition, from: 2, to: 4, library: &library, machine: &machine), .renumbered)
@@ -119,7 +120,8 @@ final class IdentityTests: XCTestCase {
 
         XCTAssertEqual(Identity.renumber(.textStyle, from: 1, to: 3, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(library.preset(1)?.layouts[.any]?.boxes[1].textStyle?.fromStyle, 3)
-        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes[1].textStyle?.fromStyle, 2)
+        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes[0].textStyle?.fromStyle, 2, "the Clock's [Time] box is in Caption's look")
+        XCTAssertEqual(library.preset(1)?.layouts[.stack(2)]?.boxes.map { $0.textStyle?.fromStyle }, [3, 3])
     }
 
     func test_renumberingMachineObjectsRewritesSettingsKeysMacrosAndLayouts() {
@@ -141,7 +143,7 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(machine.macro(2)?.commands.map(\.command)[1], .outputStack(output: 1, stack: 3))
 
         XCTAssertEqual(Identity.renumber(.audioOutput, from: 1, to: 4, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(library.channels.map(\.audioOutputs), [[4], [4]])
+        XCTAssertEqual(library.channels.map(\.audioOutputs), [[4], [4], [4]])
 
         XCTAssertEqual(Identity.renumber(.macro, from: 2, to: 6, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(machine.settings.startupMacro, 6)
