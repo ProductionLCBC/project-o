@@ -35,6 +35,9 @@ public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable
         public var shrinks: Int = 0
         /// Spec 4 §8 — how many requested fonts another font stood in for.
         public var substitutedFonts: Int = 0
+        /// Spec 6 §4 — "the overflow is reported for the editor and pre-flight":
+        /// how many rasters cut their text (each raster's layout says so too).
+        public var overflows: Int = 0
 
         public var hitRate: Double { hits + misses > 0 ? Double(hits) / Double(hits + misses) : 1 }
     }
@@ -148,6 +151,7 @@ public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable
         entries[job.key] = Entry(lines: lines, bytes: bytes, layout: raster.layout, substitutedFont: raster.substitutedFont, lastUsed: clock)
         pending.remove(job.key)
         stats.rasterized += 1
+        if raster.layout.overflowed { stats.overflows += 1 }
         stats.bytes += bytes
         stats.pending = pending.count
         stats.entries = entries.count

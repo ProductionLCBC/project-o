@@ -77,7 +77,8 @@ public struct RasterLine: @unchecked Sendable {
 
 /// Spec 4 §8 — "The glyph-run model is kept ... for every line, every glyph's
 /// ID, font, position and advance", plus the fitted point size and whether
-/// `maxLines` truncated ("reports the overflow for the pre-flight and the editor").
+/// the text was cut: by `maxLines`, or because it overflowed the box at its
+/// size (Spec 6 §4, "the overflow is reported for the editor and pre-flight").
 public struct TextLayout: Equatable, Sendable {
     public var pointSize: Double
     public var lines: [LayoutLine]

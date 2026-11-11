@@ -158,6 +158,33 @@ final class MetalStackPassTests: XCTestCase {
         XCTAssertEqual(middle, 27 + 108, accuracy: 12, "centre: the ink straddles the box's middle")
     }
 
+    /// Spec 6 §11 — "`shrinkToFit` at `minSize`, and `maxLines` taller than
+    /// the box, keep the whole lines that fit from the top, end the last in an
+    /// ellipsis, draw nothing outside the box and report the overflow", with
+    /// goldens for the overflow.
+    func test_overflowKeepsWholeLinesInsideTheBoxAndMatchesTheGoldens() throws {
+        let goldens = MetalHarness.goldens("stack")
+        let frameRect = PixelRect(x: 40, y: 60, width: 400, height: 80)
+        let text = String(repeating: "Great is Thy faithfulness, O God my Father. ", count: 6)
+        let cases = [("shrinkToFit", TextJobs.plain(size: 96, anchor: .bottom), TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 60)),
+                     ("maxLines", TextJobs.plain(size: 72, anchor: .bottom), TextFit(policy: .maxLines, maxLines: 6, minSize: 20))]
+        for (name, style, fit) in cases {
+            let (frame, layout) = try renderText(text, style: style, fit: fit, frame: frameRect)
+            XCTAssertTrue(layout.overflowed, name)
+            XCTAssertTrue(layout.lines.last?.text.hasSuffix("\u{2026}") == true, "\(name): \(layout.lines.map(\.text))")
+            XCTAssertEqual(Double(try XCTUnwrap(layout.lines.first).origin.y), 0, accuracy: 0.5, "\(name): from the top, whatever the anchor")
+            var outside = 0
+            for y in 0..<frame.height {
+                for x in 0..<frame.width where frame[x, y].r > 0.05 {
+                    if x < 40 || x >= 440 || y < 60 || y >= 140 { outside += 1 }
+                }
+            }
+            XCTAssertEqual(outside, 0, "\(name): nothing is drawn outside the box")
+            XCTAssertFalse(litRows(frame, in: frameRect).isEmpty, "\(name): the kept lines are drawn")
+            try MetalHarness.assertGolden(goldens, "overflow-\(name)", frame, tolerance: .text)
+        }
+    }
+
     /// Spec 4 §16 — "a text box under both fit policies".
     func test_textBoxUnderBothFitPoliciesMatchesTheGoldens() throws {
         let goldens = MetalHarness.goldens("stack")

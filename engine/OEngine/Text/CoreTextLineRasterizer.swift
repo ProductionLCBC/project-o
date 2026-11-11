@@ -78,6 +78,12 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
 
     func attributed(_ text: String, values: TextStyleValues, font: CTFont, outputHeight: Int) -> CFAttributedString {
         let string = values.allCaps ? text.uppercased() : text
+        return CFAttributedStringCreate(nil, string as CFString, attributes(values: values, font: font, outputHeight: outputHeight) as CFDictionary)
+    }
+
+    /// Spec 4 §8 — the attributes every run of a box's text is drawn with: the
+    /// font, the colour, the spacing, the outline and the alignment.
+    func attributes(values: TextStyleValues, font: CTFont, outputHeight: Int) -> [CFString: Any] {
         let color = CGColor(colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
                             components: [CGFloat(values.color.r), CGFloat(values.color.g), CGFloat(values.color.b), CGFloat(values.color.a)])
         var attributes: [CFString: Any] = [
@@ -105,7 +111,23 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             CTParagraphStyleSetting(spec: .lineBreakMode, valueSize: MemoryLayout<CTLineBreakMode>.size, value: &lineBreak),
         ]
         attributes[kCTParagraphStyleAttributeName] = CTParagraphStyleCreate(settings, settings.count)
-        return CFAttributedStringCreate(nil, string as CFString, attributes as CFDictionary)
+        return attributes
+    }
+
+    /// Spec 6 §4 — "keeps the whole lines that fit, counted from the top. The
+    /// last one ends in an ellipsis": a kept line's own text with an ellipsis
+    /// after it, drawn like the rest of the line, its end cut back only as far
+    /// as the ellipsis needs to fit `width`. Never the next line run into it.
+    func endingInEllipsis(_ text: String, values: TextStyleValues, font: CTFont, outputHeight: Int, width: Double) -> (line: CTLine, text: String) {
+        let attributes = self.attributes(values: values, font: font, outputHeight: outputHeight) as CFDictionary
+        var shown = text
+        while true {
+            while let last = shown.last, last.isWhitespace { shown.removeLast() }
+            let candidate = shown + "\u{2026}"
+            let line = CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, candidate as CFString, attributes))
+            if shown.isEmpty || CTLineGetTypographicBounds(line, nil, nil, nil) <= width + 0.5 { return (line, candidate) }
+            shown.removeLast()
+        }
     }
 
     /// Lay the text out at one size within the box; `fits` when every line is
@@ -132,24 +154,15 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
                 .trimmingCharacters(in: .newlines)
         }
         var texts = lines.map { substring(CTLineGetStringRange($0)) }
-        if let maxLines, lines.count > maxLines {
-            // Spec 4 §8 — "maxLines truncates after N lines with an ellipsis and reports the overflow".
+        if let maxLines, maxLines > 0, lines.count > maxLines {
+            // Spec 4 §8 — "maxLines truncates after N lines with an ellipsis and reports the overflow"; Spec 6 §4 —
+            // the kept lines are whole, and the last one is its own text ending in the ellipsis.
             truncated = true
-            let kept = Array(lines.prefix(maxLines))
-            let last = kept[maxLines - 1]
-            let lastRange = CTLineGetStringRange(last)
-            let remainderRange = CFRange(location: lastRange.location, length: total - lastRange.location)
-            let remainder = CFAttributedStringCreateWithSubstring(nil, attributed, remainderRange)
-            let remainderLine = CTLineCreateWithAttributedString(remainder ?? attributed)
-            let ellipsis = CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, "\u{2026}" as CFString, [kCTFontAttributeName: resolved.font] as CFDictionary))
-            let truncatedLine = CTLineCreateTruncatedLine(remainderLine, Double(box.width), .end, ellipsis) ?? last
-            lines = Array(kept.dropLast()) + [truncatedLine]
-            let shown = CTLineGetStringRange(truncatedLine)
-            let lastText = substring(CFRange(location: remainderRange.location, length: min(shown.length, lastRange.length)))
-                .components(separatedBy: "\n").first ?? ""
-            texts = Array(texts.prefix(maxLines - 1)) + [lastText.trimmingCharacters(in: .whitespaces) + "\u{2026}"]
+            let last = endingInEllipsis(texts[maxLines - 1], values: values, font: resolved.font, outputHeight: outputHeight, width: Double(box.width))
+            lines = Array(lines.prefix(maxLines - 1)) + [last.line]
+            texts = Array(texts.prefix(maxLines - 1)) + [last.text]
         }
-        let widest = lines.map { CTLineGetTypographicBounds($0, nil, nil, nil) }.max() ?? 0
+        let widest = lines.map { CoreTextLineRasterizer.visibleWidth(of: $0) }.max() ?? 0
         let fits = visible.length == total && widest <= Double(box.width) + 0.5 && Double(lines.count) * lineHeight <= Double(box.height) + 0.5
         return (Laid(lines: lines, texts: texts, pixelSize: pixelSize, lineHeight: lineHeight, fits: fits, truncated: truncated), resolved)
     }
@@ -185,12 +198,25 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         case .maxLines:
             chosen = layout(job.text, values: values, pixelSize: fullSize, box: job.box, outputHeight: job.outputHeight, maxLines: max(1, job.fit.maxLines))
         }
-        let laid = chosen.0
-        let font = chosen.1
+        var (laid, font) = chosen
+        // Spec 6 §4 — "Text can still overflow in two ways: shrinkToFit doesn't fit at minSize, or the N lines of
+        // maxLines are taller than the box. Either way the engine draws at that size and keeps the whole lines that
+        // fit, counted from the top. The last one ends in an ellipsis ... An overflowing block starts at the box's top
+        // whatever its anchor, so the first lines show." When not one line fits, nothing draws.
+        let boxHeight = Double(job.box.height)
+        let overflowsBox = Double(laid.lines.count) * laid.lineHeight > boxHeight + 0.5
+        if overflowsBox {
+            let whole = Int((boxHeight + 0.5) / max(1, laid.lineHeight))
+            if whole > 0 {
+                (laid, font) = layout(job.text, values: values, pixelSize: laid.pixelSize, box: job.box, outputHeight: job.outputHeight, maxLines: whole)
+            } else {
+                laid = Laid(lines: [], texts: [], pixelSize: laid.pixelSize, lineHeight: laid.lineHeight, fits: false, truncated: true)
+            }
+        }
         // Spec 6 §4 — "It places the block of lines in the box: the first line at the box's top, the block
         // centred, or the last line at the box's bottom."
         let blockHeight = Double(laid.lines.count) * laid.lineHeight
-        let top = CoreTextLineRasterizer.top(of: blockHeight, in: Double(job.box.height), anchor: values.verticalAlignment)
+        let top = overflowsBox ? 0 : CoreTextLineRasterizer.top(of: blockHeight, in: boxHeight, anchor: values.verticalAlignment)
         // Spec 6 §4 — "`outline.width`, `shadow.x`, `shadow.y`, `shadow.blur` ... are points on the 1080-line
         // canvas, scaled with the output's height", the bitmap's padding for them included.
         let scale = Double(job.outputHeight) / 1080
@@ -202,10 +228,13 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         for (index, line) in laid.lines.enumerated() {
             var ascent: CGFloat = 0
             var descent: CGFloat = 0
-            let width = CTLineGetTypographicBounds(line, &ascent, &descent, nil)
+            let typographic = CTLineGetTypographicBounds(line, &ascent, &descent, nil)
+            // A soft-wrapped line ends in the space it broke at; it is aligned by what it shows (Spec 6 §4,
+            // "Nothing draws outside the box").
+            let width = CoreTextLineRasterizer.visibleWidth(of: line)
             let glyphBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
             let left = min(0, Double(glyphBounds.minX))
-            let right = max(width, Double(glyphBounds.maxX))
+            let right = max(typographic, Double(glyphBounds.maxX))
             let bitmapWidth = max(1, Int((right - left).rounded(.up)) + pad * 2)
             let bitmapHeight = max(1, Int(laid.lineHeight.rounded(.up)) + pad * 2)
             var x: Double
@@ -223,8 +252,16 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
                                           origin: PixelRect(x: Float(x), y: Float(y), width: Float(width), height: Float(laid.lineHeight)),
                                           runs: CoreTextLineRasterizer.runs(of: line)))
         }
-        return TextRaster(lines: lines, layout: TextLayout(pointSize: laid.pixelSize * 1080 / Double(job.outputHeight), lines: layoutLines, overflowed: laid.truncated),
+        // Spec 6 §4 — "the overflow is reported for the editor and pre-flight".
+        return TextRaster(lines: lines, layout: TextLayout(pointSize: laid.pixelSize * 1080 / Double(job.outputHeight), lines: layoutLines,
+                                                           overflowed: laid.truncated || overflowsBox),
                           substitutedFont: font.substituted)
+    }
+
+    /// Spec 4 §8 — a line's width without the whitespace it ends in, which
+    /// draws nothing: what alignment and the fit policies measure.
+    static func visibleWidth(of line: CTLine) -> Double {
+        max(0, CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line))
     }
 
     /// Spec 6 §4 — where the block's first line starts in a box of `height`:
