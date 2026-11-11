@@ -69,7 +69,7 @@ final class TickSchedulerTests: XCTestCase {
         let machine = try EngineFixtures.spikeMachine()
         let backend = RecordingBackend()
         let sinks = machine.outputs.map { CapturingSink(output: $0.number) }
-        let engine = try Engine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, backend: backend, clock: TimerClock(),
+        let engine = try Engine(library: library, machine: machine, media: EngineFixtures.media, backend: backend, clock: TimerClock(),
                                 sinks: sinks, sourceFactory: FakeSourceFactory(), posters: FakePosterProvider(backend: backend),
                                 text: FakeTextProvider(backend: backend), variables: VariableProvider(settings: machine.settings))
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("blackbox-\(UUID().uuidString)")

@@ -194,14 +194,14 @@ final class StillSourceTests: XCTestCase {
     func test_posterProviderLoadsOnceAndCaches() throws {
         let backend = try MetalHarness.backend()
         let library = try EngineFixtures.library()
-        let provider = ImagePosterProvider(backend: backend, mediaRoot: EngineFixtures.mediaRoot)
+        let provider = ImagePosterProvider(backend: backend, media: EngineFixtures.media)
         let entry = try XCTUnwrap(library.mediaIndex.entry(EngineFixtures.dawn))
-        let handle = provider.poster(for: entry)
+        let handle = provider.poster(for: entry, tier: .library)
         XCTAssertFalse(handle.isNone)
-        XCTAssertEqual(provider.poster(for: entry), handle)
+        XCTAssertEqual(provider.poster(for: entry, tier: .library), handle)
         XCTAssertEqual(backend.resources.descriptor(handle)?.role, .poster)
         let noPoster = try XCTUnwrap(library.mediaIndex.entry(EngineFixtures.cross))
-        XCTAssertTrue(provider.poster(for: noPoster).isNone)
+        XCTAssertTrue(provider.poster(for: noPoster, tier: .library).isNone)
     }
 }
 

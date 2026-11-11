@@ -20,7 +20,7 @@ final class LivePointerEngineTests: XCTestCase {
     override func setUpWithError() throws {
         var machine = try E.spikeMachine()
         machine.settings.libraryMode = .writable
-        engine = try HeadlessEngine(library: E.library(), machine: machine, mediaRoot: E.mediaRoot)
+        engine = try HeadlessEngine(library: E.library(), machine: machine, media: E.media)
     }
 
     func fire(item: Int, cue: Int) {

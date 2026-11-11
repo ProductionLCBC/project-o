@@ -14,7 +14,7 @@ final class ClearsEngineTests: XCTestCase {
 
     override func setUpWithError() throws {
         engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(),
-                                    mediaRoot: EngineFixtures.mediaRoot)
+                                    media: EngineFixtures.media)
     }
 
     private func sink(_ output: Int) throws -> SinkPass {
@@ -99,7 +99,7 @@ final class ClearsEngineTests: XCTestCase {
     func test_anUnknownAudioOutputChangesNothing() throws {
         var library = try EngineFixtures.library()
         library.macros.append(Macro(number: 40, commands: [GuardedCommand(.audioMute(audio: .number(9), state: .on))]))
-        engine = try HeadlessEngine(library: library, machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         engine.send("macro 40")
         engine.tick()
         XCTAssertEqual(engine.control.mutedAudioOutputs, [])

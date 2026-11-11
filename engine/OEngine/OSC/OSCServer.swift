@@ -342,7 +342,7 @@ public enum OSCFeedbackDeriver {
             for effect in entry.effects {
                 switch effect {
                 case .transition(let t):
-                    out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library)))
+                    out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library, machine: machine)))
                     out.append(OSCFeedback.channelState(t.channel, feedbackState(of: t.to)))
                 case .applied(let command):
                     switch command {
@@ -377,14 +377,16 @@ public enum OSCFeedbackDeriver {
     }
 
     /// Spec 2 §6 — `s:label`: the first line of text, the media item's name,
-    /// the slide's or input's id.
-    static func label(of content: ContentInstance, library: Library) -> String {
+    /// the slide's or input's id. The item is the one the ref resolves to, in
+    /// either index (Spec 8 §2); one whose file has no path is named by its id.
+    static func label(of content: ContentInstance, library: Library, machine: Machine?) -> String {
         switch content {
         case .empty: return ""
         case .text(let t): return String((t.fields["body"] ?? t.fields.values.sorted().first ?? "").split(separator: "\n").first ?? "")
         case .media(let m):
-            let path = library.mediaIndex.entry(m.ref)?.path ?? m.ref
-            return String(path.split(separator: "/").last ?? Substring(path))
+            let path = MediaResolver.resolve(m.ref, library: library, machine: machine)?.entry.path ?? ""
+            let name = path.isEmpty ? m.ref : path
+            return String(name.split(separator: "/").last ?? Substring(name))
         case .slide(let s): return s.ref
         case .input(let i): return "input \(i.input)"
         }

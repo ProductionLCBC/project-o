@@ -87,7 +87,7 @@ final class PreviewPassTests: XCTestCase {
 /// output feeds (Spec 4 §2, §10; Area 5 reading).
 final class PreviewPlanTests: XCTestCase {
     func test_previewsRunAtMostThirtyTimesASecondAndCarryTheirSource() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         let backend = try XCTUnwrap(engine.recording)
         engine.tick(count: 4)
         XCTAssertEqual(backend.encoded.map(\.auxPasses), [2, 0, 2, 0], "at 60 Hz every other tick carries the two stacks' previews")
@@ -100,7 +100,7 @@ final class PreviewPlanTests: XCTestCase {
             XCTAssertEqual(aux.target, engine.control.previewTargets[aux.stack])
         }
         // A 30 Hz master: every tick is a preview tick.
-        let slow = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(rate: FrameRate(num: 30)), mediaRoot: EngineFixtures.mediaRoot)
+        let slow = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(rate: FrameRate(num: 30)), media: EngineFixtures.media)
         slow.tick(count: 3)
         XCTAssertEqual(try XCTUnwrap(slow.recording).encoded.map(\.auxPasses), [2, 2, 2])
     }
@@ -118,7 +118,7 @@ final class PreviewPlanTests: XCTestCase {
         library.presets.append(Preset(number: 8, label: "Picture", uuid: EngineFixtures.uuid("c0de", 8),
                                       layouts: [.any: Layout(boxes: [Box(binding: .pixels, fit: .pixels(.fit))])]))
         machine.stacks[1].slots = [StackSlot(channel: 1, preset: 8), StackSlot(channel: 2)]   // the unassigned stack samples both
-        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         let backend = try XCTUnwrap(engine.recording)
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.send("channel 2 write text \"x\"")
@@ -157,7 +157,7 @@ final class PreviewPlanTests: XCTestCase {
     func test_theEngineExposesOnePreviewSurfacePerStack() throws {
         let metal = try MetalHarness.backend()
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                                        mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+                                        media: EngineFixtures.media, metal: metal)
         let surfaces = engine.engine.previewSurfaces
         XCTAssertEqual(Set(surfaces.keys), [1, 2])
         XCTAssertEqual(Set(surfaces.values).count, 2, "distinct surfaces")

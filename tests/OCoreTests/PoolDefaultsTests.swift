@@ -70,10 +70,13 @@ final class PoolDefaultsTests: XCTestCase {
 
         let resolved = MediaResolver.resolve(F.mountains, library: library, machine: machine)
         XCTAssertEqual(resolved?.tier, .machine)
-        XCTAssertEqual(MediaResolver.resolve(F.cross, library: library, machine: machine)?.path, "local/cross-fast.png", "an override moves the path, not the entry")
+        // Spec 8 §2 — "an override ... is a path relative to `machine/media/` ... and wins over its entry's `path`."
+        XCTAssertEqual(MediaResolver.resolve(F.cross, library: library, machine: machine)?.location, MediaLocation(.machineMedia, "cross-fast.png"),
+                       "an override moves the file, not the entry")
         XCTAssertEqual(MediaResolver.resolve(F.cross, library: library, machine: machine)?.tier, .library)
-        XCTAssertEqual(MediaResolver.resolve(F.dawn, library: library, machine: machine)?.path, "backgrounds/dawn.mp4")
+        XCTAssertEqual(MediaResolver.resolve(F.dawn, library: library, machine: machine)?.location, MediaLocation(.mediaRoot, "backgrounds/dawn.mp4"))
         XCTAssertEqual(MediaResolver.resolve(F.announcement, library: library, machine: machine)?.tier, .machine)
+        XCTAssertEqual(MediaResolver.resolve(F.announcement, library: library, machine: machine)?.location, MediaLocation(.machineMedia, "announcement.png"))
         XCTAssertNil(MediaResolver.resolve("sha256:" + String(repeating: "cd", count: 32), library: library, machine: machine))
         library.mediaIndex.replaced[F.mountains] = F.dawn
         XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.entry.id, F.dawn,
@@ -81,6 +84,45 @@ final class PoolDefaultsTests: XCTestCase {
         machine.mediaLocal.entries.removeAll()
         XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.entry.id, F.dawn)
         XCTAssertEqual(MediaResolver.resolve(F.mountains, library: library, machine: machine)?.tier, .library)
+    }
+
+    /// Spec 8 §11, Resolver — "A write of a replaced id takes the defaults of
+    /// the item it resolves to, and a later edit of that item's defaults
+    /// reaches it." Spec 3 §4 as Spec 8 corrected it: "falling back to the
+    /// defaults of the pool item the ref resolves to".
+    func test_aWriteOfAReplacedIdTakesItsReplacementsDefaults() throws {
+        var (library, machine, _) = F.load()
+        library.mediaIndex.replaced[F.mountains] = F.dawn
+        let first = write(MediaContent(ref: F.mountains), library: library, machine: machine)
+        XCTAssertEqual(first?.ref, F.mountains, "the cue still names the id it wrote")
+        XCTAssertNil(first?.inMs, "dawn's defaults, not mountains' 1500")
+        XCTAssertEqual(first?.loop, true)
+        let at = try XCTUnwrap(library.mediaIndex.position(of: F.dawn))
+        library.mediaIndex.entries[at].defaults.trimInMs = 250
+        library.mediaIndex.entries[at].defaults.loop = false
+        let later = write(MediaContent(ref: F.mountains), library: library, machine: machine)
+        XCTAssertEqual(later?.inMs, 250)
+        XCTAssertEqual(later?.loop, false)
+        // Through the machine index's own map too (Spec 8 §2, "the machine index's and then the library's").
+        machine.mediaLocal.replaced[F.cross] = F.announcement
+        XCTAssertEqual(write(MediaContent(ref: F.cross), library: library, machine: machine)?.loop, false)
+    }
+
+    /// Spec 3 §4 — Missing media, as Spec 8 §2 and §6 make it: the id the ref
+    /// reaches is in the caller's set, or its entry is deleted.
+    func test_aWriteIsMissingWhenWhatItResolvesToIsMissingOrDeleted() throws {
+        var (library, machine, _) = F.load()
+        library.mediaIndex.replaced[F.cross] = F.mountains
+        let context = ProjectionContext(frame: 100, library: library, machine: machine, missing: [F.mountains], source: CommandSource(kind: .ui))
+        let command = Command.channelWrite(ChannelWrite(channel: .number(1), content: .media(MediaContent(ref: F.cross))))
+        let (state, _) = project(ShowState.fresh(library: library, machine: machine), [command], context: context)
+        XCTAssertEqual(state.channels[1]?.content.media?.missing, true, "cross resolves to mountains, whose file is absent")
+        library.mediaIndex.replaced = [:]
+        let at = try XCTUnwrap(library.mediaIndex.position(of: F.dawn))
+        library.mediaIndex.entries[at].deletedAt = "2026-11-11T09:00:00Z"
+        library.mediaIndex.entries[at].path = ""
+        XCTAssertEqual(write(MediaContent(ref: F.dawn), library: library, machine: machine)?.missing, true,
+                       "a deleted item shows missing even before the caller's set knows")
     }
 
     /// Spec 3 §4 Media still holds with the defaults applied: writing the same

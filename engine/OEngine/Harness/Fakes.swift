@@ -134,7 +134,7 @@ public final class FakePosterProvider: PosterProvider, @unchecked Sendable {
         self.backend = backend
     }
 
-    public func poster(for entry: MediaEntry) -> TextureHandle {
+    public func poster(for entry: MediaEntry, tier: MediaTier) -> TextureHandle {
         guard entry.poster != nil else { return .none }
         lock.lock()
         defer { lock.unlock() }

@@ -98,7 +98,7 @@ final class VariableValueTests: XCTestCase {
         machine.playlists.append(Self.playlist)
         machine.stacks[1].slots[0].preset = preset.number
         edit(&library, &machine)
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: E.mediaRoot, wallClock: { clock.now })
+        return try HeadlessEngine(library: library, machine: machine, media: E.media, wallClock: { clock.now })
     }
 
     /// The text the static box with `raw` draws at `offset` on stack 2, or nil when it draws nothing.
@@ -272,8 +272,8 @@ final class VariableValueTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         let log = EngineLog(category: "test-thumbnails")
         let variables = VariableProvider(settings: machine.settings, wallClock: HeadlessEngine.fixedWallClock)
-        let service = try ThumbnailService(library: library, machine: machine, mediaRoot: E.mediaRoot, backend: metal,
-                                           posters: ImagePosterProvider(backend: metal, mediaRoot: E.mediaRoot, log: log),
+        let service = try ThumbnailService(library: library, machine: machine, media: E.media, backend: metal,
+                                           posters: ImagePosterProvider(backend: metal, media: E.media, log: log),
                                            variables: variables, cacheFolder: folder, log: log)
         variables.publish(livePlaylist: machine.playlists.first { $0.title == "Sunday Night" }, timers: [:])
         let roots = (library: service.library, machine: service.machine)
@@ -325,7 +325,7 @@ final class ServiceInTests: XCTestCase {
                                                    S.label("[Service In h:mm:ss]", 0, y: 0.26), S.label("[Service In]", 1, y: 0.38)]))
         machine.playlists.append(contentsOf: [Self.dated, Self.sunday9, Self.saturday9, Self.garbled])
         machine.stacks[1].slots[0].preset = 9
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: E.mediaRoot, wallClock: { clock.now })
+        return try HeadlessEngine(library: library, machine: machine, media: E.media, wallClock: { clock.now })
     }
 
     func serviceIn(_ engine: HeadlessEngine, _ raw: String = "[Service In]", offset: Int = 0) -> String? {

@@ -80,9 +80,11 @@ public final class ControlLoop: @unchecked Sendable {
     public let audio: AudioSystem?
     let log: EngineLog
     let encodeKinds: [Int: EncodeKind]
-    let mediaRoot: URL?
-    /// Spec 3 §6 — "the set of media ids the resolver cannot find".
-    public let missing: Set<String>
+    /// Spec 8 §2 — the media root and `machine/media/`, which locations read against.
+    let media: MediaFolders
+    /// Spec 3 §6 — "the set of media ids the resolver cannot find", as
+    /// Spec 8 §2 works it out per location (`LocalFiles.missingMedia`).
+    public private(set) var missing: Set<String>
     public private(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
@@ -124,7 +126,7 @@ public final class ControlLoop: @unchecked Sendable {
     /// The timers this build's commands changed, with their lines' `seq`.
     private var changedTimers: [(timer: Int, seq: Int)] = []
 
-    public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
+    public init(library: Library, machine: Machine, pacing: Pacing, media: MediaFolders, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
                 variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioSystem? = nil, log: EngineLog) {
         self.library = library
@@ -139,14 +141,11 @@ public final class ControlLoop: @unchecked Sendable {
         self.variables = variables
         self.audio = audio
         self.encodeKinds = encodeKinds
-        self.mediaRoot = mediaRoot
+        self.media = media
         self.log = log
-        // Spec 1 §7 — "Missing state is computed, never stored".
-        if let mediaRoot, let existing = try? LocalFiles.existingMediaPaths(mediaRoot: mediaRoot) {
-            missing = MediaResolver.missingIds(library: library, machine: machine, existingPaths: existing)
-        } else {
-            missing = Set((machine.mediaLocal.entries + library.mediaIndex.entries).map(\.id))
-        }
+        // Spec 1 §7 — "Missing state is computed, never stored"; Spec 8 §9 — "worked out per
+        // location", over the media root and `machine/media/`, a folder that can't be read counting absent.
+        missing = LocalFiles.missingMedia(library: library, machine: machine, folders: media)
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
         // Spec 6 §6 — "after a relaunch every timer is unset".
@@ -748,7 +747,7 @@ public final class ControlLoop: @unchecked Sendable {
                         m.clearIssued = false
                         // Spec 4 §11 — after `stop`, play resumes from the in-point: a fresh decoder.
                         releaseAudio(of: &m)
-                        attachAudio(to: &m, channel: channel, instance: instance)
+                        if let url = mediaURL(for: instance.ref) { attachAudio(to: &m, channel: channel, instance: instance, url: url) }
                     } else {
                         m.clock.resume(at: frame)
                         if let a = m.audio { audio?.setPlaying(true, for: a) }
@@ -789,23 +788,25 @@ public final class ControlLoop: @unchecked Sendable {
         case .media(let m):
             let resolved = MediaResolver.resolve(m.ref, library: library, machine: machine)
             let entry = resolved?.entry
+            // Spec 8 §9 — "video, stills and audio open at the resolved location, not under the media root alone".
+            let url = resolved?.location.flatMap { media.url(for: $0) }
             let inMs = Double(m.inMs ?? 0)
             let duration = entry?.durationMs.map(Double.init) ?? .infinity
             let outMs = m.outMs.map(Double.init) ?? duration
             var runtime = MediaRuntime(
                 ref: m.ref, handle: InstanceHandle(rawValue: -1), source: nil,
-                poster: entry.map { posters.poster(for: $0) } ?? .none, entry: entry,
+                poster: resolved.map { posters.poster(for: $0.entry, tier: $0.tier) } ?? .none, entry: entry,
                 layout: .nv12, size: PixelSize(width: entry?.width ?? 0, height: entry?.height ?? 0), matrix: .bt709, range: .limited,
                 inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: true),
-                ready: false, missing: m.missing || resolved == nil || mediaRoot == nil, clearIssued: false,
+                ready: false, missing: m.missing || url == nil, clearIssued: false,
                 transport: m.transport, endBehavior: m.endBehavior)
-            guard !runtime.missing, let entry, let resolved, let mediaRoot else { return .media(runtime) }
+            guard !runtime.missing, let entry, let url else { return .media(runtime) }
             guard let handle = allocateHandle() else {
                 log.error("no free instance slot for \(m.ref) on channel \(channel)")
                 runtime.missing = true
                 return .media(runtime)
             }
-            let request = SourceRequest(url: mediaRoot.appendingPathComponent(resolved.path), entry: entry, inMs: inMs,
+            let request = SourceRequest(url: url, entry: entry, inMs: inMs,
                                         outMs: outMs.isFinite ? outMs : nil, loop: m.endBehavior == .loop, handle: handle)
             let source = sourceFactory.adoptPrefetched(request) ?? sourceFactory.open(request)
             sources.install(source, at: handle)
@@ -818,9 +819,16 @@ public final class ControlLoop: @unchecked Sendable {
             runtime.ready = source.isReady
             runtime.syncOffsetMs = m.syncOffsetMs ?? 0
             runtime.gainOverride = m.gainOverride
-            attachAudio(to: &runtime, channel: channel, instance: m)
+            attachAudio(to: &runtime, channel: channel, instance: m, url: url)
             return .media(runtime)
         }
+    }
+
+    /// Spec 8 §9 — "video, stills and audio open at the resolved location,
+    /// not under the media root alone": the file a media ref resolves to, or
+    /// nil when it has no location or its folder isn't known.
+    func mediaURL(for ref: String) -> URL? {
+        MediaResolver.resolve(ref, library: library, machine: machine)?.location.flatMap { media.url(for: $0) }
     }
 
     /// Spec 4 §11 — "Each channel's content may carry sound; the engine
@@ -828,13 +836,12 @@ public final class ControlLoop: @unchecked Sendable {
     /// it to the numbered audio outputs the channel names." One ring per
     /// device those outputs reach; a channel naming no output on this machine
     /// gets no decoder.
-    private func attachAudio(to runtime: inout MediaRuntime, channel: Int, instance: MediaInstance) {
-        guard let audio, let entry = runtime.entry, entry.hasAudio, entry.kind != .image, let mediaRoot,
-              let resolved = MediaResolver.resolve(instance.ref, library: library, machine: machine) else { return }
+    private func attachAudio(to runtime: inout MediaRuntime, channel: Int, instance: MediaInstance, url: URL) {
+        guard let audio, let entry = runtime.entry, entry.hasAudio, entry.kind != .image else { return }
         let outputs = library.channel(channel)?.audioOutputs ?? []
         let rings = audio.ringCount(forOutputs: outputs)
         guard rings > 0 else { return }
-        let decoder = AudioFileDecoder(url: mediaRoot.appendingPathComponent(resolved.path), inMs: runtime.inMs,
+        let decoder = AudioFileDecoder(url: url, inMs: runtime.inMs,
                                        outMs: runtime.outMs.isFinite ? runtime.outMs : nil, loop: instance.endBehavior == .loop, channels: 2,
                                        ringCount: rings, log: log)
         decoder.start()
@@ -1233,8 +1240,9 @@ public final class ControlLoop: @unchecked Sendable {
                                             contentPixels: bound.size, mips: pass.generateMips)
         }
         guard let media = content?.media, !media.missing,
-              let entry = MediaResolver.resolve(media.ref, library: library, machine: machine)?.entry else { return nil }
-        let poster = posters.poster(for: entry)
+              let resolved = MediaResolver.resolve(media.ref, library: library, machine: machine) else { return nil }
+        let entry = resolved.entry
+        let poster = posters.poster(for: entry, tier: resolved.tier)
         guard !poster.isNone else { return nil }
         return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))
     }

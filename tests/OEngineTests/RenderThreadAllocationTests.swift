@@ -21,7 +21,7 @@ import OCore
 final class RenderThreadAllocationTests: XCTestCase {
     func test_aWarmRenderTickAllocatesNothing() throws {
         guard MallocCounter.available else { throw XCTSkip("malloc_logger is not reachable in this process") }
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         let backend = try XCTUnwrap(engine.recording)
         backend.recordsEncodes = false
         engine.send("list 42 cue 1")

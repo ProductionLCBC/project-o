@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://project-o.lcbcchurch.com/schemas/media-local.schema.json",
   "title": "media-local.json",
-  "description": "Spec 1 §7 — the machine index: local-only media with the same entry shape as the library index, plus overrides from id to a local path.",
+  "description": "Spec 1 §7 — the machine index: local-only media with the same entry shape as the library index, its files in machine/media/ (Spec 8 §2); overrides from id to a path relative to machine/media/, or absolute; and its own replaced map, written while it holds a mapping.",
   "type": "object",
   "required": ["schema", "app", "kind", "entries", "overrides"],
   "properties": {
@@ -10,7 +10,8 @@
     "app": { "type": "string" },
     "kind": { "const": "mediaLocal" },
     "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
-    "overrides": { "type": "object", "additionalProperties": { "type": "string" } }
+    "overrides": { "type": "object", "additionalProperties": { "type": "string" } },
+    "replaced": { "type": "object", "additionalProperties": { "$ref": "#/$defs/mediaId" } }
   },
   "$defs": {
     "mediaId": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64}|slide:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$" },
@@ -52,6 +53,7 @@
         },
         "addedAt": { "type": ["string", "null"] },
         "folder": { "type": ["string", "null"] },
+        "deletedAt": { "type": ["string", "null"] },
         "tracks": { "type": "array", "items": { "$ref": "#/$defs/mediaId" } },
         "crossfadeMs": { "type": "integer", "minimum": 0 }
       }

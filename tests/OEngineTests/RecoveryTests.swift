@@ -30,7 +30,7 @@ final class RecoveryTests: XCTestCase {
 
     /// "Frame not ready at tick: Repeat the previous channel texture; count videoRepeat for that channel."
     func test_frameNotReadyRepeatsAndCountsVideoRepeat() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.tick()
         let source = try XCTUnwrap(engine.fakeSources?.liveSources.first)
@@ -44,7 +44,7 @@ final class RecoveryTests: XCTestCase {
 
     /// "Render thread misses a tick: Sinks present or re-schedule their last frame; count tickMissed."
     func test_sinkRePresentsWhenNoNewFrameArrived() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         engine.tick(count: 2)
         let sink = try XCTUnwrap(engine.sinks[1])
         XCTAssertEqual(sink.rePresentCount, 0)
@@ -65,7 +65,7 @@ final class RecoveryTests: XCTestCase {
     /// sink from CPU copies ...; rebuild pipelines and heaps; resume; log as a
     /// severe event."
     func test_gpuErrorRebuildsPipelinesAndHoldsTheLastFrame() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         let backend = try XCTUnwrap(engine.recording)
         engine.tick(count: 2)
         let sink = try XCTUnwrap(engine.sinks[1])
@@ -194,7 +194,7 @@ final class RecoveryTests: XCTestCase {
 
     /// "Control thread stalls: ... watchdog logs after 500 ms" and the plan is reused: Spec 4 §3.
     func test_controlStallIsReportedByTheWatchdog() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         engine.tick(count: 2)
         engine.stallControl(ticks: 40)
         engine.tick(count: 40)

@@ -98,7 +98,7 @@ final class FontLibraryTests: XCTestCase {
     func test_theEngineRegistersItsFontsAtLaunch() throws {
         let metal = try MetalHarness.backend()
         _ = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                               mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+                               media: EngineFixtures.media, metal: metal)
         XCTAssertTrue(FontLibrary.shared.isRegistered)
     }
 }

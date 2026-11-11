@@ -84,7 +84,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     private var lastRenderNs: Int64 = 0
     private let log: EngineLog
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: MetalBackend, posters: any PosterProvider, variables: VariableProvider,
+    public init(library: Library, machine: Machine, media: MediaFolders, backend: MetalBackend, posters: any PosterProvider, variables: VariableProvider,
                 cacheFolder: URL, log: EngineLog, poolSize: Int = 32, textCacheBytes: Int = 64 * 1024 * 1024, memoryBytes: Int = 32 * 1024 * 1024) throws {
         roots = (library, machine)
         self.backend = backend
@@ -100,11 +100,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         textCache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont), backend: backend,
                               maximumBytes: textCacheBytes, synchronous: true, log: log)
         cache = ThumbnailCache(folder: cacheFolder, maximumBytes: memoryBytes)
-        if let mediaRoot, let existing = try? LocalFiles.existingMediaPaths(mediaRoot: mediaRoot) {
-            missing = MediaResolver.missingIds(library: library, machine: machine, existingPaths: existing)
-        } else {
-            missing = []
-        }
+        // Spec 8 §9 — the missing set the control loop works out, by the same rule (Spec 3 §6).
+        missing = LocalFiles.missingMedia(library: library, machine: machine, folders: media)
         // Spec 4 §5 — allocated at load: the scratch stack texture and the fixed pool of thumbnail textures.
         scratch = backend.makeTexture(TextureDescriptor(role: .stack, size: size, label: "thumbnail stack"))
         var pool: [TextureHandle] = []
@@ -327,8 +324,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// Spec 4 §5 — "Poster frame ... For offset boxes and thumbnails".
     private func posterSource(for content: ContentInstance?, roots: (library: Library, machine: Machine)) -> SlotResolver.PixelSource? {
         guard let media = content?.media, !media.missing, !missing.contains(media.ref),
-              let entry = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine)?.entry else { return nil }
-        let poster = posters.poster(for: entry)
+              let resolved = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine) else { return nil }
+        let entry = resolved.entry
+        let poster = posters.poster(for: entry, tier: resolved.tier)
         guard !poster.isNone else { return nil }
         return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))
     }

@@ -44,7 +44,11 @@ public protocol SourceFactory: AnyObject, Sendable {
 /// Spec 4 §5 — "Poster frame ... 1 per pool item, loaded on demand. For offset
 /// boxes and thumbnails." `.none` when the item has no poster.
 public protocol PosterProvider: AnyObject, Sendable {
-    func poster(for entry: MediaEntry) -> TextureHandle
+    /// Spec 4 §5 — the poster of an index entry, from the tier that holds it:
+    /// its `poster` path is "relative to the same folder as its `path`" (Spec 8
+    /// §5), the media root for library media and `machine/media/` for the
+    /// machine's own.
+    func poster(for entry: MediaEntry, tier: MediaTier) -> TextureHandle
 }
 
 /// Spec 4 §8 — one cache entry as the plan builder sees it: the line textures

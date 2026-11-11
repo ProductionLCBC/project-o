@@ -33,7 +33,7 @@ final class MediaIdentityTests: XCTestCase {
     func test_mediaIdsAreTheHashOfTheFixtureFiles() throws {
         let dawn = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("backgrounds/dawn.mp4").path))
         XCTAssertEqual(MediaID.sha256(of: dawn), F.dawn)
-        let announcement = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("local/announcement.png").path))
+        let announcement = try XCTUnwrap(FileManager.default.contents(atPath: F.machineMediaRoot.appendingPathComponent("announcement.png").path))
         XCTAssertEqual(MediaID.sha256(of: announcement), F.announcement)
     }
 

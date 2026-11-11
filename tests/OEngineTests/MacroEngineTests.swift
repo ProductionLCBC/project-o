@@ -33,7 +33,7 @@ final class MacroEngineTests: XCTestCase {
     }
 
     override func setUpWithError() throws {
-        engine = try HeadlessEngine(library: Self.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: Self.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
     }
 
     // MARK: - From a key and from OSC

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://project-o.lcbcchurch.com/schemas/media-index.schema.json",
   "title": "media-index.json",
-  "description": "Spec 1 §7 — the library index: entries (id, path, kind, size, modified, durationMs, fps, width, height, hasAudio, hasAlpha, codec, poster, defaults, addedAt, folder; tracks and crossfadeMs for audio sets) and the replaced map that replace media records.",
+  "description": "Spec 1 §7 — the library index: entries (id, path, kind, size, modified, durationMs, fps, width, height, hasAudio, hasAlpha, codec, poster, defaults, addedAt, folder; deletedAt once media delete trashed the file, Spec 8 §6; tracks and crossfadeMs for audio sets) and the replaced map that media replace and the walk record (Spec 8 §4 and §6).",
   "type": "object",
   "required": ["schema", "app", "kind", "entries", "replaced"],
   "properties": {
@@ -52,6 +52,7 @@
         },
         "addedAt": { "type": ["string", "null"] },
         "folder": { "type": ["string", "null"] },
+        "deletedAt": { "type": ["string", "null"] },
         "tracks": { "type": "array", "items": { "$ref": "#/$defs/mediaId" } },
         "crossfadeMs": { "type": "integer", "minimum": 0 }
       }

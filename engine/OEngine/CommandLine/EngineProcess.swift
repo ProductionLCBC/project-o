@@ -31,6 +31,8 @@ public struct LoadedRoots: Sendable {
     public var libraryRoot: URL
     public var machineRoot: URL
     public var mediaRoot: URL
+    /// Spec 8 §2 — the media root and `machine/media/`, which locations read against.
+    public var media: MediaFolders
     public var libraryReport: ValidationReport
     public var machineReport: ValidationReport
     public var librarySnapshot: RootSnapshot
@@ -41,15 +43,18 @@ public struct LoadedRoots: Sendable {
         let machineSnapshot = try LocalFiles.snapshot(ofRoot: machineRoot)
         let (library, libraryReport) = Loader.library(from: librarySnapshot)
         let (machine, machineReport) = Loader.machine(from: machineSnapshot)
-        let mediaRoot = URL(fileURLWithPath: machine.settings.mediaRoot, relativeTo: machineRoot).standardizedFileURL
-        return LoadedRoots(library: library, machine: machine, libraryRoot: libraryRoot, machineRoot: machineRoot, mediaRoot: mediaRoot,
+        let media = MediaFolders.of(machineRoot: machineRoot, settings: machine.settings)
+        let mediaRoot = media.mediaRoot ?? URL(fileURLWithPath: machine.settings.mediaRoot, relativeTo: machineRoot).standardizedFileURL
+        return LoadedRoots(library: library, machine: machine, libraryRoot: libraryRoot, machineRoot: machineRoot, mediaRoot: mediaRoot, media: media,
                            libraryReport: libraryReport, machineReport: machineReport,
                            librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
     }
 
     public var issueLines: [String] { libraryReport.lines + machineReport.lines }
     public var hasErrors: Bool { (libraryReport.issues + machineReport.issues).contains { $0.severity == .error } }
-    public var mediaIDs: Set<String> { Set(library.mediaIndex.entries.map(\.id) + machine.mediaLocal.entries.map(\.id)) }
+    /// Spec 2 §2 — the ids an abbreviated hash expands against: every id the
+    /// two indexes name, their `replaced` maps included (Spec 8 §2).
+    public var mediaIDs: Set<String> { MediaResolver.knownIds(library: library.mediaIndex, machine: machine.mediaLocal) }
 }
 
 /// Spec 4 §15 — the `oengine` process: the Metal backend, a display sink per
@@ -146,7 +151,7 @@ public final class EngineProcess: @unchecked Sendable {
         // Sources, posters, text, variables (Spec 4 §6, §8). Spec 6 §4 — the bundled fonts are registered "at
         // launch and before the first raster".
         let sourceFactory = MediaSourceFactory(backend: backend, log: log)
-        let posters = ImagePosterProvider(backend: backend, mediaRoot: roots.mediaRoot, log: log)
+        let posters = ImagePosterProvider(backend: backend, media: roots.media, log: log)
         FontLibrary.shared.register(log: log)
         textCache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont), backend: backend, log: log)
         let variables = VariableProvider(settings: machine.settings)
@@ -161,7 +166,7 @@ public final class EngineProcess: @unchecked Sendable {
         }
         audio = system
 
-        engine = try Engine(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, clock: master,
+        engine = try Engine(library: library, machine: machine, media: roots.media, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
                             variables: variables, audio: system, log: log)
         // Spec 5 §2 — edits are written to the roots they were loaded from.
@@ -171,7 +176,7 @@ public final class EngineProcess: @unchecked Sendable {
         watcher = DiskWatcher(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot) { control.requestScan() }
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
-            engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: roots.mediaRoot, backend: backend, posters: posters,
+            engine.thumbnails = try ThumbnailService(library: library, machine: machine, media: roots.media, backend: backend, posters: posters,
                                                      variables: variables, cacheFolder: roots.machineRoot.appendingPathComponent("thumbnails"), log: log)
         } catch {
             log.error("thumbnails are off: \(error)")
@@ -279,9 +284,9 @@ public final class EngineProcess: @unchecked Sendable {
         case ("channel", "state"):
             return state.channels[number].map { OSCFeedback.channelState(number, OSCFeedbackDeriver.feedbackState(of: $0.content)) }
         case ("channel", "content"):
-            let library = engine.control.publishedRoots.library
+            let roots = engine.control.publishedRoots
             return state.channels[number].map {
-                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: library))
+                OSCFeedback.channelContent(number, kind: $0.content.kind, label: OSCFeedbackDeriver.label(of: $0.content, library: roots.library, machine: roots.machine))
             }
         case ("lock", ""):
             return state.channels[number].map { OSCFeedback.lock(number, locked: $0.lock) }

@@ -2,6 +2,7 @@
 
 import Foundation
 import OCore
+import OFormats
 
 /// Spec 4 §14 — "the engine is constructed with its backend, its clock and its
 /// sinks injected, so tests can run it headless with a software clock and a
@@ -39,16 +40,16 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     /// The harness over the recording backend and the fakes: no GPU, no decoder.
-    public convenience init(library: Library, machine: Machine, mediaRoot: URL?, backend: RecordingBackend = RecordingBackend(),
+    public convenience init(library: Library, machine: Machine, media: MediaFolders, backend: RecordingBackend = RecordingBackend(),
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
-        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, sourceFactory: FakeSourceFactory(),
+        try self.init(library: library, machine: machine, media: media, backend: backend, sourceFactory: FakeSourceFactory(),
                       posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock)
     }
 
     /// The harness over a Metal backend with the real sources, posters and
     /// text cache (rasterizing synchronously), so a tick renders for real and
     /// the capturing sinks read the pixels back.
-    public convenience init(library: Library, machine: Machine, mediaRoot: URL, metal: MetalBackend,
+    public convenience init(library: Library, machine: Machine, media: MediaFolders, metal: MetalBackend,
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, thumbnailFolder: URL? = nil) throws {
         let log = EngineLog(category: "harness")
         // Spec 6 §4 — the bundled fonts, registered before the first raster as the engine process does.
@@ -57,15 +58,15 @@ public final class HeadlessEngine: @unchecked Sendable {
         // Spec 4 §11 — one graph per device: the software factory hands out a pullable
         // device per key; an `sdiEmbedded` output's feed has no card here and consumes silently.
         let factory = SoftwareAudioDeviceFactory()
-        let posters = ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log)
-        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
+        let posters = ImagePosterProvider(backend: metal, media: media, log: log)
+        try self.init(library: library, machine: machine, media: media, backend: metal,
                       sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: posters,
                       text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
                       audio: AudioSystem(outputs: machine.audioOutputs, factory: factory, log: log), wallClock: wallClock, log: log)
         audioFactory = factory
         // Spec 4 §10 — the thumbnail job over the same posters and variables, its cache in a folder of the test's choosing.
         let folder = thumbnailFolder ?? FileManager.default.temporaryDirectory.appendingPathComponent("oengine-thumbnails-\(UUID().uuidString)")
-        engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal, posters: posters,
+        engine.thumbnails = try ThumbnailService(library: library, machine: machine, media: media, backend: metal, posters: posters,
                                                  variables: variables, cacheFolder: folder, log: log)
         engine.audio?.start()
         for sink in sinks.values {
@@ -80,7 +81,7 @@ public final class HeadlessEngine: @unchecked Sendable {
         }
     }
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, sourceFactory: any SourceFactory,
+    public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, sourceFactory: any SourceFactory,
                 posters: any PosterProvider, text: any TextProvider, audio: AudioSystem? = nil,
                 wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, log: EngineLog = EngineLog(category: "harness")) throws {
         self.backend = backend
@@ -91,7 +92,7 @@ public final class HeadlessEngine: @unchecked Sendable {
         var sinks: [Int: CapturingSink] = [:]
         for output in machine.outputs { sinks[output.number] = CapturingSink(output: output.number) }
         self.sinks = sinks
-        engine = try Engine(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, clock: clock,
+        engine = try Engine(library: library, machine: machine, media: media, backend: backend, clock: clock,
                             sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
                             variables: variables, audio: audio, log: log)
         let backendRef = backend
@@ -119,7 +120,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// the library as it is now; `client` names the sender for typing (§5).
     @discardableResult
     public func send(_ text: String, source: SourceKind = .osc, client: String? = nil) -> Rejection? {
-        let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
+        let ids = MediaResolver.knownIds(library: engine.library.mediaIndex, machine: engine.machine.mediaLocal)
         switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
         case .success(let guarded):
             engine.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: source), commands: [guarded], client: client))
@@ -133,7 +134,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// Several commands in their text forms as one group (Spec 2 §8, Spec 5 §5).
     @discardableResult
     public func send(group texts: [String], source: SourceKind = .osc, client: String? = nil) -> Rejection? {
-        let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
+        let ids = MediaResolver.knownIds(library: engine.library.mediaIndex, machine: engine.machine.mediaLocal)
         var commands: [GuardedCommand] = []
         for text in texts {
             switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
@@ -204,8 +205,8 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     public func posterHandle(for ref: String) -> TextureHandle {
-        guard let entry = MediaResolver.resolve(ref, library: engine.library, machine: engine.machine)?.entry else { return .none }
-        return posters.poster(for: entry)
+        guard let resolved = MediaResolver.resolve(ref, library: engine.library, machine: engine.machine) else { return .none }
+        return posters.poster(for: resolved.entry, tier: resolved.tier)
     }
 
     public func sources(onChannel channel: Int) -> [InstanceHandle] {

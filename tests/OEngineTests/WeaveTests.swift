@@ -12,7 +12,7 @@ import OCore
 /// earliest tick at which both fields exist.
 final class WeavePlanTests: XCTestCase {
     func test_theInterlacedSinkIsDueOnTheSecondFieldsTickAndNamesBothFields() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.pacingMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.pacingMachine(), media: EngineFixtures.media)
         engine.send("channel 2 write text \"x\"")
         engine.tick()   // tick 0: the first field
         var plan = try XCTUnwrap(engine.lastPlan)
@@ -40,7 +40,7 @@ final class WeavePlanTests: XCTestCase {
         var machine = try EngineFixtures.pacingMachine()
         // Spec 3: the blackout runs over the blackout transition of the first output showing the stack, so every output gets the fade.
         for index in machine.outputs.indices { machine.outputs[index].transitions = OutputTransitions(switch: 2, blackout: 3) }
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, media: EngineFixtures.media)
         engine.send("stack 1 blackout on")
         engine.tick()            // tick 0: the fade starts
         engine.tick(count: 31)   // tick 31: a second field's tick, part way through the 1000 ms fade
@@ -136,7 +136,7 @@ final class WeaveTests: XCTestCase {
             machine.outputs[index].format.width = 480
             machine.outputs[index].format.height = 270
         }
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot, metal: backend)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, media: EngineFixtures.media, metal: backend)
         engine.send("channel 2 write text \"Weave\"")
         engine.tick(count: 21)                // tick 20
         engine.send("channel 2 write text \"Woven\"")   // preset 1's body box dissolves over 250 ms: the picture changes every tick

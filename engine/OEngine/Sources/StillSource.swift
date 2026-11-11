@@ -5,6 +5,7 @@ import CoreGraphics
 import ImageIO
 import Metal
 import OCore
+import OFormats
 import Synchronization
 
 public enum StillError: Error {
@@ -103,23 +104,25 @@ public final class StillSource: ContentSource, @unchecked Sendable {
 /// premultiplied sRGB bitmap and uploaded as an sRGB-typed texture.
 public final class ImagePosterProvider: PosterProvider, @unchecked Sendable {
     private let backend: MetalBackend
-    private let mediaRoot: URL
+    private let media: MediaFolders
     private let log: EngineLog?
     private let lock = NSLock()
     private var handles: [String: TextureHandle] = [:]
 
-    public init(backend: MetalBackend, mediaRoot: URL, log: EngineLog? = nil) {
+    public init(backend: MetalBackend, media: MediaFolders, log: EngineLog? = nil) {
         self.backend = backend
-        self.mediaRoot = mediaRoot
+        self.media = media
         self.log = log
     }
 
-    public func poster(for entry: MediaEntry) -> TextureHandle {
-        guard let path = entry.poster else { return .none }
+    public func poster(for entry: MediaEntry, tier: MediaTier) -> TextureHandle {
+        // Spec 8 §5 — "The entry's `poster` holds that path, relative to the same folder as its `path`".
+        guard let path = entry.poster, let location = MediaLocation(tier == .machine ? .machineMedia : .mediaRoot, path),
+              let url = media.url(for: location) else { return .none }
         lock.lock()
         defer { lock.unlock() }
         if let handle = handles[entry.id] { return handle }
-        let handle = load(mediaRoot.appendingPathComponent(path), label: "poster " + entry.id.prefix(15))
+        let handle = load(url, label: "poster " + entry.id.prefix(15))
         handles[entry.id] = handle
         return handle
     }

@@ -107,17 +107,20 @@ extension Fold {
             // `gainOverride`, `syncOffsetMs` taken from the content expression,
             // falling back to the pool item's defaults, then to none.
             // `endBehavior` starts as `loop` when the expression says loop,
-            // otherwise `hold`." Spec 1 §7 — the machine index is consulted
-            // first, then the library index. The expression's `loop` can ask
-            // for a loop, not refuse the pool's (`end hold` does that).
-            let pool = (context.machine.mediaLocal.entry(m.ref) ?? context.library.mediaIndex.entry(m.ref))?.defaults
+            // otherwise `hold`." As Spec 8 corrected it, the defaults are "of
+            // the pool item the ref resolves to (Spec 8 §2)": through both
+            // indexes' `replaced` maps, then the machine index first (Spec 1
+            // §7). The expression's `loop` can ask for a loop, not refuse the
+            // pool's (`end hold` does that).
+            let found = context.media(m.ref)
+            let pool = found.entry?.defaults
             let loop = m.loop || (pool?.loop ?? false)
             restart = current.media?.ref == m.ref
             newContent = .media(MediaInstance(
                 ref: m.ref, inMs: m.inMs ?? pool?.trimInMs, outMs: m.outMs ?? pool?.trimOutMs, loop: loop,
                 gainOverride: m.gain ?? pool?.gain, syncOffsetMs: m.syncOffsetMs ?? pool?.syncOffsetMs,
                 startedAtFrame: frame, transport: .playing,
-                endBehavior: loop ? .loop : .hold, missing: context.missing.contains(m.ref)))
+                endBehavior: loop ? .loop : .hold, missing: found.missing))
         case .text(let fields):
             // Spec 3 §4 — Text: "If the fields and the provenance are identical
             // to the current ones, the result is `noop` ... Identical fields
@@ -142,7 +145,7 @@ extension Fold {
                     channel.content = .slide(updated)
                 }
             } else {
-                newContent = .slide(SlideInstance(ref: ref, build: target, missing: context.missing.contains(ref)))
+                newContent = .slide(SlideInstance(ref: ref, build: target, missing: context.media(ref).missing))
             }
         case .input(let input):
             // Spec 3 §4 — Input: "writing the same input is a `noop`."

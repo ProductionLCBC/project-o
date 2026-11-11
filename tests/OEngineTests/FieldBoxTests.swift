@@ -141,7 +141,7 @@ final class FieldBoxTests: XCTestCase {
 /// Area 6: Static boxes.
 final class StaticBoxTests: XCTestCase {
     func engine() throws -> HeadlessEngine {
-        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
     }
 
     /// Stack 2's `[Time]` box, drawn or not.

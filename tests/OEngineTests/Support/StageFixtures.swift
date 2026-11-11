@@ -78,7 +78,7 @@ enum StageFixtures {
         machine.playlists.append(contentsOf: playlists)
         if let preset { machine.stacks[1].slots[0].preset = preset.number }
         edit(&library, &machine)
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: E.mediaRoot)
+        return try HeadlessEngine(library: library, machine: machine, media: E.media)
     }
 }
 

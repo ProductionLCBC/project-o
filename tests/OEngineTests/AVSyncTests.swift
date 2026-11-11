@@ -1,5 +1,6 @@
 import XCTest
 import OCore
+import OFormats
 @testable import OEngine
 
 /// Spec 4 §16, Audio — "the clock reading drives frame selection within one
@@ -16,7 +17,7 @@ final class AVSyncTests: XCTestCase {
         library.mediaIndex.add(MediaEntry(id: id, path: url.lastPathComponent, kind: .video, size: 1, durationMs: 3000, fps: FrameRate(num: 30),
                                           width: 320, height: 180, hasAudio: true, codec: "avc1"))
         let engine = try HeadlessEngine(library: library, machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                                        mediaRoot: ClipFixtures.folder, metal: metal)
+                                        media: MediaFolders(mediaRoot: ClipFixtures.folder), metal: metal)
         engine.send("channel 1 write media \(id)")
         engine.tick()
         // Wait for the first decoded frame; the audio clock has not moved yet.

@@ -11,7 +11,7 @@ import OCore
 /// and the time. On the playlist's last cue the +1 box is empty."
 final class ConfidenceStackTests: XCTestCase {
     func engine() throws -> HeadlessEngine {
-        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
     }
 
     func test_theFirstRunConfidenceStackShowsTheCurrentAndNextLyricAndTheTime() throws {

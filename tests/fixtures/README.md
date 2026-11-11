@@ -21,16 +21,20 @@ uuid, §5), list 7 (*Doxology*, Thomas Ken, 1674; a timecode trigger, a missing 
 write, a macro call), and `media-index.json`.
 
 `library/media/` holds synthetic media only: `backgrounds/dawn.mp4` (64×36, eight frames of a
-colour wash, written by AVAssetWriter), `backgrounds/cross.png`, `local/cross-fast.png` (the same
-bytes at a second path: one identity, Spec 1 §4), `local/announcement.png` (local-only media,
-indexed in the machine root), a poster frame, and `slides/welcome.oslide` (the §7 envelope). The
-index also lists `backgrounds/mountains.mp4`, which does not exist: the missing state of §7.
+colour wash, written by AVAssetWriter), `backgrounds/cross.png`, dawn's poster frame at
+`.posters/<hex>-0.png` (Spec 8 §5: the frame at the default in-point, named by the hash and the
+in-point, beside its media), and `slides/welcome.oslide` (the §7 envelope). The index also lists
+`backgrounds/mountains.mp4`, whose video and poster (`.posters/<hex>-1500.png`, at its 1500 ms
+in-point) are both absent: the missing state of §7.
 
 `machine/` is the machine root: settings, stacks (Spec 6 §9's: Main holds channels 1 and 2,
 Confidence channels 2 and 3, neither with a default preset, so each slot takes its channel's
 preset: the confidence stack draws Preset 1's `"2"` layout for channel 2 and the Clock for channel
 3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
-entry, the machine index with a path override, the machine-level macro 2 (Preshow, which names a
+entry, the machine index with a path override, `media/` (the machine's own media folder, Spec 8 §2:
+`announcement.png`, local-only media indexed in the machine root, and `cross-fast.png`, the same
+bytes as `backgrounds/cross.png` and the target of cross's override: one identity, Spec 1 §4), the
+machine-level macro 2 (Preshow, which names a
 stack and an output), three playlists named from their titles (Spec 7 §8: "Sunday", dated, in
 `sunday.json`; "Sunday Night", which links list 42 twice, for the pointer tests; and "Sunday
 2026-11-01", the archived copy of "Sunday"), each item with the uuid Spec 7 §3's `KIND:KEY:N`

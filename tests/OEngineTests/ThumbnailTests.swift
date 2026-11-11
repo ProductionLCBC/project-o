@@ -27,8 +27,8 @@ final class ThumbnailTests: XCTestCase {
         let library = try library ?? EngineFixtures.library()
         let machine = try machine ?? EngineFixtures.spikeMachine()
         let log = EngineLog(category: "test-thumbnails")
-        return try ThumbnailService(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, backend: metal,
-                                    posters: ImagePosterProvider(backend: metal, mediaRoot: EngineFixtures.mediaRoot, log: log),
+        return try ThumbnailService(library: library, machine: machine, media: EngineFixtures.media, backend: metal,
+                                    posters: ImagePosterProvider(backend: metal, media: EngineFixtures.media, log: log),
                                     variables: VariableProvider(settings: machine.settings, wallClock: HeadlessEngine.fixedWallClock),
                                     cacheFolder: folder, log: log)
     }
@@ -239,7 +239,7 @@ final class ThumbnailTests: XCTestCase {
     /// list's cues for the thumbnail stack, so the soak exercises the job".
     func test_theEngineWarmsTheLiveListOnTheThumbnailStack() throws {
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                                        mediaRoot: EngineFixtures.mediaRoot, metal: metal, thumbnailFolder: folder)
+                                        media: EngineFixtures.media, metal: metal, thumbnailFolder: folder)
         let service = try XCTUnwrap(engine.engine.thumbnails)
         XCTAssertTrue(engine.engine.pressure.caches.contains { $0 === service }, "registered for memory pressure")
         engine.tick()

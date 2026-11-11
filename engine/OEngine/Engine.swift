@@ -3,6 +3,7 @@
 
 import Foundation
 import OCore
+import OFormats
 import Synchronization
 
 /// The engine assembled from its parts. One `Engine` owns the control loop,
@@ -64,7 +65,7 @@ public final class Engine: @unchecked Sendable {
     /// Signalled by the control thread when it leaves its loop.
     private let controlDone = DispatchSemaphore(value: 0)
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
+    public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
                 text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
@@ -92,7 +93,7 @@ public final class Engine: @unchecked Sendable {
         audio?.onRecovery = { [watchdog] recovery in watchdog.recordRecovery(recovery) }
         pressure = MemoryPressureMonitor(caches: [text as? ShrinkableCache].compactMap { $0 }, log: log)
         thermal = ThermalMonitor(log: log)
-        control = ControlLoop(library: library, machine: machine, pacing: pacing, mediaRoot: mediaRoot, backend: backend,
+        control = ControlLoop(library: library, machine: machine, pacing: pacing, media: media, backend: backend,
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,

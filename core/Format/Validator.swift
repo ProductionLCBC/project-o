@@ -17,8 +17,12 @@ public enum IssueCode: String, Equatable, Sendable {
     case missingMacro, missingList, missingStack, missingOutput, missingAudioOutput, missingInput, missingBuiltIn
     // Numbers, slots and boxes (§8, §3, §2; Spec 6 §2, §3).
     case duplicateNumber, duplicateSlot, slotOutOfRange, boxOffsetOutOfRange
-    // Media (§7, §8) and fonts (§7).
+    // Media (§7, §8; Spec 8 §2, §6) and fonts (§7).
     case unknownMedia, missingMedia, fontNotInstalled
+    // Spec 8 §2 and §6 — a referenced item that `media delete` trashed; a
+    // `replaced` chain that comes back to an id it passed; a media root,
+    // override or root where media may not live, or a path that leaves its folder.
+    case deletedMedia, mediaLoop, mediaPlace
     // Commands (§6, Spec 2 §7, Spec 2 §5).
     case unknownCommand, invalidCommand, guardOnCue, macroCycle
     // Playlists (§3; Spec 7 §3).
@@ -91,17 +95,28 @@ public struct ValidationReport: Equatable, Sendable {
     }
 }
 
-/// What the validator can only learn from outside the roots: which media
-/// files exist (Spec 1 §7, missing state), which fonts are installed and
-/// which are bundled with the engine (Spec 6 §4). Nil means unknown, and that
-/// check is skipped.
+/// What the validator can only learn from outside the roots: what is known
+/// of the file at each media location (Spec 8 §2, presence), where the media
+/// folders are and whether media may live there (Spec 8 §2, choice M-8),
+/// which fonts are installed and which are bundled with the engine (Spec 6
+/// §4). Nil means unknown, and that check is skipped.
 public struct ValidationEnvironment: Sendable {
-    public var existingMediaPaths: Set<String>?
+    public var mediaState: (@Sendable (MediaLocation) -> MediaFileState)?
+    /// The media root and `machine/media/` as absolute, standardized paths,
+    /// with the places check that applies to them and to absolute overrides.
+    public var mediaPlaces: MediaPlaces?
+    public var mediaRootPath: String?
+    public var machineMediaPath: String?
     public var installedFonts: Set<String>?
     public var bundledFonts: Set<String>
 
-    public init(existingMediaPaths: Set<String>? = nil, installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
-        self.existingMediaPaths = existingMediaPaths
+    public init(mediaState: (@Sendable (MediaLocation) -> MediaFileState)? = nil, mediaPlaces: MediaPlaces? = nil,
+                mediaRootPath: String? = nil, machineMediaPath: String? = nil,
+                installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
+        self.mediaState = mediaState
+        self.mediaPlaces = mediaPlaces
+        self.mediaRootPath = mediaRootPath
+        self.machineMediaPath = machineMediaPath
         self.installedFonts = installedFonts
         self.bundledFonts = bundledFonts
     }
@@ -109,8 +124,9 @@ public struct ValidationEnvironment: Sendable {
 
 /// Spec 1 §8 — "references to numbers that do not exist (a cue writing a
 /// deleted channel, a slot naming a missing preset), duplicate channels in a
-/// stack, duplicate numbers within a type, media ids with no path, and fonts
-/// not installed." Plus §6's command flags, Spec 2 §5's macro cycles and
+/// stack, duplicate numbers within a type, ... media a reference names that is
+/// unknown, missing or deleted once resolved (Spec 8 §2), and fonts neither
+/// installed nor bundled." Plus §6's command flags, Spec 2 §5's macro cycles and
 /// §3's playlist names. A library validates alone; with a machine, the
 /// references that "meet by number" are checked too.
 public enum Validator {
@@ -146,6 +162,9 @@ struct Checks {
     let machine: Machine?
     let environment: ValidationEnvironment
     var report: ValidationReport
+    /// Spec 8 §9 — the media ids the commands name, for "a deleted item only
+    /// while something references it".
+    var referencedMedia: [String: String] = [:]
 
     mutating func warn(_ code: IssueCode, _ subject: String, _ message: String) {
         report.add(.warning, code, subject: subject, message: message)
@@ -400,8 +419,15 @@ struct Checks {
             command.forEachReference(of: type) { number in reference(type, number, from: subject) }
             condition?.forEachReference(of: type) { number in reference(type, number, from: subject) }
         }
-        if let ref = command.mediaRef, MediaResolver.resolve(ref, library: library, machine: machine) == nil {
-            warn(.unknownMedia, subject, "\(ref) is in neither media index")
+        // Spec 1 §8 — "media a reference names that is unknown, missing or
+        // deleted once resolved (Spec 8 §2)": unknown here, per place; deleted
+        // and missing once every reference is known (`media()`).
+        if let ref = command.mediaRef {
+            if MediaResolver.resolve(ref, library: library, machine: machine) == nil {
+                warn(.unknownMedia, subject, "\(ref) is in neither media index")
+            } else if referencedMedia[ref] == nil {
+                referencedMedia[ref] = subject
+            }
         }
         // Spec 7 §3 — "A title held in a macro, a key binding, a scheduler entry
         // or a cue is looked up when it runs ... and the reference report flags
@@ -476,12 +502,62 @@ struct Checks {
 
     // MARK: - Media and fonts
 
-    /// Spec 1 §7 — "an id whose path no longer exists ... is listed by pre-flight."
+    /// Spec 1 §7 — "an id whose file no longer exists, no longer holds its
+    /// bytes or was deleted (Spec 8 §6) stays in the index, is shown with a
+    /// missing badge wherever it is referenced, and is listed by pre-flight";
+    /// Spec 1 §8 — "media a reference names that is unknown, missing or
+    /// deleted once resolved"; Spec 8 §2 and §9:
+    ///
+    /// - a `replaced` chain that comes back to an id it passed, once per loop
+    ///   ("the reference report names the loop");
+    /// - an entry whose path would leave its folder;
+    /// - a missing entry, once per id; an entry a `replaced` map leads from is
+    ///   left out, since what names it resolves elsewhere;
+    /// - "a deleted item only while something references it";
+    /// - a media root, `machine/media/` or absolute override where media may
+    ///   not live ("the reference report lists an override that points elsewhere").
     mutating func media() {
-        guard let existing = environment.existingMediaPaths else { return }
-        for id in MediaResolver.missingIds(library: library, machine: machine, existingPaths: existing).sorted() {
-            let path = MediaResolver.resolve(id, library: library, machine: machine)?.path ?? ""
-            warn(.missingMedia, id, "\(path) is not in the media root")
+        let local = machine?.mediaLocal
+        var loops: Set<[String]> = []
+        for id in MediaResolver.knownIds(library: library.mediaIndex, machine: local).sorted() {
+            guard let loop = MediaResolver.chain(from: id, library: library.mediaIndex, machine: local).loop else { continue }
+            // One line per loop, whichever id it was met from.
+            guard let first = loop.min(), let at = loop.firstIndex(of: first) else { continue }
+            let canonical = Array(loop[at...] + loop[..<at])
+            if loops.insert(canonical).inserted {
+                warn(.mediaLoop, first, "the replaced maps loop: " + (canonical + [first]).joined(separator: " → "))
+            }
+        }
+        var mapped = Set(library.mediaIndex.replaced.keys)
+        if let local { mapped.formUnion(local.replaced.keys) }
+        var entries: [(MediaEntry, MediaTier)] = library.mediaIndex.entries.map { ($0, .library) }
+        entries += (local?.entries ?? []).map { ($0, .machine) }
+        for (entry, tier) in entries where !entry.isDeleted {
+            let (location, overridden) = MediaResolver.location(of: entry, tier: tier, overrides: local?.overrides ?? [:])
+            if location == nil, overridden || !entry.path.isEmpty {
+                warn(.mediaPlace, entry.id, "\(overridden ? "its override" : "its path") \(local?.overrides[entry.id] ?? entry.path) leaves its folder")
+                continue
+            }
+            if case .absolute? = location?.folder, let places = environment.mediaPlaces, let path = location?.path,
+               let problem = places.problem(with: path) {
+                warn(.mediaPlace, entry.id, "its override \(path) \(problem.description), where media may not live; it isn't read")
+                continue
+            }
+            guard let state = environment.mediaState, !mapped.contains(entry.id), let location else { continue }
+            if MediaResolver.presence(of: entry, at: location, state: state(location)) == .missing {
+                warn(.missingMedia, entry.id, "\(location.path) doesn't hold this item's file")
+            }
+        }
+        for (ref, subject) in referencedMedia.sorted(by: { $0.key < $1.key }) {
+            guard let resolved = MediaResolver.resolve(ref, library: library, machine: machine), resolved.entry.isDeleted else { continue }
+            warn(.deletedMedia, resolved.id, "deleted, and still referenced by \(subject)")
+        }
+        if let places = environment.mediaPlaces {
+            for (name, path) in [("the media root", environment.mediaRootPath), ("machine/media/", environment.machineMediaPath)] {
+                if let path, let problem = places.problem(with: path) {
+                    warn(.mediaPlace, name, "\(path) \(problem.description), where media may not live; nothing there is read")
+                }
+            }
         }
     }
 
