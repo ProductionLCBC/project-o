@@ -361,6 +361,11 @@ public enum OSCFeedback {
         OSCMessage("/o/timer/\(timer)", [.string(formatted), .int32(Int32(clamping: ms))])
     }
 
+    /// Spec 6 §8 — "An unset timer sends `s:""` alone."
+    public static func timerUnset(_ timer: Int) -> OSCMessage {
+        OSCMessage("/o/timer/\(timer)", [.string("")])
+    }
+
     public static func popup(_ popup: Int, text: String) -> OSCMessage {
         OSCMessage("/o/popup/\(popup)", [.string(text)])
     }

@@ -130,6 +130,40 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertEqual(again.state, outcome.state)
     }
 
+    /// Spec 6 §6 — "A timer command that would change nothing yields `noop`
+    /// (Spec 2 §8)", and Spec 6 §7's pending clear, which a `popup N set`
+    /// replaces or cancels: the timers and the pending clears are the
+    /// engine's, outside ShowState (Spec 3 §2), so the engine settles the
+    /// results of the commands it acts on as the group runs, in order, and a
+    /// macro's own line still follows what its commands did (Spec 2 §5).
+    func test_theEngineSettlesTheResultsOfTheCommandsItActsOn() throws {
+        var library = F.library
+        library.macros.append(Macro(number: 3, commands: [GuardedCommand(.timerStart(timer: 1)), GuardedCommand(.timerStart(timer: 1))]))
+        var seen: [Command] = []
+        let settle: (Command, CommandSource, CommandResult) -> CommandResult = { command, source, result in
+            seen.append(command)
+            switch command {
+            case .timerStart: return seen.count == 1 ? .ok : .noop
+            case .popupSet: return .ok
+            default: return result
+            }
+        }
+        var state = F.fresh()
+        state.popups[1] = "Same"
+        let commands: [Command] = [.timerStart(timer: 1), .macro(3), .popupSet(popup: 1, text: "Same", clearAfterMs: 30_000)]
+        let context = F.context(frame: 100, source: .engine, library: library, machine: F.machine)
+        let outcome = try CommandRunner.run(group(commands), state: state, context: context, settle: settle).get()
+        XCTAssertEqual(outcome.executed.map(\.command), [.timerStart(timer: 1), .macro(3), .timerStart(timer: 1), .timerStart(timer: 1),
+                                                         .popupSet(popup: 1, text: "Same", clearAfterMs: 30_000)])
+        XCTAssertEqual(results(outcome), [.ok, .noop, .noop, .noop, .ok], "the macro's line is noop when every inner command was")
+        XCTAssertEqual(outcome.executed[4].effects, [.noop(.popupSet(popup: 1, text: "Same", clearAfterMs: 30_000))],
+                       "the projection's own effects stand")
+        XCTAssertEqual(seen.count, 4, "each command it acts on, once, in order; the macro's own line follows its commands")
+        // Without the engine every timer command passes through as `ok` (Spec 3 §6).
+        let plain = try CommandRunner.run(group(commands), state: state, context: context).get()
+        XCTAssertEqual(results(plain), [.ok, .ok, .ok, .ok, .noop])
+    }
+
     /// Spec 3 §8 — "A macro fired by a cue inherits `cue` as its source kind,
     /// so lock cannot be dodged by wrapping a write in a macro." Spec 2 §9 —
     /// its inner commands carry "the cue's source and the macro's number".
