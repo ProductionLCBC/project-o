@@ -25,10 +25,13 @@ public struct ExecutedCommand: Equatable, Sendable {
     public var changes: [LibraryChange]
     public var structure: [StructureChange]
     public var warnings: [String]
+    /// Spec 2 §9 as Spec 8 §7 adds — "A `media import` result also carries
+    /// the `job` its outcomes are reported under."
+    public var job: String?
 
     public init(group: GroupID, source: CommandSource, command: Command, result: CommandResult,
                 effects: [Effect], fire: FireRecord? = nil, refusal: Rejection? = nil, inverse: Command? = nil,
-                changes: [LibraryChange] = [], structure: [StructureChange] = [], warnings: [String] = []) {
+                changes: [LibraryChange] = [], structure: [StructureChange] = [], warnings: [String] = [], job: String? = nil) {
         self.group = group
         self.source = source
         self.command = command
@@ -40,6 +43,7 @@ public struct ExecutedCommand: Equatable, Sendable {
         self.changes = changes
         self.structure = structure
         self.warnings = warnings
+        self.job = job
     }
 }
 
@@ -214,6 +218,10 @@ struct Runner {
             }
             return
         }
+        if case .media(let media) = command, media.isEdit {
+            runMediaEdit(media, group: group, source: source, fire: fire)
+            return
+        }
         var projectionContext = context
         projectionContext.source = source
         let before = state
@@ -307,6 +315,21 @@ struct Runner {
             executed.append(ExecutedCommand(group: group, source: source, command: .edit(edit), result: .blocked,
                                             effects: [], fire: fire, refusal: rejection))
         }
+    }
+
+    /// Spec 8 §2 — "`media replace`, `media delete` and their inverses are
+    /// ordinary edits". Until the edit path applies them (Area 8, after the
+    /// walk) they are refused as Spec 5 §3 refuses the edits later areas
+    /// build: `notInV1`, a `blocked` line when a cue, macro, key binding or
+    /// scheduler entry holds one, the group's rejection when sent directly.
+    mutating func runMediaEdit(_ media: MediaCommand, group: GroupID, source: CommandSource, fire: FireRecord?) {
+        let rejection = Rejection(reason: .notInV1, message: "\(media.cmd) isn't applied yet")
+        guard source.kind.holdsEdits else {
+            refused = rejection
+            return
+        }
+        executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .blocked,
+                                        effects: [], fire: fire, refusal: rejection))
     }
 
     /// The cue a navigation command fired and its `pointer` effect. A fire

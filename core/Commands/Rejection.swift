@@ -83,6 +83,9 @@ public enum RejectionReason: String, Codable, Equatable, Sendable {
     case notInV1
     /// Spec 8 §6 — `media delete` with no Trash to move the files to.
     case noTrash
+    /// Spec 8 §3 — "A `media import` sent from elsewhere names its own PATH;
+    /// one the engine can't read is rejected with `unreadable`."
+    case unreadable
     /// Spec 9 §6 — refused while the disk is full.
     case diskFull
     /// Spec 10 §12 — the lock can't be turned on before a passcode is set.

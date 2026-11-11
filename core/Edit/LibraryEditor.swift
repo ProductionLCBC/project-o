@@ -315,10 +315,13 @@ struct Editor {
         throw reject(mapped, rejection.message)
     }
 
-    /// Spec 5 §6 — the command validator's reasons as the edit path's codes.
+    /// Spec 5 §6 — the command validator's reasons as the edit path's codes;
+    /// a held media command naming an id neither index holds is a broken
+    /// reference too (check 5, "Every media id resolves to an entry in either
+    /// index", Spec 8 §2).
     static func editCode(_ reason: RejectionReason) -> RejectionReason {
         switch reason {
-        case .noSuchTarget, .noSuchReference, .unknownMedia: return .unknownReference
+        case .noSuchTarget, .noSuchReference, .unknownMedia, .unknownObject: return .unknownReference
         case .macroCycle, .macroDepth: return .cycle
         default: return .badValue
         }

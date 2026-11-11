@@ -73,6 +73,11 @@ public enum OSCMapping {
         }
         var arguments: [OSCArgument] = []
         for arg in row.args {
+            // Spec 8 §2 — a recorded body travels as one string, its canonical JSON.
+            if case .body(let keys, _) = arg.kind {
+                if let body = CommandPrinter.bodyValue(keys, object) { arguments.append(.string(JSONCanonical.line(body))) }
+                continue
+            }
             guard let value = object[arg.key] else { continue }
             switch arg.kind {
             case .int:
@@ -81,12 +86,12 @@ public enum OSCMapping {
                 arguments.append(real(value.doubleValue ?? 0))
             case .duration, .optionalDuration, .optionalKeywordSeconds:
                 arguments.append(seconds(ms: value.intValue ?? 0))
-            case .string, .optionalString, .keyword:
+            case .string, .optionalString, .keyword, .hash:
                 arguments.append(.string(value.stringValue ?? ""))
             case .flag(let word):
                 // Spec 2 §6 — "`up` follows as `s:"up"`".
                 if value.boolValue == true { arguments.append(.string(word)) }
-            case .write, .edit:
+            case .write, .edit, .body:
                 break
             }
         }

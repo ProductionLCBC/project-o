@@ -525,8 +525,10 @@ public final class ControlLoop: @unchecked Sendable {
                 if case .macro(let number) = executed.command, let refusal = executed.refusal {
                     log.warning("macro \(number) ran nothing: \(refusal.message)")
                 }
-                // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason".
-                if case .edit = executed.command, executed.result == .blocked, let refusal = executed.refusal {
+                // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason"; Spec 8 §2 —
+                // "any refusal of a media command is `blocked` with its reason and logged".
+                if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media."),
+                   executed.result == .blocked, let refusal = executed.refusal {
                     let text = CommandText.print(executed.command) ?? executed.command.cmd
                     log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
                 }

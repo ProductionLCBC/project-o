@@ -60,8 +60,19 @@ struct VocabularyRow: Sendable {
         }
     }
 
-    /// Spec 2 §2 — `argument := integer | decimal | duration | string | ref | keyword`.
+    /// Spec 2 §2 — `argument := integer | decimal | duration | string | ref |
+    /// keyword | hash | json`.
     enum Kind: Sendable {
+        /// Spec 2 §2 — "hash: `sha256:` and the hex, abbreviated to its first
+        /// 12 hex characters in the command bar as in a ref", expanded on
+        /// parse and printed in full.
+        case hash
+        /// Spec 2 §2 — "json: a JSON object or array: a structured value
+        /// (Spec 5 §4) or a recorded inverse (Spec 8 §2)". The object's
+        /// members are the command object's own keys, from `keys`; it prints
+        /// as one canonical line when any of them is present, and may be left
+        /// out when `optional`.
+        case body([String], optional: Bool)
         case int
         case decimal
         case duration(DurationText.Style)
@@ -209,6 +220,20 @@ enum Vocabulary {
         VocabularyRow("system.clearAll", target: "system", verb: .word("clearall"), lock: .passes, undo: .runtime),
         VocabularyRow("system.preflight", target: "system", verb: .word("preflight"), lock: .passes, undo: .none),
         VocabularyRow("system.snapshot", target: "system", verb: .word("snapshot"), lock: .passes, undo: .none),
+        // Spec 2 §3 as Spec 8 §2 corrected it — the media commands. "Channel lock
+        // doesn't apply to any of them, so Spec 2's lock column reads `passes`."
+        VocabularyRow("media.import", target: "media", verb: .word("import"), args: [Arg("path", .string)], lock: .passes, undo: .none),
+        VocabularyRow("media.rebuild", target: "media", verb: .word("rebuild"), lock: .passes, undo: .none),
+        VocabularyRow("media.replace", target: "media", verb: .word("replace"),
+                      args: [Arg("old", .hash), Arg("new", .hash), Arg("", .body(MediaReplaceRecord.keys, optional: true))],
+                      lock: .passes, undo: .edit),
+        VocabularyRow("media.delete", target: "media", verb: .word("delete"),
+                      args: [Arg("id", .hash), Arg("", .body(["files"], optional: true))], lock: .passes, undo: .edit),
+        VocabularyRow("media.undelete", target: "media", verb: .word("undelete"),
+                      args: [Arg("id", .hash), Arg("", .body(["files"], optional: false))], lock: .passes, undo: .edit),
+        VocabularyRow("media.unreplace", target: "media", verb: .word("unreplace"),
+                      args: [Arg("old", .hash), Arg("new", .hash), Arg("", .body(MediaReplaceRecord.keys, optional: false))],
+                      lock: .passes, undo: .edit),
     ]
     // Spec 5 §4 — the edit family: "`cmd` is `edit.` plus the verb", every
     // one an edit command (undo class `edit`), with its own parser and printer.
@@ -270,9 +295,11 @@ extension Command {
         Vocabulary.row(cmd: cmd)?.undo ?? .none
     }
 
-    /// Spec 2 §9 — "`kind` is `runtime` or `edit`".
+    /// Spec 2 §9 — "`kind` is `runtime` or `edit`"; Spec 8 §2 — "`media
+    /// replace`, `media delete` and their inverses are ordinary edits".
     public var logKind: LogKind {
         if case .edit = self { return .edit }
+        if case .media(let m) = self, m.isEdit { return .edit }
         return .runtime
     }
 }

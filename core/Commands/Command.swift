@@ -136,6 +136,8 @@ public enum Command: Codable, Equatable, Sendable {
     case systemSnapshot
     /// Spec 5 §4 — the edit family, `edit.` plus the verb.
     case edit(EditCommand)
+    /// Spec 8 §2 — the media family, `media.` plus the verb.
+    case media(MediaCommand)
     /// Spec 1 §6 — an unknown `cmd`, kept verbatim with its parameters.
     case unknown(cmd: String, fields: [String: JSONValue] = [:])
     /// Spec 1 §6 — a known `cmd` whose parameters did not decode, kept verbatim.
@@ -185,6 +187,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .systemPreflight: return "system.preflight"
         case .systemSnapshot: return "system.snapshot"
         case .edit(let e): return e.cmd
+        case .media(let m): return m.cmd
         case .unknown(let cmd, _): return cmd
         case .invalid(let cmd, _): return cmd
         }
@@ -202,7 +205,7 @@ public enum Command: Codable, Equatable, Sendable {
         "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "history.undo",
         "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot",
         "next", "previous", "cue", "undo", "redo", "macro",
-    ]).union(EditAction.commandNames)
+    ]).union(EditAction.commandNames).union(MediaCommand.commandNames)
 
     public var isUnknown: Bool {
         if case .unknown = self { return true }
@@ -354,6 +357,8 @@ public enum Command: Codable, Equatable, Sendable {
         case "system.snapshot": self = .systemSnapshot
         case let edit where edit.hasPrefix("edit."):
             self = .edit(try EditCommand(cmd: edit, fields: try Command.parameters(from: decoder)))
+        case let media where media.hasPrefix("media."):
+            self = .media(try MediaCommand(cmd: media, fields: try Command.parameters(from: decoder)))
         default:
             throw DecodingError.dataCorruptedError(forKey: Key("cmd"), in: c, debugDescription: "unknown command \(cmd)")
         }
@@ -452,6 +457,8 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(position, forKey: Key("position"))
         case .edit(let e):
             for (key, value) in e.fields { try c.encode(value, forKey: Key(key)) }
+        case .media(let m):
+            for (key, value) in m.fields { try c.encode(value, forKey: Key(key)) }
         }
     }
 
@@ -535,7 +542,7 @@ public enum Command: Codable, Equatable, Sendable {
             return .edit(e.mapReferences(transform))
         case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .disarm, .timerSet, .timerStart, .timerPause, .timerReset,
              .popupSet, .popupClear, .undo, .redo, .historyJump, .systemClearAll, .systemPreflight, .systemSnapshot,
-             .unknown, .invalid:
+             .media, .unknown, .invalid:
             return self
         }
     }

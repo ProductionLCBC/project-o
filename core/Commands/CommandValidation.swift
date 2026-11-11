@@ -298,10 +298,30 @@ struct Checker {
     // MARK: - "content references resolve in the media index"
 
     func media(_ command: Command) throws {
+        if case .media(let media) = command { return try mediaCommand(media) }
         guard case .channelWrite(let write) = command, let ref = write.content.mediaRef else { return }
         guard MediaID.isValid(ref) else { throw reject(.unknownMedia, "\(ref) is not a media id") }
         guard MediaResolver.resolve(ref, library: library, machine: machine) != nil else {
             throw reject(.unknownMedia, "\(ref) is in neither media index")
+        }
+    }
+
+    /// Spec 8 §2 and §7 — a media command's form: every HASH is a full
+    /// `sha256:` id that names an entry in either index (`unknownObject`
+    /// otherwise; `media replace` "takes two ids in the index", Spec 8 §6),
+    /// and an import names an absolute PATH (`unreadable` otherwise; whether
+    /// the engine can read it is the engine's to say). Spec 5 §6, step 8 — the
+    /// same checks run when a cue holding one is saved.
+    func mediaCommand(_ media: MediaCommand) throws {
+        if case .importFile(let path) = media {
+            guard path.hasPrefix("/") else { throw reject(.unreadable, "\"\(path)\" isn't an absolute path") }
+            return
+        }
+        for id in media.ids {
+            guard id.hasPrefix(MediaID.hashPrefix), MediaID.isValid(id) else { throw reject(.unknownObject, "\(id) is not a media hash") }
+            guard MediaResolver.entry(for: id, library: library.mediaIndex, machine: machine.mediaLocal) != nil else {
+                throw reject(.unknownObject, "\(id) is in neither media index")
+            }
         }
     }
 
