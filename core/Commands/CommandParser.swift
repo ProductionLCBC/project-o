@@ -326,6 +326,11 @@ struct CommandParser {
                 throw reject(.badArgument, "\(word) needs a number of seconds, not \(t.described)")
             }
             object[arg.key] = .number((seconds * 1000).rounded())
+        case .flag(let word):
+            // Spec 2 §2 — "case is ignored for keywords"; absent means false.
+            guard peekWordLower() == word else { return }
+            advance()
+            object[arg.key] = .bool(true)
         case .write, .edit:
             break
         }

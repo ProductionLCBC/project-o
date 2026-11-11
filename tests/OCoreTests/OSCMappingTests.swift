@@ -75,6 +75,9 @@ final class OSCMappingTests: XCTestCase {
         row(.disarm, "/o/disarm"),
         row(.timerSet(timer: 1, ms: 300_000), "/o/timer/1/set", [i(300)]),
         row(.timerSet(timer: 1, ms: 1500), "/o/timer/1/set", [f(1.5)]),
+        // Spec 2 §6 as Spec 6 §10 corrected it — "`/o/timer/N/set` takes `s:"up"` after the duration".
+        row(.timerSet(timer: 1, ms: 0, up: true), "/o/timer/1/set", [i(0), s("up")]),
+        row(.timerSet(timer: 2, ms: 1500, up: true), "/o/timer/2/set", [f(1.5), s("up")]),
         row(.timerStart(timer: 1), "/o/timer/1/start"),
         row(.timerPause(timer: 1), "/o/timer/1/pause"),
         row(.timerReset(timer: 1), "/o/timer/1/reset"),
@@ -126,6 +129,10 @@ final class OSCMappingTests: XCTestCase {
         }
         same(OSCMessage("/o/timer/1/set", [s("5:00")]), OSCMessage("/o/timer/1/set", [i(300)]))
         same(OSCMessage("/o/timer/1/set", [s("300")]), OSCMessage("/o/timer/1/set", [i(300)]))
+        // Spec 6 §11 — `timer 1 set 0:00 up` "maps to OSC", in every spelling.
+        same(OSCMessage("/o/timer/1/set", [s("0:00 up")]), OSCMessage("/o/timer/1/set", [i(0), s("up")]))
+        same(OSCMessage("/o/timer/1/set", [s("0:00"), s("up")]), OSCMessage("/o/timer/1/set", [i(0), s("up")]))
+        same(OSCMessage("/o/timer/1/set", [s("5:00 UP")]), OSCMessage("/o/timer/1/set", [i(300), s("Up")]))
         same(OSCMessage("/o/stack/2/blackout", [s("toggle")]), OSCMessage("/o/stack/2/blackout", [s("toggle")]))
         same(OSCMessage("/o/popup/3/set", [s("\"text\" clearafter 30")]), OSCMessage("/o/popup/3/set", [s("text"), i(30)]))
         same(OSCMessage("/o/popup/3/set", [s("\"Nursery\"")]), OSCMessage("/o/popup/3/set", [s("Nursery")]))
@@ -190,6 +197,10 @@ final class OSCMappingTests: XCTestCase {
         XCTAssertEqual(reason(OSCMessage("/o/channel/2/gain", [.bool(true)])), .badArgument)
         XCTAssertEqual(reason(OSCMessage("/o/channel/2/transition", [i(2), i(1), i(1)])), .unexpectedToken)
         XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [s("0:90")])), .badArgument)
+        XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [i(300), s("down")])), .unexpectedToken)
+        XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [i(300), s("up"), s("up")])), .unexpectedToken)
+        XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [s("up")])), .badArgument)
+        XCTAssertEqual(reason(OSCMessage("/o/timer/1/set", [i(300), i(1)])), .unexpectedToken)
         XCTAssertEqual(reason(OSCMessage("/o/popup/3/set", [i(30)])), .badArgument)
         XCTAssertEqual(reason(OSCMessage("/o/register", [s("host"), i(9000)])), .unknownTarget)
         // Spec 2 §3 — `all` belongs to `stack N blackout`, not to `stack N mute`.

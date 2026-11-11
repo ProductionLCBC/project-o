@@ -105,6 +105,32 @@ final class CommandEncodingTests: XCTestCase {
         XCTAssertEqual(try JSONCoding.encode(Command.stackBlackout(stack: .number(1), state: .off)), one)
     }
 
+    /// Spec 1 §5 — "Command objects ... write `loop`, and a timer's `up`, only
+    /// when true"; Spec 6 §6 — "In the object form it is `"up": true`, written
+    /// only when true, like `loop`".
+    func test_aTimersUpIsWrittenOnlyWhenTrue() throws {
+        let up: JSONValue = .object(["cmd": .string("timer.set"), "ms": .number(0), "timer": .number(1), "up": .bool(true)])
+        XCTAssertEqual(try JSONCoding.decode(Command.self, from: up), .timerSet(timer: 1, ms: 0, up: true))
+        XCTAssertEqual(try JSONCoding.encode(Command.timerSet(timer: 1, ms: 0, up: true)), up)
+
+        let down: JSONValue = .object(["cmd": .string("timer.set"), "ms": .number(300_000), "timer": .number(1)])
+        XCTAssertEqual(try JSONCoding.decode(Command.self, from: down), .timerSet(timer: 1, ms: 300_000, up: false))
+        XCTAssertEqual(try JSONCoding.encode(Command.timerSet(timer: 1, ms: 300_000)), down, "a countdown writes no up")
+
+        // A hand-written `"up": false` reads as a countdown and, like any key the
+        // command doesn't write back, survives a round trip in a cue (Spec 1 §8).
+        let explicit = down.setting("up", to: .bool(false))
+        XCTAssertEqual(try JSONCoding.decode(Command.self, from: explicit), .timerSet(timer: 1, ms: 300_000, up: false))
+        let entry = try JSONCoding.decode(GuardedCommand.self, from: explicit)
+        XCTAssertEqual(try JSONCoding.encode(entry), explicit)
+
+        // Spec 1 §6 — "bad parameters": an `up` that isn't a boolean is kept whole and flagged.
+        let bad = down.setting("up", to: .string("yes"))
+        let flagged = try JSONCoding.decode(Command.self, from: bad)
+        XCTAssertTrue(flagged.isInvalid, "\(flagged)")
+        XCTAssertEqual(try JSONCoding.encode(flagged), bad)
+    }
+
     /// Spec 1 §8 — a known command object keeps keys it did not recognise.
     func test_aKnownCommandKeepsUnknownKeys() throws {
         let object: JSONValue = .object(["cmd": .string("channel.clear"), "channel": .number(2), "zz": .array([.number(1)])])

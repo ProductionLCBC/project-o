@@ -116,7 +116,10 @@ public enum Command: Codable, Equatable, Sendable {
     /// Spec 2 §3, Spec 7 §4 — "Clears the armed trigger, so nothing fires on its own".
     case disarm
     // Timers, popups and audio
-    case timerSet(timer: Int, ms: Int)
+    /// Spec 2 §3 as Spec 6 §10 corrected it — "`timer N set DURATION [up]`
+    /// sets a countdown, or with `up` a count-up, and stops it" (Spec 6 §6).
+    /// Spec 1 §5 — the object form writes `"up": true` only when true.
+    case timerSet(timer: Int, ms: Int, up: Bool = false)
     case timerStart(timer: Int)
     case timerPause(timer: Int)
     case timerReset(timer: Int)
@@ -330,7 +333,10 @@ public enum Command: Codable, Equatable, Sendable {
             // stays as an unknown key of the stored command (Spec 1 §8).
             self = .playlistLoad(title: try string("title"))
         case "playlist.disarm": self = .disarm
-        case "timer.set": self = .timerSet(timer: try int("timer"), ms: try int("ms"))
+        case "timer.set":
+            // Spec 6 §6 — `up` "written only when true, like `loop`": absent is a countdown.
+            self = .timerSet(timer: try int("timer"), ms: try int("ms"),
+                             up: try c.decodeIfPresent(Bool.self, forKey: Key("up")) ?? false)
         case "timer.start": self = .timerStart(timer: try int("timer"))
         case "timer.pause": self = .timerPause(timer: try int("timer"))
         case "timer.reset": self = .timerReset(timer: try int("timer"))
@@ -425,9 +431,10 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(cue, forKey: Key("cue"))
         case .playlistLoad(let title):
             try c.encode(title, forKey: Key("title"))
-        case .timerSet(let timer, let ms):
+        case .timerSet(let timer, let ms, let up):
             try c.encode(timer, forKey: Key("timer"))
             try c.encode(ms, forKey: Key("ms"))
+            if up { try c.encode(true, forKey: Key("up")) }
         case .timerStart(let timer), .timerPause(let timer), .timerReset(let timer):
             try c.encode(timer, forKey: Key("timer"))
         case .popupSet(let popup, let text, let clearAfterMs):

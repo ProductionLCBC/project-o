@@ -89,6 +89,8 @@ enum CommandPrinter {
             return [value.stringValue ?? ""]
         case .optionalKeywordSeconds(let word):
             return [word, secondsText(ms: value.intValue ?? 0)]
+        case .flag(let word):
+            return value.boolValue == true ? [word] : []
         case .write, .edit:
             return []
         }

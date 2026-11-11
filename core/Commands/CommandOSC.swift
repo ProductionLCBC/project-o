@@ -83,6 +83,9 @@ public enum OSCMapping {
                 arguments.append(seconds(ms: value.intValue ?? 0))
             case .string, .optionalString, .keyword:
                 arguments.append(.string(value.stringValue ?? ""))
+            case .flag(let word):
+                // Spec 2 §6 — "`up` follows as `s:"up"`".
+                if value.boolValue == true { arguments.append(.string(word)) }
             case .write, .edit:
                 break
             }

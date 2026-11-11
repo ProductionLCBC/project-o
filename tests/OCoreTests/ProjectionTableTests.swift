@@ -401,6 +401,13 @@ final class ProjectionTableTests: XCTestCase {
         let (state, effects) = run(before, [timer], frame: 500)
         XCTAssertEqual(state, before)
         XCTAssertEqual(effects, [.passthrough(timer)])
+        // Spec 6 §6 — "Every timer command is logged with `undo: none`, and the
+        // projection passes it through (Spec 3 §6)": a count-up too.
+        let up = Command.timerSet(timer: 1, ms: 0, up: true)
+        let (after, upEffects) = run(before, [up], frame: 500)
+        XCTAssertEqual(after, before)
+        XCTAssertEqual(upEffects, [.passthrough(up)])
+        XCTAssertEqual(up.undoClass, .none)
     }
 
     /// Row 24 — Any state and context: same inputs twice. Identical outputs.

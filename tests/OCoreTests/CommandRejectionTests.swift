@@ -95,6 +95,12 @@ final class CommandRejectionTests: XCTestCase {
         expect("timer 1 set 0:90", .badArgument)
         expect("timer 1 set soon", .badArgument)
         expect("timer 0 start", .badArgument)
+        // Spec 2 §3 as Spec 6 §10 corrected it — `timer N set DURATION [up]`.
+        expect("timer 1 set up", .badArgument)
+        expect("timer 1 set 5:00 down", .unexpectedToken, containing: "down")
+        expect("timer 1 set 5:00 up up", .unexpectedToken)
+        expect("timer 1 start up", .unexpectedToken)
+        accept("timer 4 set 0:00 up")
         expect("stack 2 mute on", .badArgument)
         // Spec 2 §3 — `all` is a `stack N blackout` word only; an unfinished
         // `stack all` names what is missing.
