@@ -221,6 +221,8 @@ public struct BoxRun: Sendable {
     /// wall-clock second it adopted it in: "re-laid-out only when its resolved
     /// text changes, and no more than once a second".
     public var adoptedText: String?
+    /// Spec 6 §4 — whether the adopted text was laid out with tabular digits.
+    public var adoptedTabular = false
     public var adoptedSecond: Int64 = .min
     public var type: TransitionType = .cut
     public var easing: Easing = .linear

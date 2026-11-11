@@ -31,8 +31,10 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
 
     /// Spec 1 §2 — "variations (a map of OpenType axis tag to value ... weight
     /// is the wght axis when the font is variable and the nearest instance
-    /// when it is not)".
-    func resolveFont(_ values: TextStyleValues, pixelSize: Double) -> ResolvedFont {
+    /// when it is not)". Spec 6 §4 — with `tabular`, "lays out its digits with
+    /// the font's tabular figures (`tnum`) when the font has them": the
+    /// number-spacing feature set to monospaced, which a font without it ignores.
+    func resolveFont(_ values: TextStyleValues, pixelSize: Double, tabular: Bool = false) -> ResolvedFont {
         var font = CTFontCreateWithName(values.font as CFString, pixelSize, nil)
         var substituted: String?
         let actual = CTFontCopyPostScriptName(font) as String
@@ -55,6 +57,12 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
                 let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontVariationAttribute: variation] as CFDictionary)
                 font = CTFontCreateCopyWithAttributes(font, pixelSize, nil, descriptor)
             }
+        }
+        if tabular {
+            let settings: [[CFString: Any]] = [[kCTFontFeatureTypeIdentifierKey: kNumberSpacingType,
+                                                kCTFontFeatureSelectorIdentifierKey: kMonospacedNumbersSelector]]
+            let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontFeatureSettingsAttribute: settings] as CFDictionary)
+            font = CTFontCreateCopyWithAttributes(font, pixelSize, nil, descriptor)
         }
         return ResolvedFont(font: font, substituted: substituted)
     }
@@ -132,8 +140,9 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
 
     /// Lay the text out at one size within the box; `fits` when every line is
     /// within the width and the lines fit the height.
-    func layout(_ text: String, values: TextStyleValues, pixelSize: Double, box: PixelSize, outputHeight: Int, maxLines: Int?) -> (Laid, ResolvedFont) {
-        let resolved = resolveFont(values, pixelSize: pixelSize)
+    func layout(_ text: String, values: TextStyleValues, pixelSize: Double, box: PixelSize, outputHeight: Int, tabular: Bool = false,
+                maxLines: Int?) -> (Laid, ResolvedFont) {
+        let resolved = resolveFont(values, pixelSize: pixelSize, tabular: tabular)
         let attributed = attributed(text, values: values, font: resolved.font, outputHeight: outputHeight)
         let framesetter = CTFramesetterCreateWithAttributedString(attributed)
         let path = CGPath(rect: CGRect(x: 0, y: 0, width: CGFloat(box.width), height: 100_000), transform: nil)
@@ -180,12 +189,12 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             // "shrinkToFit binary-searches the point size between minSize and the style's size until the frame fits the box in both dimensions."
             var low = min(minSize, fullSize)
             var high = fullSize
-            chosen = layout(job.text, values: values, pixelSize: high, box: job.box, outputHeight: job.outputHeight, maxLines: nil)
+            chosen = layout(job.text, values: values, pixelSize: high, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: nil)
             if !chosen.0.fits {
-                var best = layout(job.text, values: values, pixelSize: low, box: job.box, outputHeight: job.outputHeight, maxLines: nil)
+                var best = layout(job.text, values: values, pixelSize: low, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: nil)
                 for _ in 0..<8 where high - low > 0.5 {
                     let mid = (low + high) / 2
-                    let trial = layout(job.text, values: values, pixelSize: mid, box: job.box, outputHeight: job.outputHeight, maxLines: nil)
+                    let trial = layout(job.text, values: values, pixelSize: mid, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: nil)
                     if trial.0.fits {
                         best = trial
                         low = mid
@@ -196,7 +205,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
                 chosen = best
             }
         case .maxLines:
-            chosen = layout(job.text, values: values, pixelSize: fullSize, box: job.box, outputHeight: job.outputHeight, maxLines: max(1, job.fit.maxLines))
+            chosen = layout(job.text, values: values, pixelSize: fullSize, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: max(1, job.fit.maxLines))
         }
         var (laid, font) = chosen
         // Spec 6 §4 — "Text can still overflow in two ways: shrinkToFit doesn't fit at minSize, or the N lines of
@@ -208,7 +217,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         if overflowsBox {
             let whole = Int((boxHeight + 0.5) / max(1, laid.lineHeight))
             if whole > 0 {
-                (laid, font) = layout(job.text, values: values, pixelSize: laid.pixelSize, box: job.box, outputHeight: job.outputHeight, maxLines: whole)
+                (laid, font) = layout(job.text, values: values, pixelSize: laid.pixelSize, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: whole)
             } else {
                 laid = Laid(lines: [], texts: [], pixelSize: laid.pixelSize, lineHeight: laid.lineHeight, fits: false, truncated: true)
             }

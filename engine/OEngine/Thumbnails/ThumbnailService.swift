@@ -301,7 +301,10 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
                                                    return states[index + offset]
                                                },
                                                pixels: { _, _, content in self.posterSource(for: content, roots: roots) },
-                                               staticText: { _, _, raw, shown in self.variables.resolve(raw, state: shown) },
+                                               staticText: { _, _, raw, shown in
+                                                   SlotResolver.StaticText(text: self.variables.resolve(raw, state: shown),
+                                                                           tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
+                                               },
                                                onTextMiss: { _ in })
             boxes.append(contentsOf: results.compactMap(\.resolved))
         }

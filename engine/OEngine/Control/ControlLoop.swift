@@ -1026,10 +1026,12 @@ public final class ControlLoop: @unchecked Sendable {
                 pixels: { slot, offset, content in pixelSource(for: slot, offset: offset, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
                 staticText: { key, box, raw, shown in
                     // Spec 6 §5 — a static box's values read the state being drawn: the live state, or the
-                    // lookahead state of an offset box.
-                    let resolvedNow = variables.resolve(raw, state: shown)
-                    guard VariableProvider.containsVariables(raw) else { return resolvedNow }
-                    return adoptedVariableValue(key, resolved: resolvedNow, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
+                    // lookahead state of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup
+                    // that names one.
+                    let now = SlotResolver.StaticText(text: variables.resolve(raw, state: shown),
+                                                      tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
+                    guard VariableProvider.containsVariables(raw) else { return now }
+                    return adoptedVariableValue(key, resolved: now, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
                 },
                 onTextMiss: { job in
                     scratch.jobs.append(job)
@@ -1075,7 +1077,8 @@ public final class ControlLoop: @unchecked Sendable {
         for box in layout.boxes where box.offset == offset {
             guard case .field(let name) = box.binding.kind,
                   let value = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !value.isEmpty else { continue }
-            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height)
+            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
+                                           tabular: SlotResolver.wantsTabularDigits(value, popups: state.popups))
             if text.entry(for: job) == nil { text.request(job) }
         }
     }
@@ -1089,23 +1092,29 @@ public final class ControlLoop: @unchecked Sendable {
     /// fractional master rate). A first value and a clear are not re-layouts
     /// and show at once. The previous raster goes when a value is adopted, its
     /// textures freed once any box transition between the two has run.
-    private func adoptedVariableValue(_ key: BoxKey, resolved: String, box: Box, frame: Int64, frameRect: PixelRect, size: PixelSize) -> String {
+    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.StaticText, box: Box, frame: Int64, frameRect: PixelRect,
+                                      size: PixelSize) -> SlotResolver.StaticText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
         let second = variables.currentSecond
+        // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
+        // are the ones the cache holds.
         guard let adopted = run.adoptedText else {
-            run.adoptedText = resolved
+            run.adoptedText = resolved.text
+            run.adoptedTabular = resolved.tabular
             run.adoptedSecond = second
             return resolved
         }
-        guard adopted != resolved else { return adopted }
-        if !adopted.isEmpty, !resolved.isEmpty, second == run.adoptedSecond { return adopted }
+        let held = SlotResolver.StaticText(text: adopted, tabular: run.adoptedTabular)
+        guard held != resolved else { return held }
+        if !adopted.isEmpty, !resolved.text.isEmpty, second == run.adoptedSecond { return held }
         if !adopted.isEmpty {
             let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height).key,
+            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
                          afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
         }
-        run.adoptedText = resolved
+        run.adoptedText = resolved.text
+        run.adoptedTabular = resolved.tabular
         run.adoptedSecond = second
         return resolved
     }

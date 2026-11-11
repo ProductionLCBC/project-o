@@ -5,10 +5,11 @@ import OCore
 /// Text jobs and raster readings for the Spec 6 §4 tests.
 enum TextJobs {
     static func job(_ text: String, style: TextStyleValues = TextStyleValues(), box: PixelSize = PixelSize(width: 1728, height: 864),
-                    fit: TextFit = TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24), outputHeight: Int = 1080) -> TextJob {
+                    fit: TextFit = TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24), outputHeight: Int = 1080,
+                    tabular: Bool = false) -> TextJob {
         let boxStyle = BoxTextStyle(values: style)
-        return TextJob(key: TextKey.make(text: text, style: boxStyle, box: box, fit: fit, outputHeight: outputHeight),
-                       text: text, style: boxStyle, box: box, fit: fit, outputHeight: outputHeight)
+        return TextJob(key: TextKey.make(text: text, style: boxStyle, box: box, fit: fit, outputHeight: outputHeight, tabular: tabular),
+                       text: text, style: boxStyle, box: box, fit: fit, outputHeight: outputHeight, tabular: tabular)
     }
 
     /// A plain style with no shadow or outline, so a line's ink is its glyphs alone.

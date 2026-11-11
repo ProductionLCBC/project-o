@@ -83,13 +83,15 @@ public extension TextProvider {
 
 extension TextKey {
     /// Spec 4 §8 — "Keyed by a hash of (field text, text style value, box pixel
-    /// width, box pixel height, fit policy, output scale)." FNV-1a over a
-    /// canonical rendering, so the key is stable across runs and saved plans.
-    public static func make(text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int) -> TextKey {
+    /// width, box pixel height, fit policy, output scale, tabular digits)."
+    /// FNV-1a over a canonical rendering, so the key is stable across runs and
+    /// saved plans. Spec 6 §4 — "the text cache's key includes it".
+    public static func make(text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int, tabular: Bool = false) -> TextKey {
         var canonical = text
         canonical += "\u{1}"
         canonical += TextKey.canonical(style.values)
         canonical += "\u{1}\(box.width)x\(box.height)\u{1}\(fit.policy.rawValue)/\(fit.maxLines)/\(fit.minSize)\u{1}\(outputHeight)"
+        if tabular { canonical += "\u{1}tnum" }
         return TextKey(hash: fnv1a(canonical))
     }
 

@@ -118,7 +118,7 @@ public enum SlotResolver {
     public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot,
                                state: (Int) -> ShowState?,
                                pixels: (StackSlot, Int, ContentInstance?) -> PixelSource?,
-                               staticText: (BoxKey, Box, String, ShowState) -> String,
+                               staticText: (BoxKey, Box, String, ShowState) -> StaticText,
                                onTextMiss: (TextJob) -> Void) -> [SlotBox] {
         guard let layout = inputs.layout(for: slot) else { return [] }
         let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
@@ -144,12 +144,14 @@ public enum SlotResolver {
                 }
             case .field(let name):
                 if let value = fieldValue(name, channel: slot.channel, state: shown, inputs: inputs), !value.isEmpty {
-                    resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
+                    resolved = textBox(value, tabular: wantsTabularDigits(value, popups: shown.popups), box: box, frame: frameRect,
+                                       inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
                 }
             case .static(let raw):
                 let value = staticText(key, box, raw, shown)
-                if !value.isEmpty {
-                    resolved = textBox(value, box: box, frame: frameRect, inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
+                if !value.text.isEmpty {
+                    resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
+                                       opacity: opacity, onTextMiss: onTextMiss)
                 }
             }
             if resolved != nil { drewAt.insert(box.offset) }
@@ -191,20 +193,81 @@ public enum SlotResolver {
     }
 
     /// Spec 4 §8 — the job for one box's text: its key, the style, the box's
-    /// pixel size, the fit policy and the output height the sizes scale with.
-    public static func textJob(_ value: String, box: Box, frame: PixelRect, outputHeight: Int) -> TextJob {
+    /// pixel size, the fit policy, the output height the sizes scale with and,
+    /// Spec 6 §4, whether its digits are tabular.
+    public static func textJob(_ value: String, box: Box, frame: PixelRect, outputHeight: Int, tabular: Bool = false) -> TextJob {
         let style = box.textStyle ?? BoxTextStyle()
         let fit = box.fit.textFit ?? TextFit()
         let boxSize = PixelSize(width: Int(frame.width.rounded()), height: Int(frame.height.rounded()))
-        return TextJob(key: TextKey.make(text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight),
-                       text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight)
+        return TextJob(key: TextKey.make(text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight, tabular: tabular),
+                       text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight, tabular: tabular)
+    }
+
+    /// What a static box draws: its text with variables resolved, and whether
+    /// that text asks for tabular digits (Spec 6 §4).
+    public struct StaticText: Equatable, Sendable {
+        public var text: String
+        public var tabular: Bool
+
+        public init(text: String, tabular: Bool) {
+            self.text = text
+            self.tabular = tabular
+        }
+    }
+
+    /// Spec 6 §4 — "A box whose text names `[Time]`, `[Timer N]` or `[Service
+    /// In]`, itself or inside a popup it shows, lays out its digits with the
+    /// font's tabular figures": `text` is the box's text before its variables
+    /// resolve, `popups` the popup texts of the state being drawn. Names match
+    /// in any case, with or without a format; a popup's own `[Popup N]` is not
+    /// followed, since a popup resolves one level deep (Spec 6 §5), and a
+    /// doubled bracket is not a name.
+    public static func wantsTabularDigits(_ text: String, popups: [Int: String]) -> Bool {
+        let names = bracketedNames(in: text)
+        if names.contains(where: namesAClock) { return true }
+        for name in names {
+            let words = name.split(separator: " ")
+            guard words.count >= 2, words[0].lowercased() == "popup", let n = Int(words[1]), let popup = popups[n] else { continue }
+            if bracketedNames(in: popup).contains(where: namesAClock) { return true }
+        }
+        return false
+    }
+
+    /// Spec 6 §5 — `[Time]` and its formats, `[Timer N]` with a number, `[Service In]`.
+    static func namesAClock(_ name: String) -> Bool {
+        let words = name.split(separator: " ").map { $0.lowercased() }
+        guard let head = words.first else { return false }
+        switch head {
+        case "time": return true
+        case "timer": return words.count >= 2 && Int(words[1]) != nil
+        case "service": return words.count >= 2 && words[1] == "in"
+        default: return false
+        }
+    }
+
+    /// The names between single square brackets; `[[` opens no name (Spec 6 §5,
+    /// "Doubled brackets print one bracket").
+    static func bracketedNames(in text: String) -> [String] {
+        var names: [String] = []
+        var rest = Substring(text)
+        while let open = rest.firstIndex(of: "[") {
+            let after = rest.index(after: open)
+            if after < rest.endIndex, rest[after] == "[" {
+                rest = rest[rest.index(after: after)...]
+                continue
+            }
+            guard let close = rest[after...].firstIndex(of: "]") else { break }
+            names.append(String(rest[after..<close]))
+            rest = rest[rest.index(after: close)...]
+        }
+        return names
     }
 
     /// Spec 4 §9 — "field: The cached line textures ... a missing cache entry
     /// draws nothing this tick and counts `textLate`".
-    static func textBox(_ value: String, box: Box, frame: PixelRect, inputs: Inputs, slot: StackSlot, opacity: Float,
+    static func textBox(_ value: String, tabular: Bool, box: Box, frame: PixelRect, inputs: Inputs, slot: StackSlot, opacity: Float,
                         onTextMiss: (TextJob) -> Void) -> ResolvedBox {
-        let job = textJob(value, box: box, frame: frame, outputHeight: inputs.size.height)
+        let job = textJob(value, box: box, frame: frame, outputHeight: inputs.size.height, tabular: tabular)
         var lines: [TextLine] = []
         if let entry = inputs.text.entry(for: job) {
             lines = entry.lines.map { line in
