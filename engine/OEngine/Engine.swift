@@ -67,7 +67,8 @@ public final class Engine: @unchecked Sendable {
 
     public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
-                text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
+                text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, mediaCache: MediaCache = MediaCache(),
+                log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
         self.pacing = try Pacing(machine: machine)
         self.backend = backend
@@ -95,7 +96,7 @@ public final class Engine: @unchecked Sendable {
         thermal = ThermalMonitor(log: log)
         control = ControlLoop(library: library, machine: machine, pacing: pacing, media: media, backend: backend,
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
-                              encodeKinds: byOutput.mapValues(\.encode), audio: audio, log: log)
+                              encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
     }
@@ -125,11 +126,15 @@ public final class Engine: @unchecked Sendable {
     func finishBuild() {
         afterBuild?(control)
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
+        // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
+        for event in control.lastMediaEvents { publisher.publish(event) }
         // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.
         for timer in control.lastTimerFeedback { publisher.publish(timer.event) }
-        if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
+        if control.lastRootsChanged || control.mediaFilesChanged {
+            thumbnails?.update(library: control.library, machine: control.machine, missing: control.missing)
+        }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
     }

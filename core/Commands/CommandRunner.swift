@@ -112,14 +112,19 @@ public enum CommandRunner {
     /// the pending clear is `ok`. It is called once for each command the
     /// projection folds (a macro's own line and navigation lines aside), in
     /// the order they run, with the projection's result; a macro's line then
-    /// follows what its commands did (Spec 2 §5).
+    /// follows what its commands did (Spec 2 §5). Spec 8 §2 — `media` is the
+    /// engine's say on a media command it runs (`media import`, `media
+    /// rebuild`): a refusal only the engine can make (`unreadable`), or the
+    /// `job` an import's result carries (Spec 8 §7).
     public static func run(_ group: CommandGroup, state: ShowState, context: ProjectionContext, validate: Bool = true,
                            editing: EditContext = EditContext(),
                            settle: ((Command, CommandSource, CommandResult) -> CommandResult)? = nil,
+                           media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)? = nil,
                            makeGroupID: () -> GroupID = { GroupID.random() },
                            makeUUID: () -> UUID = { UUID() }) -> Result<RunOutcome, Rejection> {
         var runner = Runner(state: state, context: context, editing: editing)
         runner.settle = settle
+        runner.media = media
         var fire = group.fire
         for (index, entry) in group.commands.enumerated() {
             if validate {
@@ -175,6 +180,8 @@ struct Runner {
     var deferred: [DeferredEdit] = []
     /// Spec 6 §6 and §7 — the engine's say on a folded command's result.
     var settle: ((Command, CommandSource, CommandResult) -> CommandResult)?
+    /// Spec 8 §2 — the engine's say on a media command it runs.
+    var media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)?
 
     struct DeferredEdit {
         var edit: EditCommand
@@ -218,8 +225,8 @@ struct Runner {
             }
             return
         }
-        if case .media(let media) = command, media.isEdit {
-            runMediaEdit(media, group: group, source: source, fire: fire)
+        if case .media(let media) = command {
+            runMedia(media, group: group, source: source, fire: fire)
             return
         }
         var projectionContext = context
@@ -317,19 +324,36 @@ struct Runner {
         }
     }
 
-    /// Spec 8 §2 — "`media replace`, `media delete` and their inverses are
-    /// ordinary edits". Until the edit path applies them (Area 8, after the
-    /// walk) they are refused as Spec 5 §3 refuses the edits later areas
-    /// build: `notInV1`, a `blocked` line when a cue, macro, key binding or
-    /// scheduler entry holds one, the group's rejection when sent directly.
-    mutating func runMediaEdit(_ media: MediaCommand, group: GroupID, source: CommandSource, fire: FireRecord?) {
-        let rejection = Rejection(reason: .notInV1, message: "\(media.cmd) isn't applied yet")
-        guard source.kind.holdsEdits else {
-            refused = rejection
-            return
+    /// Spec 8 §2 — a media command. "Operator lock refuses every media
+    /// command but `media rebuild` with `operatorLock`" (Spec 5 §7);
+    /// `media replace`, `media delete` and their inverses, "ordinary edits",
+    /// are refused `notInV1` until the edit path applies them (Area 8, after
+    /// the walk); `media import` and `media rebuild` are logged and not
+    /// undoable, an import's result carrying its `job`. "Inside a cue, a
+    /// macro, a key binding or a scheduler entry, any refusal of a media
+    /// command is `blocked` with its reason and logged, and the rest of the
+    /// group runs"; sent directly, a refusal rejects the group.
+    mutating func runMedia(_ media: MediaCommand, group: GroupID, source: CommandSource, fire: FireRecord?) {
+        var outcome: Result<String?, Rejection> = .success(nil)
+        if context.machine.settings.operatorLock.enabled, media != .rebuild {
+            outcome = .failure(Rejection(reason: .operatorLock, message: "the operator lock is on: \(media.cmd) is refused"))
+        } else if media.isEdit {
+            outcome = .failure(Rejection(reason: .notInV1, message: "\(media.cmd) isn't applied yet"))
+        } else if let check = self.media {
+            outcome = check(media, source)
         }
-        executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .blocked,
-                                        effects: [], fire: fire, refusal: rejection))
+        switch outcome {
+        case .success(let job):
+            executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .ok,
+                                            effects: [.passthrough(.media(media))], fire: fire, job: job))
+        case .failure(let rejection):
+            guard source.kind.holdsEdits else {
+                refused = rejection
+                return
+            }
+            executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .blocked,
+                                            effects: [], fire: fire, refusal: rejection))
+        }
     }
 
     /// The cue a navigation command fired and its `pointer` effect. A fire

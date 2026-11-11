@@ -73,7 +73,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     private let backend: MetalBackend
     private let posters: any PosterProvider
     private let variables: VariableProvider
-    private let missing: Set<String>
+    /// Spec 8 §9 — "The projection's `missing` set, the thumbnail job ... all
+    /// take the current one": the engine's, handed over with the roots.
+    private var missing: Set<String>
     private let scratch: TextureHandle
     private let pool: [TextureHandle]
     private var nextPoolSlot = 0
@@ -130,10 +132,19 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// Spec 5 §2 — the engine hands over the roots after an applied edit.
     /// The stack, its size and its textures are the machine's at launch:
     /// stacks are edited with Area 14.
-    public func update(library: Library, machine: Machine) {
+    public func update(library: Library, machine: Machine, missing: Set<String>? = nil) {
         lock.lock()
         roots = (library, machine)
+        if let missing { self.missing = missing }
         lock.unlock()
+    }
+
+    /// Spec 4 §10 — the library version of a list now: the roots and the missing set as last handed over.
+    func version(of list: List) -> String {
+        lock.lock()
+        let (roots, missing) = (self.roots, self.missing)
+        lock.unlock()
+        return LibraryVersion.hash(library: roots.library, machine: roots.machine, list: list, missing: missing)
     }
 
     public var statistics: Statistics {
@@ -151,12 +162,12 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
 
     /// The file of a cue's thumbnail at the current library version, if it exists.
     public func thumbnailURL(forCue cue: UUID, in list: List) -> URL? {
-        cache.lookup(ThumbnailKey(cue: cue, stack: stack, version: LibraryVersion.hash(library: library, list: list)))?.url
+        cache.lookup(ThumbnailKey(cue: cue, stack: stack, version: version(of: list)))?.url
     }
 
     /// The PNG of a cue's thumbnail, from memory or disk, if it exists.
     public func thumbnailData(forCue cue: UUID, in list: List) -> Data? {
-        cache.data(for: ThumbnailKey(cue: cue, stack: stack, version: LibraryVersion.hash(library: library, list: list)))
+        cache.data(for: ThumbnailKey(cue: cue, stack: stack, version: version(of: list)))
     }
 
     // MARK: - Rendering
@@ -168,7 +179,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         guard position >= 1, position <= list.cues.count else { throw ThumbnailError.noSuchCue(position) }
         let cue = list.cues[position - 1]
         let roots = (library: library, machine: machine)
-        let version = LibraryVersion.hash(library: roots.library, list: list)
+        let version = self.version(of: list)
         let key = ThumbnailKey(cue: cue.uuid, stack: stack, version: version)
         if let found = cache.lookup(key) {
             lock.lock()
@@ -218,7 +229,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         queue.async { [self] in
             for position in 1...max(1, list.cues.count) where position <= list.cues.count {
                 let cue = list.cues[position - 1]
-                if cache.lookup(ThumbnailKey(cue: cue.uuid, stack: stack, version: LibraryVersion.hash(library: library, list: list))) != nil { continue }
+                if cache.lookup(ThumbnailKey(cue: cue.uuid, stack: stack, version: version(of: list))) != nil { continue }
                 // Spec 4 §4 — "skipped first under pressure".
                 while auxBlocked() { Thread.sleep(forTimeInterval: 0.05) }
                 // Spec 4 §3 — "rate-limited to 30 Hz".
@@ -265,6 +276,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// from no pointer.
     func projectedStates(of list: List, through index: Int, roots: (library: Library, machine: Machine)) -> [ShowState] {
         let (library, machine) = roots
+        lock.lock()
+        let missing = self.missing
+        lock.unlock()
         var state = ShowState.fresh(library: library, machine: machine)
         var out: [ShowState] = []
         for (i, cue) in list.cues.enumerated() where i <= index {
@@ -323,7 +337,7 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
 
     /// Spec 4 §5 — "Poster frame ... For offset boxes and thumbnails".
     private func posterSource(for content: ContentInstance?, roots: (library: Library, machine: Machine)) -> SlotResolver.PixelSource? {
-        guard let media = content?.media, !media.missing, !missing.contains(media.ref),
+        guard let media = content?.media, !media.missing,
               let resolved = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine) else { return nil }
         let entry = resolved.entry
         let poster = posters.poster(for: entry, tier: resolved.tier)

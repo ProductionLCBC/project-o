@@ -196,8 +196,7 @@ final class ValidationReportTests: XCTestCase {
         let at = library.mediaIndex.position(of: F.mountains) ?? 0
         library.mediaIndex.entries[at].path = "../outside/mountains.mp4"
         let places = MediaPlaces(home: "/Users/av", isOnStartupVolume: { _ in true })
-        let environment = ValidationEnvironment(mediaPlaces: places, mediaRootPath: "/Volumes/Media/library/media",
-                                                machineMediaPath: "/Users/av/Project O/machine/media")
+        let environment = ValidationEnvironment(mediaPlaces: places, mediaRootPath: "/Volumes/Media/library/media")
         let issues = report(library, machine, environment: environment).issues.filter { $0.code == .mediaPlace }
         XCTAssertEqual(Set(issues.map(\.subject)), [F.dawn, F.mountains, "the media root"])
         XCTAssertTrue(issues.contains { $0.subject == F.dawn && $0.message.contains("Downloads") })

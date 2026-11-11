@@ -102,21 +102,19 @@ public struct ValidationReport: Equatable, Sendable {
 /// §4). Nil means unknown, and that check is skipped.
 public struct ValidationEnvironment: Sendable {
     public var mediaState: (@Sendable (MediaLocation) -> MediaFileState)?
-    /// The media root and `machine/media/` as absolute, standardized paths,
-    /// with the places check that applies to them and to absolute overrides.
+    /// Spec 8 §2 — the places check that applies to the media root and to
+    /// absolute overrides, and the media root as an absolute, standardized
+    /// path. (`machine/media/` is read with the machine root it is in.)
     public var mediaPlaces: MediaPlaces?
     public var mediaRootPath: String?
-    public var machineMediaPath: String?
     public var installedFonts: Set<String>?
     public var bundledFonts: Set<String>
 
     public init(mediaState: (@Sendable (MediaLocation) -> MediaFileState)? = nil, mediaPlaces: MediaPlaces? = nil,
-                mediaRootPath: String? = nil, machineMediaPath: String? = nil,
-                installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
+                mediaRootPath: String? = nil, installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
         self.mediaState = mediaState
         self.mediaPlaces = mediaPlaces
         self.mediaRootPath = mediaRootPath
-        self.machineMediaPath = machineMediaPath
         self.installedFonts = installedFonts
         self.bundledFonts = bundledFonts
     }
@@ -514,8 +512,8 @@ struct Checks {
     /// - a missing entry, once per id; an entry a `replaced` map leads from is
     ///   left out, since what names it resolves elsewhere;
     /// - "a deleted item only while something references it";
-    /// - a media root, `machine/media/` or absolute override where media may
-    ///   not live ("the reference report lists an override that points elsewhere").
+    /// - a media root or absolute override where media may not live ("the
+    ///   reference report lists an override that points elsewhere").
     mutating func media() {
         let local = machine?.mediaLocal
         var loops: Set<[String]> = []
@@ -552,12 +550,8 @@ struct Checks {
             guard let resolved = MediaResolver.resolve(ref, library: library, machine: machine), resolved.entry.isDeleted else { continue }
             warn(.deletedMedia, resolved.id, "deleted, and still referenced by \(subject)")
         }
-        if let places = environment.mediaPlaces {
-            for (name, path) in [("the media root", environment.mediaRootPath), ("machine/media/", environment.machineMediaPath)] {
-                if let path, let problem = places.problem(with: path) {
-                    warn(.mediaPlace, name, "\(path) \(problem.description), where media may not live; nothing there is read")
-                }
-            }
+        if let places = environment.mediaPlaces, let path = environment.mediaRootPath, let problem = places.problem(with: path) {
+            warn(.mediaPlace, "the media root", "\(path) \(problem.description), where media may not live; nothing there is read")
         }
     }
 

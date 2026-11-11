@@ -108,40 +108,55 @@ final class ThumbnailTests: XCTestCase {
     /// plus the list's own version.
     func test_libraryVersionFollowsTheRenderingDocumentsAndTheListVersion() throws {
         let library = try EngineFixtures.library()
+        let machine = try EngineFixtures.fixtureMachine()
         let list = try XCTUnwrap(library.list(number: 42))
-        let base = LibraryVersion.hash(library: library, list: list)
+        func version(_ library: Library, _ list: List, missing: Set<String> = []) -> String {
+            LibraryVersion.hash(library: library, machine: machine, list: list, missing: missing)
+        }
+        let base = version(library, list)
         XCTAssertEqual(base.count, 16)
-        XCTAssertEqual(LibraryVersion.hash(library: library, list: list), base, "stable across calls")
+        XCTAssertEqual(version(library, list), base, "stable across calls")
         var grades = library
         grades.grades[0].hue += 1
-        XCTAssertNotEqual(LibraryVersion.hash(library: grades, list: list), base, "a grade edit")
+        XCTAssertNotEqual(version(grades, list), base, "a grade edit")
         var styles = library
         styles.textStyles[0].values.size.value += 1
-        XCTAssertNotEqual(LibraryVersion.hash(library: styles, list: list), base, "a text style edit")
+        XCTAssertNotEqual(version(styles, list), base, "a text style edit")
         var presets = library
         presets.presets[0].layouts[.any]?.boxes[0].frame = Frame(x: 0, y: 0, w: 0.5, h: 0.5)
-        XCTAssertNotEqual(LibraryVersion.hash(library: presets, list: list), base, "a preset edit")
+        XCTAssertNotEqual(version(presets, list), base, "a preset edit")
         var transitions = library
         transitions.transitions[1].ms = 600
-        XCTAssertNotEqual(LibraryVersion.hash(library: transitions, list: list), base, "a transition edit")
+        XCTAssertNotEqual(version(transitions, list), base, "a transition edit")
         var channels = library
         channels.channels[0].defaultPreset = 3
-        XCTAssertNotEqual(LibraryVersion.hash(library: channels, list: list), base, "a channel's default preset")
+        XCTAssertNotEqual(version(channels, list), base, "a channel's default preset")
+        // Spec 4 §10 as Spec 8 corrected it — "the resolved id, poster path and presence of each media
+        // item the list's cues use": list 42 writes dawn, and nothing else from the pool.
+        XCTAssertTrue(LibraryVersion.media(of: list, library: library, machine: machine).contains(EngineFixtures.dawn))
         var posters = library
-        posters.mediaIndex.entries[0].poster = "posters/other.png"
-        XCTAssertNotEqual(LibraryVersion.hash(library: posters, list: list), base, "a poster path")
+        posters.mediaIndex.entries[try XCTUnwrap(posters.mediaIndex.position(of: EngineFixtures.dawn))].poster = ".posters/other-1500.png"
+        XCTAssertNotEqual(version(posters, list), base, "a trim edit's new poster redraws the lists that use the item")
+        XCTAssertNotEqual(version(library, list, missing: [EngineFixtures.dawn]), base, "its presence")
+        var replaced = library
+        replaced.mediaIndex.replaced[EngineFixtures.dawn] = EngineFixtures.cross
+        XCTAssertNotEqual(version(replaced, list), base, "a re-export: the id it resolves to")
+        var elsewhere = library
+        elsewhere.mediaIndex.entries[try XCTUnwrap(elsewhere.mediaIndex.position(of: EngineFixtures.mountains))].poster = ".posters/x-0.png"
+        elsewhere.mediaIndex.add(MediaEntry(id: "sha256:" + String(repeating: "ab", count: 32), path: "imports/new.mov", kind: .video, size: 1))
+        XCTAssertEqual(version(elsewhere, list, missing: [EngineFixtures.mountains]), base, "an import elsewhere redraws none")
         var newer = list
         newer.version += 1
-        XCTAssertNotEqual(LibraryVersion.hash(library: library, list: newer), base, "the list's version, incremented on every save")
+        XCTAssertNotEqual(version(library, newer), base, "the list's version, incremented on every save")
         // Spec 6 §3 — field boxes fall back to the list's title, author, copyright and ccli, so they are in it.
         for edit in [\List.title, \List.author, \List.copyright, \List.ccli] {
             var changed = list
             changed[keyPath: edit] += " (edited)"
-            XCTAssertNotEqual(LibraryVersion.hash(library: library, list: changed), base, "a list's \(edit) is drawn by a field box")
+            XCTAssertNotEqual(version(library, changed), base, "a list's \(edit) is drawn by a field box")
         }
         var renoted = list
         renoted.cues[0].note = "A new note"
-        XCTAssertEqual(LibraryVersion.hash(library: library, list: renoted), base, "the cues' own text is covered by the list's version")
+        XCTAssertEqual(version(library, renoted), base, "the cues' own text is covered by the list's version")
     }
 
     /// Spec 6 §3 — a field box in a projected state reads the list whose cue

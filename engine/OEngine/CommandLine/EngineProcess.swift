@@ -38,12 +38,15 @@ public struct LoadedRoots: Sendable {
     public var librarySnapshot: RootSnapshot
     public var machineSnapshot: RootSnapshot
 
-    public static func load(libraryRoot: URL, machineRoot: URL) throws -> LoadedRoots {
+    /// Spec 1 §5 — both roots read; Spec 8 §2 — with `places`, a media root
+    /// where media may not live isn't read (the engine process gives this
+    /// Mac's; tests read media wherever their copies are).
+    public static func load(libraryRoot: URL, machineRoot: URL, places: MediaPlaces? = nil) throws -> LoadedRoots {
         let librarySnapshot = try LocalFiles.snapshot(ofRoot: libraryRoot)
         let machineSnapshot = try LocalFiles.snapshot(ofRoot: machineRoot)
         let (library, libraryReport) = Loader.library(from: librarySnapshot)
         let (machine, machineReport) = Loader.machine(from: machineSnapshot)
-        let media = MediaFolders.of(machineRoot: machineRoot, settings: machine.settings)
+        let media = MediaFolders.of(machineRoot: machineRoot, settings: machine.settings, places: places)
         let mediaRoot = media.mediaRoot ?? URL(fileURLWithPath: machine.settings.mediaRoot, relativeTo: machineRoot).standardizedFileURL
         return LoadedRoots(library: library, machine: machine, libraryRoot: libraryRoot, machineRoot: machineRoot, mediaRoot: mediaRoot, media: media,
                            libraryReport: libraryReport, machineReport: machineReport,
@@ -166,14 +169,25 @@ public final class EngineProcess: @unchecked Sendable {
         }
         audio = system
 
+        // Spec 8 §4 — the machine's hash cache, which the launch's look at each location reads.
+        let mediaCache = LocalFiles.mediaCache(machineRoot: roots.machineRoot)
         engine = try Engine(library: library, machine: machine, media: roots.media, backend: backend, clock: master,
                             fallbackClocks: fallbacks, sinks: sinks, sourceFactory: sourceFactory, posters: posters, text: textCache,
-                            variables: variables, audio: system, log: log)
+                            variables: variables, audio: system, mediaCache: mediaCache, log: log)
         // Spec 5 §2 — edits are written to the roots they were loaded from.
         engine.control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
                                        librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
         let control = engine.control
-        watcher = DiskWatcher(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot) { control.requestScan() }
+        // Spec 8 §2 — the media worker; Spec 8 §3 — the app's staging folder, which the engine empties at launch.
+        let staging = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Project O/Staging", isDirectory: true)
+        let render = engine.render
+        let worker = MediaWorker(folders: roots.media, machineRoot: roots.machineRoot, staging: staging,
+                                 seams: .live(blocked: { render.isSkippingAux }), log: log)
+        control.attachMedia(worker)
+        let mediaFolders = [roots.media.mediaRoot, roots.media.machineMedia].compactMap { $0 }
+        watcher = DiskWatcher(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot, media: mediaFolders,
+                              onChange: { control.requestScan() }, onMedia: { worker.requestWalk() })
         // Spec 4 §10 — the thumbnail job, its PNGs under the machine root (Area 5 reading: `thumbnails/`).
         do {
             engine.thumbnails = try ThumbnailService(library: library, machine: machine, media: roots.media, backend: backend, posters: posters,

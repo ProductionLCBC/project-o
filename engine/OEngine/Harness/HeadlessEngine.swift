@@ -41,9 +41,11 @@ public final class HeadlessEngine: @unchecked Sendable {
 
     /// The harness over the recording backend and the fakes: no GPU, no decoder.
     public convenience init(library: Library, machine: Machine, media: MediaFolders, backend: RecordingBackend = RecordingBackend(),
-                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
+                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock,
+                            mediaCache: MediaCache = MediaCache()) throws {
         try self.init(library: library, machine: machine, media: media, backend: backend, sourceFactory: FakeSourceFactory(),
-                      posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock)
+                      posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock,
+                      mediaCache: mediaCache)
     }
 
     /// The harness over a Metal backend with the real sources, posters and
@@ -83,7 +85,8 @@ public final class HeadlessEngine: @unchecked Sendable {
 
     public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, sourceFactory: any SourceFactory,
                 posters: any PosterProvider, text: any TextProvider, audio: AudioSystem? = nil,
-                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, log: EngineLog = EngineLog(category: "harness")) throws {
+                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, mediaCache: MediaCache = MediaCache(),
+                log: EngineLog = EngineLog(category: "harness")) throws {
         self.backend = backend
         self.sourceFactory = sourceFactory
         self.posters = posters
@@ -94,7 +97,7 @@ public final class HeadlessEngine: @unchecked Sendable {
         self.sinks = sinks
         engine = try Engine(library: library, machine: machine, media: media, backend: backend, clock: clock,
                             sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
-                            variables: variables, audio: audio, log: log)
+                            variables: variables, audio: audio, mediaCache: mediaCache, log: log)
         let backendRef = backend
         for sink in sinks.values {
             // Spec 4 §12 — a frame whose GPU work failed is never presented; the previous one holds.
@@ -171,6 +174,48 @@ public final class HeadlessEngine: @unchecked Sendable {
         control.requestScan()
         waitForWrites()
         tick()
+    }
+
+    /// What the harness refuses.
+    public enum HarnessError: Error, Equatable {
+        /// Spec 8 §9 — a media worker on a fixture in the repository, which it would write.
+        case fixtureInPlace(String)
+    }
+
+    /// Spec 8 §2 — the media worker, which walks and imports, as the engine
+    /// process attaches it. Spec 8 §9 — "A launch on any fixture walks it and
+    /// writes tiles and the cache, and can write the machine index, so every
+    /// test that launches the engine on a fixture runs on a temporary copy":
+    /// the harness refuses media folders inside the repository's fixtures.
+    public func attachMediaWorker(machineRoot: URL, staging: URL? = nil, seams: MediaWorker.Seams) throws -> MediaWorker {
+        let folders = control.media
+        for folder in [folders.mediaRoot, folders.machineMedia, Optional(machineRoot)].compactMap({ $0 }) where
+            folder.standardizedFileURL.path.contains("/tests/fixtures/") {
+            throw HarnessError.fixtureInPlace(folder.path)
+        }
+        let worker = MediaWorker(folders: folders, machineRoot: machineRoot, staging: staging, seams: seams, log: log)
+        control.attachMedia(worker)
+        return worker
+    }
+
+    /// Spec 8 §4 — what the watcher does when a media folder changes: a walk,
+    /// then the ticks that apply what it found.
+    public func walkMedia() {
+        guard let worker = control.mediaWorker else { return }
+        worker.requestWalk()
+        settleMedia()
+    }
+
+    /// A tick runs what is queued (a `media import` starts its job, a `media
+    /// rebuild` its walk); the worker does everything asked; the next tick
+    /// takes in what it reported; the worker writes the cache it was handed,
+    /// and the writer's queue the indexes.
+    public func settleMedia() {
+        tick()
+        control.mediaWorker?.waitUntilIdle()
+        tick()
+        control.mediaWorker?.waitUntilIdle()
+        waitForWrites()
     }
 
     /// One master tick.

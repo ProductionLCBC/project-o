@@ -41,21 +41,21 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 5 §2 — "The engine holds the loaded documents of both roots ...
     /// An edit changes the document in memory". The control thread's own;
     /// other threads read `publishedRoots`.
-    public private(set) var library: Library
-    public private(set) var machine: Machine
+    public internal(set) var library: Library
+    public internal(set) var machine: Machine
     /// Spec 5 §2 — "The engine keeps one library revision per run. It starts
     /// at 1 at launch and goes up by one for every applied edit group, every
     /// reload from disk and every unlock".
-    public private(set) var revision = 1
+    public internal(set) var revision = 1
     /// Spec 2 §9 — every executed command's line, in memory (Area 12 writes
     /// the day's file); Spec 5 §5 — typing's runs.
     public let commandLog = CommandLog()
     /// Spec 5 §2 — the `library` events of this build, in order, for the
     /// engine to publish once the plan is built. Reset every build.
-    public private(set) var lastLibraryEvents: [LibraryEvent] = []
+    public internal(set) var lastLibraryEvents: [LibraryEvent] = []
     /// Whether this build changed the roots: an edit, a reload, or a write
     /// that raised a list's version or renamed a file.
-    public private(set) var lastRootsChanged = false
+    public internal(set) var lastRootsChanged = false
     /// Spec 7 §4 — the kept copies of the live list and playlist, engine
     /// memory between builds: the runner takes them at fires and after
     /// groups, and a reload refreshes them.
@@ -67,7 +67,7 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var lastLiveFeedback: LiveFeedback?
     /// Spec 5 §2 — writing, when the engine runs over roots on disk; nil for
     /// roots built in memory, whose edits are never written.
-    private(set) var documents: DocumentStore?
+    internal(set) var documents: DocumentStore?
     public let pacing: Pacing
     public let geometry: MachineGeometry
     let backend: any RenderBackend
@@ -83,8 +83,26 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 8 §2 — the media root and `machine/media/`, which locations read against.
     let media: MediaFolders
     /// Spec 3 §6 — "the set of media ids the resolver cannot find", as
-    /// Spec 8 §2 works it out per location (`LocalFiles.missingMedia`).
-    public private(set) var missing: Set<String>
+    /// Spec 8 §2 works it out per location: "again after every walk and
+    /// whenever either index reloads, not once at launch".
+    public internal(set) var missing: Set<String>
+    /// Spec 8 §2 — what is known of the file at each location: from the
+    /// launch's look (`LocalFiles.mediaStates`), then from every walk.
+    public internal(set) var mediaFiles: [MediaLocation: MediaFileState]
+    /// Spec 8 §4 — "what it found last time, which the cache records".
+    public internal(set) var mediaCache: MediaCache
+    /// Spec 8 §2 — the worker that walks and imports; nil runs without one.
+    public internal(set) var mediaWorker: MediaWorker?
+    /// Spec 8 §7 — this build's `media` events, for the publisher. Reset every build.
+    public internal(set) var lastMediaEvents: [JSONValue] = []
+    /// Whether this build changed what is known of a location, so missing state is worked out again.
+    var mediaFilesChanged = false
+    /// Spec 8 §4 — "Only the launch walk prunes": done once, in the first build after the worker is attached.
+    var mediaLaunchPending = false
+    /// Spec 8 §3 — files imported where they lie, waiting for the walk that reads them.
+    var waitingInPlace: [(job: String, file: String, location: MediaLocation)] = []
+    /// Spec 8 §4 — the walk's notes, each logged once a run.
+    var mediaNotesLogged: Set<MediaWalkNote> = []
     public private(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
@@ -128,7 +146,8 @@ public final class ControlLoop: @unchecked Sendable {
 
     public init(library: Library, machine: Machine, pacing: Pacing, media: MediaFolders, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
-                variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioSystem? = nil, log: EngineLog) {
+                variables: VariableProvider, encodeKinds: [Int: EncodeKind], audio: AudioSystem? = nil,
+                mediaCache: MediaCache = MediaCache(), log: EngineLog) {
         self.library = library
         self.machine = machine
         self.pacing = pacing
@@ -145,7 +164,11 @@ public final class ControlLoop: @unchecked Sendable {
         self.log = log
         // Spec 1 §7 — "Missing state is computed, never stored"; Spec 8 §9 — "worked out per
         // location", over the media root and `machine/media/`, a folder that can't be read counting absent.
-        missing = LocalFiles.missingMedia(library: library, machine: machine, folders: media)
+        // Spec 8 §2 — before the walk has read anything: the launch's look at each location, with the cache.
+        let files = LocalFiles.mediaStates(library: library, machine: machine, folders: media, cache: mediaCache)
+        mediaFiles = files
+        self.mediaCache = mediaCache
+        missing = MediaResolver.missingIds(library: library, machine: machine, state: { files[$0] ?? .absent })
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
         // Spec 6 §6 — "after a relaunch every timer is unset".
@@ -292,7 +315,9 @@ public final class ControlLoop: @unchecked Sendable {
         lastExecuted = []
         lastRejected = []
         lastLibraryEvents = []
+        lastMediaEvents = []
         lastRootsChanged = false
+        mediaFilesChanged = false
         changedTimers = []
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
@@ -304,12 +329,16 @@ public final class ControlLoop: @unchecked Sendable {
                 kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
             }
         }
+        // Spec 8 §2 — what the media worker found, "through the one queue", before the queued groups.
+        absorbMedia(now: now)
         for group in groups { run(group, frame: frame, now: now) }
         // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
         if let documents, documents.writeDue(library: &library, machine: &machine, now: now) {
             lastRootsChanged = true
             kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
         }
+        // Spec 8 §2 — missing state, worked out again when the indexes or what is known of the files changed.
+        refreshMedia()
         updateLive(frame: frame)
         syncTransports(frame)
         reconcileGrades(frame)
@@ -483,7 +512,8 @@ public final class ControlLoop: @unchecked Sendable {
         let settler = GroupSettler(timers: timers, clears: pendingClears, frame: frame, rate: pacing.masterRate,
                                    popupSlots: variables.popupSlots)
         switch CommandRunner.run(group, state: model.state, context: context, editing: editing,
-                                 settle: { command, _, result in settler.settle(command, result: result) }) {
+                                 settle: { command, _, result in settler.settle(command, result: result) },
+                                 media: { [unowned self] command, source in prepareMedia(command, source: source) }) {
         case .failure(let rejection):
             // Spec 5 §5 — "any other command from that client closes the run early".
             if let client = group.client { commandLog.closeRun(of: client) }
@@ -525,6 +555,8 @@ public final class ControlLoop: @unchecked Sendable {
                 if case .macro(let number) = executed.command, let refusal = executed.refusal {
                     log.warning("macro \(number) ran nothing: \(refusal.message)")
                 }
+                // Spec 8 §3 and §4 — an import's job and a rebuild's walk start once their group applied.
+                if case .media(let media) = executed.command, executed.result == .ok { startMediaWork(media, job: executed.job) }
                 // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason"; Spec 8 §2 —
                 // "any refusal of a media command is `blocked` with its reason and logged".
                 if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media."),
@@ -543,6 +575,8 @@ public final class ControlLoop: @unchecked Sendable {
         revision += 1
         lastRootsChanged = true
         lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .file, changed: changes, seq: commandLog.lastSeq))
+        // Spec 8 §2 — an index that reloaded may name files no walk has looked at.
+        if changes.contains(where: { $0.object == "media" }) { mediaWorker?.requestWalk() }
     }
 
     // MARK: - Effects to runtimes (Spec 3 §6, "Who acts": the engine)
