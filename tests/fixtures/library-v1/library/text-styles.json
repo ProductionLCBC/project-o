@@ -25,6 +25,7 @@
       "size": { "unit": "pt", "value": 72 },
       "uuid": "7e570000-0000-4000-8000-000000000001",
       "variations": {},
+      "verticalAlignment": "center",
       "weight": 700
     },
     {
@@ -49,6 +50,7 @@
       "size": { "unit": "percent", "value": 4.5 },
       "uuid": "7e570000-0000-4000-8000-000000000002",
       "variations": { "wdth": 110, "wght": 500 },
+      "verticalAlignment": "center",
       "weight": 500
     }
   ]

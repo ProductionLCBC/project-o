@@ -187,9 +187,10 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         }
         let laid = chosen.0
         let font = chosen.1
-        // Vertical placement: the block of lines is centred in the box (Area 4 reading: the style has no vertical anchor yet).
+        // Spec 6 §4 — "It places the block of lines in the box: the first line at the box's top, the block
+        // centred, or the last line at the box's bottom."
         let blockHeight = Double(laid.lines.count) * laid.lineHeight
-        let top = max(0, (Double(job.box.height) - blockHeight) / 2)
+        let top = CoreTextLineRasterizer.top(of: blockHeight, in: Double(job.box.height), anchor: values.verticalAlignment)
         let shadowPad = values.shadow.color.a > 0 ? values.shadow.blur * 2 + max(abs(values.shadow.x), abs(values.shadow.y)) : 0
         let outlinePad = values.outline.width > 0 ? values.outline.width * Double(job.outputHeight) / 1080 : 0
         let pad = Int((shadowPad + outlinePad).rounded(.up)) + 2
@@ -221,6 +222,17 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         }
         return TextRaster(lines: lines, layout: TextLayout(pointSize: laid.pixelSize * 1080 / Double(job.outputHeight), lines: layoutLines, overflowed: laid.truncated),
                           substitutedFont: font.substituted)
+    }
+
+    /// Spec 6 §4 — where the block's first line starts in a box of `height`:
+    /// at the top, centred, or with the last line at the bottom. A block
+    /// taller than the box starts at the top.
+    static func top(of blockHeight: Double, in height: Double, anchor: VerticalAlignment) -> Double {
+        switch anchor {
+        case .top: return 0
+        case .center: return max(0, (height - blockHeight) / 2)
+        case .bottom: return max(0, height - blockHeight)
+        }
     }
 
     /// One line into a premultiplied BGRA8 sRGB bitmap, top row first.

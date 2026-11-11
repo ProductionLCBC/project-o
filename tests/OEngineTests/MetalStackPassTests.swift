@@ -116,6 +116,48 @@ final class MetalStackPassTests: XCTestCase {
         try MetalHarness.assertGolden(goldens, "gamma-blend-on", gamma)
     }
 
+    /// Renders `text` in a box of a 480 × 270 stack through the real text cache.
+    func renderText(_ text: String, style: TextStyleValues, fit: TextFit, frame frameRect: PixelRect) throws -> (CapturedFrame, TextLayout) {
+        let size = PixelSize(width: 480, height: 270)
+        let target = backend.makeTexture(TextureDescriptor(role: .stack, size: size, label: "text stack"))
+        let cache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: "HelveticaNeue"), backend: backend, synchronous: true)
+        let boxSize = PixelSize(width: Int(frameRect.width), height: Int(frameRect.height))
+        let job = TextJobs.job(text, style: style, box: boxSize, fit: fit, outputHeight: 270)
+        cache.request(job)
+        let entry = try XCTUnwrap(cache.entry(for: job))
+        let lines = entry.lines.map { TextLine(texture: $0.texture, frame: PixelRect(x: frameRect.x + $0.frame.x, y: frameRect.y + $0.frame.y, width: $0.frame.width, height: $0.frame.height)) }
+        let box = ResolvedBox(channel: 2, frame: frameRect, content: .lines(lines), opacity: 1, binding: .field(name: "body"), text: text)
+        let frame = try XCTUnwrap(MetalHarness.render(StackPass(stack: 1, target: target, size: size, base: .black, gammaBlend: false, boxes: [box]), backend: backend))
+        return (frame, try XCTUnwrap(cache.layout(for: job.key)))
+    }
+
+    /// The rows of `frame` with any lit pixel inside `rect`.
+    func litRows(_ frame: CapturedFrame, in rect: PixelRect) -> [Int] {
+        (Int(rect.y)..<Int(rect.y + rect.height)).filter { y in
+            (Int(rect.x)..<Int(rect.x + rect.width)).contains { x in frame[x, y].r > 0.2 }
+        }
+    }
+
+    /// Spec 6 §11 — "Anchor ... Goldens for top, centre and bottom."
+    func test_theVerticalAnchorMatchesTheGoldens() throws {
+        let goldens = MetalHarness.goldens("stack")
+        let frameRect = PixelRect(x: 24, y: 27, width: 432, height: 216)
+        var rows: [VerticalAlignment: [Int]] = [:]
+        for anchor in [VerticalAlignment.top, .center, .bottom] {
+            let (frame, _) = try renderText("Great is Thy faithfulness,\nO God my Father", style: TextJobs.plain(anchor: anchor),
+                                            fit: TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24), frame: frameRect)
+            rows[anchor] = litRows(frame, in: frameRect)
+            try MetalHarness.assertGolden(goldens, "anchor-\(anchor.rawValue)", frame, tolerance: .text)
+        }
+        let top = try XCTUnwrap(rows[.top]), centre = try XCTUnwrap(rows[.center]), bottom = try XCTUnwrap(rows[.bottom])
+        XCTAssertLessThan(try XCTUnwrap(top.first), 27 + 216 / 3, "top: ink starts in the box's upper third")
+        XCTAssertLessThan(try XCTUnwrap(top.last), 27 + 216 / 2)
+        XCTAssertGreaterThan(try XCTUnwrap(bottom.first), 27 + 216 / 2, "bottom: ink in the lower half")
+        XCTAssertGreaterThan(try XCTUnwrap(bottom.last), 27 + 216 * 2 / 3)
+        let middle = Double(try XCTUnwrap(centre.first) + XCTUnwrap(centre.last)) / 2
+        XCTAssertEqual(middle, 27 + 108, accuracy: 12, "centre: the ink straddles the box's middle")
+    }
+
     /// Spec 4 §16 — "a text box under both fit policies".
     func test_textBoxUnderBothFitPoliciesMatchesTheGoldens() throws {
         let goldens = MetalHarness.goldens("stack")

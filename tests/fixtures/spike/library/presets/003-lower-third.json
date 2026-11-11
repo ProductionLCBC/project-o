@@ -33,6 +33,7 @@
             },
             "size": { "unit": "percent", "value": 4.5 },
             "variations": { "wdth": 110, "wght": 500 },
+            "verticalAlignment": "center",
             "weight": 500
           },
           "transition": { "ms": 300, "ref": 2 },
@@ -70,6 +71,7 @@
             },
             "size": { "unit": "pt", "value": 36 },
             "variations": {},
+            "verticalAlignment": "center",
             "weight": 700
           },
           "transition": { "ms": null, "ref": 1 },

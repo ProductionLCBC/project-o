@@ -3,16 +3,19 @@
 import Foundation
 
 /// Spec 1 §2 — the Text Style value: "`font` (PostScript name), `size`,
-/// `weight`, `color`, `alignment`, `lineSpacing`, `letterSpacing`, `outline`,
+/// `weight`, `color`, `alignment`, `verticalAlignment` (`top`, `center` or
+/// `bottom`; default `center`), `lineSpacing`, `letterSpacing`, `outline`,
 /// `shadow`, `allCaps`, variations (a map of OpenType axis tag to value...)".
 /// "The same value type is embedded in boxes and in slide-designer text
-/// layers." Encoded flat into whichever object carries it.
+/// layers." Encoded flat into whichever object carries it. Spec 6 §4 —
+/// `verticalAlignment` is "written on every style, inline ones included".
 public struct TextStyleValues: Equatable, Sendable {
     public var font: String
     public var size: TextSize
     public var weight: Double
     public var color: Color
     public var alignment: TextAlignment
+    public var verticalAlignment: VerticalAlignment
     public var lineSpacing: Double
     public var letterSpacing: Double
     public var outline: Outline
@@ -21,14 +24,15 @@ public struct TextStyleValues: Equatable, Sendable {
     public var variations: [String: Double]
 
     public init(font: String = "HelveticaNeue-Bold", size: TextSize = TextSize(value: 72), weight: Double = 700,
-                color: Color = .white, alignment: TextAlignment = .center, lineSpacing: Double = 1.1,
-                letterSpacing: Double = 0, outline: Outline = Outline(), shadow: Shadow = Shadow(),
+                color: Color = .white, alignment: TextAlignment = .center, verticalAlignment: VerticalAlignment = .center,
+                lineSpacing: Double = 1.1, letterSpacing: Double = 0, outline: Outline = Outline(), shadow: Shadow = Shadow(),
                 allCaps: Bool = false, variations: [String: Double] = [:]) {
         self.font = font
         self.size = size
         self.weight = weight
         self.color = color
         self.alignment = alignment
+        self.verticalAlignment = verticalAlignment
         self.lineSpacing = lineSpacing
         self.letterSpacing = letterSpacing
         self.outline = outline
@@ -38,7 +42,7 @@ public struct TextStyleValues: Equatable, Sendable {
     }
 
     enum Keys: String, CodingKey, CaseIterable {
-        case font, size, weight, color, alignment, lineSpacing, letterSpacing, outline, shadow, allCaps, variations
+        case font, size, weight, color, alignment, verticalAlignment, lineSpacing, letterSpacing, outline, shadow, allCaps, variations
     }
 
     /// Read the values from the container of the object that embeds them.
@@ -48,6 +52,7 @@ public struct TextStyleValues: Equatable, Sendable {
         weight = try c.value(.weight, default: 700)
         color = try c.value(.color, default: .white)
         alignment = try c.value(.alignment, default: .center)
+        verticalAlignment = try c.value(.verticalAlignment, default: .center)
         lineSpacing = try c.value(.lineSpacing, default: 1.1)
         letterSpacing = try c.value(.letterSpacing, default: 0)
         outline = try c.value(.outline, default: Outline())
@@ -62,6 +67,7 @@ public struct TextStyleValues: Equatable, Sendable {
         try c.encode(weight, forKey: .weight)
         try c.encode(color, forKey: .color)
         try c.encode(alignment, forKey: .alignment)
+        try c.encode(verticalAlignment, forKey: .verticalAlignment)
         try c.encode(lineSpacing, forKey: .lineSpacing)
         try c.encode(letterSpacing, forKey: .letterSpacing)
         try c.encode(outline, forKey: .outline)

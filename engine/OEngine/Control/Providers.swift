@@ -95,7 +95,7 @@ extension TextKey {
 
     static func canonical(_ v: TextStyleValues) -> String {
         let variations = v.variations.keys.sorted().map { "\($0)=\(v.variations[$0] ?? 0)" }.joined(separator: ",")
-        return "\(v.font)|\(v.size.value)\(v.size.unit.rawValue)|\(v.weight)|\(v.color.r),\(v.color.g),\(v.color.b),\(v.color.a)|\(v.alignment.rawValue)|\(v.lineSpacing)|\(v.letterSpacing)|\(v.outline.width),\(v.outline.color.r),\(v.outline.color.g),\(v.outline.color.b),\(v.outline.color.a)|\(v.shadow.x),\(v.shadow.y),\(v.shadow.blur),\(v.shadow.color.r),\(v.shadow.color.g),\(v.shadow.color.b),\(v.shadow.color.a)|\(v.allCaps)|\(variations)"
+        return "\(v.font)|\(v.size.value)\(v.size.unit.rawValue)|\(v.weight)|\(v.color.r),\(v.color.g),\(v.color.b),\(v.color.a)|\(v.alignment.rawValue)|\(v.verticalAlignment.rawValue)|\(v.lineSpacing)|\(v.letterSpacing)|\(v.outline.width),\(v.outline.color.r),\(v.outline.color.g),\(v.outline.color.b),\(v.outline.color.a)|\(v.shadow.x),\(v.shadow.y),\(v.shadow.blur),\(v.shadow.color.r),\(v.shadow.color.g),\(v.shadow.color.b),\(v.shadow.color.a)|\(v.allCaps)|\(variations)"
     }
 
     static func fnv1a(_ s: String) -> UInt64 {

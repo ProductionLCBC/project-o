@@ -85,7 +85,7 @@
     },
     "textStyle": {
       "type": "object",
-      "required": ["font", "size", "weight", "color", "alignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations", "fromStyle"],
+      "required": ["font", "size", "weight", "color", "alignment", "verticalAlignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations", "fromStyle"],
       "properties": {
         "font": { "type": "string" },
         "size": {
@@ -97,6 +97,7 @@
         "weight": { "type": "number" },
         "color": { "$ref": "#/$defs/color" },
         "alignment": { "enum": ["left", "center", "right"] },
+        "verticalAlignment": { "enum": ["top", "center", "bottom"] },
         "lineSpacing": { "type": "number" },
         "letterSpacing": { "type": "number" },
         "outline": {
