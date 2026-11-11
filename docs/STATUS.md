@@ -26,33 +26,34 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Next, in its own session: Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md` and under Next below; it can start now (`media replace`, `media delete` and the defaults edits ride Area 9's edit path and writer, and its fixtures meet the spike documents Area 6 left canonical). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Two gaps accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, which since Adam's approval of Area 6 also carries Spec 1 §2's `weight`; it can start now that Area 6 is merged, its context values reading the provenance's list. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5, with tabular digits since Area 6; the pointer's reads, `[Next Title]` among them, in OCore since Area 9. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), and marks restored content with the `restored` provenance that keeps its cue and list (Area 6). |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | brief waiting for approval | In review on `area/variables` (8182cf9, pushed, hosted CI green on both jobs): `timer N set DURATION up`, the variable language and the v1 set, the adoption pacing, timers, `clearafter`, the timer and remaining-time feedback, and Spec 1 §2's `weight`, built tests first with stops after the core changes and after the pacing; the brief, the final message of the Area 11 session (2026-11-11), waits for Adam's `approved`. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), marks restored content with the `restored` provenance that keeps its cue and list (Area 6), and saves the popups' pending clears, which Area 11 keeps as engine memory. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), and the app maps keys to commands sent with source `key` (§9). |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run. It runs the shutdown macro on `stop` (Spec 10 §18) and puts the `outputs` and `audio` topics on the API; Area 15 keeps the muted audio outputs in the control loop for them, and Area 9's `library` and `live` events wait in the engine's own publisher. Its first run writes Spec 6 §9's channels, presets and stacks, which Area 6 put in Preset 1's code and the fixtures. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run. It runs the shutdown macro on `stop` (Spec 10 §18) and puts the `outputs` and `audio` topics on the API; Area 15 keeps the muted audio outputs in the control loop for them, and Area 9's `library` and `live` events and Area 11's `timers` events wait in the engine's own publisher. Its first run writes Spec 6 §9's channels, presets and stacks, which Area 6 put in Preset 1's code and the fixtures. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Nothing is in review; everything is on `main`.** Area 6, stacks and presets, shipped on
-2026-11-11. Adam approved it as built, with every reading in the brief and its recommended
-answers: the Spec 3 §6 correction and ADR 0008's acceptance went onto the branch, it was
-merged with `--no-ff` (af3c948) and pushed, and Spec 1 §2's `weight` went into Area 11's
-block. Area 8 is next, in its own session; Areas 11 and 12 can start now too. The bench run
-with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Area 11, variables, is in review** on `area/variables` (8182cf9, pushed, hosted CI green
+on both jobs). Its brief is the final message of the Area 11 session (2026-11-11) and waits
+for Adam's `approved`; the code stays on the branch until then, and everything else is on
+`main`. Area 8, media pool, is next, in its own session, and Area 12 can start now too. The
+bench run with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. The Area 6 brief (the final message of the Area 6 session, 2026-11-11) was answered
-the same day: approved as built, with its recommended answers, merged (af3c948).
+- **Area 11 — Variables** (`area/variables`, 8182cf9). The brief is the final message of
+  the Area 11 session, 2026-11-11. It asks Adam to take the readings in the table below as
+  built, which is the recommended answer: he answered some with the plan and kept others
+  at the session's stops, and the rest are new. No spec correction is proposed.
 
 ### Decisions
 
@@ -102,8 +103,7 @@ the same day: approved as built, with its recommended answers, merged (af3c948).
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 6's task is `shipped`, and Area
-  11's carries its block's new `weight` clause.
+  dependencies from the block's "Starts after" line. Area 11's task is `in review`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -127,37 +127,41 @@ the same day: approved as built, with its recommended answers, merged (af3c948).
 
 ### Spec interpretations made so far
 
-None outstanding. Area 6's readings were approved as built on 2026-11-11, with the
-recommended answers, and are recorded here and in its brief; some had been answered
-already, with the plan on 2026-11-10 and at the second stop. Earlier areas' readings were
-approved with their briefs and are in the specs' text, the briefs, or this page as it stood
-before (Area 9's at f4b43ac): Area 9's on 2026-11-10, Area 15's on 2026-11-10, Area 16's on
-2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
+Area 11's, below, wait with its brief. "With the plan" marks a reading Adam approved with
+the plan on 2026-11-11, and "kept at the second stop" one he kept when he let the session go
+on after the adoption pacing. Earlier areas' readings were approved with their briefs and
+are in the specs' text, the briefs, or this page as it stood before: Area 6's at a77bf69,
+approved on 2026-11-11; Area 9's at f4b43ac, approved on 2026-11-10; Area 15's on
+2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
-| Spec 6 §4, choice T-6 | Which files of DM Sans are bundled | The roman and italic variable fonts, version 4.004, from google/fonts at a pinned commit (Adam's answer to the plan) | The roman alone |
-| Spec 6 §4, the bundled names | Which names reach a bundled face | Core Text's own names (`DMSans-9ptRegular_Bold`) and the usual family-and-style names (`DMSans-Regular` to `DMSans-BlackItalic`) (Adam's answer) | Core Text's names only |
-| Spec 3 §4 and Spec 6 §5, identical text from another cue or list | Its effect, and what the boxes do | An `applied` effect, logged `ok`, with no channel transition; a title, author, copyright or ccli box whose text changed runs its own box transition (Adam's answer) | A `noop` that updates the provenance silently |
-| Spec 6 §3, field boxes | A field the write carries, but empty | It is the write's own and hides the box | It falls back to the list's metadata like an absent field |
-| Spec 6 §3 and §5, "the list" | Content a cue wrote under an older provenance with no list, from a `last.json` written before Area 6 | It reads the pointer's list, as content no cue wrote | No list, so its field boxes show no metadata |
-| Spec 6 §3, static boxes at an offset | The state their variables read | The state at the box's offset, so a +1 `[Popup N]` shows the popup the next cue sets | The live state |
-| Spec 6 §4, "the overflow is reported" | Where | In the text's layout and the text cache's count, for the editor and pre-flight to read; no log line | A log line for every overflowing raster |
-| Spec 6 §4, choice T-8 | A box too short for one whole line | Nothing draws, and the overflow is reported | The first line, clipped at the box |
-| Spec 6 §4 and Spec 4 §8, a line's width | What alignment and fitting measure | What the line shows, without the space it wrapped at, so centred text sits centred and nothing draws outside the box | The full typographic width, as `main` measured it |
-| Spec 6 §4, choice T-10 | Which text sets the tabular flag | The box's own text and the text of a popup it shows, one level deep as T-2 resolves popups | The box's own text only |
-| Spec 6 §4 and Spec 1 §8, fonts | When a style's font counts as installed | Only a face whose PostScript name is the one asked for, as `main` detected a substitution; else a bundled face by its own or usual name; else the fallback, recorded. The plan took Core Text's nearest installed face instead | Core Text's choice of an installed face with another name |
-| Spec 6 §9, preset 4 | The Credits preset's layout | Centred: `title` in the Body look at 56 pt on up to two lines, then `author`, `copyright` and `ccli` in the Caption look on one line each, every box with a 250 ms dissolve (as built, 2026-11-11) | Another layout |
-| Spec 6 §9, "Preset 2 becomes Clock" | The Clock's uuid | Confidence's, `c0de…0002`: the document is replaced in place (as built) | A new uuid |
-| Spec 6 §9, the fixtures' outputs | Whether stack 2 leaves its output, as at a fresh install | No: the fixtures keep output 2 on stack 2, which the soak's confidence display needs (as built) | Stack 2 on no output |
+| Spec 6 §5, names | How strictly a variable's name must match | The table's words in any case, single-spaced, and a slot number of digits worth 1 or more: `[ Time]`, `[Timer  1]` and `[Timer 0]` print as written (with the plan) | Looser matching of spaces and numbers |
+| Spec 6 §5, formats | A format on a name that takes none (`[Section x]`), or an empty one (`[Time ]`) | A format outside the set: the value, or the default, and one log line per box (with the plan; `[Time ]` kept at the second stop) | Printed as written |
+| Spec 6 §5, where values resolve | Whether a value's own text is read for variables | Never, but for a popup's text, one level deep (T-2); a field box's list-metadata fallback resolves in the content's scope (with the plan) | Metadata printed as written |
+| Spec 6 §5, "a value going empty" | Which values | Any value turning empty, or the whole text, shows at once; a value appearing inside text that stays keeps its own pace, and only a box going from nothing to text is a first value (with the plan; kept at the second stop) | The whole text alone, as `main` had it |
+| Spec 6 §5, a popup and the clock at once | Which pace wins | A pending popup change holds the clock's to the 100 ms spacing, and whatever adopts takes every value at its newest (with the plan) | The clock's once-a-second gate as well |
+| Spec 6 §5, a timer's box | Which second it keeps | The timer's own: at once, unless the box already took a clock change in this wall-clock second (Adam's answer to the plan) | The wall-clock second |
+| Spec 6 §5, timer commands | Whether a `set` or `reset` is "a timer" for the pace | Yes: at once, unless that box already took a clock change in this wall-clock second (kept at the second stop) | At once, like a fire |
+| Spec 6 §5, thumbnails | What a static box's context values read in a projected state | The cue drawn and its list, with no playlist, so `[Next Title]` is empty; thumbnails have no pacing (with the plan) | No pointer, so nothing |
+| Spec 6 §5, `[Service In]` | A `serviceTime` or a `serviceDate` that doesn't read | Empty (with the plan; the date kept at the second stop) | Counting to today |
+| Spec 6 §3 and §5, the text one cue ahead | Which boxes are rasterized ahead | Static boxes with variables too, so a `next` that changes `[Section]` never draws late (kept at the second stop) | Field boxes alone, as `main` had it |
+| Spec 6 §6, the timers' clock | Which monotonic clock they count | The master tick's frames at the machine's rate (Adam's answer to the plan) | The Mac's uptime clock |
+| Spec 6 §6, `set` | Whether a `set` that changes nothing is a `noop` | Never: the spec's list of `noop` cases doesn't name it | `noop` when it repeats a stopped timer's value |
+| Spec 6 §6, a timer above the count | A cue's command, which nothing validates at run time | A `noop` (with the plan) | A warning in the engine log as well |
+| Spec 6 §7, an identical `popup N set` | Its result | `ok` when it changed the pending clear, else `noop` (Adam's answer to the plan) | Always `noop` |
+| Spec 6 §7, `clearafter` | Its clock, and a slot above the count | The master tick, to the nearest frame; no clear scheduled above the count; pending clears are engine memory for Area 12 to save (Spec 9 §4) (with the plan) | The wall clock |
+| Spec 6 §8, timer feedback | "once a second" | When the timer's whole-second value changes, on its own second and past zero too (`s` holding `0:00`, `i` negative), with the last line's `seq`; after a command, that line's `seq` | On the wall-clock second |
+| Spec 2 §6, remaining time | When it is sent, and for a loop | When its whole second changes, and at once when the clip starts again; a loop, the time left in its pass (Adam's answer to the plan); nothing while paused, stopped, held at its end or untimed (with the plan) | Nothing for a loop |
+| Spec 2 §6, subscriptions | Whose they are, and how they expire | The subscribing client's host: they reach its registered and configured peers and end once it has neither. `main` keyed them by the sending port and never let them expire, so a client that sends from another port never received them (with the plan) | By the exact sender address |
+| Spec 2 §6, `/o/query` | Which addresses it answers | Also `/o/timer/N`, `/o/popup/N` and `/o/channel/N/remaining` (with the plan) | Only those answered before |
+| Spec 7 §5 and Spec 2 §7, dates | What reads `yyyy-MM-dd` once `[Date]` defaults to `MMMM d` | Archive titles and the guards (v1.5) still do, and the guards read `[Timer N]` as it shows (with the plan; the guards' reading new) | The guards follow `[Date]`'s default |
+| Spec 1 §2, weight | How a style's weight meets its font | A variable font's `wght` follows it, clamped to the axis, unless the variations name `wght` (Skia's axis, 0.48 to 3.2, clamps as written); a static font draws with its family's nearest face by OS/2 weight class, keeping its slant and width, a tie keeping the named face, then the lighter; the fallback font too, recorded as the machine's fallback font (with the plan) | Core Text's own nearest match |
+| Spec 6 §5, the reference report | The note for a slot above the count | `info`, one line per place, naming each variable (with the plan) | A warning per variable |
 
 ### Spec corrections proposed
 
-None outstanding. Area 6's correction went onto `area/presets` (85b4e88) on Adam's
-`approved`, and reached `main` with the merge (af3c948) on 2026-11-11:
-
-- **Spec 3 §6, the `applied` effect.** Its list of state changes with nothing to animate
-  gains a text write that updates the provenance alone (§4, as Spec 6 corrected it).
+None. Area 11 proposes none.
 
 ## Next
 
@@ -209,10 +213,10 @@ Area 13.
 
 **After Area 8:**
 
-- **Engine-side, no bench run.** Areas 11 and 12 can start now, in their own sessions, and
-  Area 19 starts after Area 12, each from its block in `docs/build-order.md`, which its
-  Build tracker task carries verbatim. Area 11's block now also carries Spec 1 §2's
-  `weight`.
+- **Area 11** waits for Adam's `approved` on its brief; the same session merges it.
+- **Engine-side, no bench run.** Area 12 can start now, in its own session, and Area 19
+  starts after Area 12, each from its block in `docs/build-order.md`, which its Build
+  tracker task carries verbatim.
 - **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
   follows 14, 17 follows 13 and 14, and 18 follows 17.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
