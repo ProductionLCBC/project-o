@@ -21,13 +21,13 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 holds; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
-| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | brief waiting for approval | In review on `area/presets` (b9dec5e, pushed, hosted CI green on both jobs), built in the stops Adam reviewed in the session, with his answers to the plan; he took the fixtures as built and left the soak to the bench run. The brief is the final message of the Area 6 session (2026-11-11). Next: his `approved`, then the merge. |
+| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers; the Spec 3 §6 correction and ADR 0008's acceptance on the branch (85b4e88), `area/presets` merged into `main` with `--no-ff` (af3c948), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Spec 1 §2's `weight` went into Area 11's block. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
-| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Next, in its own session: Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md` and under Next below. It can start now that Area 9 is merged (`media replace`, `media delete` and the defaults edits ride Area 9's edit path and writer), best after Area 6's merge (Next). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
+| 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Next, in its own session: Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md` and under Next below; it can start now (`media replace`, `media delete` and the defaults edits ride Area 9's edit path and writer, and its fixtures meet the spike documents Area 6 left canonical). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Two gaps accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, to start after Area 6 is merged: its context values read the provenance's list, which Area 6 adds and which waits on `area/presets`. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5; the pointer's reads, `[Next Title]` among them, in OCore since Area 9. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now that Area 9 is merged: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), and marks restored content with the `restored` provenance that keeps its cue and list (Area 6, on `area/presets`). |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | not started | Spec 6 accepted 2026-11-04, its prompt block in `docs/build-order.md`, which since Adam's approval of Area 6 also carries Spec 1 §2's `weight`; it can start now that Area 6 is merged, its context values reading the provenance's list. `popup N set` over OSC is on `main` since Area 3; `[Time]`, `[Date]` and `[Popup N]` in static boxes since Area 5, with tabular digits since Area 6; the pointer's reads, `[Next Title]` among them, in OCore since Area 9. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), and marks restored content with the `restored` provenance that keeps its cue and list (Area 6). |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), and the app maps keys to commands sent with source `key` (§9). |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
@@ -40,32 +40,19 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 6, stacks and presets, is in review on `area/presets`** (b9dec5e, pushed, hosted CI
-green on both jobs). It was built in the stops Adam reviewed in the session: the core
-changes, the engine, then Preset 1 with the fixtures, which he took as built, leaving the
-soak to the bench run. The brief is the final message of the Area 6 session. `main` has only
-the status documents from it; the code waits on the branch for his `approved`. Areas 8 and
-12 can start now, best after Area 6's merge; Area 11 waits for that merge. The bench run
+**Nothing is in review; everything is on `main`.** Area 6, stacks and presets, shipped on
+2026-11-11. Adam approved it as built, with every reading in the brief and its recommended
+answers: the Spec 3 §6 correction and ADR 0008's acceptance went onto the branch, it was
+merged with `--no-ff` (af3c948) and pushed, and Spec 1 §2's `weight` went into Area 11's
+block. Area 8 is next, in its own session; Areas 11 and 12 can start now too. The bench run
 with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 6, stacks and presets.** The brief is the final message of the Area 6 session
-  (2026-11-11), code on `area/presets` (b9dec5e). It asks for:
-  - **The readings as built** (the table below). Recommended: as built.
-  - **ADR 0008, bundled OFL fonts** (`docs/decisions/0008-bundled-ofl-fonts.md`, proposed,
-    on the branch). Recommended: accepted with the `approved`.
-  - **The Spec 3 §6 correction** below. Recommended: accepted, and applied on the branch
-    before the merge.
-  - **Spec 1 §2's `weight`.** The rasterizer never applies a style's `weight`; only
-    `variations` set a variable font's axes, so a DM Sans style with `weight` 700 and no
-    `wght` draws at its named face's weight. No style can be authored before Area 14, and
-    the fixtures name their weight in the font or in `variations`. Recommended: build it in
-    the next session in the text code, Area 11, with one clause added to its block on
-    Adam's word: `weight` sets `wght` when `variations` lacks it, and picks the family's
-    nearest face for a static font. Alternative: fix it on `area/presets` before the merge.
+None. The Area 6 brief (the final message of the Area 6 session, 2026-11-11) was answered
+the same day: approved as built, with its recommended answers, merged (af3c948).
 
 ### Decisions
 
@@ -83,10 +70,10 @@ with a card stays deferred to a window Adam sets aside; it gates `app/` and Area
   `scripts/soak.sh tests/soak/spike.json`. He can run it without a session; its record
   answers the DeckLink criteria of §15, sets the §13 median window, shows whether the
   purgeable zone caps and what the thumbnail job costs, checks the weave on the capture
-  rig, and the embedded audio feed against the clapper. Once Area 6 is merged, the bench
-  machine root is copied again from the spike fixtures first (Spec 6 §2): in the old copy
-  stack 2's default preset is preset 2, now the Clock, so the confidence screen would
-  show only the time.
+  rig, and the embedded audio feed against the clapper. The bench machine root is copied
+  again from the spike fixtures first (Spec 6 §2): Area 6 changed the stacks, and in an
+  older copy stack 2's default preset is preset 2, now the Clock, so the confidence screen
+  would show only the time.
 
 ### The attended run
 
@@ -115,7 +102,8 @@ with a card stays deferred to a window Adam sets aside; it gates `app/` and Area
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 6's task is `in review`.
+  dependencies from the block's "Starts after" line. Area 6's task is `shipped`, and Area
+  11's carries its block's new `weight` clause.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -139,14 +127,12 @@ with a card stays deferred to a window Adam sets aside; it gates `app/` and Area
 
 ### Spec interpretations made so far
 
-Area 6's readings, below and in its brief, wait for Adam's `approved`. Some are answered
-already: his answers to the plan on 2026-11-10 (T-6's files, the names that reach the
-bundled faces, and what an identical write from another list does), the readings the plan
-he approved named, and the fixtures' choices he took as built at the second stop on
-2026-11-11. The rest are new in the brief. Area 9's readings were approved as built on
-2026-11-10 and are in its brief and in this page as it stood at f4b43ac; earlier areas'
-are in the specs' text or their briefs: Area 15's on 2026-11-10, Area 16's on 2026-11-04,
-Area 5's on 2026-11-03, and Area 4's in 7032182.
+None outstanding. Area 6's readings were approved as built on 2026-11-11, with the
+recommended answers, and are recorded here and in its brief; some had been answered
+already, with the plan on 2026-11-10 and at the second stop. Earlier areas' readings were
+approved with their briefs and are in the specs' text, the briefs, or this page as it stood
+before (Area 9's at f4b43ac): Area 9's on 2026-11-10, Area 15's on 2026-11-10, Area 16's on
+2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
@@ -167,10 +153,11 @@ Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 ### Spec corrections proposed
 
-- **Spec 3 §6, the `applied` effect.** Its row says "State changed with nothing to animate
-  (transport, end behaviour, lock, freeze)". The code also emits it for identical text from
-  another cue or list, which updates the provenance alone (§4, as Spec 6 corrected it). The
-  fix: the list gains "a text write's provenance (§4)".
+None outstanding. Area 6's correction went onto `area/presets` (85b4e88) on Adam's
+`approved`, and reached `main` with the merge (af3c948) on 2026-11-11:
+
+- **Spec 3 §6, the `applied` effect.** Its list of state changes with nothing to animate
+  gains a text write that updates the provenance alone (§4, as Spec 6 corrected it).
 
 ## Next
 
@@ -222,15 +209,14 @@ Area 13.
 
 **After Area 8:**
 
-- **Area 6's merge** waits on Adam's `approved` on its brief. Areas 8 and 12 are best started
-  after it: Area 8's fixtures (Spec 8 §9) meet the spike documents Area 6 rewrote in
-  canonical form, and Area 12's restore uses the `restored` provenance Area 6 adds.
-- **Engine-side, no bench run.** Area 11 starts after Area 6 is merged, Area 12 can start
-  now, and Area 19 starts after Area 12, each from its block in `docs/build-order.md`,
-  which its Build tracker task carries verbatim.
+- **Engine-side, no bench run.** Areas 11 and 12 can start now, in their own sessions, and
+  Area 19 starts after Area 12, each from its block in `docs/build-order.md`, which its
+  Build tracker task carries verbatim. Area 11's block now also carries Spec 1 §2's
+  `weight`.
 - **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
   follows 14, 17 follows 13 and 14, and 18 follows 17.
-- **The bench run with the card** happens whenever Adam sets a window. It must pass before
-  anything in `app/` starts and before Area 7's bench verification.
+- **The bench run with the card** happens whenever Adam sets a window, with the bench
+  machine root copied again from the spike fixtures first. It must pass before anything in
+  `app/` starts and before Area 7's bench verification.
 - **Spec 5 has no area of its own.** Its engine side lands with Area 9 (the edit path, the
   writer and changes on disk, on `main`) and Area 12 (edit undo and redo, and the restores).

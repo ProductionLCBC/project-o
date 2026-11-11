@@ -13,7 +13,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | shipped |
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | shipped |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | shipped |
-| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | in review |
+| 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | shipped |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | shipped |
@@ -269,8 +269,11 @@ from the live playlist's serviceTime; the adoption pacing (context values at onc
 popups at most every 100 ms, the clock and timers once a wall-clock second); timers on
 the monotonic clock, counting down and up, with overrun and the noop cases; clearafter
 logged from source engine; the /o/timer/N and timers-topic feedback and
-/o/channel/N/remaining. Tests first from §11's Area 11 list. Stop for review after the
-core changes and again after the adoption pacing. Nothing in app/.
+/o/channel/N/remaining. Also Spec 1 §2's weight, which Area 6 left: a text style's
+weight sets a variable font's wght axis when its variations name none, and picks the
+family's nearest face for a static font, with tests of its own. Tests first from §11's
+Area 11 list. Stop for review after the core changes and again after the adoption
+pacing. Nothing in app/.
 ```
 
 **Area 12 — Log and saving** (branch `area/saving`)
