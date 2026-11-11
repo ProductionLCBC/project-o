@@ -126,14 +126,19 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(MediaResolver.missingIds(library: library, machine: machine, existingPaths: F.existingMediaPaths), [F.mountains])
     }
 
-    /// "fonts not installed" → one line per font, when the installed set is known.
-    func test_fontsNotInstalledAreReportedOncePerFont() {
+    /// Spec 1 §8 (corrected by Spec 6 §10) — "fonts neither installed nor
+    /// bundled" → one line per font, when the installed set is known.
+    func test_fontsNeitherInstalledNorBundledAreReportedOncePerFont() {
         let (library, machine) = fresh()
         let environment = ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold"])
         let issue = only(.fontNotInstalled, in: report(library, machine, environment: environment))
         XCTAssertEqual(issue?.subject, "HelveticaNeue-Medium")
+        XCTAssertEqual(issue?.message, "neither installed nor bundled with the engine; the fallback font substitutes")
         let none = report(library, machine, environment: ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold", "HelveticaNeue-Medium"]))
         XCTAssertEqual(none.issues, [])
+        let bundled = report(library, machine, environment: ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold"],
+                                                                                 bundledFonts: ["HelveticaNeue-Medium"]))
+        XCTAssertEqual(bundled.issues, [], "a bundled font is not missing")
     }
 
     /// A rider naming a missing transition → one line; degrade (Spec 1 §8,

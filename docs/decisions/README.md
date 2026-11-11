@@ -11,5 +11,6 @@ One paragraph each: context, decision, consequences. Numbered, never edited afte
 | 0005 | OCore imports nothing from Apple frameworks |
 | 0006 | Specs and tests are the durable assets; code is regenerated against them |
 | 0007 | No Apple Developer Program membership before something workable exists |
+| 0008 | The engine bundles OFL fonts; an installed copy wins (proposed) |
 
 Template: `0000-template.md`.

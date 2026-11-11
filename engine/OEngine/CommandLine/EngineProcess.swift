@@ -143,9 +143,11 @@ public final class EngineProcess: @unchecked Sendable {
             }
         }
 
-        // Sources, posters, text, variables (Spec 4 §6, §8).
+        // Sources, posters, text, variables (Spec 4 §6, §8). Spec 6 §4 — the bundled fonts are registered "at
+        // launch and before the first raster".
         let sourceFactory = MediaSourceFactory(backend: backend, log: log)
         let posters = ImagePosterProvider(backend: backend, mediaRoot: roots.mediaRoot, log: log)
+        FontLibrary.shared.register(log: log)
         textCache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont), backend: backend, log: log)
         let variables = VariableProvider(settings: machine.settings)
 

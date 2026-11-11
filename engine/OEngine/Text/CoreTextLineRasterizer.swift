@@ -12,14 +12,19 @@ import OCore
 /// all-caps), laid out into a CTFrame within the box's pixel width."
 /// "Raster is Core Graphics into a premultiplied BGRA8 bitmap, one texture per
 /// line, with the style's outline and shadow drawn as part of the line."
-/// "Fonts. v1 resolves PostScript names against installed fonts and falls
-/// back to the machine's fallback font, recording the substitution."
+/// "Fonts. v1 resolves PostScript names against installed fonts and the OFL
+/// fonts bundled with the engine, which it registers for its own process at
+/// launch (Spec 6 §4), and falls back to the machine's fallback font,
+/// recording the substitution for pre-flight."
 public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
     public let name = "coretext-lines"
     public let fallbackFont: String
+    /// Spec 6 §4 — where a PostScript name finds its face.
+    public let fonts: FontLibrary
 
-    public init(fallbackFont: String) {
+    public init(fallbackFont: String, fonts: FontLibrary = .shared) {
         self.fallbackFont = fallbackFont
+        self.fonts = fonts
     }
 
     // MARK: - Fonts
@@ -35,12 +40,13 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
     /// the font's tabular figures (`tnum`) when the font has them": the
     /// number-spacing feature set to monospaced, which a font without it ignores.
     func resolveFont(_ values: TextStyleValues, pixelSize: Double, tabular: Bool = false) -> ResolvedFont {
-        var font = CTFontCreateWithName(values.font as CFString, pixelSize, nil)
+        var font: CTFont
         var substituted: String?
-        let actual = CTFontCopyPostScriptName(font) as String
-        if actual.caseInsensitiveCompare(values.font) != .orderedSame {
-            substituted = actual
-            let fallback = CTFontCreateWithName(fallbackFont as CFString, pixelSize, nil)
+        if let found = fonts.font(named: values.font, size: pixelSize) {
+            font = found
+        } else {
+            // Spec 6 §4 — "A missing font falls back to the machine's `fallbackFont` and is recorded for pre-flight".
+            let fallback = fonts.font(named: fallbackFont, size: pixelSize) ?? CTFontCreateWithName(fallbackFont as CFString, pixelSize, nil)
             font = fallback
             substituted = CTFontCopyPostScriptName(fallback) as String
         }

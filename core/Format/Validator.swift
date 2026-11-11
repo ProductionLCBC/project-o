@@ -89,15 +89,18 @@ public struct ValidationReport: Equatable, Sendable {
 }
 
 /// What the validator can only learn from outside the roots: which media
-/// files exist (Spec 1 §7, missing state) and which fonts are installed.
-/// Nil means unknown, and that check is skipped.
+/// files exist (Spec 1 §7, missing state), which fonts are installed and
+/// which are bundled with the engine (Spec 6 §4). Nil means unknown, and that
+/// check is skipped.
 public struct ValidationEnvironment: Sendable {
     public var existingMediaPaths: Set<String>?
     public var installedFonts: Set<String>?
+    public var bundledFonts: Set<String>
 
-    public init(existingMediaPaths: Set<String>? = nil, installedFonts: Set<String>? = nil) {
+    public init(existingMediaPaths: Set<String>? = nil, installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
         self.existingMediaPaths = existingMediaPaths
         self.installedFonts = installedFonts
+        self.bundledFonts = bundledFonts
     }
 }
 
@@ -447,11 +450,13 @@ struct Checks {
         }
     }
 
-    /// Spec 1 §7 — "v1 references fonts by PostScript name and uses whatever
-    /// is installed, with the machine's fallback font substituting and the
-    /// substitution reported."
+    /// Spec 1 §7 — "v1 references fonts by PostScript name and uses those
+    /// installed or bundled with the engine (Spec 6 §4), with the machine's
+    /// fallback font substituting and the substitution reported"; Spec 1 §8 —
+    /// "fonts neither installed nor bundled".
     mutating func fonts() {
         guard let installed = environment.installedFonts else { return }
+        let bundled = environment.bundledFonts
         var used: [String] = library.textStyles.map(\.values.font)
         for preset in library.presets {
             for key in preset.layouts.keys.sorted() {
@@ -462,8 +467,8 @@ struct Checks {
         }
         if let fallback = machine?.settings.fallbackFont { used.append(fallback) }
         var seen: Set<String> = []
-        for font in used where !installed.contains(font) && seen.insert(font).inserted {
-            warn(.fontNotInstalled, font, "not installed on this machine; the fallback font substitutes")
+        for font in used where !installed.contains(font) && !bundled.contains(font) && seen.insert(font).inserted {
+            warn(.fontNotInstalled, font, "neither installed nor bundled with the engine; the fallback font substitutes")
         }
     }
 }
