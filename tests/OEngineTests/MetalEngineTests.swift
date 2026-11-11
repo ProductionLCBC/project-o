@@ -97,6 +97,21 @@ final class MetalEngineTests: XCTestCase {
         XCTAssertEqual(records.last?.instanceQueueDepths.count, 1, "one instance is live: \(records.last.map { "\($0)" } ?? "")")
     }
 
+    /// Spec 6 §11 — "goldens for ... the confidence stack": the first-run
+    /// confidence stack, at a quarter of HD, on list 42's first cue.
+    func test_theConfidenceStackMatchesTheGolden() throws {
+        let metal = try MetalHarness.backend()
+        var machine = try EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270))
+        machine.outputs[1].format = VideoFormat(width: 480, height: 270, rate: .fps60, interlaced: false)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+        engine.send("list 42 cue 1")
+        engine.tick(count: 2)
+        let frame = try XCTUnwrap(engine.captured(output: 2))
+        XCTAssertEqual(frame.width, 480)
+        XCTAssertGreaterThan(lit(region(frame, Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27))), 30, "the next verse")
+        try MetalHarness.assertGolden(MetalHarness.goldens("stack"), "confidence-stack", frame, tolerance: .text)
+    }
+
     func test_timeBoxReadsTheMachineClockAndCountsNoTextLateAfterWarmUp() throws {
         engine.send("channel 2 write text \"Amen\"")
         engine.tick(count: 3)
