@@ -26,6 +26,9 @@ public enum IssueCode: String, Equatable, Sendable {
     // Files and folders (Spec 7 §2–§3): two files holding one list or
     // playlist, two folders that differ only in case.
     case duplicateFile, folderCaseClash
+    // Spec 6 §5 — "A timer or popup number above the machine's count is still
+    // a v1 name. It resolves empty and the reference report notes it".
+    case variableAboveSlotCount
 }
 
 /// One line of the report.
@@ -282,6 +285,7 @@ struct Checks {
                     if !Box.offsetRange.contains(box.offset) {
                         warn(.boxOffsetOutOfRange, subject, "offset \(box.offset) must be -2 to +3; the box draws nothing")
                     }
+                    if case .static(let text) = box.binding.kind { variableSlots(in: [text], subject: subject) }
                 }
             }
         }
@@ -405,6 +409,37 @@ struct Checks {
         if case .playlistLoad(let title) = command, let machine, machine.playlist(titled: title) == nil {
             warn(.missingPlaylist, commandSubject, "names no playlist: \"\(title)\"")
         }
+        switch command {
+        case .channelWrite(let write):
+            if case .text(let fields) = write.content {
+                variableSlots(in: fields.keys.sorted().compactMap { fields[$0] }, subject: commandSubject)
+            }
+        case .popupSet(_, let text, _):
+            variableSlots(in: [text], subject: commandSubject)
+        default:
+            break
+        }
+    }
+
+    /// Spec 6 §5 — "A timer or popup number above the machine's count is
+    /// still a v1 name. It resolves empty and the reference report notes it,
+    /// since presets travel between campuses with different counts." One
+    /// note per subject, naming each such variable; nothing without a machine.
+    mutating func variableSlots(in texts: [String], subject: String) {
+        guard let settings = machine?.settings else { return }
+        var above: [String] = []
+        for token in texts.flatMap({ VariableText.parse($0).tokens }) {
+            switch token.name {
+            case .timer(let n) where n > settings.timers:
+                above.append("\(token.written) names timer \(n), above this machine's \(settings.timers) timer slots")
+            case .popup(let n) where n > settings.popups:
+                above.append("\(token.written) names popup \(n), above this machine's \(settings.popups) popup slots")
+            default:
+                break
+            }
+        }
+        guard !above.isEmpty else { return }
+        report.add(.info, .variableAboveSlotCount, subject: subject, message: above.joined(separator: "; ") + "; it shows nothing here")
     }
 
     /// Spec 2 §5 — "A macro can call another macro; depth is capped at 8 and
