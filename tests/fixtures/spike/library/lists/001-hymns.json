@@ -136,7 +136,7 @@
           "audioTransition": { "ref": 2, "scope": "once" },
           "channel": 1,
           "cmd": "channel.write",
-          "content": { "in": 1000, "kind": "media", "loop": false, "out": 11000, "ref": "sha256:5c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a02" },
+          "content": { "in": 1000, "kind": "media", "out": 11000, "ref": "sha256:5c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a025c7e0a02" },
           "transition": { "ms": 1000, "ref": 2, "scope": "once" }
         },
         {
@@ -317,7 +317,7 @@
         {
           "channel": 1,
           "cmd": "channel.write",
-          "content": { "kind": "media", "loop": false, "ref": "sha256:11a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a4" },
+          "content": { "kind": "media", "ref": "sha256:11a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a411a4e0a4" },
           "transition": { "ms": 1000, "ref": 2, "scope": "once" }
         },
         {
@@ -388,7 +388,7 @@
         {
           "channel": 1,
           "cmd": "channel.write",
-          "content": { "kind": "media", "loop": false, "ref": "sha256:c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06" },
+          "content": { "kind": "media", "ref": "sha256:c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06c0550a06" },
           "transition": { "ms": 1000, "ref": 2, "scope": "once" }
         },
         {
@@ -478,7 +478,7 @@
           "audioTransition": { "ref": 1, "scope": "once" },
           "channel": 1,
           "cmd": "channel.write",
-          "content": { "kind": "media", "loop": false, "ref": "sha256:c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71" },
+          "content": { "kind": "media", "ref": "sha256:c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71c1a99e71" },
           "transition": { "ref": 1, "scope": "once" }
         }
       ],

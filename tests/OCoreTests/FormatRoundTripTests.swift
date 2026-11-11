@@ -25,6 +25,28 @@ final class FormatRoundTripTests: XCTestCase {
         }
     }
 
+    /// Spec 6 §9 — "Area 6 rewrites both fixture roots to this shape": the
+    /// spike's documents write back byte for byte too, and its catalogs,
+    /// presets and stacks are the fixture library's.
+    func test_everySpikeDocumentRoundTripsByteForByteAndSharesTheFirstRunShape() throws {
+        let documents = F.documents(under: F.spikeLibraryRoot).map { ("library", $0.path, $0.data) }
+            + F.documents(under: F.spikeMachineRoot).map { ("machine", $0.path, $0.data) }
+        XCTAssertGreaterThan(documents.count, 15, "the spike roots are missing")
+        for (root, path, data) in documents {
+            let loaded = try Loader.document(path: path, data: data)
+            let written = Writer.data(for: loaded)
+            XCTAssertEqual(written, data, "spike \(root)/\(path): " + ByteDiff.describe(expected: data, actual: written))
+        }
+        let library = F.documents(under: F.libraryRoot)
+        let spike = F.documents(under: F.spikeLibraryRoot)
+        for path in ["channels.json", "text-styles.json", "presets/001-default.json", "presets/002-clock.json", "presets/003-lower-third.json",
+                     "presets/004-credits.json"] {
+            XCTAssertEqual(spike.first { $0.path == path }?.data, library.first { $0.path == path }?.data, path)
+        }
+        XCTAssertEqual(F.documents(under: F.spikeMachineRoot).first { $0.path == "stacks.json" }?.data,
+                       F.documents(under: F.machineRoot).first { $0.path == "stacks.json" }?.data, "stacks.json")
+    }
+
     /// Spec 1 §8 — unknown keys are preserved on every object that has fields
     /// of its own. The exceptions are the fixed value shapes (colours, frames,
     /// sizes, rates, outline, shadow, mask), the plain maps (layouts, fields,

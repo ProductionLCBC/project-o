@@ -27,7 +27,9 @@ final class SchemaTests: XCTestCase {
     }
 
     func test_everyFixtureDocumentValidatesAgainstItsSchema() throws {
+        // Spec 6 §9 — both fixture roots, the spike's included.
         let documents = F.documents(under: F.libraryRoot) + F.documents(under: F.machineRoot)
+            + F.documents(under: F.spikeLibraryRoot) + F.documents(under: F.spikeMachineRoot)
         for (path, data) in documents {
             let tree = try JSONValue.parse(data)
             let kind = try XCTUnwrap(tree["kind"]?.stringValue.flatMap(DocumentKind.init(rawValue:)), path)

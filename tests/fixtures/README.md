@@ -9,12 +9,16 @@ A complete first-run library plus the worked examples of Spec 1 §9, in the cano
 scalars or empty on one line, one object per line otherwise). Every later spec's tests start
 from it, and the round-trip test requires the writer to reproduce every document byte for byte.
 
-`library/` is the library root: `library.json`, the five catalog documents, presets 1–3
-(Default, built in; Confidence, with the static `[Time]` box; Lower third, with a layout for
-stack 2), the portable macro 1 (Welcome, with a guard), list 42 (*Great Is Thy Faithfulness*,
-Thomas Chisholm, 1923, public domain; the §9 two cues plus a Time-triggered third and a chorus
-with riders) at version 17 with version 16 under `versions/042/`, list 7 (*Doxology*, Thomas Ken,
-1674; a timecode trigger, a missing video, a slide write, a macro call), and `media-index.json`.
+`library/` is the library root: `library.json`, the five catalog documents (channels 1–3:
+Background, Foreground and Clock, the first-run set of Spec 6 §9), presets 1–4 (Default, built
+in, with its `"*"` layout and the confidence layout `"2"`, whose second body box draws the next
+cue at offset +1; Clock, one static `[Time]` box; Lower third, with a layout for stack 2; Credits,
+field boxes for `title`, `author`, `copyright` and `ccli`, for the list-metadata fallback of Spec 6
+§3), the portable macro 1 (Welcome, with a guard), list 42 (*Great Is Thy Faithfulness*, Thomas
+Chisholm, 1923, public domain; the §9 two cues plus a Time-triggered third and a chorus with
+riders) at version 17 with version 16 under `versions/a9f00000-0000-4000-8000-00000000002a/` (its
+uuid, §5), list 7 (*Doxology*, Thomas Ken, 1674; a timecode trigger, a missing video, a slide
+write, a macro call), and `media-index.json`.
 
 `library/media/` holds synthetic media only: `backgrounds/dawn.mp4` (64×36, eight frames of a
 colour wash, written by AVAssetWriter), `backgrounds/cross.png`, `local/cross-fast.png` (the same
@@ -22,8 +26,10 @@ bytes at a second path: one identity, Spec 1 §4), `local/announcement.png` (loc
 indexed in the machine root), a poster frame, and `slides/welcome.oslide` (the §7 envelope). The
 index also lists `backgrounds/mountains.mp4`, which does not exist: the missing state of §7.
 
-`machine/` is the machine root: settings, stacks (the §9 main and confidence stacks), two
-outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
+`machine/` is the machine root: settings, stacks (Spec 6 §9's: Main holds channels 1 and 2,
+Confidence channels 2 and 3, neither with a default preset, so each slot takes its channel's
+preset: the confidence stack draws Preset 1's `"2"` layout for channel 2 and the Clock for channel
+3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
 entry, the machine index with a path override, the machine-level macro 2 (Preshow, which names a
 stack and an output), three playlists named from their titles (Spec 7 §8: "Sunday", dated, in
 `sunday.json`; "Sunday Night", which links list 42 twice, for the pointer tests; and "Sunday
@@ -42,8 +48,8 @@ cue's `trigger` was a bare string with its value beside it (`triggerMs`, `trigge
 
 ## `spike/` — the engine spike's roots (Spec 4 §15)
 
-`spike/library/` is the library root the soak runs: the catalog documents and the three presets
-copied from `library-v1/`, one list (*Spike hymns*: Amazing Grace, Holy Holy Holy, Be Thou My
+`spike/library/` is the library root the soak runs: the catalog documents and the four presets
+copied from `library-v1/` byte for byte, one list (*Spike hymns*: Amazing Grace, Holy Holy Holy, Be Thou My
 Vision, It Is Well with My Soul and Come Thou Fount, all public domain, two lines a cue, a clear
 at the end of each hymn, and a last cue that cuts to the clapper) and `media-index.json` naming
 six synthetic items: a ProRes 422 Proxy background that loops between its trims, an HEVC
@@ -54,7 +60,10 @@ make-fixtures tests/fixtures/spike/library/media` (which `scripts/soak.sh` runs 
 are missing) writes it with `FixtureMedia`, and the index carries fixed ids rather than content
 hashes so the lists resolve on any machine. `spike/machine/` is the bench machine root: two
 60p display outputs (the main one at 1920×1080 here; the bench edits it to 4096×2160 or an SDI
-output), the two stacks of `library-v1/` and one audio output on the default device.
+output), the two stacks of `library-v1/` and one audio output on the default device. Both spike
+roots are in canonical form and covered by the round-trip and schema tests like `library-v1/`, and
+the round-trip test checks that the shared documents still match. A bench machine that holds an
+older copy of these roots needs a fresh copy from here (Spec 6 §9 changed the stacks and presets).
 
 `../soak/spike.json` is the Spec 4 §15 script: the list on repeat with `next` every five seconds,
 a stack switch and a blackout every ten minutes. Large soak media stays on the test bench.
