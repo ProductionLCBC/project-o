@@ -162,6 +162,8 @@ final class TimerEngineTests: XCTestCase {
         var box = S.label("[Timer 1]", 0)
         var style = BoxTextStyle()
         style.values.font = "Skia-Regular"
+        // Skia is a variable font whose `wght` runs 0.48 to 3.2: naming it keeps Skia's own default (Spec 1 §2).
+        style.values.variations = ["wght": 1]
         style.values.size = TextSize(value: 72)
         style.values.shadow = Shadow()
         style.values.outline = Outline()
