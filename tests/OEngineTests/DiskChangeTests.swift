@@ -283,9 +283,11 @@ final class DiskChangeTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.title, "Old Hundredth")
     }
 
-    /// Events under the rest of the roots aren't changes to documents.
-    func test_theWatcherWatchesListsPlaylistsAndLocalCopiesOnly() {
-        let watcher = DiskWatcher(libraryRoot: disk.libraryRoot, machineRoot: disk.machineRoot, onChange: {})
+    /// Events under the rest of the roots aren't changes to documents; Spec 8
+    /// §4 — events under the media root or `machine/media/` start a walk.
+    func test_theWatcherWatchesDocumentsAndTheMediaFolders() {
+        let media = [disk.libraryRoot.appendingPathComponent("media"), disk.machineRoot.appendingPathComponent("media")]
+        let watcher = DiskWatcher(libraryRoot: disk.libraryRoot, machineRoot: disk.machineRoot, media: media, onChange: {})
         let library = DiskWatcher.realPath(disk.libraryRoot)
         let machine = DiskWatcher.realPath(disk.machineRoot)
         XCTAssertTrue(library.hasPrefix("/private/"), "FSEvents names real paths: \(library)")
@@ -293,8 +295,44 @@ final class DiskChangeTests: XCTestCase {
         XCTAssertTrue(watcher.matches(library + "/lists"))
         XCTAssertTrue(watcher.matches(machine + "/playlists/sunday.json"))
         XCTAssertTrue(watcher.matches(machine + "/lists-local/042-x.json"))
+        XCTAssertTrue(watcher.matches(library + "/media-index.json"), "Spec 8 §2 — the library media index")
+        XCTAssertTrue(watcher.matches(machine + "/media-local.json"), "and the machine's")
+        XCTAssertFalse(watcher.matches(machine + "/media-cache.json"), "the cache is the engine's own")
         XCTAssertFalse(watcher.matches(machine + "/thumbnails/a.png"))
         XCTAssertFalse(watcher.matches(library + "/media/dawn.mp4"))
         XCTAssertFalse(watcher.matches(library + "/listsx/a.json"))
+        XCTAssertTrue(watcher.matchesMedia(library + "/media/backgrounds/dawn.mp4"))
+        XCTAssertTrue(watcher.matchesMedia(machine + "/media/announcement.png"))
+        XCTAssertFalse(watcher.matchesMedia(machine + "/media-local.json"))
+        XCTAssertFalse(watcher.matchesMedia(library + "/lists/Hymns/042.json"))
+    }
+
+    // MARK: - The media indexes (Spec 8 §2, §9)
+
+    /// Spec 8 §2 — "Missing state is worked out ... whenever either index
+    /// reloads": a media index changed on disk reloads with one `library`
+    /// event, cause `file`, naming the media by id.
+    func test_aMediaIndexChangedOnDiskReloads() throws {
+        let announcement = "sha256:fa3021eba9c15cb8aa65b79e04c0df3d5291d79d397e5930610248bab8d3e2e0"
+        let data = try XCTUnwrap(disk.data(.machine, "media-local.json"))
+        let text = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\"loop\": false", with: "\"loop\": true")
+        try disk.write(.machine, "media-local.json", Data(text.utf8))
+        disk.engine.scanDisk()
+        XCTAssertEqual(machine.mediaLocal.entry(announcement)?.defaults.loop, true)
+        XCTAssertEqual(fileEvents.count, 1)
+        XCTAssertEqual(fileEvents.last?["changed"], .array([.object(["object": .string("media"), "media": .string(announcement), "paths": .array([])])]))
+        // The library's, which arrives by sync.
+        let index = try XCTUnwrap(disk.data(.library, "media-index.json"))
+        let synced = String(decoding: index, as: UTF8.self).replacingOccurrences(of: "\"replaced\": {}",
+            with: "\"replaced\": { \"\(EngineFixtures.mountains)\": \"\(EngineFixtures.dawn)\" }")
+        try disk.write(.library, "media-index.json", Data(synced.utf8))
+        disk.engine.scanDisk()
+        XCTAssertEqual(library.mediaIndex.replaced, [EngineFixtures.mountains: EngineFixtures.dawn])
+        XCTAssertEqual(fileEvents.count, 2)
+        // A file that went: the engine keeps the index it holds.
+        try FileManager.default.removeItem(at: disk.url(.machine, "media-local.json"))
+        disk.engine.scanDisk()
+        XCTAssertEqual(machine.mediaLocal.entry(announcement)?.defaults.loop, true)
+        XCTAssertEqual(fileEvents.count, 2)
     }
 }

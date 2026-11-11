@@ -329,3 +329,22 @@ public struct MediaLocalIndex: Codable, Equatable, Sendable {
         if !replaced.isEmpty { try c.encode(replaced, forKey: .replaced) }
     }
 }
+
+/// Spec 5 §2 as Spec 8 §2 adds — the `library` event names "the media by
+/// id": what differs between two versions of an index.
+public enum MediaIndexDiff {
+    /// One changed item, as the event names it.
+    public static func change(_ id: String) -> LibraryChange {
+        LibraryChange(object: "media", address: ["media": .string(id)])
+    }
+
+    /// Each id whose entry or mapping differs, in id order.
+    public static func changes(_ oldEntries: [MediaEntry], _ oldReplaced: [String: String],
+                               _ newEntries: [MediaEntry], _ newReplaced: [String: String]) -> [LibraryChange] {
+        let old = Dictionary(oldEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let new = Dictionary(newEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var ids = Set(old.keys).union(new.keys).filter { old[$0] != new[$0] }
+        ids.formUnion(Set(oldReplaced.keys).union(newReplaced.keys).filter { oldReplaced[$0] != newReplaced[$0] })
+        return ids.sorted().map(change)
+    }
+}

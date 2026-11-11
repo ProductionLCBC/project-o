@@ -226,6 +226,8 @@ struct Reload {
         for file in delta.arrived.sorted(by: { $0.path < $1.path }) where file.path.hasPrefix("lists/") {
             arriveInLibrary(file, removed: &removed, present: delta.present)
         }
+        if let file = delta.arrived.first(where: { $0.path == DocumentKind.mediaIndex.fixedPath }) { arriveIndex(file, .mediaIndex) }
+        if removed.removeValue(forKey: DocumentKind.mediaIndex.fixedPath ?? "") != nil { indexGone(.mediaIndex) }
         for (path, digest) in removed.sorted(by: { $0.key < $1.key }) where path.hasPrefix("lists/") {
             goneFromLibrary(path, digest: digest)
         }
@@ -407,10 +409,57 @@ struct Reload {
         }
     }
 
+    // MARK: - The media indexes (Spec 1 §7, Spec 8 §2)
+
+    /// Spec 8 §2 and §9 — a media index that changed on disk, a library index
+    /// arriving by sync above all: reloaded, "whenever either index reloads"
+    /// missing state is worked out again. With unwritten changes to it, the
+    /// engine's win and the arriving file is kept (Spec 5 §10). A file that
+    /// doesn't read yet is ignored until it does.
+    mutating func arriveIndex(_ file: ArrivedFile, _ ref: DocumentRef) {
+        guard case .success(let loaded) = file.document else { return }
+        if unwritten.contains(ref) {
+            outcome.conflicts.append(KeptConflict(name: Self.name(file.path), data: file.data, about: "\(ref) at \(file.path)"))
+            outcome.rewrite.append(ref)
+            outcome.warnings.append("\(ref) changed on disk while the engine held unwritten changes to it: the engine's win")
+            return
+        }
+        switch loaded.body {
+        case .mediaIndex(let index) where ref == .mediaIndex:
+            let before = outcome.library.mediaIndex
+            guard index != before else { return }
+            outcome.library.mediaIndex = index
+            if !loaded.extras.isEmpty { outcome.library.documentExtras[.mediaIndex] = loaded.extras }
+            outcome.changes += MediaIndexDiff.changes(before.entries, before.replaced, index.entries, index.replaced)
+            outcome.notes.append("the library media index changed on disk and was reloaded")
+        case .mediaLocal(let index) where ref == .mediaLocal:
+            let before = outcome.machine.mediaLocal
+            guard index != before else { return }
+            outcome.machine.mediaLocal = index
+            if !loaded.extras.isEmpty { outcome.machine.documentExtras[.mediaLocal] = loaded.extras }
+            outcome.changes += MediaIndexDiff.changes(before.entries, before.replaced, index.entries, index.replaced)
+            for id in Set(before.overrides.keys).union(index.overrides.keys) where before.overrides[id] != index.overrides[id] {
+                outcome.changes.append(MediaIndexDiff.change(id))
+            }
+            outcome.notes.append("the machine media index changed on disk and was reloaded")
+        default:
+            break
+        }
+    }
+
+    /// Spec 1 §7 — the indexes "can be rebuilt from the files if lost", but
+    /// an index whose file went keeps what the engine holds, defaults
+    /// included, and is written again with its next change.
+    mutating func indexGone(_ ref: DocumentRef) {
+        outcome.warnings.append("\(ref)'s file went from disk; the engine keeps the index it holds")
+    }
+
     // MARK: - The machine root: playlists/ and lists-local/
 
     mutating func applyMachine(_ delta: RootDelta) {
         var removed = delta.removed
+        if let file = delta.arrived.first(where: { $0.path == DocumentKind.mediaLocal.fixedPath }) { arriveIndex(file, .mediaLocal) }
+        if removed.removeValue(forKey: DocumentKind.mediaLocal.fixedPath ?? "") != nil { indexGone(.mediaLocal) }
         for file in delta.arrived.sorted(by: { $0.path < $1.path }) {
             if file.path.hasPrefix("playlists/") {
                 arrivePlaylist(file, removed: &removed, present: delta.present)
