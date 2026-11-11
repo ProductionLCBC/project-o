@@ -179,13 +179,72 @@ public struct NetworkSettings: Codable, Equatable, Sendable {
     }
 }
 
+/// Spec 8 §8 — "`dropChannels` is a new machine setting (M8): `{video, image,
+/// audio}`, each a channel number or null. An item's
+/// `defaults.defaultChannel` overrides it. The pool's double-click and its
+/// drops use them ... First run writes `{"video": 1, "image": 1, "audio":
+/// null}`: channel 1 is the background, and a first-run machine has no
+/// channel meant for audio, so the pool asks (choice M-6)."
+public struct DropChannels: Codable, Equatable, Sendable {
+    public var video: Int?
+    public var image: Int?
+    public var audio: Int?
+    public var extra: [String: JSONValue]
+
+    public init(video: Int? = nil, image: Int? = nil, audio: Int? = nil, extra: [String: JSONValue] = [:]) {
+        self.video = video
+        self.image = image
+        self.audio = audio
+        self.extra = extra
+    }
+
+    /// Spec 8 §8 — what first run writes (Spec 10 §13, Area 19).
+    public static let firstRun = DropChannels(video: 1, image: 1, audio: nil)
+
+    /// Spec 8 §8 — the channel a pool drop of an item goes to: its
+    /// `defaults.defaultChannel`, else the setting for its kind; nil means
+    /// the pool asks. Slides and templates have none until the slide
+    /// designer (Spec 8 §1); an audio set counts as audio.
+    public func channel(for kind: MediaKind, defaultChannel: Int?) -> Int? {
+        if let defaultChannel { return defaultChannel }
+        switch kind {
+        case .video: return video
+        case .image: return image
+        case .audio, .audioSet: return audio
+        case .slide, .template: return nil
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case video, image, audio }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        video = try c.decodeIfPresent(Int.self, forKey: .video)
+        image = try c.decodeIfPresent(Int.self, forKey: .image)
+        audio = try c.decodeIfPresent(Int.self, forKey: .audio)
+        extra = try decoder.unknownKeys(besides: CodingKeys.known)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        try encoder.encode(unknownKeys: extra)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeNullable(video, forKey: .video)
+        try c.encodeNullable(image, forKey: .image)
+        try c.encodeNullable(audio, forKey: .audio)
+    }
+}
+
 /// Spec 1 §3 — Machine settings (one document, `machine.json`): machine
 /// `uuid` and `campusName`, `defaultRole`, `operatorLock`, `libraryMode`,
-/// `mediaRoot`, `defaultImportFolder`, `fallbackFont`, `thumbnailStack`,
-/// `decoderCapDefault`, `tracking`, `timers` and `popups` (slot counts),
-/// `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`,
+/// `mediaRoot`, `defaultImportFolder`, `dropChannels` ("a channel per media
+/// kind for drops from the pool, Spec 8 §8"), `fallbackFont`,
+/// `thumbnailStack`, `decoderCapDefault`, `tracking`, `timers` and `popups`
+/// (slot counts), `timeFormat`, `timeZone`, `startupMacro`, `shutdownMacro`,
 /// `restoreLastState` (default false), `snapshots`, `commandBar` (default
 /// false), `network`. The defaults are the UX spec's first-run defaults.
+/// `dropChannels` is nil when `machine.json` doesn't hold it, and is then
+/// written back absent, so a machine root from before Spec 8 round-trips
+/// unchanged; read as a setting, nil means the pool asks for every kind.
 public struct MachineSettings: Codable, Equatable, Sendable {
     public var uuid: UUID
     public var campusName: String
@@ -194,6 +253,7 @@ public struct MachineSettings: Codable, Equatable, Sendable {
     public var libraryMode: LibraryMode
     public var mediaRoot: String
     public var defaultImportFolder: String
+    public var dropChannels: DropChannels?
     public var fallbackFont: String
     public var thumbnailStack: Int
     public var decoderCapDefault: Int
@@ -213,6 +273,7 @@ public struct MachineSettings: Codable, Equatable, Sendable {
     public init(uuid: UUID = UUID(), campusName: String = "", defaultRole: Role = .editor,
                 operatorLock: OperatorLock = OperatorLock(), libraryMode: LibraryMode = .readOnlyMasters,
                 mediaRoot: String = "../library/media", defaultImportFolder: String = "imports",
+                dropChannels: DropChannels? = nil,
                 fallbackFont: String = "HelveticaNeue", thumbnailStack: Int = 1, decoderCapDefault: Int = 2,
                 tracking: TrackingSwitches = TrackingSwitches(), timers: Int = 4, popups: Int = 4,
                 timeFormat: String = "h:mm a", timeZone: String = "America/New_York", startupMacro: Int? = nil,
@@ -225,6 +286,7 @@ public struct MachineSettings: Codable, Equatable, Sendable {
         self.libraryMode = libraryMode
         self.mediaRoot = mediaRoot
         self.defaultImportFolder = defaultImportFolder
+        self.dropChannels = dropChannels
         self.fallbackFont = fallbackFont
         self.thumbnailStack = thumbnailStack
         self.decoderCapDefault = decoderCapDefault
@@ -243,7 +305,7 @@ public struct MachineSettings: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case uuid, campusName, defaultRole, operatorLock, libraryMode, mediaRoot, defaultImportFolder, fallbackFont
+        case uuid, campusName, defaultRole, operatorLock, libraryMode, mediaRoot, defaultImportFolder, dropChannels, fallbackFont
         case thumbnailStack, decoderCapDefault, tracking, timers, popups, timeFormat, timeZone, startupMacro, shutdownMacro
         case restoreLastState, snapshots, commandBar, network
     }
@@ -257,6 +319,7 @@ public struct MachineSettings: Codable, Equatable, Sendable {
         libraryMode = try c.value(.libraryMode, default: .readOnlyMasters)
         mediaRoot = try c.value(.mediaRoot, default: "../library/media")
         defaultImportFolder = try c.value(.defaultImportFolder, default: "imports")
+        dropChannels = try c.decodeIfPresent(DropChannels.self, forKey: .dropChannels)
         fallbackFont = try c.value(.fallbackFont, default: "HelveticaNeue")
         thumbnailStack = try c.value(.thumbnailStack, default: 1)
         decoderCapDefault = try c.value(.decoderCapDefault, default: 2)
@@ -284,6 +347,8 @@ public struct MachineSettings: Codable, Equatable, Sendable {
         try c.encode(libraryMode, forKey: .libraryMode)
         try c.encode(mediaRoot, forKey: .mediaRoot)
         try c.encode(defaultImportFolder, forKey: .defaultImportFolder)
+        // Spec 8 §8 — written when the document holds it, so older machine roots round-trip.
+        try c.encodeIfPresent(dropChannels, forKey: .dropChannels)
         try c.encode(fallbackFont, forKey: .fallbackFont)
         try c.encode(thumbnailStack, forKey: .thumbnailStack)
         try c.encode(decoderCapDefault, forKey: .decoderCapDefault)

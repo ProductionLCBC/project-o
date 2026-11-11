@@ -27,7 +27,7 @@ in-point, beside its media), and `slides/welcome.oslide` (the §7 envelope). The
 `backgrounds/mountains.mp4`, whose video and poster (`.posters/<hex>-1500.png`, at its 1500 ms
 in-point) are both absent: the missing state of §7.
 
-`machine/` is the machine root: settings, stacks (Spec 6 §9's: Main holds channels 1 and 2,
+`machine/` is the machine root: settings (with Spec 8 §8's first-run `dropChannels`), stacks (Spec 6 §9's: Main holds channels 1 and 2,
 Confidence channels 2 and 3, neither with a default preset, so each slot takes its channel's
 preset: the confidence stack draws Preset 1's `"2"` layout for channel 2 and the Clock for channel
 3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler

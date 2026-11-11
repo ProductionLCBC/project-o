@@ -5,6 +5,7 @@
   "decoderCapDefault": 2,
   "defaultImportFolder": "imports",
   "defaultRole": "editor",
+  "dropChannels": { "audio": null, "image": 1, "video": 1 },
   "fallbackFont": "HelveticaNeue",
   "kind": "machine",
   "libraryMode": "readOnlyMasters",
