@@ -412,7 +412,7 @@ public final class ControlLoop: @unchecked Sendable {
     private func run(_ group: CommandGroup, frame: Int64, now: MonotonicTime) {
         let context = projectionContext(frame: frame, source: group.source)
         // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
-        let editing = EditContext(today: variables.date())
+        let editing = EditContext(today: variables.today())
         switch CommandRunner.run(group, state: model.state, context: context, editing: editing) {
         case .failure(let rejection):
             // Spec 5 §5 — "any other command from that client closes the run early".
@@ -869,9 +869,18 @@ public final class ControlLoop: @unchecked Sendable {
             }
         }
 
+        // Spec 6 §5 — "[Time], [Date], [Timer N] and [Service In] read the same in every state": read once per
+        // build, with [Service In] from the live playlist; the thumbnail job reads what this build publishes.
+        let livePlaylist = model.state.livePlaylist(library: library, machine: machine, kept: kept)
+        let timers = timerReadings(at: frame)
+        let resolving = Resolving(roots: VariableRoots(library: library, machine: machine, kept: kept),
+                                  clock: variables.clock(livePlaylist: livePlaylist, timers: timers))
+        variables.publish(livePlaylist: livePlaylist, timers: timers)
+
         var plan = FramePlan(frame: frame)
         for stack in machine.stacks where rendering.contains(stack.number) {
-            plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), scratch: &scratch))
+            plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), resolving: resolving,
+                                              scratch: &scratch))
         }
         plan.channelPasses = scratch.channelPasses.keys.sorted().compactMap { channel in
             guard var pass = scratch.channelPasses[channel] ?? nil else { return nil }
@@ -1000,11 +1009,33 @@ public final class ControlLoop: @unchecked Sendable {
         return scratch.lookahead[steps - 1]
     }
 
+    /// Spec 6 §5 — what one build resolves variables with: the roots a
+    /// context value is read through, and the readings that "read the same in
+    /// every state".
+    struct Resolving {
+        var roots: VariableRoots
+        var clock: VariableClock
+    }
+
+    /// Spec 6 §6 — the timers as they read at `frame` (Area 11's timers come
+    /// with its fourth step; until then every timer is unset).
+    func timerReadings(at frame: Int64) -> [Int: TimerReading] {
+        [:]
+    }
+
+    /// Spec 6 §5 — a text box's variables resolved in the state being drawn,
+    /// each format outside the set logged once per box.
+    private func resolveText(_ template: SlotResolver.BoxTemplate, key: BoxKey, state: ShowState, resolving: Resolving) -> ResolvedText {
+        let resolved = variables.resolve(template.raw, state: state, scope: template.scope, roots: resolving.roots, clock: resolving.clock)
+        if !resolved.issues.isEmpty { variables.log(resolved.issues, box: key, to: log) }
+        return resolved
+    }
+
     /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top". The
     /// slots resolve through `SlotResolver`, shared with the thumbnail job;
     /// the box transitions, the variable gate and the lookahead are the live
     /// plan's own.
-    private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> StackPass {
+    private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, resolving: Resolving, scratch: inout BuildScratch) -> StackPass {
         let size = geometry.stackSize(stack.number)
         let target = stackRings[stack.number]?[Int(frame % Int64(FrameRing.depth))] ?? .none
         let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
@@ -1015,7 +1046,7 @@ public final class ControlLoop: @unchecked Sendable {
             // offset box, the text one cue beyond its offset".
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
                 if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch) {
-                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after)
+                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after, resolving: resolving)
                 }
             }
             let results = SlotResolver.resolve(
@@ -1024,13 +1055,12 @@ public final class ControlLoop: @unchecked Sendable {
                 // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
                 state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
                 pixels: { slot, offset, content in pixelSource(for: slot, offset: offset, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
-                staticText: { key, box, raw, shown in
-                    // Spec 6 §5 — a static box's values read the state being drawn: the live state, or the
-                    // lookahead state of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup
-                    // that names one.
-                    let now = SlotResolver.StaticText(text: variables.resolve(raw, state: shown),
-                                                      tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
-                    guard VariableProvider.containsVariables(raw) else { return now }
+                text: { key, box, template, shown in
+                    // Spec 6 §5 — the values read the state being drawn: the live state, or the lookahead state
+                    // of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup that names one.
+                    let resolved = resolveText(template, key: key, state: shown, resolving: resolving)
+                    let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
+                    guard resolved.hasVariables, case .static = box.binding.kind else { return now }
                     return adoptedVariableValue(key, resolved: now, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
                 },
                 onTextMiss: { job in
@@ -1069,16 +1099,29 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 6 §3 — "The engine rasterizes the text one cue beyond each offset
-    /// box ahead of time ... so a `next` never waits on text": the field boxes
-    /// at `offset` with the text the slot's channel will hold one cue later,
-    /// `state`.
-    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState) {
+    /// box ahead of time ... so a `next` never waits on text": the text boxes
+    /// at `offset` with the text they will draw one cue later, in `state`, its
+    /// variables resolved there (Spec 6 §5). A static box without variables
+    /// draws the same text in every state, already cached.
+    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState, resolving: Resolving) {
         guard let layout = inputs.layout(for: slot) else { return }
         for box in layout.boxes where box.offset == offset {
-            guard case .field(let name) = box.binding.kind,
-                  let value = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !value.isEmpty else { continue }
-            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
-                                           tabular: SlotResolver.wantsTabularDigits(value, popups: state.popups))
+            let template: SlotResolver.BoxTemplate
+            switch box.binding.kind {
+            case .field(let name):
+                guard let raw = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !raw.isEmpty else { continue }
+                template = SlotResolver.BoxTemplate(raw: raw, scope: .content(channel: slot.channel))
+            case .static(let raw):
+                guard VariableText.parse(raw).hasVariables else { continue }
+                template = SlotResolver.BoxTemplate(raw: raw, scope: .pointer)
+            case .pixels:
+                continue
+            }
+            // The box logs its own formats outside the set when it draws (Spec 6 §5).
+            let resolved = variables.resolve(template.raw, state: state, scope: template.scope, roots: resolving.roots, clock: resolving.clock)
+            guard !resolved.text.isEmpty else { continue }
+            let job = SlotResolver.textJob(resolved.text, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
+                                           tabular: resolved.tabular)
             if text.entry(for: job) == nil { text.request(job) }
         }
     }
@@ -1092,8 +1135,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// fractional master rate). A first value and a clear are not re-layouts
     /// and show at once. The previous raster goes when a value is adopted, its
     /// textures freed once any box transition between the two has run.
-    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.StaticText, box: Box, frame: Int64, frameRect: PixelRect,
-                                      size: PixelSize) -> SlotResolver.StaticText {
+    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.BoxText, box: Box, frame: Int64, frameRect: PixelRect,
+                                      size: PixelSize) -> SlotResolver.BoxText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
         let second = variables.currentSecond
@@ -1105,7 +1148,7 @@ public final class ControlLoop: @unchecked Sendable {
             run.adoptedSecond = second
             return resolved
         }
-        let held = SlotResolver.StaticText(text: adopted, tabular: run.adoptedTabular)
+        let held = SlotResolver.BoxText(text: adopted, tabular: run.adoptedTabular)
         guard held != resolved else { return held }
         if !adopted.isEmpty, !resolved.text.isEmpty, second == run.adoptedSecond { return held }
         if !adopted.isEmpty {

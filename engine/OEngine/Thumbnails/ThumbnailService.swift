@@ -260,7 +260,12 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// Spec 3 §1 — "the cue grid runs it from the top of a list to draw
     /// thumbnails": tracked state from the top of the list, starting empty,
     /// the state after each cue in turn, so cue 1's background shows on every
-    /// later thumbnail.
+    /// later thumbnail. Spec 6 §5 — "Context values and list metadata come
+    /// from the state being drawn: ... a thumbnail's projected state", and "In
+    /// a static box, a value reads the state's pointer: its cue and its list";
+    /// "A projected state has no playlist": each state read names the cue
+    /// drawn and its list, with no playlist. The fold itself runs as before,
+    /// from no pointer.
     func projectedStates(of list: List, through index: Int, roots: (library: Library, machine: Machine)) -> [ShowState] {
         let (library, machine) = roots
         var state = ShowState.fresh(library: library, machine: machine)
@@ -272,7 +277,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
                                             source: CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid),
                                             variables: { name in variables.value(name, state: current) })
             state = project(state, cue.commands.map(\.command), context: context).0
-            out.append(state)
+            var drawn = state
+            drawn.pointer = LivePointer(listUuid: list.uuid, cueUuid: cue.uuid)
+            out.append(drawn)
         }
         return out
     }
@@ -293,6 +300,10 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         // library no longer holds that version.
         let inputs = SlotResolver.Inputs(library: library, machine: roots.machine, kept: KeptCopies(list: list), stack: stackObject, size: size,
                                          muted: state.stacks[stack]?.muted ?? [], text: eager)
+        // Spec 6 §5 — "[Time], [Date], [Timer N] and [Service In] read the same in every state ... A thumbnail shows
+        // them as they were when it rendered": the wall clock now, the live playlist and timers the last build published.
+        let variableRoots = VariableRoots(library: library, machine: roots.machine, kept: KeptCopies(list: list))
+        let clock = variables.publishedClock()
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stackObject.effectiveSlots(library: library).enumerated() {
             let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot,
@@ -301,9 +312,11 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
                                                    return states[index + offset]
                                                },
                                                pixels: { _, _, content in self.posterSource(for: content, roots: roots) },
-                                               staticText: { _, _, raw, shown in
-                                                   SlotResolver.StaticText(text: self.variables.resolve(raw, state: shown),
-                                                                           tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
+                                               text: { key, _, template, shown in
+                                                   let resolved = self.variables.resolve(template.raw, state: shown, scope: template.scope,
+                                                                                         roots: variableRoots, clock: clock)
+                                                   if !resolved.issues.isEmpty { self.variables.log(resolved.issues, box: key, to: self.log) }
+                                                   return SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
                                                },
                                                onTextMiss: { _ in })
             boxes.append(contentsOf: results.compactMap(\.resolved))
