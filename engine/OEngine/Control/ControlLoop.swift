@@ -873,8 +873,9 @@ public final class ControlLoop: @unchecked Sendable {
         // build, with [Service In] from the live playlist; the thumbnail job reads what this build publishes.
         let livePlaylist = model.state.livePlaylist(library: library, machine: machine, kept: kept)
         let timers = timerReadings(at: frame)
-        let resolving = Resolving(roots: VariableRoots(library: library, machine: machine, kept: kept),
-                                  clock: variables.clock(livePlaylist: livePlaylist, timers: timers))
+        let readings = variables.readings(livePlaylist: livePlaylist, timers: timers)
+        let resolving = Resolving(roots: VariableRoots(library: library, machine: machine, kept: kept), clock: readings.clock,
+                                  second: readings.second)
         variables.publish(livePlaylist: livePlaylist, timers: timers)
 
         var plan = FramePlan(frame: frame)
@@ -1015,6 +1016,8 @@ public final class ControlLoop: @unchecked Sendable {
     struct Resolving {
         var roots: VariableRoots
         var clock: VariableClock
+        /// The wall-clock second `clock` reads.
+        var second: Int64
     }
 
     /// Spec 6 §6 — the timers as they read at `frame` (Area 11's timers come
@@ -1059,9 +1062,8 @@ public final class ControlLoop: @unchecked Sendable {
                     // Spec 6 §5 — the values read the state being drawn: the live state, or the lookahead state
                     // of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup that names one.
                     let resolved = resolveText(template, key: key, state: shown, resolving: resolving)
-                    let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
-                    guard resolved.hasVariables, case .static = box.binding.kind else { return now }
-                    return adoptedVariableValue(key, resolved: now, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
+                    return adopt(key, template: template.raw, resolved: resolved, box: box, frame: frame, second: resolving.second,
+                                 frameRect: PixelRect(box.frame, in: size), size: size)
                 },
                 onTextMiss: { job in
                     scratch.jobs.append(job)
@@ -1069,11 +1071,17 @@ public final class ControlLoop: @unchecked Sendable {
                 })
             for result in results {
                 guard var box = result.resolved else {
-                    endBox(result.key, frame: frame, box: result.box, slot: slot, inputs: inputs, into: &boxes)
+                    // Spec 6 §5 — a box hidden by a value going empty swaps unless it asks to transition.
+                    let allowed = result.hiddenByValue ? result.box.transitionOnVariableChange : result.transitionAllowed
+                    endBox(result.key, frame: frame, box: result.box, allowed: allowed, slot: slot, inputs: inputs, into: &boxes)
                     continue
                 }
+                // Spec 6 §5 — "A box with `transitionOnVariableChange` runs its box transition between the old text
+                // and the new; the rest swap": a value's change asks the box, new text transitions as any write.
+                let valueChange = model.boxRuns[result.key]?.valueChange ?? false
+                let allowed = box.binding.isText ? (valueChange ? result.box.transitionOnVariableChange : true) : result.transitionAllowed
                 box.transition = boxTransition(result.key, content: box.content, text: box.text, box: result.box, offset: result.box.offset,
-                                               allowed: result.transitionAllowed, frame: frame)
+                                               allowed: allowed, frame: frame)
                 boxes.append(box)
             }
         }
@@ -1126,40 +1134,98 @@ public final class ControlLoop: @unchecked Sendable {
         }
     }
 
-    /// Spec 4 §8 — "A box whose text contains variables is re-laid-out only
-    /// when its resolved text changes, and no more than once a second; the
-    /// result replaces the cache entry." The box keeps the value it adopted
-    /// until the resolved text differs and the wall-clock second has moved on
-    /// (Area 5 reading, approved 2026-11-03: the second is the one the variable
-    /// provider reads for `[Time]`, so a seconds clock never skips a value on a
-    /// fractional master rate). A first value and a clear are not re-layouts
-    /// and show at once. The previous raster goes when a value is adopted, its
-    /// textures freed once any box transition between the two has run.
-    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.BoxText, box: Box, frame: Int64, frameRect: PixelRect,
-                                      size: PixelSize) -> SlotResolver.BoxText {
+    /// Spec 6 §5 — "When a box adopts a new value. A box whose text names
+    /// variables is laid out again only when its resolved text changes (Spec 4
+    /// §8). How soon depends on what changed:
+    ///
+    /// - A context value changed by a fire shows at once (choice T-5). A
+    ///   change to the list's metadata, sections or notes by an edit already
+    ///   shows from the next frame (Spec 5 §2).
+    /// - A popup also shows at once, but at most ten times a second. A new
+    ///   value is adopted on the first frame at least 100 ms after the box's
+    ///   previous adoption, and the value adopted then is the newest (P10).
+    /// - The clock, a timer or `[Service In]` alone changes the box at most
+    ///   once per wall-clock second, the gate `main` has used since Area 5.
+    /// - A box's first value, and a value going empty, show at once, as on
+    ///   `main`."
+    ///
+    /// Every text box comes through here, at every offset: new text (a write,
+    /// an edit of the box) shows at once and is not a value's change. A value
+    /// going empty is any value turning empty, or the whole text. With the
+    /// clock, a timer or `[Service In]`, a box takes their change at once
+    /// unless it already took one in this wall-clock second, so a timer's box
+    /// moves on the timer's own second (Adam's answer to the plan, 2026-11-11)
+    /// and a box with `[Time]` beside it still moves at most once a second. A
+    /// popup's pending change holds the clock's to its 100 ms too. Whatever
+    /// adopts takes every value at its newest. The raster a value's change
+    /// replaces goes, its textures freed once any box transition between the
+    /// two has run; new text's stays in the cache, where a `previous` finds it.
+    private func adopt(_ key: BoxKey, template: String, resolved: ResolvedText, box: Box, frame: Int64, second: Int64,
+                       frameRect: PixelRect, size: PixelSize) -> SlotResolver.BoxText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
-        let second = variables.currentSecond
-        // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
-        // are the ones the cache holds.
-        guard let adopted = run.adoptedText else {
-            run.adoptedText = resolved.text
-            run.adoptedTabular = resolved.tabular
-            run.adoptedSecond = second
-            return resolved
+        let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
+        func take(valueChange: Bool, clocked: Bool) -> SlotResolver.BoxText {
+            // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
+            // are the ones the cache holds.
+            if valueChange, let old = run.adoptedText, !old.isEmpty, old != now.text || run.adoptedTabular != now.tabular {
+                let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+                text.release(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
+                             afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+            }
+            run.adoptedTemplate = template
+            run.adoptedText = now.text
+            run.adoptedTabular = now.tabular
+            run.adoptedValues = resolved.values
+            run.adoptedFrame = frame
+            if clocked { run.clockedSecond = second }
+            run.valueChange = valueChange
+            return now
+        }
+        let hasClock = resolved.values.contains { $0.pacing == .clocked }
+        // "A box's first value ... show[s] at once"; so does new text, which is no value's change.
+        guard let adopted = run.adoptedText, run.adoptedTemplate == template else {
+            return take(valueChange: false, clocked: hasClock)
         }
         let held = SlotResolver.BoxText(text: adopted, tabular: run.adoptedTabular)
-        guard held != resolved else { return held }
-        if !adopted.isEmpty, !resolved.text.isEmpty, second == run.adoptedSecond { return held }
-        if !adopted.isEmpty {
-            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
-                         afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+        guard held != now else {
+            run.adoptedValues = resolved.values
+            return held
         }
-        run.adoptedText = resolved.text
-        run.adoptedTabular = resolved.tabular
-        run.adoptedSecond = second
-        return resolved
+        // What changed, value by value; a different list of values means a popup's text changed.
+        var changed: Set<VariablePacing> = []
+        var wentEmpty = now.text.isEmpty
+        let old = run.adoptedValues
+        let new = resolved.values
+        for index in 0..<max(old.count, new.count) {
+            guard index < old.count, index < new.count, old[index].written == new[index].written else {
+                changed.insert(.popup)
+                continue
+            }
+            guard old[index].value != new[index].value else { continue }
+            changed.insert(new[index].pacing)
+            if !old[index].value.isEmpty, new[index].value.isEmpty { wentEmpty = true }
+        }
+        if adopted.isEmpty || wentEmpty || changed.isEmpty || changed.contains(.context) {
+            return take(valueChange: true, clocked: changed.contains(.clocked))
+        }
+        if changed.contains(.popup) {
+            guard let last = run.adoptedFrame, frame - last < popupSpacingFrames else {
+                return take(valueChange: true, clocked: changed.contains(.clocked))
+            }
+            return held
+        }
+        guard second != run.clockedSecond else { return held }
+        return take(valueChange: true, clocked: true)
+    }
+
+    /// Spec 6 §5 — "at most ten times a second": the frames of the master tick
+    /// that make at least 100 ms (six at 60 Hz and at 59.94).
+    private var popupSpacingFrames: Int64 {
+        let rate = pacing.masterRate
+        let num = Int64(max(1, rate.num))
+        let den = Int64(max(1, rate.den))
+        return max(1, (100 * num + 1000 * den - 1) / (1000 * den))
     }
 
     /// Spec 4 §9 — box transitions; "Offset boxes ... cut rather than
@@ -1199,13 +1265,15 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// A box that no longer draws: if it drew before, its content transitions
-    /// out, unless it is a variable box without `transitionOnVariableChange`
-    /// (Spec 4 §8: "the rest swap").
-    private func endBox(_ key: BoxKey, frame: Int64, box: Box, slot: StackSlot, inputs: SlotResolver.Inputs, into boxes: inout [ResolvedBox]) {
+    /// out, unless a value going empty hid it and the box has no
+    /// `transitionOnVariableChange` (Spec 4 §8: "the rest swap"); `allowed`
+    /// says which.
+    private func endBox(_ key: BoxKey, frame: Int64, box: Box, allowed: Bool, slot: StackSlot, inputs: SlotResolver.Inputs,
+                        into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && SlotResolver.transitionAllowed(for: box), frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && allowed, frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }

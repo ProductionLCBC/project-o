@@ -144,10 +144,15 @@ public final class VariableProvider: @unchecked Sendable {
     /// wall-clock second, which is a countdown rounded up; nil when empty, and
     /// when the time or the date does not read.
     public func serviceInSeconds(for playlist: Playlist?) -> Int? {
-        guard let playlist, let time = playlist.serviceTime else { return nil }
         refresh()
         lock.lock()
         defer { lock.unlock() }
+        return serviceInLocked(playlist)
+    }
+
+    /// Called with the lock held, the reading refreshed.
+    private func serviceInLocked(_ playlist: Playlist?) -> Int? {
+        guard let playlist, let time = playlist.serviceTime else { return nil }
         let key = (playlist.serviceDate ?? "") + "|" + time
         if let cached = serviceCache, cached.key == key, cached.second == cachedSecond { return cached.seconds }
         let seconds = serviceIn(date: playlist.serviceDate, time: time)
@@ -177,8 +182,19 @@ public final class VariableProvider: @unchecked Sendable {
     /// build: the wall clock, `[Service In]` from `livePlaylist`, and the
     /// timers.
     public func clock(livePlaylist: Playlist?, timers: [Int: TimerReading]) -> VariableClock {
-        VariableClock(wall: reading(), timeFormat: timeFormat, serviceInSeconds: serviceInSeconds(for: livePlaylist), timers: timers,
-                      timerSlots: timerSlots, popupSlots: popupSlots)
+        readings(livePlaylist: livePlaylist, timers: timers).clock
+    }
+
+    /// The readings for one build and the wall-clock second they are of, read
+    /// together, so a box's adoption counts the second its clock shows
+    /// (Spec 6 §5, "at most once per wall-clock second").
+    public func readings(livePlaylist: Playlist?, timers: [Int: TimerReading]) -> (clock: VariableClock, second: Int64) {
+        refresh()
+        lock.lock()
+        defer { lock.unlock() }
+        let clock = VariableClock(wall: cachedReading, timeFormat: timeFormat, serviceInSeconds: serviceInLocked(livePlaylist), timers: timers,
+                                  timerSlots: timerSlots, popupSlots: popupSlots)
+        return (clock, cachedSecond)
     }
 
     /// Spec 6 §5 — `text` with its variables resolved in `state`, read in

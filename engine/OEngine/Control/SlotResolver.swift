@@ -42,6 +42,10 @@ public enum SlotResolver {
         public var box: Box
         public var resolved: ResolvedBox?
         public var transitionAllowed: Bool
+        /// Spec 6 §5 — a text box that draws nothing because its text is
+        /// empty once its variables resolve: a value went empty, which runs
+        /// the box transition only with `transitionOnVariableChange`.
+        public var hiddenByValue = false
     }
 
     /// What every slot of one stack pass shares.
@@ -134,6 +138,7 @@ public enum SlotResolver {
             }
             let frameRect = PixelRect(box.frame, in: inputs.size)
             var resolved: ResolvedBox?
+            var hiddenByValue = false
             switch box.binding.kind {
             case .pixels:
                 if let source = pixels(slot, box.offset, shown.channels[slot.channel]?.content) {
@@ -150,6 +155,8 @@ public enum SlotResolver {
                     if !value.text.isEmpty {
                         resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
                                            opacity: opacity, onTextMiss: onTextMiss)
+                    } else {
+                        hiddenByValue = true
                     }
                 }
             case .static(let raw):
@@ -157,10 +164,12 @@ public enum SlotResolver {
                 if !value.text.isEmpty {
                     resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
                                        opacity: opacity, onTextMiss: onTextMiss)
+                } else {
+                    hiddenByValue = true
                 }
             }
             if resolved != nil { drewAt.insert(box.offset) }
-            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed))
+            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed, hiddenByValue: hiddenByValue))
         }
         return out
     }

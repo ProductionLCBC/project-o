@@ -217,13 +217,28 @@ public struct BoxKey: Hashable, Sendable {
 public struct BoxRun: Sendable {
     public var previousContent: BoxContent?
     public var previousText: String?
-    /// Spec 4 §8 — the resolved value a variable box last adopted, and the
-    /// wall-clock second it adopted it in: "re-laid-out only when its resolved
-    /// text changes, and no more than once a second".
+    /// Spec 4 §8 and Spec 6 §5 — what a text box last adopted: "A box whose
+    /// text names variables is laid out again only when its resolved text
+    /// changes ... How soon depends on what changed". The text before its
+    /// variables resolved (a field's text, or a static box's own), the text
+    /// drawn, and each value it was resolved with.
+    public var adoptedTemplate: String?
     public var adoptedText: String?
     /// Spec 6 §4 — whether the adopted text was laid out with tabular digits.
     public var adoptedTabular = false
-    public var adoptedSecond: Int64 = .min
+    public var adoptedValues: [ResolvedValue] = []
+    /// Spec 6 §5 — the frame of the box's last adoption: a popup's new value
+    /// "is adopted on the first frame at least 100 ms after the box's
+    /// previous adoption".
+    public var adoptedFrame: Int64?
+    /// Spec 6 §5 — the wall-clock second of the box's last adoption that took
+    /// the clock, a timer or `[Service In]`: they change the box "at most once
+    /// per wall-clock second".
+    public var clockedSecond: Int64 = .min
+    /// Spec 6 §5 — whether the last change adopted was a value's, which runs
+    /// the box transition only with `transitionOnVariableChange`, rather than
+    /// new text.
+    public var valueChange = false
     public var type: TransitionType = .cut
     public var easing: Easing = .linear
     public var startFrame: Int64 = 0

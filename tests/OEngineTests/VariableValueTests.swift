@@ -48,8 +48,9 @@ final class SettableWallClock: @unchecked Sendable {
 /// "Parsing ... a timer number above the count resolving empty, and an
 /// unknown format falling back with one log line."
 ///
-/// The wall clock moves a second before each change, so the adoption pacing
-/// (Spec 6 §5, `AdoptionTests`) never holds a value these tests read.
+/// The wall clock moves a second, and six frames run, with each change, so
+/// the adoption pacing (Spec 6 §5, `AdoptionTests`) never holds a value these
+/// tests read.
 final class VariableValueTests: XCTestCase {
     typealias S = StageFixtures
     typealias E = EngineFixtures
@@ -116,10 +117,12 @@ final class VariableValueTests: XCTestCase {
         }?.text
     }
 
+    /// A second of the wall clock and six frames (100 ms) after `command`, so
+    /// no change waits on the adoption pacing (Spec 6 §5).
     func step(_ engine: HeadlessEngine, _ clock: SettableWallClock, _ command: String? = nil) {
         clock.advance(seconds: 1)
         if let command { engine.send(command) }
-        engine.tick()
+        engine.tick(count: 6)
     }
 
     // MARK: - Context values (Spec 6 §5)
