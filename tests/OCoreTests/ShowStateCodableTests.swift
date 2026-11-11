@@ -34,7 +34,7 @@ final class ShowStateCodableTests: XCTestCase {
         state.channels[1]?.content = .media(MediaInstance(
             ref: "sha256:9f2c", inMs: 2000, outMs: 60_000, loop: true, gainOverride: -3, syncOffsetMs: 40,
             startedAtFrame: 123, transport: .paused, endBehavior: .loop, missing: true))
-        state.channels[1]?.provenance = .cue(F.cueUuid(list: 1, cue: 1))
+        state.channels[1]?.provenance = .cue(F.cueUuid(list: 1, cue: 1), list: F.listUuid(1))
         state.channels[1]?.outgoing = [OutgoingInstance(instance: MediaInstance(ref: F.mediaA, startedAtFrame: 1), endsAtFrame: 61)]
         state.channels[1]?.attributes.grade = Tracked(value: 7, origin: .once, shadow: 5)
         state.channels[1]?.attributes.transition = Tracked(value: TransitionSetting(ref: 2, ms: 750), origin: .tracked)
@@ -42,7 +42,7 @@ final class ShowStateCodableTests: XCTestCase {
         state.channels[2]?.content = .text(TextInstance(fields: ["body": "Great is Thy faithfulness,\nO God my Father", "title": "Hymn"]))
         state.channels[2]?.provenance = .source(.osc)
         state.channels[3]?.content = .slide(SlideInstance(ref: F.slideS, build: 2))
-        state.channels[3]?.provenance = .restored
+        state.channels[3]?.provenance = .restored(cue: F.cueUuid(list: 1, cue: 2), list: F.listUuid(1))
         state.outputs[1] = 2
         state.stacks[1] = StackState(blackout: true, muted: [2, 1])
         state.pointer = F.pointer(item: 2, list: 1, cue: 2)

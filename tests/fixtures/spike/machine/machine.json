@@ -9,12 +9,7 @@
   "kind": "machine",
   "libraryMode": "readOnlyMasters",
   "mediaRoot": "../library/media",
-  "network": {
-    "apiPort": 8220,
-    "apiToken": "keychain",
-    "oscInPort": 8000,
-    "oscOutTargets": []
-  },
+  "network": { "apiPort": 8220, "apiToken": "keychain", "oscInPort": 8000, "oscOutTargets": [] },
   "operatorLock": { "enabled": false },
   "popups": 4,
   "restoreLastState": false,

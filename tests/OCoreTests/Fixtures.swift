@@ -148,7 +148,7 @@ enum Fixtures {
     static let machine = Machine(
         stacks: [
             Stack(number: 1, slots: [StackSlot(channel: 1), StackSlot(channel: 2)]),
-            Stack(number: 2, slots: [StackSlot(channel: 2), StackSlot(channel: 2, offset: 1)]),
+            Stack(number: 2, slots: [StackSlot(channel: 2)]),
         ],
         outputs: [
             Output(number: 1, defaultStack: 1, transitions: OutputTransitions(switch: 2, blackout: 3)),

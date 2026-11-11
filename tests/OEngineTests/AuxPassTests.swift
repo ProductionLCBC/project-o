@@ -111,11 +111,14 @@ final class PreviewPlanTests: XCTestCase {
     /// samples.
     func test_anUnassignedStackRendersOnPreviewTicksAsAuxOnlyWork() throws {
         var machine = try EngineFixtures.spikeMachine()
+        var library = try EngineFixtures.library()
         machine.outputs.removeLast()                           // stack 2 feeds no output
         machine.stacks[0].slots = [StackSlot(channel: 2)]       // the main stack samples channel 2 only
-        machine.stacks[1].slots = [StackSlot(channel: 1), StackSlot(channel: 2, offset: 0)]   // the unassigned stack samples both
-        machine.stacks[1].defaultPreset = nil                   // through preset 1, whose pixel box samples channel 1's picture
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        // Spec 6 §3 — Preset 1's "2" layout has no pixel box, so channel 1's picture on stack 2 takes a preset of its own.
+        library.presets.append(Preset(number: 8, label: "Picture", uuid: EngineFixtures.uuid("c0de", 8),
+                                      layouts: [.any: Layout(boxes: [Box(binding: .pixels, fit: .pixels(.fit))])]))
+        machine.stacks[1].slots = [StackSlot(channel: 1, preset: 8), StackSlot(channel: 2)]   // the unassigned stack samples both
+        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
         let backend = try XCTUnwrap(engine.recording)
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.send("channel 2 write text \"x\"")

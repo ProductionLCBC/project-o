@@ -1,6 +1,6 @@
 # Spec 3: Channel state and projection
 
-2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§2, §4, §6); corrected 2026-10-28 from the Area 2 review (§4 pool defaults) · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
+2026-10-25 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-10-27 from the Area 1 review (§2, §4, §6); corrected 2026-10-28 from the Area 2 review (§4 pool defaults); corrected 2026-11-11 from the Area 6 review (§6, the `applied` effect) · Builds on Spec 1 (objects) and Spec 2 (commands); Spec 4 (render pipeline) consumes the state this spec defines
 
 ## 1. Purpose and scope
 
@@ -130,7 +130,7 @@ func project(_ state: ShowState,
 | `pointer` | old, new, armed | UI moves the live marker; the scheduler arms or disarms its timer |
 | `steppedOn` | channel, dropped ref | Engine cuts the content; strip flashes; log records it |
 | `blocked` | channel, command | Log records it; the strip shows a lock glint |
-| `applied` | command | State changed with nothing to animate (transport, end behaviour, lock, freeze); logged as `ok` |
+| `applied` | command | State changed with nothing to animate (transport, end behaviour, lock, freeze, a text write's provenance alone, §4); logged as `ok` |
 | `noop` | command | Nothing, but logged |
 | `passthrough` | command | The caller (engine, history, scheduler) handles it |
 

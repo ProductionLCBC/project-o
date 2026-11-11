@@ -88,10 +88,13 @@ package.targets += [
     ),
     // Spec 4 (render pipeline). Metal, VideoToolbox, AVFoundation, CoreAudio,
     // CoreText, CoreGraphics and the DeckLink SDK live here and nowhere else.
+    // Spec 6 §4 — the OFL fonts the engine registers at launch ride in its
+    // resource bundle (ADR 0008).
     .target(
         name: "OEngine",
         dependencies: ["OCore", "OFormats", "ODeckLink"],
         path: "engine/OEngine",
+        resources: [.copy("Resources/Fonts")],
         plugins: ["MetalCompiler"]
     ),
     // Spec 4 §15 — the headless OEngine process driven over OSC, the product

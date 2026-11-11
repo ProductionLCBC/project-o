@@ -24,6 +24,18 @@
       "textThumbnail": "body",
       "usualContent": "text",
       "uuid": "2b770000-0000-4000-8000-000000000002"
+    },
+    {
+      "audioOutputs": [1],
+      "decoderCap": 2,
+      "defaultPreset": 2,
+      "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+      "label": "Clock",
+      "number": 3,
+      "renderSize": "largest",
+      "textThumbnail": "body",
+      "usualContent": "any",
+      "uuid": "3c3c0000-0000-4000-8000-000000000003"
     }
   ],
   "kind": "channels",

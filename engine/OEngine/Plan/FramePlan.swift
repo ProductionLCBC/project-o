@@ -235,9 +235,9 @@ public struct BoxTransitionState: Equatable, Codable, Sendable {
 /// Spec 4 §4 — "an ordered list of resolved boxes: for each slot, the preset
 /// layout chosen by the Spec 1 resolution order, with every box already bound
 /// to a concrete source ..., its frame in pixels, its opacity (slot opacity
-/// times mute), its transition state, and its per-box grade." The slot
-/// offset, the binding and the resolved text ride along for the harness,
-/// which checks the +1 slot against the projected state (Spec 4 §15).
+/// times mute), its transition state, and its per-box grade." The box's
+/// offset (Spec 6 §3), the binding and the resolved text ride along for the
+/// harness, which checks the +1 box against the projected state (Spec 4 §15).
 public struct ResolvedBox: Equatable, Codable, Sendable {
     public var channel: Int
     public var offset: Int
@@ -374,7 +374,7 @@ public struct SinkPass: Equatable, Codable, Sendable {
 }
 
 /// Spec 4 §8 — the cache key: "a hash of (field text, text style value, box
-/// pixel width, box pixel height, fit policy, output scale)".
+/// pixel width, box pixel height, fit policy, output scale, tabular digits)".
 public struct TextKey: Hashable, Codable, Sendable {
     public var hash: UInt64
 
@@ -394,14 +394,18 @@ public struct TextJob: Equatable, Codable, Sendable {
     /// Spec 1 §2 — sizes in pt are "points on a 1080-line canvas scaled with
     /// output height; percent is a percentage of output height".
     public var outputHeight: Int
+    /// Spec 6 §4 — "lays out its digits with the font's tabular figures
+    /// (`tnum`) when the font has them ... The text job carries the flag".
+    public var tabular: Bool
 
-    public init(key: TextKey, text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int) {
+    public init(key: TextKey, text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int, tabular: Bool = false) {
         self.key = key
         self.text = text
         self.style = style
         self.box = box
         self.fit = fit
         self.outputHeight = outputHeight
+        self.tabular = tabular
     }
 }
 

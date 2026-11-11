@@ -1,0 +1,49 @@
+{
+  "app": "0.1.0",
+  "builtIn": false,
+  "kind": "preset",
+  "label": "Clock",
+  "layouts": {
+    "*": {
+      "boxes": [
+        {
+          "binding": { "kind": "static", "text": "[Time]" },
+          "fallback": false,
+          "fit": { "maxLines": 1, "minSize": 12, "policy": "shrinkToFit" },
+          "frame": { "h": 0.09, "w": 0.28, "x": 0.69, "y": 0.01 },
+          "grade": null,
+          "offset": 0,
+          "textStyle": {
+            "alignment": "right",
+            "allCaps": true,
+            "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+            "font": "HelveticaNeue-Medium",
+            "fromStyle": 2,
+            "letterSpacing": 0.5,
+            "lineSpacing": 1.2,
+            "outline": {
+              "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+              "width": 1
+            },
+            "shadow": {
+              "blur": 0,
+              "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+              "x": 0,
+              "y": 0
+            },
+            "size": { "unit": "percent", "value": 4.5 },
+            "variations": { "wdth": 110, "wght": 500 },
+            "verticalAlignment": "center",
+            "weight": 500
+          },
+          "transition": { "ms": null, "ref": 1 },
+          "transitionOnVariableChange": false
+        }
+      ],
+      "mask": null
+    }
+  },
+  "number": 2,
+  "schema": 1,
+  "uuid": "c0de0000-0000-4000-8000-000000000002"
+}

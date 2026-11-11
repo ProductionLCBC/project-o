@@ -820,7 +820,9 @@ public final class ControlLoop: @unchecked Sendable {
         var channelPasses: [Int: ChannelPass?] = [:]
         /// The channels a stack that is not aux-only asked a pass for (Spec 4 §4 step 5).
         var liveChannels: Set<Int> = []
-        var lookahead: [Int: ShowState?] = [:]
+        /// Spec 3 §7 — the states after the next 1, 2, … cues, each folded from
+        /// the one before; nil from the first step past the end.
+        var lookahead: [ShowState?] = []
         var jobs: [TextJob] = []
         var dueStackSizes: [Int: [PixelSize]] = [:]
     }
@@ -856,10 +858,13 @@ public final class ControlLoop: @unchecked Sendable {
             for stack in machine.stacks where !assignedStacks.contains(stack.number) { auxOnlyStacks.insert(stack.number) }
         }
         let rendering = dueStacks.union(auxOnlyStacks)
-        // Which stacks sample each channel, for mip generation below half scale.
+        // Which stacks sample each channel, for mip generation below half scale: the slots whose
+        // layout has a pixel box at offset 0, the only box that samples the channel texture (Spec 6 §3).
         for stack in machine.stacks where rendering.contains(stack.number) {
             let size = geometry.stackSize(stack.number)
-            for slot in stack.effectiveSlots(library: library) where slot.offset == 0 {
+            for slot in stack.effectiveSlots(library: library) {
+                let layout = SlotResolver.layout(for: slot, stack: stack, library: library)
+                guard layout?.boxes.contains(where: { $0.offset == 0 && !$0.binding.isText }) == true else { continue }
                 scratch.dueStackSizes[slot.channel, default: []].append(size)
             }
         }
@@ -979,13 +984,20 @@ public final class ControlLoop: @unchecked Sendable {
         }
     }
 
-    /// Spec 3 §7 — lookahead for offset slots, once per offset per build.
+    /// Spec 3 §7 — "Lookahead for offset boxes. Start from the live ShowState
+    /// and fold the next K cues from the pointer": the state a box at +K
+    /// draws, nil past the end of the playlist. Folded once per build, each
+    /// step from the one before, only as far as a due box asks (+3, and +4 for
+    /// the text one cue beyond, Spec 6 §3).
     private func lookaheadState(_ steps: Int, frame: Int64, scratch: inout BuildScratch) -> ShowState? {
-        if let cached = scratch.lookahead[steps] { return cached }
+        guard steps > 0 else { return model.state }
+        if steps <= scratch.lookahead.count { return scratch.lookahead[steps - 1] }
         let context = projectionContext(frame: frame, source: CommandSource(kind: .engine))
-        let state = lookahead(model.state, steps: steps, context: context)
-        scratch.lookahead[steps] = state
-        return state
+        while scratch.lookahead.count < steps {
+            let previous: ShowState? = scratch.lookahead.isEmpty ? model.state : scratch.lookahead[scratch.lookahead.count - 1]
+            scratch.lookahead.append(previous.flatMap { lookahead($0, steps: 1, context: context) })
+        }
+        return scratch.lookahead[steps - 1]
     }
 
     /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top". The
@@ -995,32 +1007,31 @@ public final class ControlLoop: @unchecked Sendable {
     private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> StackPass {
         let size = geometry.stackSize(stack.number)
         let target = stackRings[stack.number]?[Int(frame % Int64(FrameRing.depth))] ?? .none
-        let inputs = SlotResolver.Inputs(library: library, stack: stack, size: size, muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
+        let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
+                                         muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
-            let content: ContentInstance?
-            if slot.offset == 0 {
-                content = model.state.channels[slot.channel]?.content
-                // Spec 4 §8 — "Lookahead pre-rasterizes the next cue's text for every due stack".
-                if let next = lookaheadState(1, frame: frame, scratch: &scratch), case .text(let t)? = next.channels[slot.channel]?.content {
-                    prefetchText(inputs: inputs, slot: slot, fields: t.fields)
+            // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each
+            // offset box, the text one cue beyond its offset".
+            for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
+                if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch) {
+                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after)
                 }
-            } else if slot.offset > 0 {
-                content = lookaheadState(slot.offset, frame: frame, scratch: &scratch)?.channels[slot.channel]?.content
-                // Spec 4 §8 — the same rule for an offset slot: the text it will show after the next fire.
-                if let after = lookaheadState(slot.offset + 1, frame: frame, scratch: &scratch), case .text(let t)? = after.channels[slot.channel]?.content {
-                    prefetchText(inputs: inputs, slot: slot, fields: t.fields)
-                }
-            } else {
-                content = nil   // negative offsets are v1.5
             }
             let results = SlotResolver.resolve(
-                inputs, slotIndex: slotIndex, slot: slot, content: content,
-                pixels: { slot, content in pixelSource(for: slot, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
-                staticText: { key, box, raw in
-                    let resolvedNow = variables.resolve(raw, state: model.state)
-                    guard VariableProvider.containsVariables(raw) else { return resolvedNow }
-                    return adoptedVariableValue(key, resolved: resolvedNow, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
+                inputs, slotIndex: slotIndex, slot: slot,
+                // Spec 6 §3 — "At 0 the box draws its slot's channel as it is now. At +K it draws the channel as
+                // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
+                state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
+                pixels: { slot, offset, content in pixelSource(for: slot, offset: offset, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
+                staticText: { key, box, raw, shown in
+                    // Spec 6 §5 — a static box's values read the state being drawn: the live state, or the
+                    // lookahead state of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup
+                    // that names one.
+                    let now = SlotResolver.StaticText(text: variables.resolve(raw, state: shown),
+                                                      tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
+                    guard VariableProvider.containsVariables(raw) else { return now }
+                    return adoptedVariableValue(key, resolved: now, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
                 },
                 onTextMiss: { job in
                     scratch.jobs.append(job)
@@ -1031,7 +1042,7 @@ public final class ControlLoop: @unchecked Sendable {
                     endBox(result.key, frame: frame, box: result.box, slot: slot, inputs: inputs, into: &boxes)
                     continue
                 }
-                box.transition = boxTransition(result.key, content: box.content, text: box.text, box: result.box, offset: slot.offset,
+                box.transition = boxTransition(result.key, content: box.content, text: box.text, box: result.box, offset: result.box.offset,
                                                allowed: result.transitionAllowed, frame: frame)
                 boxes.append(box)
             }
@@ -1040,11 +1051,11 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 4 §9 — what a pixel box draws: at offset 0 the channel texture
-    /// through its pass; for an offset slot "a pixel box points at the pool
-    /// item's poster frame texture".
-    private func pixelSource(for slot: StackSlot, content: ContentInstance?, frame: Int64, auxOnly: Bool,
+    /// through its pass; for an offset box "a pixel box points at the pool
+    /// item's poster frame texture" (Spec 6 §3, "An offset box shows a still").
+    private func pixelSource(for slot: StackSlot, offset: Int, content: ContentInstance?, frame: Int64, auxOnly: Bool,
                              scratch: inout BuildScratch) -> SlotResolver.PixelSource? {
-        if slot.offset == 0 {
+        if offset == 0 {
             guard let pass = channelPass(slot.channel, frame: frame, auxOnly: auxOnly, scratch: &scratch) else { return nil }
             let bound = pass.incoming.source == .none ? (pass.outgoing ?? pass.incoming) : pass.incoming
             return SlotResolver.PixelSource(texture: pass.target, content: ControlLoop.contentRect(source: bound.size, channel: pass.size),
@@ -1057,11 +1068,17 @@ public final class ControlLoop: @unchecked Sendable {
         return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))
     }
 
-    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, fields: [String: String]) {
-        guard let layout = inputs.preset(for: slot).layout(for: inputs.stack.number) else { return }
-        for box in layout.boxes {
-            guard case .field(let name) = box.binding.kind, let value = fields[name], !value.isEmpty else { continue }
-            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height)
+    /// Spec 6 §3 — "The engine rasterizes the text one cue beyond each offset
+    /// box ahead of time ... so a `next` never waits on text": the field boxes
+    /// at `offset` with the text the slot's channel will hold one cue later,
+    /// `state`.
+    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState) {
+        guard let layout = inputs.layout(for: slot) else { return }
+        for box in layout.boxes where box.offset == offset {
+            guard case .field(let name) = box.binding.kind,
+                  let value = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !value.isEmpty else { continue }
+            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
+                                           tabular: SlotResolver.wantsTabularDigits(value, popups: state.popups))
             if text.entry(for: job) == nil { text.request(job) }
         }
     }
@@ -1075,28 +1092,35 @@ public final class ControlLoop: @unchecked Sendable {
     /// fractional master rate). A first value and a clear are not re-layouts
     /// and show at once. The previous raster goes when a value is adopted, its
     /// textures freed once any box transition between the two has run.
-    private func adoptedVariableValue(_ key: BoxKey, resolved: String, box: Box, frame: Int64, frameRect: PixelRect, size: PixelSize) -> String {
+    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.StaticText, box: Box, frame: Int64, frameRect: PixelRect,
+                                      size: PixelSize) -> SlotResolver.StaticText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
         let second = variables.currentSecond
+        // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
+        // are the ones the cache holds.
         guard let adopted = run.adoptedText else {
-            run.adoptedText = resolved
+            run.adoptedText = resolved.text
+            run.adoptedTabular = resolved.tabular
             run.adoptedSecond = second
             return resolved
         }
-        guard adopted != resolved else { return adopted }
-        if !adopted.isEmpty, !resolved.isEmpty, second == run.adoptedSecond { return adopted }
+        let held = SlotResolver.StaticText(text: adopted, tabular: run.adoptedTabular)
+        guard held != resolved else { return held }
+        if !adopted.isEmpty, !resolved.text.isEmpty, second == run.adoptedSecond { return held }
         if !adopted.isEmpty {
             let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height).key,
+            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
                          afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
         }
-        run.adoptedText = resolved
+        run.adoptedText = resolved.text
+        run.adoptedTabular = resolved.tabular
         run.adoptedSecond = second
         return resolved
     }
 
-    /// Spec 4 §9 — box transitions; "Offset slots ... cut rather than transition".
+    /// Spec 4 §9 — box transitions; "Offset boxes ... cut rather than
+    /// transition" (Spec 6 §3, "the box cuts rather than transitions").
     private func boxTransition(_ key: BoxKey, content: BoxContent, text: String?, box: Box, offset: Int, allowed: Bool,
                                frame: Int64) -> BoxTransitionState? {
         var run = model.boxRuns[key] ?? BoxRun()
@@ -1138,14 +1162,14 @@ public final class ControlLoop: @unchecked Sendable {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: slot.offset == 0 && SlotResolver.transitionAllowed(for: box), frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && SlotResolver.transitionAllowed(for: box), frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }
         if let state = run.state(at: frame) {
             let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
             boxes.append(ResolvedBox(channel: slot.channel, frame: PixelRect(box.frame, in: inputs.size), content: .lines([]), opacity: opacity,
-                                     transition: state, grade: SlotResolver.boxGrade(box, library: library), offset: slot.offset, binding: box.binding))
+                                     transition: state, grade: SlotResolver.boxGrade(box, library: library), offset: box.offset, binding: box.binding))
         }
     }
 

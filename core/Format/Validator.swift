@@ -15,8 +15,8 @@ public enum IssueCode: String, Equatable, Sendable {
     // References to numbers that do not exist (§8).
     case missingChannel, missingPreset, missingTextStyle, missingGrade, missingTransition, missingAudioTransition
     case missingMacro, missingList, missingStack, missingOutput, missingAudioOutput, missingInput, missingBuiltIn
-    // Numbers and slots (§8, §9, §3).
-    case duplicateNumber, duplicateSlot, slotOutOfRange
+    // Numbers, slots and boxes (§8, §3, §2; Spec 6 §2, §3).
+    case duplicateNumber, duplicateSlot, slotOutOfRange, boxOffsetOutOfRange
     // Media (§7, §8) and fonts (§7).
     case unknownMedia, missingMedia, fontNotInstalled
     // Commands (§6, Spec 2 §7, Spec 2 §5).
@@ -89,15 +89,18 @@ public struct ValidationReport: Equatable, Sendable {
 }
 
 /// What the validator can only learn from outside the roots: which media
-/// files exist (Spec 1 §7, missing state) and which fonts are installed.
-/// Nil means unknown, and that check is skipped.
+/// files exist (Spec 1 §7, missing state), which fonts are installed and
+/// which are bundled with the engine (Spec 6 §4). Nil means unknown, and that
+/// check is skipped.
 public struct ValidationEnvironment: Sendable {
     public var existingMediaPaths: Set<String>?
     public var installedFonts: Set<String>?
+    public var bundledFonts: Set<String>
 
-    public init(existingMediaPaths: Set<String>? = nil, installedFonts: Set<String>? = nil) {
+    public init(existingMediaPaths: Set<String>? = nil, installedFonts: Set<String>? = nil, bundledFonts: Set<String> = []) {
         self.existingMediaPaths = existingMediaPaths
         self.installedFonts = installedFonts
+        self.bundledFonts = bundledFonts
     }
 }
 
@@ -116,17 +119,19 @@ public enum Validator {
         return report
     }
 
-    /// Spec 1 §9 — the stack rule the loader enforces, and §3's slot ranges.
+    /// Spec 6 §2 and Spec 1 §10 — "A second slot for a channel in a stack is
+    /// ignored and reported", "on every load (Spec 1 §8)"; and §3's opacity
+    /// range.
     static func checkStacks(_ machine: Machine, into report: inout ValidationReport, file: String?) {
         for stack in machine.stacks {
             for index in stack.duplicateSlotIndices {
                 let slot = stack.slots[index]
                 report.add(.warning, .duplicateSlot, file: file, subject: "stack \(stack.number) slot \(index + 1)",
-                           message: "channel \(slot.channel) appears again at offset \(slot.offset); the slot is empty at use")
+                           message: "channel \(slot.channel) already has a slot in this stack; this one is ignored")
             }
             for (index, slot) in stack.slots.enumerated() where !slot.isInRange {
                 report.add(.warning, .slotOutOfRange, file: file, subject: "stack \(stack.number) slot \(index + 1)",
-                           message: "offset \(slot.offset) must be -2 to +3 and opacity \(slot.opacity) 0 to 1")
+                           message: "opacity \(slot.opacity) must be 0 to 1")
             }
         }
     }
@@ -273,6 +278,10 @@ struct Checks {
                     if let style = box.textStyle?.fromStyle { reference(.textStyle, style, from: subject) }
                     reference(.transition, box.transition.ref, from: subject)
                     if let grade = box.grade { reference(.grade, grade, from: subject) }
+                    // Spec 6 §3 — "Outside −2 to +3, the reference report flags the box and it draws nothing."
+                    if !Box.offsetRange.contains(box.offset) {
+                        warn(.boxOffsetOutOfRange, subject, "offset \(box.offset) must be -2 to +3; the box draws nothing")
+                    }
                 }
             }
         }
@@ -441,11 +450,13 @@ struct Checks {
         }
     }
 
-    /// Spec 1 §7 — "v1 references fonts by PostScript name and uses whatever
-    /// is installed, with the machine's fallback font substituting and the
-    /// substitution reported."
+    /// Spec 1 §7 — "v1 references fonts by PostScript name and uses those
+    /// installed or bundled with the engine (Spec 6 §4), with the machine's
+    /// fallback font substituting and the substitution reported"; Spec 1 §8 —
+    /// "fonts neither installed nor bundled".
     mutating func fonts() {
         guard let installed = environment.installedFonts else { return }
+        let bundled = environment.bundledFonts
         var used: [String] = library.textStyles.map(\.values.font)
         for preset in library.presets {
             for key in preset.layouts.keys.sorted() {
@@ -456,8 +467,8 @@ struct Checks {
         }
         if let fallback = machine?.settings.fallbackFont { used.append(fallback) }
         var seen: Set<String> = []
-        for font in used where !installed.contains(font) && seen.insert(font).inserted {
-            warn(.fontNotInstalled, font, "not installed on this machine; the fallback font substitutes")
+        for font in used where !installed.contains(font) && !bundled.contains(font) && seen.insert(font).inserted {
+            warn(.fontNotInstalled, font, "neither installed nor bundled with the engine; the fallback font substitutes")
         }
     }
 }

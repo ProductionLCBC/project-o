@@ -25,6 +25,28 @@ final class FormatRoundTripTests: XCTestCase {
         }
     }
 
+    /// Spec 6 §9 — "Area 6 rewrites both fixture roots to this shape": the
+    /// spike's documents write back byte for byte too, and its catalogs,
+    /// presets and stacks are the fixture library's.
+    func test_everySpikeDocumentRoundTripsByteForByteAndSharesTheFirstRunShape() throws {
+        let documents = F.documents(under: F.spikeLibraryRoot).map { ("library", $0.path, $0.data) }
+            + F.documents(under: F.spikeMachineRoot).map { ("machine", $0.path, $0.data) }
+        XCTAssertGreaterThan(documents.count, 15, "the spike roots are missing")
+        for (root, path, data) in documents {
+            let loaded = try Loader.document(path: path, data: data)
+            let written = Writer.data(for: loaded)
+            XCTAssertEqual(written, data, "spike \(root)/\(path): " + ByteDiff.describe(expected: data, actual: written))
+        }
+        let library = F.documents(under: F.libraryRoot)
+        let spike = F.documents(under: F.spikeLibraryRoot)
+        for path in ["channels.json", "text-styles.json", "presets/001-default.json", "presets/002-clock.json", "presets/003-lower-third.json",
+                     "presets/004-credits.json"] {
+            XCTAssertEqual(spike.first { $0.path == path }?.data, library.first { $0.path == path }?.data, path)
+        }
+        XCTAssertEqual(F.documents(under: F.spikeMachineRoot).first { $0.path == "stacks.json" }?.data,
+                       F.documents(under: F.machineRoot).first { $0.path == "stacks.json" }?.data, "stacks.json")
+    }
+
     /// Spec 1 §8 — unknown keys are preserved on every object that has fields
     /// of its own. The exceptions are the fixed value shapes (colours, frames,
     /// sizes, rates, outline, shadow, mask), the plain maps (layouts, fields,
@@ -59,12 +81,12 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(report.issues, [])
         XCTAssertEqual(library.info.uuid, F.libraryUuid)
         XCTAssertEqual(library.info.name, "LCBC Library")
-        XCTAssertEqual(library.channels.map(\.number), [1, 2])
+        XCTAssertEqual(library.channels.map(\.number), [1, 2, 3])
         XCTAssertEqual(library.textStyles.map(\.number), [1, 2])
         XCTAssertEqual(library.grades.map(\.number), [1])
         XCTAssertEqual(library.transitions.map(\.number), [1, 2, 3])
         XCTAssertEqual(library.audioTransitions.map(\.number), [1, 2, 3])
-        XCTAssertEqual(library.presets.map(\.number), [1, 2, 3])
+        XCTAssertEqual(library.presets.map(\.number), [1, 2, 3, 4])
         XCTAssertEqual(library.macros.map(\.number), [1])
         XCTAssertEqual(library.lists.map(\.number), [7, 42])
         XCTAssertEqual(library.mediaIndex.entries.map(\.id), [F.dawn, F.mountains, F.cross, F.welcomeSlide].sorted())
@@ -118,7 +140,7 @@ final class FormatRoundTripTests: XCTestCase {
 
         let preset = library.preset(1)
         XCTAssertEqual(preset?.builtIn, true)
-        XCTAssertEqual(preset?.layouts.keys.sorted(), [.any])
+        XCTAssertEqual(preset?.layouts.keys.sorted(), [.any, .stack(2)], "Spec 6 §3 — the confidence layout beside \"*\"")
         XCTAssertEqual(preset?.layouts[.any]?.boxes.count, 2)
         XCTAssertEqual(preset?.layouts[.any]?.boxes[0].binding.kind, .pixels)
         XCTAssertEqual(preset?.layouts[.any]?.boxes[1].binding.kind, .field(name: "body"))
@@ -140,10 +162,13 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(library.list(number: 7)?.cues[0].trigger, .timecode("01:00:10:00"))
         XCTAssertEqual(library.list(number: 7)?.trackThrough, true)
 
+        // Spec 6 §9 — the confidence stack: channels 2 and 3, no default preset; the next lyric is a box at +1
+        // of Preset 1's "2" layout, and the clock is the Clock preset's static box.
         let confidence = machine.stack(2)
-        XCTAssertEqual(confidence?.defaultPreset, 2)
-        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, offset: 0, opacity: 1, mute: false),
-                                           StackSlot(channel: 2, preset: 3, offset: 1, opacity: 1, mute: false)])
+        XCTAssertNil(confidence?.defaultPreset)
+        XCTAssertEqual(confidence?.slots, [StackSlot(channel: 2, preset: nil, opacity: 1, mute: false), StackSlot(channel: 3, preset: nil, opacity: 1, mute: false)])
+        XCTAssertEqual(preset?.layouts[.stack(2)]?.boxes.map(\.offset), [0, 1])
+        XCTAssertEqual(library.preset(2)?.layouts[.any]?.boxes.map(\.binding.kind), [.static(text: "[Time]")])
         XCTAssertEqual(machine.settings.libraryMode, .readOnlyMasters)
         XCTAssertEqual(machine.settings.network.oscInPort, 8000)
         XCTAssertEqual(machine.settings.startupMacro, 2)

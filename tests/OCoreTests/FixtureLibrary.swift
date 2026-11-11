@@ -20,6 +20,9 @@ enum FixtureLibrary {
     static var machineRoot: URL { root.appendingPathComponent("machine") }
     static var mediaRoot: URL { libraryRoot.appendingPathComponent("media") }
     static var schemaZeroList: URL { repoRoot.appendingPathComponent("tests/fixtures/migrations/list-schema-0.json") }
+    /// Spec 4 §15 — the spike's roots, which Spec 6 §9 rewrites to the first-run shape too.
+    static var spikeLibraryRoot: URL { repoRoot.appendingPathComponent("tests/fixtures/spike/library") }
+    static var spikeMachineRoot: URL { repoRoot.appendingPathComponent("tests/fixtures/spike/machine") }
     static var schemasRoot: URL { repoRoot.appendingPathComponent("formats/schemas") }
 
     /// Every `.json` document under a root, as (relative path, bytes), sorted by

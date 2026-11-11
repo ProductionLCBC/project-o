@@ -184,8 +184,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let target = pool[nextPoolSlot]
         nextPoolSlot = (nextPoolSlot + 1) % pool.count
         lock.unlock()
-        let states = projectedStates(of: list, through: position - 1 + furthestOffset, roots: roots)
-        let pass = stackPass(states: states, index: position - 1, roots: roots)
+        let states = projectedStates(of: list, through: position - 1 + furthestOffset(library: roots.library), roots: roots)
+        let pass = stackPass(states: states, index: position - 1, roots: roots, list: list)
         guard backend.renderOffline(pass, into: target) else {
             countFailure()
             throw ThumbnailError.renderDidNotComplete
@@ -248,8 +248,14 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
 
     // MARK: - The projected state (Spec 3)
 
-    /// The furthest offset any slot of the thumbnail stack looks ahead.
-    private var furthestOffset: Int { stackObject.slots.map(\.offset).max() ?? 0 }
+    /// Spec 6 §3 — the furthest offset any box of the thumbnail stack's
+    /// layouts looks ahead, within what v1 draws (0 to +3).
+    private func furthestOffset(library: Library) -> Int {
+        let offsets = stackObject.effectiveSlots(library: library).flatMap {
+            SlotResolver.offsets(of: SlotResolver.layout(for: $0, stack: stackObject, library: library))
+        }
+        return min(Box.drawnOffsets.upperBound, max(0, offsets.max() ?? 0))
+    }
 
     /// Spec 3 §1 — "the cue grid runs it from the top of a list to draw
     /// thumbnails": tracked state from the top of the list, starting empty,
@@ -274,28 +280,38 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// Spec 4 §10 — "the normal stack pass against poster frames and
     /// rasterized text": the slots resolved as the live plan resolves them,
     /// pixel boxes bound to posters, text through the thumbnail's own cache
-    /// at thumbnail scale, offset slots from the states after this cue.
-    func stackPass(states: [ShowState], index: Int, roots: (library: Library, machine: Machine)) -> StackPass {
+    /// at thumbnail scale. Spec 6 §3 — "In a projected state, such as a
+    /// thumbnail ..., a +K box folds the next K cues of the same list from the
+    /// cue being drawn. That fold has no playlist, so past the list's end the
+    /// box draws nothing": offset boxes from the states after this cue, of
+    /// `list`, the list the states were folded from.
+    func stackPass(states: [ShowState], index: Int, roots: (library: Library, machine: Machine), list: List) -> StackPass {
         let library = roots.library
         let state = states[min(index, states.count - 1)]
         let eager = EagerTextProvider(cache: textCache)
-        let inputs = SlotResolver.Inputs(library: library, stack: stackObject, size: size, muted: state.stacks[stack]?.muted ?? [], text: eager)
+        // Spec 6 §3 — the list being drawn stands as the kept copy, so its field boxes find it even when the
+        // library no longer holds that version.
+        let inputs = SlotResolver.Inputs(library: library, machine: roots.machine, kept: KeptCopies(list: list), stack: stackObject, size: size,
+                                         muted: state.stacks[stack]?.muted ?? [], text: eager)
         var boxes: [ResolvedBox] = []
         for (slotIndex, slot) in stackObject.effectiveSlots(library: library).enumerated() {
-            var content: ContentInstance?
-            if slot.offset >= 0, index + slot.offset < states.count {
-                content = states[index + slot.offset].channels[slot.channel]?.content
-            }
-            let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot, content: content,
-                                               pixels: { _, content in self.posterSource(for: content, roots: roots) },
-                                               staticText: { _, _, raw in self.variables.resolve(raw, state: state) },
+            let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot,
+                                               state: { offset in
+                                                   guard offset >= 0, index + offset < states.count else { return nil }
+                                                   return states[index + offset]
+                                               },
+                                               pixels: { _, _, content in self.posterSource(for: content, roots: roots) },
+                                               staticText: { _, _, raw, shown in
+                                                   SlotResolver.StaticText(text: self.variables.resolve(raw, state: shown),
+                                                                           tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
+                                               },
                                                onTextMiss: { _ in })
             boxes.append(contentsOf: results.compactMap(\.resolved))
         }
         return StackPass(stack: stack, target: scratch, size: size, base: stackObject.base, gammaBlend: stackObject.gammaBlend, boxes: boxes)
     }
 
-    /// Spec 4 §5 — "Poster frame ... For offset slots and thumbnails".
+    /// Spec 4 §5 — "Poster frame ... For offset boxes and thumbnails".
     private func posterSource(for content: ContentInstance?, roots: (library: Library, machine: Machine)) -> SlotResolver.PixelSource? {
         guard let media = content?.media, !media.missing, !missing.contains(media.ref),
               let entry = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine)?.entry else { return nil }

@@ -128,6 +128,14 @@ public enum TextAlignment: String, Codable, Equatable, Sendable {
     case left, center, right
 }
 
+/// Spec 1 §2 and Spec 6 §4 — Text Style `verticalAlignment`: "`top`,
+/// `center` or `bottom`, defaulting to `center` ... It places the block of
+/// lines in the box: the first line at the box's top, the block centred, or
+/// the last line at the box's bottom."
+public enum VerticalAlignment: String, Codable, Equatable, Sendable, CaseIterable {
+    case top, center, bottom
+}
+
 /// Spec 1 §2 — Text Style `outline` `{width, color}`.
 public struct Outline: Codable, Equatable, Sendable {
     public var width: Double

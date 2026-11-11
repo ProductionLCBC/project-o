@@ -51,6 +51,8 @@ public final class HeadlessEngine: @unchecked Sendable {
     public convenience init(library: Library, machine: Machine, mediaRoot: URL, metal: MetalBackend,
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, thumbnailFolder: URL? = nil) throws {
         let log = EngineLog(category: "harness")
+        // Spec 6 §4 — the bundled fonts, registered before the first raster as the engine process does.
+        FontLibrary.shared.register(log: log)
         let renderer = CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont)
         // Spec 4 §11 — one graph per device: the software factory hands out a pullable
         // device per key; an `sdiEmbedded` output's feed has no card here and consumes silently.

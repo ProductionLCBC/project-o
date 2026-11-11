@@ -42,7 +42,7 @@ public protocol SourceFactory: AnyObject, Sendable {
 }
 
 /// Spec 4 §5 — "Poster frame ... 1 per pool item, loaded on demand. For offset
-/// slots and thumbnails." `.none` when the item has no poster.
+/// boxes and thumbnails." `.none` when the item has no poster.
 public protocol PosterProvider: AnyObject, Sendable {
     func poster(for entry: MediaEntry) -> TextureHandle
 }
@@ -83,19 +83,21 @@ public extension TextProvider {
 
 extension TextKey {
     /// Spec 4 §8 — "Keyed by a hash of (field text, text style value, box pixel
-    /// width, box pixel height, fit policy, output scale)." FNV-1a over a
-    /// canonical rendering, so the key is stable across runs and saved plans.
-    public static func make(text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int) -> TextKey {
+    /// width, box pixel height, fit policy, output scale, tabular digits)."
+    /// FNV-1a over a canonical rendering, so the key is stable across runs and
+    /// saved plans. Spec 6 §4 — "the text cache's key includes it".
+    public static func make(text: String, style: BoxTextStyle, box: PixelSize, fit: TextFit, outputHeight: Int, tabular: Bool = false) -> TextKey {
         var canonical = text
         canonical += "\u{1}"
         canonical += TextKey.canonical(style.values)
         canonical += "\u{1}\(box.width)x\(box.height)\u{1}\(fit.policy.rawValue)/\(fit.maxLines)/\(fit.minSize)\u{1}\(outputHeight)"
+        if tabular { canonical += "\u{1}tnum" }
         return TextKey(hash: fnv1a(canonical))
     }
 
     static func canonical(_ v: TextStyleValues) -> String {
         let variations = v.variations.keys.sorted().map { "\($0)=\(v.variations[$0] ?? 0)" }.joined(separator: ",")
-        return "\(v.font)|\(v.size.value)\(v.size.unit.rawValue)|\(v.weight)|\(v.color.r),\(v.color.g),\(v.color.b),\(v.color.a)|\(v.alignment.rawValue)|\(v.lineSpacing)|\(v.letterSpacing)|\(v.outline.width),\(v.outline.color.r),\(v.outline.color.g),\(v.outline.color.b),\(v.outline.color.a)|\(v.shadow.x),\(v.shadow.y),\(v.shadow.blur),\(v.shadow.color.r),\(v.shadow.color.g),\(v.shadow.color.b),\(v.shadow.color.a)|\(v.allCaps)|\(variations)"
+        return "\(v.font)|\(v.size.value)\(v.size.unit.rawValue)|\(v.weight)|\(v.color.r),\(v.color.g),\(v.color.b),\(v.color.a)|\(v.alignment.rawValue)|\(v.verticalAlignment.rawValue)|\(v.lineSpacing)|\(v.letterSpacing)|\(v.outline.width),\(v.outline.color.r),\(v.outline.color.g),\(v.outline.color.b),\(v.outline.color.a)|\(v.shadow.x),\(v.shadow.y),\(v.shadow.blur),\(v.shadow.color.r),\(v.shadow.color.g),\(v.shadow.color.b),\(v.shadow.color.a)|\(v.allCaps)|\(variations)"
     }
 
     static func fnv1a(_ s: String) -> UInt64 {

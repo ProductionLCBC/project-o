@@ -56,15 +56,15 @@ final class ValidationReportTests: XCTestCase {
     /// "a slot naming a missing preset" → one line; degrade: Preset 1.
     func test_aSlotNamingAMissingPresetDegradesToPresetOne() {
         var (library, machine) = fresh()
-        machine.stacks[1].slots[1].preset = 9
+        machine.stacks[0].slots[1].preset = 9
         let issue = only(.missingPreset, in: report(library, machine))
-        XCTAssertEqual(issue?.subject, "stack 2 slot 2")
+        XCTAssertEqual(issue?.subject, "stack 1 slot 2")
         XCTAssertEqual(library.resolvedPreset(9).number, 1)
         XCTAssertEqual(library.resolvedPreset(nil).number, 1)
         XCTAssertEqual(library.resolvedPreset(2).number, 2)
         library.presets.removeAll { $0.number == 1 }
         XCTAssertEqual(library.resolvedPreset(9), Preset.builtInDefault, "without a preset 1 on disk the built-in one applies")
-        XCTAssertEqual(machine.stack(2)?.effectiveSlots(library: library)[1].preset, 9, "the slot itself is not rewritten")
+        XCTAssertEqual(machine.stack(1)?.effectiveSlots(library: library)[1].preset, 9, "the slot itself is not rewritten")
     }
 
     /// Channel and stack default presets, and the built-in preset 1 missing.
@@ -80,16 +80,17 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(only(.missingBuiltIn, in: report(library, machine))?.subject, "preset 1")
     }
 
-    /// "duplicate channels in a stack" (the §9 rule: at each offset) → one
-    /// line; degrade: an empty slot, which is the slot dropped from the
-    /// effective list. Distinct offsets of one channel are accepted.
+    /// "duplicate channels in a stack" → one line; Spec 6 §2, "The engine uses
+    /// the first slot for a channel and ignores any later one", so the later
+    /// slot is dropped from the effective list.
     func test_duplicateSlotsAreReportedOnceAndDroppedAtUse() {
         var (library, machine) = fresh()
-        machine.stacks[0].slots.append(StackSlot(channel: 2, preset: 3, offset: 0, opacity: 0.5, mute: false))
+        machine.stacks[0].slots.append(StackSlot(channel: 2, preset: 3, opacity: 0.5, mute: false))
         let issue = only(.duplicateSlot, in: report(library, machine))
         XCTAssertEqual(issue?.subject, "stack 1 slot 3")
         XCTAssertEqual(machine.stack(1)?.effectiveSlots(library: library).map(\.channel), [1, 2])
-        XCTAssertEqual(machine.stack(2)?.effectiveSlots(library: library).count, 2, "offset slots of one channel are distinct")
+        XCTAssertEqual(machine.stack(1)?.effectiveSlots(library: library).map(\.opacity), [1, 1], "the first slot for channel 2 is the one used")
+        XCTAssertEqual(machine.stack(2)?.effectiveSlots(library: library).map(\.channel), [2, 3])
     }
 
     /// "duplicate numbers within a type" → one line; lookup keeps the first.
@@ -125,14 +126,19 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(MediaResolver.missingIds(library: library, machine: machine, existingPaths: F.existingMediaPaths), [F.mountains])
     }
 
-    /// "fonts not installed" → one line per font, when the installed set is known.
-    func test_fontsNotInstalledAreReportedOncePerFont() {
+    /// Spec 1 §8 (corrected by Spec 6 §10) — "fonts neither installed nor
+    /// bundled" → one line per font, when the installed set is known.
+    func test_fontsNeitherInstalledNorBundledAreReportedOncePerFont() {
         let (library, machine) = fresh()
         let environment = ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold"])
         let issue = only(.fontNotInstalled, in: report(library, machine, environment: environment))
         XCTAssertEqual(issue?.subject, "HelveticaNeue-Medium")
+        XCTAssertEqual(issue?.message, "neither installed nor bundled with the engine; the fallback font substitutes")
         let none = report(library, machine, environment: ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold", "HelveticaNeue-Medium"]))
         XCTAssertEqual(none.issues, [])
+        let bundled = report(library, machine, environment: ValidationEnvironment(installedFonts: ["HelveticaNeue", "HelveticaNeue-Bold"],
+                                                                                 bundledFonts: ["HelveticaNeue-Medium"]))
+        XCTAssertEqual(bundled.issues, [], "a bundled font is not missing")
     }
 
     /// A rider naming a missing transition → one line; degrade (Spec 1 §8,
@@ -204,9 +210,13 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertEqual(only(.missingStack, in: report(library, machine))?.subject, "preset 3 layout 4")
         library.presets[2].layouts[.stack(4)] = nil
 
-        machine.stacks[0].slots[0].offset = 4
+        machine.stacks[0].slots[0].opacity = 2
         XCTAssertEqual(only(.slotOutOfRange, in: report(library, machine))?.subject, "stack 1 slot 1")
-        machine.stacks[0].slots[0].offset = 0
+        machine.stacks[0].slots[0].opacity = 1
+
+        library.presets[2].layouts[.stack(2)]?.boxes[0].offset = 5
+        XCTAssertEqual(only(.boxOffsetOutOfRange, in: report(library, machine))?.subject, "preset 3 layout 2 box 1")
+        library.presets[2].layouts[.stack(2)]?.boxes[0].offset = 0
 
         machine.keys[0].command = .macro(7)
         XCTAssertEqual(only(.missingMacro, in: report(library, machine))?.subject, "key binding 1")

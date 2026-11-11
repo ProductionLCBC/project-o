@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://project-o.lcbcchurch.com/schemas/text-styles.schema.json",
   "title": "text-styles.json",
-  "description": "Spec 1 §2 — Text Style: a numbered template of the text style value (font, size, weight, color, alignment, lineSpacing, letterSpacing, outline, shadow, allCaps, variations).",
+  "description": "Spec 1 §2 — Text Style: a numbered template of the text style value (font, size, weight, color, alignment, verticalAlignment, lineSpacing, letterSpacing, outline, shadow, allCaps, variations).",
   "type": "object",
   "required": ["schema", "app", "kind", "textStyles"],
   "properties": {
@@ -26,7 +26,7 @@
     },
     "textStyle": {
       "type": "object",
-      "required": ["number", "label", "uuid", "font", "size", "weight", "color", "alignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations"],
+      "required": ["number", "label", "uuid", "font", "size", "weight", "color", "alignment", "verticalAlignment", "lineSpacing", "letterSpacing", "outline", "shadow", "allCaps", "variations"],
       "properties": {
         "number": { "type": "integer", "minimum": 1 },
         "label": { "type": "string" },
@@ -41,6 +41,7 @@
         "weight": { "type": "number" },
         "color": { "$ref": "#/$defs/color" },
         "alignment": { "enum": ["left", "center", "right"] },
+        "verticalAlignment": { "enum": ["top", "center", "bottom"] },
         "lineSpacing": { "type": "number" },
         "letterSpacing": { "type": "number" },
         "outline": {
