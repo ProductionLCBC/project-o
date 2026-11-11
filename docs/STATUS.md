@@ -24,10 +24,10 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers; the Spec 3 §6 correction and ADR 0008's acceptance on the branch (85b4e88), `area/presets` merged into `main` with `--no-ff` (af3c948), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Spec 1 §2's `weight` went into Area 11's block. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | not started | Next, in its own session: Spec 8 accepted 2026-11-07, its prompt block in `docs/build-order.md` and under Next below; it can start now (`media replace`, `media delete` and the defaults edits ride Area 9's edit path and writer, and its fixtures meet the spike documents Area 6 left canonical). The index types, a resolver over the media root, SHA-256 identity and a missing set computed at launch are on `main` since Area 2. |
-| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Two gaps accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
+| 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
-| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | brief waiting for approval | In review on `area/variables` (8182cf9, pushed, hosted CI green on both jobs): `timer N set DURATION up`, the variable language and the v1 set, the adoption pacing, timers, `clearafter`, the timer and remaining-time feedback, and Spec 1 §2's `weight`, built tests first with stops after the core changes and after the pacing; the brief, the final message of the Area 11 session (2026-11-11), waits for Adam's `approved`. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), marks restored content with the `restored` provenance that keeps its cue and list (Area 6), and saves the popups' pending clears, which Area 11 keeps as engine memory. |
+| 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md`; it can start now: it writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer. It also runs the startup macro at launch (Spec 9 §4), which Area 15 left to it, takes the kept copies when it restores the last state (Area 9's brief), marks restored content with the `restored` provenance that keeps its cue and list (Area 6), and saves the popups' pending clears, which the engine has kept in memory since Area 11. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), and the app maps keys to commands sent with source `key` (§9). |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
@@ -40,20 +40,18 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 11, variables, is in review** on `area/variables` (8182cf9, pushed, hosted CI green
-on both jobs). Its brief is the final message of the Area 11 session (2026-11-11) and waits
-for Adam's `approved`; the code stays on the branch until then, and everything else is on
-`main`. Area 8, media pool, is next, in its own session, and Area 12 can start now too. The
+**Nothing is in review; everything is on `main`.** Area 11, variables, shipped on
+2026-11-11. Adam approved it as built, with every reading in the brief and its recommended
+answers, and no spec correction was proposed; it was merged with `--no-ff` (d4333fa) and
+pushed. Area 8, media pool, is next, in its own session; Area 12 can start now too. The
 bench run with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 11 — Variables** (`area/variables`, 8182cf9). The brief is the final message of
-  the Area 11 session, 2026-11-11. It asks Adam to take the readings in the table below as
-  built, which is the recommended answer: he answered some with the plan and kept others
-  at the session's stops, and the rest are new. No spec correction is proposed.
+None. The Area 11 brief (the final message of the Area 11 session, 2026-11-11) was answered
+the same day: approved as built, with its recommended answers, merged (d4333fa).
 
 ### Decisions
 
@@ -103,7 +101,7 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 11's task is `in review`.
+  dependencies from the block's "Starts after" line. Area 11's task is `shipped`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -121,18 +119,19 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
-- **One card test skips in the main checkout.** `EmbeddedAudioFeedTests`' unavailable-sink
+- **A card test skips in the main checkout.** `EmbeddedAudioFeedTests`' unavailable-sink
   test skips wherever `vendor/DeckLinkSDK` is present ("a card may be present"). A fresh
   worktree has no SDK and runs it.
 
 ### Spec interpretations made so far
 
-Area 11's, below, wait with its brief. "With the plan" marks a reading Adam approved with
-the plan on 2026-11-11, and "kept at the second stop" one he kept when he let the session go
-on after the adoption pacing. Earlier areas' readings were approved with their briefs and
-are in the specs' text, the briefs, or this page as it stood before: Area 6's at a77bf69,
-approved on 2026-11-11; Area 9's at f4b43ac, approved on 2026-11-10; Area 15's on
-2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
+None outstanding. Area 11's readings, below, were approved as built on 2026-11-11, with the
+recommended answers, and are recorded here and in its brief. "With the plan" marks a reading
+Adam had approved with the plan that day, and "kept at the second stop" one he kept when he
+let the session go on after the adoption pacing. Earlier areas' readings were approved with
+their briefs and are in the specs' text, the briefs, or this page as it stood before: Area
+6's at a77bf69, approved on 2026-11-11; Area 9's at f4b43ac, approved on 2026-11-10; Area
+15's on 2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
@@ -161,7 +160,7 @@ approved on 2026-11-11; Area 9's at f4b43ac, approved on 2026-11-10; Area 15's o
 
 ### Spec corrections proposed
 
-None. Area 11 proposes none.
+None. Area 11 proposed none.
 
 ## Next
 
@@ -213,7 +212,6 @@ Area 13.
 
 **After Area 8:**
 
-- **Area 11** waits for Adam's `approved` on its brief; the same session merges it.
 - **Engine-side, no bench run.** Area 12 can start now, in its own session, and Area 19
   starts after Area 12, each from its block in `docs/build-order.md`, which its Build
   tracker task carries verbatim.
