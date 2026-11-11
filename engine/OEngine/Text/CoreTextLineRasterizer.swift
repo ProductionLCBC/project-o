@@ -191,8 +191,11 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         // centred, or the last line at the box's bottom."
         let blockHeight = Double(laid.lines.count) * laid.lineHeight
         let top = CoreTextLineRasterizer.top(of: blockHeight, in: Double(job.box.height), anchor: values.verticalAlignment)
-        let shadowPad = values.shadow.color.a > 0 ? values.shadow.blur * 2 + max(abs(values.shadow.x), abs(values.shadow.y)) : 0
-        let outlinePad = values.outline.width > 0 ? values.outline.width * Double(job.outputHeight) / 1080 : 0
+        // Spec 6 §4 — "`outline.width`, `shadow.x`, `shadow.y`, `shadow.blur` ... are points on the 1080-line
+        // canvas, scaled with the output's height", the bitmap's padding for them included.
+        let scale = Double(job.outputHeight) / 1080
+        let shadowPad = values.shadow.color.a > 0 ? (values.shadow.blur * 2 + max(abs(values.shadow.x), abs(values.shadow.y))) * scale : 0
+        let outlinePad = values.outline.width > 0 ? values.outline.width * scale : 0
         let pad = Int((shadowPad + outlinePad).rounded(.up)) + 2
         var lines: [RasterLine] = []
         var layoutLines: [LayoutLine] = []
