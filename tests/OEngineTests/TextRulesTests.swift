@@ -2,14 +2,16 @@ import XCTest
 import OCore
 @testable import OEngine
 
-/// Spec 4 §8 — "A box whose text contains variables is re-laid-out only when
-/// its resolved text changes, and no more than once a second; the result
-/// replaces the cache entry. A timer box therefore costs one small raster per
-/// second. Boxes with `transitionOnVariableChange` run their box transition
-/// between the old and new textures; the rest swap." Area 5 reading, approved
-/// on 2026-11-03: the second is the wall-clock second the variable provider
-/// reads for `[Time]`, and the gate sits between two non-empty values; a first
-/// value and a clear are not re-layouts and show at once.
+/// Spec 4 §8 as Spec 6 §10 corrected it — "A box whose text contains
+/// variables is re-laid-out only when its resolved text changes, at the pace
+/// Spec 6 §5 sets: at once for context values, at most ten times a second for
+/// a popup, and at most once a wall-clock second for the clock, timers and
+/// `[Service In]`; the result replaces the cache entry. A timer box therefore
+/// costs one small raster per second. Boxes with `transitionOnVariableChange`
+/// run their box transition between the old and new textures; the rest
+/// swap." Spec 6 §5 — "A box's first value, and a value going empty, show at
+/// once, as on `main`." The harness's master tick is 60 Hz: 100 ms is six
+/// frames. `AdoptionTests` holds the rest of §11's adoption tests.
 final class VariableBoxGateTests: XCTestCase {
     /// The spike library with a caption preset: one static `[Popup 1]` box on
     /// channel 2's slot of the main stack, dissolving over 500 ms.
@@ -29,7 +31,7 @@ final class VariableBoxGateTests: XCTestCase {
         engine.lastPlan?.stackPasses.first { $0.stack == 1 }?.boxes.first { if case .static = $0.binding.kind { return true } else { return false } }
     }
 
-    func test_aVariableBoxAdoptsOneValuePerSecondAndTheLatestAfter() throws {
+    func test_aPopupBoxAdoptsAtMostOneValuePer100msAndTheNewestThen() throws {
         let clock = VariableRasterTests.MovingClock()
         let engine = try engine(transitionOnChange: true, clock: clock)
         engine.tick()
@@ -39,14 +41,13 @@ final class VariableBoxGateTests: XCTestCase {
         XCTAssertEqual(captionBox(engine)?.text, "a", "the first value shows at once: nothing was laid out before it")
         engine.send("popup 1 set \"b\"")
         engine.tick()
-        XCTAssertEqual(captionBox(engine)?.text, "a", "a second change within the same second waits")
+        XCTAssertEqual(captionBox(engine)?.text, "a", "a change within 100 ms of the last adoption waits")
         engine.send("popup 1 set \"c\"")
-        engine.tick(count: 3)
-        XCTAssertEqual(captionBox(engine)?.text, "a")
-        clock.advance(seconds: 1)
+        engine.tick(count: 4)
+        XCTAssertEqual(captionBox(engine)?.text, "a", "five frames after it, still within 100 ms")
         engine.tick()
         let box = try XCTUnwrap(captionBox(engine))
-        XCTAssertEqual(box.text, "c", "the latest value, once the second has moved on")
+        XCTAssertEqual(box.text, "c", "the newest value, on the first frame 100 ms after the last adoption")
         let transition = try XCTUnwrap(box.transition, "transitionOnVariableChange: the box dissolves from the old lines")
         XCTAssertEqual(transition.type, .dissolve)
         XCTAssertFalse(transition.outgoing.isEmpty)
@@ -62,7 +63,7 @@ final class VariableBoxGateTests: XCTestCase {
         engine.send("popup 1 set \"a\"")
         engine.tick()
         XCTAssertEqual(captionBox(engine)?.text, "a")
-        clock.advance(seconds: 1)
+        engine.tick(count: 6)
         engine.send("popup 1 set \"b\"")
         engine.tick()
         let box = try XCTUnwrap(captionBox(engine))

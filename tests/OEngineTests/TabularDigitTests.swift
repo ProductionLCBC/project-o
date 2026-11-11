@@ -45,6 +45,8 @@ final class TabularDigitTests: XCTestCase {
         }
         var style = TextJobs.plain(size: 72)
         style.font = font
+        // Skia is a variable font whose `wght` runs 0.48 to 3.2: naming it keeps Skia's own default (Spec 1 §2).
+        style.variations = ["wght": 1]
         let rasterizer = CoreTextLineRasterizer(fallbackFont: "HelveticaNeue")
         func width(_ text: String, tabular: Bool) throws -> Double {
             Double(try XCTUnwrap(rasterizer.rasterize(TextJobs.job(text, style: style, tabular: tabular)).layout.lines.first).origin.width)

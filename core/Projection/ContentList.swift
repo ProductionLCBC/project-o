@@ -23,6 +23,17 @@ extension ShowState {
         return ShowState.list(uuid: uuid, library: library, machine: machine, kept: kept)
     }
 
+    /// Spec 6 §5 — "`[Service In]` ... reads only the live playlist, whatever
+    /// state is being drawn": the playlist the pointer names, loaded or with a
+    /// cue fired, or its kept copy once it is gone (Spec 7 §4); nil with no
+    /// playlist live.
+    public func livePlaylist(library: Library, machine: Machine, kept: KeptCopies = KeptCopies()) -> Playlist? {
+        guard let uuid = pointer?.playlist else { return nil }
+        if let now = machine.playlist(uuid: uuid) { return now }
+        if let copy = kept.playlist, copy.uuid == uuid { return copy }
+        return nil
+    }
+
     /// Spec 6 §5 and Spec 7 §4 — a list by uuid, from the library, the local
     /// copies, or the kept copy of the live list.
     public static func list(uuid: UUID, library: Library, machine: Machine, kept: KeptCopies = KeptCopies()) -> List? {

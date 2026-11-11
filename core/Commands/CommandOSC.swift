@@ -83,6 +83,9 @@ public enum OSCMapping {
                 arguments.append(seconds(ms: value.intValue ?? 0))
             case .string, .optionalString, .keyword:
                 arguments.append(.string(value.stringValue ?? ""))
+            case .flag(let word):
+                // Spec 2 §6 — "`up` follows as `s:"up"`".
+                if value.boolValue == true { arguments.append(.string(word)) }
             case .write, .edit:
                 break
             }
@@ -356,6 +359,11 @@ public enum OSCFeedback {
     /// "`s:formatted` `i:ms`: once a second while running, and on set".
     public static func timer(_ timer: Int, formatted: String, ms: Int) -> OSCMessage {
         OSCMessage("/o/timer/\(timer)", [.string(formatted), .int32(Int32(clamping: ms))])
+    }
+
+    /// Spec 6 §8 — "An unset timer sends `s:""` alone."
+    public static func timerUnset(_ timer: Int) -> OSCMessage {
+        OSCMessage("/o/timer/\(timer)", [.string("")])
     }
 
     public static func popup(_ popup: Int, text: String) -> OSCMessage {

@@ -126,7 +126,7 @@ struct Checker {
             guard machine.playlist(titled: title) != nil else {
                 throw reject(.noSuchTarget, "no playlist \"\(title)\" on this machine")
             }
-        case .timerSet(let timer, _), .timerStart(let timer), .timerPause(let timer), .timerReset(let timer):
+        case .timerSet(let timer, _, _), .timerStart(let timer), .timerPause(let timer), .timerReset(let timer):
             try slot(timer, count: machine.settings.timers, "timer", reason: .noSuchTarget)
         case .popupSet(let popup, _, _), .popupClear(let popup):
             try slot(popup, count: machine.settings.popups, "popup", reason: .noSuchTarget)
@@ -276,7 +276,7 @@ struct Checker {
             try nonNegative(ms, "the duration")
         case .channelBuild(_, let build):
             try nonNegative(build, "build")
-        case .timerSet(_, let ms):
+        case .timerSet(_, let ms, _):
             try nonNegative(ms, "the timer")
         case .popupSet(_, _, let after?):
             try nonNegative(after, "clearafter")

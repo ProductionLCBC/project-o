@@ -44,21 +44,12 @@ extension Editor {
 
     /// Spec 1 §3 — `serviceDate`, "ISO date or null".
     static func isServiceDate(_ s: String) -> Bool {
-        let parts = s.split(separator: "-", omittingEmptySubsequences: false)
-        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
-              parts.allSatisfy({ $0.allSatisfy(DurationText.isDigit) }),
-              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]), (1...12).contains(m), d >= 1 else { return false }
-        let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)
-        let days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        return d <= days[m - 1]
+        Playlist.serviceDay(s) != nil
     }
 
     /// Spec 1 §3 — `serviceTime`, "`HH:MM` or null, in the machine's time zone".
     static func isServiceTime(_ s: String) -> Bool {
-        let parts = s.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 2, parts.allSatisfy({ $0.count == 2 && $0.allSatisfy(DurationText.isDigit) }),
-              let h = Int(parts[0]), let m = Int(parts[1]) else { return false }
-        return (0...23).contains(h) && (0...59).contains(m)
+        Playlist.serviceClock(s) != nil
     }
 
     // MARK: - Playlists

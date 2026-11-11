@@ -42,6 +42,10 @@ public enum SlotResolver {
         public var box: Box
         public var resolved: ResolvedBox?
         public var transitionAllowed: Bool
+        /// Spec 6 §5 — a text box that draws nothing because its text is
+        /// empty once its variables resolve: a value went empty, which runs
+        /// the box transition only with `transitionOnVariableChange`.
+        public var hiddenByValue = false
     }
 
     /// What every slot of one stack pass shares.
@@ -104,10 +108,11 @@ public enum SlotResolver {
     /// `state` answers the state a box at an offset draws (the live state at
     /// 0, the lookahead for later offsets, a projected state for a thumbnail),
     /// or nil where the lookahead does not reach; `pixels` is what a pixel box
-    /// at an offset draws for the channel's content there; `staticText`
-    /// resolves a static box's variables in that state (the control loop gates
-    /// it, Spec 4 §8); `onTextMiss` hears of every text job the cache could not
-    /// answer ("counts `textLate`").
+    /// at an offset draws for the channel's content there; `text` resolves a
+    /// text box's variables in that state (Spec 6 §5: a field's in the
+    /// content's scope, a static box's in the pointer's; the control loop
+    /// paces the values it adopts, Spec 4 §8); `onTextMiss` hears of every
+    /// text job the cache could not answer ("counts `textLate`").
     ///
     /// Spec 6 §3 — "v1 draws 0 to +3 (P4), and a negative offset draws nothing
     /// until v1.5 adds the ring buffer. Outside −2 to +3, the reference report
@@ -118,7 +123,7 @@ public enum SlotResolver {
     public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot,
                                state: (Int) -> ShowState?,
                                pixels: (StackSlot, Int, ContentInstance?) -> PixelSource?,
-                               staticText: (BoxKey, Box, String, ShowState) -> StaticText,
+                               text: (BoxKey, Box, BoxTemplate, ShowState) -> BoxText,
                                onTextMiss: (TextJob) -> Void) -> [SlotBox] {
         guard let layout = inputs.layout(for: slot) else { return [] }
         let opacity = Float(slot.opacity) * (inputs.muted.contains(slot.channel) ? 0 : 1)
@@ -133,6 +138,7 @@ public enum SlotResolver {
             }
             let frameRect = PixelRect(box.frame, in: inputs.size)
             var resolved: ResolvedBox?
+            var hiddenByValue = false
             switch box.binding.kind {
             case .pixels:
                 if let source = pixels(slot, box.offset, shown.channels[slot.channel]?.content) {
@@ -143,19 +149,27 @@ public enum SlotResolver {
                                            grade: boxGrade(box, library: inputs.library), offset: box.offset, binding: box.binding)
                 }
             case .field(let name):
-                if let value = fieldValue(name, channel: slot.channel, state: shown, inputs: inputs), !value.isEmpty {
-                    resolved = textBox(value, tabular: wantsTabularDigits(value, popups: shown.popups), box: box, frame: frameRect,
-                                       inputs: inputs, slot: slot, opacity: opacity, onTextMiss: onTextMiss)
+                // Spec 6 §3 — "A field that is empty once its variables resolve (§5) hides the box, like any empty text."
+                if let raw = fieldValue(name, channel: slot.channel, state: shown, inputs: inputs), !raw.isEmpty {
+                    let value = text(key, box, BoxTemplate(raw: raw, scope: .content(channel: slot.channel)), shown)
+                    if !value.text.isEmpty {
+                        resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
+                                           opacity: opacity, onTextMiss: onTextMiss)
+                    } else {
+                        hiddenByValue = true
+                    }
                 }
             case .static(let raw):
-                let value = staticText(key, box, raw, shown)
+                let value = text(key, box, BoxTemplate(raw: raw, scope: .pointer), shown)
                 if !value.text.isEmpty {
                     resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
                                        opacity: opacity, onTextMiss: onTextMiss)
+                } else {
+                    hiddenByValue = true
                 }
             }
             if resolved != nil { drewAt.insert(box.offset) }
-            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed))
+            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed, hiddenByValue: hiddenByValue))
         }
         return out
     }
@@ -177,10 +191,11 @@ public enum SlotResolver {
     }
 
     /// Spec 4 §8 — "Boxes with `transitionOnVariableChange` run their box
-    /// transition between the old and new textures; the rest swap." A box
-    /// without variables always transitions.
+    /// transition between the old and new textures; the rest swap." A static
+    /// box changes only when a value does; one without v1 variables (Spec 6
+    /// §5) never changes, and transitions.
     public static func transitionAllowed(for box: Box) -> Bool {
-        guard case .static(let raw) = box.binding.kind, VariableProvider.containsVariables(raw) else { return true }
+        guard case .static(let raw) = box.binding.kind, VariableText.parse(raw).hasVariables else { return true }
         return box.transitionOnVariableChange
     }
 
@@ -203,9 +218,24 @@ public enum SlotResolver {
                        text: value, style: style, box: boxSize, fit: fit, outputHeight: outputHeight, tabular: tabular)
     }
 
-    /// What a static box draws: its text with variables resolved, and whether
+    /// Spec 6 §5 — a text box's text before its variables resolve, and where
+    /// its context values read: "In text content, a value reads the content's
+    /// provenance ... In a static box, a value reads the state's pointer".
+    public struct BoxTemplate: Equatable, Sendable {
+        /// The field's text (the write's own, or the list's metadata, Spec 6
+        /// §3), or the static box's own text.
+        public var raw: String
+        public var scope: VariableScope
+
+        public init(raw: String, scope: VariableScope) {
+            self.raw = raw
+            self.scope = scope
+        }
+    }
+
+    /// What a text box draws: its text with variables resolved, and whether
     /// that text asks for tabular digits (Spec 6 §4).
-    public struct StaticText: Equatable, Sendable {
+    public struct BoxText: Equatable, Sendable {
         public var text: String
         public var tabular: Bool
 
@@ -218,49 +248,11 @@ public enum SlotResolver {
     /// Spec 6 §4 — "A box whose text names `[Time]`, `[Timer N]` or `[Service
     /// In]`, itself or inside a popup it shows, lays out its digits with the
     /// font's tabular figures": `text` is the box's text before its variables
-    /// resolve, `popups` the popup texts of the state being drawn. Names match
-    /// in any case, with or without a format; a popup's own `[Popup N]` is not
-    /// followed, since a popup resolves one level deep (Spec 6 §5), and a
-    /// doubled bracket is not a name.
+    /// resolve, `popups` the popup texts of the state being drawn. Names are
+    /// Spec 6 §5's; a popup's own `[Popup N]` is not followed, since a popup
+    /// resolves one level deep, and a doubled bracket is not a name.
     public static func wantsTabularDigits(_ text: String, popups: [Int: String]) -> Bool {
-        let names = bracketedNames(in: text)
-        if names.contains(where: namesAClock) { return true }
-        for name in names {
-            let words = name.split(separator: " ")
-            guard words.count >= 2, words[0].lowercased() == "popup", let n = Int(words[1]), let popup = popups[n] else { continue }
-            if bracketedNames(in: popup).contains(where: namesAClock) { return true }
-        }
-        return false
-    }
-
-    /// Spec 6 §5 — `[Time]` and its formats, `[Timer N]` with a number, `[Service In]`.
-    static func namesAClock(_ name: String) -> Bool {
-        let words = name.split(separator: " ").map { $0.lowercased() }
-        guard let head = words.first else { return false }
-        switch head {
-        case "time": return true
-        case "timer": return words.count >= 2 && Int(words[1]) != nil
-        case "service": return words.count >= 2 && words[1] == "in"
-        default: return false
-        }
-    }
-
-    /// The names between single square brackets; `[[` opens no name (Spec 6 §5,
-    /// "Doubled brackets print one bracket").
-    static func bracketedNames(in text: String) -> [String] {
-        var names: [String] = []
-        var rest = Substring(text)
-        while let open = rest.firstIndex(of: "[") {
-            let after = rest.index(after: open)
-            if after < rest.endIndex, rest[after] == "[" {
-                rest = rest[rest.index(after: after)...]
-                continue
-            }
-            guard let close = rest[after...].firstIndex(of: "]") else { break }
-            names.append(String(rest[after..<close]))
-            rest = rest[rest.index(after: close)...]
-        }
-        return names
+        VariableResolver.asksForTabularDigits(text, popups: popups)
     }
 
     /// Spec 4 §9 — "field: The cached line textures ... a missing cache entry

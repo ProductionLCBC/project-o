@@ -71,6 +71,10 @@ struct VocabularyRow: Sendable {
         case keyword([String])
         /// `[clearafter SECONDS]`: a keyword then whole or decimal seconds, stored as ms.
         case optionalKeywordSeconds(String)
+        /// Spec 2 §3 as Spec 6 §10 corrected it — `timer N set DURATION [up]`:
+        /// a bare keyword that sets a boolean, written to the object only when
+        /// true (Spec 1 §5) and sent over OSC as `s:"up"` (Spec 2 §6).
+        case flag(String)
         /// Spec 2 §2 — `write CONTENT [riders]`, parsed and printed by hand.
         case write
         /// Spec 5 §4 — `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`.
@@ -188,7 +192,7 @@ enum Vocabulary {
         VocabularyRow("playlist.disarm", target: "disarm", lock: .passes, undo: .none),
         // Timers, popups and audio
         VocabularyRow("timer.set", target: "timer", number: .int("timer"), verb: .word("set"),
-                      args: [Arg("ms", .duration(.clock))], lock: .passes, undo: .none),
+                      args: [Arg("ms", .duration(.clock)), Arg("up", .flag("up"))], lock: .passes, undo: .none),
         VocabularyRow("timer.start", target: "timer", number: .int("timer"), verb: .word("start"), lock: .passes, undo: .none),
         VocabularyRow("timer.pause", target: "timer", number: .int("timer"), verb: .word("pause"), lock: .passes, undo: .none),
         VocabularyRow("timer.reset", target: "timer", number: .int("timer"), verb: .word("reset"), lock: .passes, undo: .none),

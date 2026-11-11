@@ -207,6 +207,28 @@ public struct Playlist: Codable, Equatable, Sendable {
         return String(String.UnicodeScalarView(scalars))
     }
 
+    /// Spec 1 §3 — `serviceDate`, "ISO date or null": the year, month and day
+    /// of a `YYYY-MM-DD` that names a day of the calendar, or nil. `[Service
+    /// In]` counts to the service time on it (Spec 6 §5).
+    public static func serviceDay(_ text: String) -> (year: Int, month: Int, day: Int)? {
+        let parts = text.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              parts.allSatisfy({ $0.allSatisfy(DurationText.isDigit) }),
+              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2]), (1...12).contains(m), d >= 1 else { return nil }
+        let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)
+        let days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        return d <= days[m - 1] ? (y, m, d) : nil
+    }
+
+    /// Spec 1 §3 — `serviceTime`, "`HH:MM` or null, in the machine's time
+    /// zone, read by `[Service In]`": the hour and minute, or nil.
+    public static func serviceClock(_ text: String) -> (hour: Int, minute: Int)? {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts.allSatisfy({ $0.count == 2 && $0.allSatisfy(DurationText.isDigit) }),
+              let h = Int(parts[0]), let m = Int(parts[1]), (0...23).contains(h), (0...59).contains(m) else { return nil }
+        return (h, m)
+    }
+
     /// Spec 7 §3 — what a save writes for each linked item: the uuid of the
     /// list it finds ("records that list's uuid at the next save") and that
     /// list's number ("the number in the file is corrected at the playlist's

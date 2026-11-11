@@ -52,6 +52,9 @@ public final class FontLibrary: @unchecked Sendable {
     private let installedNames: Set<String>?
     private let lock = NSLock()
     private var resolved: [String: (CTFontDescriptor, Origin)?] = [:]
+    /// Spec 1 §2 — the face a static font's name draws with at a weight, nil
+    /// for the font itself, by name and weight.
+    private var nearest: [String: CTFontDescriptor?] = [:]
     private var registered = false
 
     /// `installedNames` stands in for what the machine has installed, for
@@ -145,6 +148,95 @@ public final class FontLibrary: @unchecked Sendable {
     private func isBundled(_ url: URL?) -> Bool {
         guard let folder, let path = url?.standardizedFileURL.path else { return false }
         return path.hasPrefix(folder.path + "/")
+    }
+
+    // MARK: - Weight (Spec 1 §2)
+
+    /// Spec 1 §2 — "weight is the wght axis when the font is variable and the
+    /// nearest instance when it is not": for a static `font`, the face of its
+    /// family nearest `weight`, among the static faces installed or bundled
+    /// with its slant and width (a condensed face stays condensed, an italic
+    /// italic). A face's weight is its OS/2 weight class, or Core Text's
+    /// weight trait on that scale when it has none. A tie keeps `font`, then
+    /// takes the lighter face, then the first name. Variable fonts' instances
+    /// are never chosen: their weight is an axis.
+    public func nearestFace(to font: CTFont, weight: Double, size: Double) -> CTFont {
+        let name = CTFontCopyPostScriptName(font) as String
+        let key = name.lowercased() + "|" + String(Int(weight.rounded()))
+        lock.lock()
+        let known = nearest[key]
+        lock.unlock()
+        if let known {
+            return known.map { CTFontCreateWithFontDescriptor($0, size, nil) } ?? font
+        }
+        let chosen = nearestDescriptor(to: font, name: name, weight: weight)
+        lock.lock()
+        nearest[key] = .some(chosen)
+        lock.unlock()
+        return chosen.map { CTFontCreateWithFontDescriptor($0, size, nil) } ?? font
+    }
+
+    private func nearestDescriptor(to font: CTFont, name: String, weight: Double) -> CTFontDescriptor? {
+        let own = FontLibrary.weightClass(of: font)
+        guard abs(Double(own) - weight) > 0.5 else { return nil }
+        let family = CTFontCopyFamilyName(font) as String
+        let italic = CTFontGetSymbolicTraits(font).contains(.traitItalic)
+        let width = FontLibrary.widthTrait(of: font)
+        var candidates: [(name: String, weight: Int, descriptor: CTFontDescriptor?)] = [(name, own, nil)]
+        var seen: Set<String> = [name.lowercased()]
+        let request = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: family] as CFDictionary)
+        let mandatory = Set([kCTFontFamilyNameAttribute as String]) as CFSet
+        let installed = (CTFontDescriptorCreateMatchingFontDescriptors(request, mandatory) as? [CTFontDescriptor]) ?? []
+        let bundledFaces = bundled.values.map(\.descriptor).filter {
+            (CTFontDescriptorCopyAttribute($0, kCTFontFamilyNameAttribute) as? String) == family
+        }
+        for descriptor in installed + bundledFaces {
+            guard let faceName = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String,
+                  seen.insert(faceName.lowercased()).inserted else { continue }
+            // Only what counts as installed (a test may say), and the bundled faces.
+            let ours = isBundled(CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute) as? URL)
+            if !ours, let installedNames, !installedNames.contains(faceName.lowercased()) { continue }
+            let face = CTFontCreateWithFontDescriptor(descriptor, 12, nil)
+            guard ((CTFontCopyVariationAxes(face) as? [Any]) ?? []).isEmpty,
+                  CTFontGetSymbolicTraits(face).contains(.traitItalic) == italic,
+                  abs(FontLibrary.widthTrait(of: face) - width) < 0.05 else { continue }
+            candidates.append((faceName, FontLibrary.weightClass(of: face), descriptor))
+        }
+        let best = candidates.min { a, b in
+            let da = abs(Double(a.weight) - weight)
+            let db = abs(Double(b.weight) - weight)
+            if da != db { return da < db }
+            if (a.descriptor == nil) != (b.descriptor == nil) { return a.descriptor == nil }
+            if a.weight != b.weight { return a.weight < b.weight }
+            return a.name < b.name
+        }
+        return best?.descriptor
+    }
+
+    /// A face's weight on the 100–900 scale: the OS/2 table's weight class
+    /// (1 to 9 read as hundreds), or Core Text's weight trait mapped to it.
+    static func weightClass(of font: CTFont) -> Int {
+        if let table = CTFontCopyTable(font, CTFontTableTag(kCTFontTableOS2), []) as Data?, table.count >= 6 {
+            let value = Int(table[table.startIndex + 4]) << 8 | Int(table[table.startIndex + 5])
+            if value >= 1, value <= 9 { return value * 100 }
+            if value >= 1, value <= 1000 { return value }
+        }
+        let trait = ((CTFontCopyTraits(font) as NSDictionary)[kCTFontWeightTrait] as? NSNumber)?.doubleValue ?? 0
+        let scale: [(trait: Double, weight: Double)] = [(-0.8, 100), (-0.6, 200), (-0.4, 300), (0, 400), (0.23, 500), (0.3, 600),
+                                                        (0.4, 700), (0.56, 800), (0.62, 900)]
+        guard let first = scale.first, let last = scale.last else { return 400 }
+        if trait <= first.trait { return Int(first.weight) }
+        if trait >= last.trait { return Int(last.weight) }
+        for (low, high) in zip(scale, scale.dropFirst()) where trait <= high.trait {
+            let t = (trait - low.trait) / (high.trait - low.trait)
+            return Int((low.weight + t * (high.weight - low.weight)).rounded())
+        }
+        return 400
+    }
+
+    /// Core Text's width trait: 0 for regular width, below for condensed.
+    static func widthTrait(of font: CTFont) -> Double {
+        ((CTFontCopyTraits(font) as NSDictionary)[kCTFontWidthTrait] as? NSNumber)?.doubleValue ?? 0
     }
 
     // MARK: - Registering

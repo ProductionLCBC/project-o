@@ -105,6 +105,24 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
     /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
     public private(set) var mutedAudioOutputs: Set<Int> = []
+    /// Spec 6 §6 — "Timers live in the engine, outside ShowState (Spec 3 §2),
+    /// and run on its monotonic clock ... Nothing about them is saved": one
+    /// slot per the machine's `timers`, counting the master tick's frames.
+    public private(set) var timers: TimerBank
+    /// Spec 6 §7 — each popup slot's pending `clearafter`: the frame it is
+    /// due. Engine memory, like the timers.
+    public private(set) var pendingClears: [Int: Int64] = [:]
+    /// Spec 6 §8 — what this build sends about timers, in order: after each
+    /// timer command that changed one, and once a second while one runs.
+    public private(set) var lastTimerFeedback: [TimerFeedback] = []
+    /// Spec 2 §6 — this build's `/o/channel/N/remaining`, "Once a second while
+    /// timed content plays, only to clients that subscribed".
+    public private(set) var lastRemaining: [OSCMessage] = []
+    /// The whole second each timer's and each channel's last feedback was in.
+    private var timerSecondsSent: [Int: Int] = [:]
+    private var remainingSent: [Int: (started: Int, second: Int)] = [:]
+    /// The timers this build's commands changed, with their lines' `seq`.
+    private var changedTimers: [(timer: Int, seq: Int)] = []
 
     public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -131,6 +149,8 @@ public final class ControlLoop: @unchecked Sendable {
         }
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
+        // Spec 6 §6 — "after a relaunch every timer is unset".
+        timers = TimerBank(count: machine.settings.timers)
         lastLive = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: KeptCopies())
         handlePool = (0..<Int32(sources.capacity)).reversed()
         // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, a preview per stack.
@@ -162,6 +182,33 @@ public final class ControlLoop: @unchecked Sendable {
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
     private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
+    private var timersSnapshot: [Int: TimerReading] = [:]
+    private var remainingSnapshot: [Int: Int] = [:]
+
+    /// Spec 2 §6 — "Any client may ask for a current value with `/o/query` ...
+    /// and receives the feedback message once": `/o/timer/N` (an unset
+    /// timer's `s:""` alone, Spec 6 §8), `/o/popup/N`, and
+    /// `/o/channel/N/remaining` while timed content plays, as the last build
+    /// left them; nil for any other address, or a slot outside the counts.
+    public func answerVariables(query address: String) -> OSCMessage? {
+        let parts = address.split(separator: "/").map(String.init)
+        guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
+        stateLock.lock()
+        let (timers, remaining, popups) = (timersSnapshot, remainingSnapshot, stateSnapshot.popups)
+        stateLock.unlock()
+        switch (parts[1], parts.count > 3 ? parts[3] : "") {
+        case ("timer", "") where parts.count == 3:
+            guard number >= 1, number <= variables.timerSlots else { return nil }
+            return (timers[number] ?? .unset).message(timer: number)
+        case ("popup", "") where parts.count == 3:
+            guard number >= 1, number <= variables.popupSlots else { return nil }
+            return OSCFeedback.popup(number, text: popups[number] ?? "")
+        case ("channel", "remaining") where parts.count == 4:
+            return remaining[number].map { OSCFeedback.channelRemaining(number, ms: $0) }
+        default:
+            return nil
+        }
+    }
 
     /// Spec 2 §6 — "Any client may ask for a current value with `/o/query`":
     /// the live reading after the last build, and that build's frame, for
@@ -247,6 +294,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastRejected = []
         lastLibraryEvents = []
         lastRootsChanged = false
+        changedTimers = []
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
         if let documents {
@@ -266,6 +314,8 @@ public final class ControlLoop: @unchecked Sendable {
         updateLive(frame: frame)
         syncTransports(frame)
         reconcileGrades(frame)
+        updateTimerFeedback(frame: frame)
+        let remaining = updateRemaining(frame: frame)
         let plan = buildPlan(frame)
         backend.prepare(plan)
         for channel in model.channels.keys { model.channels[channel]?.snapshotPending = false }
@@ -274,6 +324,8 @@ public final class ControlLoop: @unchecked Sendable {
         stateSnapshot = model.state
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         liveSnapshot = (lastLive, Int(frame))
+        timersSnapshot = timerReadings(at: frame)
+        remainingSnapshot = remaining
         stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
@@ -368,14 +420,29 @@ public final class ControlLoop: @unchecked Sendable {
                                            commands: [Command.channelClear(channel: .number(channel))]))
             }
         }
+        // Spec 6 §7 — "`clearafter` clears the slot that many seconds after the set ... The clear is logged as a
+        // `popup N clear` from source `engine` (Spec 2 §5), so replaying the log reproduces it."
+        for popup in pendingClears.keys.sorted() {
+            guard let due = pendingClears[popup], due <= frame else { continue }
+            pendingClears[popup] = nil
+            groups.append(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .engine), commands: [Command.popupClear(popup: popup)]))
+        }
         return groups
     }
 
     func projectionContext(frame: Int64, source: CommandSource) -> ProjectionContext {
         let state = model.state
         let variables = self.variables
+        let timers = timerReadings(at: frame)
         return ProjectionContext(frame: Int(frame), rate: pacing.masterRate, library: library, machine: machine, missing: missing,
-                                 source: source, variables: { name in variables.value(name, state: state) }, kept: kept)
+                                 source: source, variables: { name in
+                                     // Spec 6 §6 — "the v1.5 guard `when [Timer 1] is 0:00` holds": a timer reads as it shows.
+                                     let words = name.split(separator: " ")
+                                     if words.count == 2, words[0].lowercased() == "timer", let n = Int(words[1]) {
+                                         return (timers[n] ?? .unset).text(format: VariableFormat.durations[0], overrun: false)
+                                     }
+                                     return variables.value(name, state: state)
+                                 }, kept: kept)
     }
 
     /// Spec 7 §6 — "The engine sends them on a fire, a load, an arm and a
@@ -412,8 +479,12 @@ public final class ControlLoop: @unchecked Sendable {
     private func run(_ group: CommandGroup, frame: Int64, now: MonotonicTime) {
         let context = projectionContext(frame: frame, source: group.source)
         // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
-        let editing = EditContext(today: variables.date())
-        switch CommandRunner.run(group, state: model.state, context: context, editing: editing) {
+        let editing = EditContext(today: variables.today())
+        // Spec 6 §6 and §7 — the timers and the pending clears, settled as the group runs, kept only if it does.
+        let settler = GroupSettler(timers: timers, clears: pendingClears, frame: frame, rate: pacing.masterRate,
+                                   popupSlots: variables.popupSlots)
+        switch CommandRunner.run(group, state: model.state, context: context, editing: editing,
+                                 settle: { command, _, result in settler.settle(command, result: result) }) {
         case .failure(let rejection):
             // Spec 5 §5 — "any other command from that client closes the run early".
             if let client = group.client { commandLog.closeRun(of: client) }
@@ -423,8 +494,17 @@ public final class ControlLoop: @unchecked Sendable {
         case .success(let outcome):
             model.state = outcome.state
             kept = outcome.kept
+            timers = settler.timers
+            pendingClears = settler.clears
             lastExecuted.append(contentsOf: outcome.executed)
             let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
+            // Spec 6 §8 — "after every timer command that changes the timer", with that line's `seq` (Spec 2 §9).
+            for line in logged where line.executed.result == .ok {
+                switch line.executed.command {
+                case .timerSet(let n, _, _), .timerStart(let n), .timerPause(let n), .timerReset(let n): changedTimers.append((n, line.seq))
+                default: break
+                }
+            }
             let applied = AppliedEdits.groups(in: logged.map(\.executed))
             if !applied.isEmpty {
                 let before = (library: library, machine: machine)
@@ -519,9 +599,13 @@ public final class ControlLoop: @unchecked Sendable {
                 log.warning("designed slides are v2; a slide write renders nothing")
             }
         case .passthrough(let command):
-            if case .audioMute(let target, let switchState) = command {
+            switch command {
+            case .audioMute(let target, let switchState):
                 audioMute(target, switchState)
-            } else {
+            case .timerSet, .timerStart, .timerPause, .timerReset:
+                // Spec 6 §6 — run on the timers as the group settled (`GroupSettler`).
+                break
+            default:
                 log.info("passthrough \(command.cmd) (handled outside the spike)")
             }
         case .mute, .variable, .boundary, .pointer, .blocked, .applied, .noop:
@@ -869,9 +953,19 @@ public final class ControlLoop: @unchecked Sendable {
             }
         }
 
+        // Spec 6 §5 — "[Time], [Date], [Timer N] and [Service In] read the same in every state": read once per
+        // build, with [Service In] from the live playlist; the thumbnail job reads what this build publishes.
+        let livePlaylist = model.state.livePlaylist(library: library, machine: machine, kept: kept)
+        let timers = timerReadings(at: frame)
+        let readings = variables.readings(livePlaylist: livePlaylist, timers: timers)
+        let resolving = Resolving(roots: VariableRoots(library: library, machine: machine, kept: kept), clock: readings.clock,
+                                  second: readings.second)
+        variables.publish(livePlaylist: livePlaylist, timers: timers)
+
         var plan = FramePlan(frame: frame)
         for stack in machine.stacks where rendering.contains(stack.number) {
-            plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), scratch: &scratch))
+            plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), resolving: resolving,
+                                              scratch: &scratch))
         }
         plan.channelPasses = scratch.channelPasses.keys.sorted().compactMap { channel in
             guard var pass = scratch.channelPasses[channel] ?? nil else { return nil }
@@ -1000,11 +1094,84 @@ public final class ControlLoop: @unchecked Sendable {
         return scratch.lookahead[steps - 1]
     }
 
+    /// Spec 6 §5 — what one build resolves variables with: the roots a
+    /// context value is read through, and the readings that "read the same in
+    /// every state".
+    struct Resolving {
+        var roots: VariableRoots
+        var clock: VariableClock
+        /// The wall-clock second `clock` reads.
+        var second: Int64
+    }
+
+    /// Spec 6 §6 — the timers as they read at `frame`.
+    func timerReadings(at frame: Int64) -> [Int: TimerReading] {
+        timers.readings(frame: frame, rate: pacing.masterRate)
+    }
+
+    /// Spec 6 §8 — "`/o/timer/N` ... It is sent once a second while the timer
+    /// runs, and after every timer command that changes the timer"; "The
+    /// `timers` topic sends one event per timer on the same cadence". After a
+    /// command, with its line's `seq`; while it runs, when the whole second
+    /// its value is in changes, on the timer's own second (Adam's answer to
+    /// the plan, 2026-11-11), past zero too, with the last line logged.
+    private func updateTimerFeedback(frame: Int64) {
+        lastTimerFeedback = []
+        var sent: Set<Int> = []
+        var seqs: [Int: Int] = [:]
+        for change in changedTimers { seqs[change.timer] = change.seq }
+        for timer in seqs.keys.sorted() {
+            let reading = timers.reading(timer, frame: frame, rate: pacing.masterRate)
+            lastTimerFeedback.append(TimerFeedback(timer: timer, reading: reading, seq: seqs[timer] ?? commandLog.lastSeq))
+            timerSecondsSent[timer] = reading.second
+            sent.insert(timer)
+        }
+        for timer in 1...max(1, timers.count) where timer <= timers.count && !sent.contains(timer) {
+            let reading = timers.reading(timer, frame: frame, rate: pacing.masterRate)
+            guard reading.state == .running, let second = reading.second, timerSecondsSent[timer] != second else { continue }
+            timerSecondsSent[timer] = second
+            lastTimerFeedback.append(TimerFeedback(timer: timer, reading: reading, seq: commandLog.lastSeq))
+        }
+    }
+
+    /// Spec 2 §6 — "`/o/channel/N/remaining` `i:ms` Once a second while timed
+    /// content plays": a channel whose media plays, ready, with an out point
+    /// or a known duration, sends its time to the out point when the whole
+    /// second it is in changes, and at once when the clip starts again; a
+    /// loop, the time left in the pass it is in (Adam's answer to the plan,
+    /// 2026-11-11). Paused, stopped, held at its end or untimed content sends
+    /// nothing more. The time left by channel, for `/o/query`.
+    private func updateRemaining(frame: Int64) -> [Int: Int] {
+        lastRemaining = []
+        var remaining: [Int: Int] = [:]
+        for channel in model.channels.keys.sorted() {
+            guard let rt = model.channels[channel], case .media(let m) = rt.live, !m.missing, m.ready, m.transport == .playing,
+                  !m.isStill, m.outMs.isFinite else { continue }
+            let ms = max(0, Int((m.outMs - mediaTime(m, at: frame)).rounded()))
+            remaining[channel] = ms
+            let started = model.state.channels[channel]?.content.media?.startedAtFrame ?? 0
+            let second = (ms + 999) / 1000
+            if let last = remainingSent[channel], last.started == started, last.second == second { continue }
+            remainingSent[channel] = (started, second)
+            lastRemaining.append(OSCFeedback.channelRemaining(channel, ms: ms))
+        }
+        remainingSent = remainingSent.filter { remaining[$0.key] != nil }
+        return remaining
+    }
+
+    /// Spec 6 §5 — a text box's variables resolved in the state being drawn,
+    /// each format outside the set logged once per box.
+    private func resolveText(_ template: SlotResolver.BoxTemplate, key: BoxKey, state: ShowState, resolving: Resolving) -> ResolvedText {
+        let resolved = variables.resolve(template.raw, state: state, scope: template.scope, roots: resolving.roots, clock: resolving.clock)
+        if !resolved.issues.isEmpty { variables.log(resolved.issues, box: key, to: log) }
+        return resolved
+    }
+
     /// Spec 4 §9 — one stack pass: "compositing its slots bottom to top". The
     /// slots resolve through `SlotResolver`, shared with the thumbnail job;
     /// the box transitions, the variable gate and the lookahead are the live
     /// plan's own.
-    private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, scratch: inout BuildScratch) -> StackPass {
+    private func stackPass(_ stack: Stack, frame: Int64, auxOnly: Bool, resolving: Resolving, scratch: inout BuildScratch) -> StackPass {
         let size = geometry.stackSize(stack.number)
         let target = stackRings[stack.number]?[Int(frame % Int64(FrameRing.depth))] ?? .none
         let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
@@ -1015,7 +1182,7 @@ public final class ControlLoop: @unchecked Sendable {
             // offset box, the text one cue beyond its offset".
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
                 if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch) {
-                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after)
+                    prefetchText(inputs: inputs, slot: slot, offset: offset, state: after, resolving: resolving)
                 }
             }
             let results = SlotResolver.resolve(
@@ -1024,14 +1191,12 @@ public final class ControlLoop: @unchecked Sendable {
                 // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
                 state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
                 pixels: { slot, offset, content in pixelSource(for: slot, offset: offset, content: content, frame: frame, auxOnly: auxOnly, scratch: &scratch) },
-                staticText: { key, box, raw, shown in
-                    // Spec 6 §5 — a static box's values read the state being drawn: the live state, or the
-                    // lookahead state of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup
-                    // that names one.
-                    let now = SlotResolver.StaticText(text: variables.resolve(raw, state: shown),
-                                                      tabular: SlotResolver.wantsTabularDigits(raw, popups: shown.popups))
-                    guard VariableProvider.containsVariables(raw) else { return now }
-                    return adoptedVariableValue(key, resolved: now, box: box, frame: frame, frameRect: PixelRect(box.frame, in: size), size: size)
+                text: { key, box, template, shown in
+                    // Spec 6 §5 — the values read the state being drawn: the live state, or the lookahead state
+                    // of an offset box. Spec 6 §4 — tabular digits for a clock, a timer or a popup that names one.
+                    let resolved = resolveText(template, key: key, state: shown, resolving: resolving)
+                    return adopt(key, template: template.raw, resolved: resolved, box: box, frame: frame, second: resolving.second,
+                                 frameRect: PixelRect(box.frame, in: size), size: size)
                 },
                 onTextMiss: { job in
                     scratch.jobs.append(job)
@@ -1039,11 +1204,17 @@ public final class ControlLoop: @unchecked Sendable {
                 })
             for result in results {
                 guard var box = result.resolved else {
-                    endBox(result.key, frame: frame, box: result.box, slot: slot, inputs: inputs, into: &boxes)
+                    // Spec 6 §5 — a box hidden by a value going empty swaps unless it asks to transition.
+                    let allowed = result.hiddenByValue ? result.box.transitionOnVariableChange : result.transitionAllowed
+                    endBox(result.key, frame: frame, box: result.box, allowed: allowed, slot: slot, inputs: inputs, into: &boxes)
                     continue
                 }
+                // Spec 6 §5 — "A box with `transitionOnVariableChange` runs its box transition between the old text
+                // and the new; the rest swap": a value's change asks the box, new text transitions as any write.
+                let valueChange = model.boxRuns[result.key]?.valueChange ?? false
+                let allowed = box.binding.isText ? (valueChange ? result.box.transitionOnVariableChange : true) : result.transitionAllowed
                 box.transition = boxTransition(result.key, content: box.content, text: box.text, box: result.box, offset: result.box.offset,
-                                               allowed: result.transitionAllowed, frame: frame)
+                                               allowed: allowed, frame: frame)
                 boxes.append(box)
             }
         }
@@ -1069,54 +1240,125 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 6 §3 — "The engine rasterizes the text one cue beyond each offset
-    /// box ahead of time ... so a `next` never waits on text": the field boxes
-    /// at `offset` with the text the slot's channel will hold one cue later,
-    /// `state`.
-    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState) {
+    /// box ahead of time ... so a `next` never waits on text": the text boxes
+    /// at `offset` with the text they will draw one cue later, in `state`, its
+    /// variables resolved there (Spec 6 §5). A static box without variables
+    /// draws the same text in every state, already cached.
+    private func prefetchText(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState, resolving: Resolving) {
         guard let layout = inputs.layout(for: slot) else { return }
         for box in layout.boxes where box.offset == offset {
-            guard case .field(let name) = box.binding.kind,
-                  let value = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !value.isEmpty else { continue }
-            let job = SlotResolver.textJob(value, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
-                                           tabular: SlotResolver.wantsTabularDigits(value, popups: state.popups))
+            let template: SlotResolver.BoxTemplate
+            switch box.binding.kind {
+            case .field(let name):
+                guard let raw = SlotResolver.fieldValue(name, channel: slot.channel, state: state, inputs: inputs), !raw.isEmpty else { continue }
+                template = SlotResolver.BoxTemplate(raw: raw, scope: .content(channel: slot.channel))
+            case .static(let raw):
+                guard VariableText.parse(raw).hasVariables else { continue }
+                template = SlotResolver.BoxTemplate(raw: raw, scope: .pointer)
+            case .pixels:
+                continue
+            }
+            // The box logs its own formats outside the set when it draws (Spec 6 §5).
+            let resolved = variables.resolve(template.raw, state: state, scope: template.scope, roots: resolving.roots, clock: resolving.clock)
+            guard !resolved.text.isEmpty else { continue }
+            let job = SlotResolver.textJob(resolved.text, box: box, frame: PixelRect(box.frame, in: inputs.size), outputHeight: inputs.size.height,
+                                           tabular: resolved.tabular)
             if text.entry(for: job) == nil { text.request(job) }
         }
     }
 
-    /// Spec 4 §8 — "A box whose text contains variables is re-laid-out only
-    /// when its resolved text changes, and no more than once a second; the
-    /// result replaces the cache entry." The box keeps the value it adopted
-    /// until the resolved text differs and the wall-clock second has moved on
-    /// (Area 5 reading, approved 2026-11-03: the second is the one the variable
-    /// provider reads for `[Time]`, so a seconds clock never skips a value on a
-    /// fractional master rate). A first value and a clear are not re-layouts
-    /// and show at once. The previous raster goes when a value is adopted, its
-    /// textures freed once any box transition between the two has run.
-    private func adoptedVariableValue(_ key: BoxKey, resolved: SlotResolver.StaticText, box: Box, frame: Int64, frameRect: PixelRect,
-                                      size: PixelSize) -> SlotResolver.StaticText {
+    /// Spec 6 §5 — "When a box adopts a new value. A box whose text names
+    /// variables is laid out again only when its resolved text changes (Spec 4
+    /// §8). How soon depends on what changed:
+    ///
+    /// - A context value changed by a fire shows at once (choice T-5). A
+    ///   change to the list's metadata, sections or notes by an edit already
+    ///   shows from the next frame (Spec 5 §2).
+    /// - A popup also shows at once, but at most ten times a second. A new
+    ///   value is adopted on the first frame at least 100 ms after the box's
+    ///   previous adoption, and the value adopted then is the newest (P10).
+    /// - The clock, a timer or `[Service In]` alone changes the box at most
+    ///   once per wall-clock second, the gate `main` has used since Area 5.
+    /// - A box's first value, and a value going empty, show at once, as on
+    ///   `main`."
+    ///
+    /// Every text box comes through here, at every offset: new text (a write,
+    /// an edit of the box) shows at once and is not a value's change. A value
+    /// going empty is any value turning empty, or the whole text. With the
+    /// clock, a timer or `[Service In]`, a box takes their change at once
+    /// unless it already took one in this wall-clock second, so a timer's box
+    /// moves on the timer's own second (Adam's answer to the plan, 2026-11-11)
+    /// and a box with `[Time]` beside it still moves at most once a second. A
+    /// popup's pending change holds the clock's to its 100 ms too. Whatever
+    /// adopts takes every value at its newest. The raster a value's change
+    /// replaces goes, its textures freed once any box transition between the
+    /// two has run; new text's stays in the cache, where a `previous` finds it.
+    private func adopt(_ key: BoxKey, template: String, resolved: ResolvedText, box: Box, frame: Int64, second: Int64,
+                       frameRect: PixelRect, size: PixelSize) -> SlotResolver.BoxText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
-        let second = variables.currentSecond
-        // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
-        // are the ones the cache holds.
-        guard let adopted = run.adoptedText else {
-            run.adoptedText = resolved.text
-            run.adoptedTabular = resolved.tabular
-            run.adoptedSecond = second
-            return resolved
+        let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
+        func take(valueChange: Bool, clocked: Bool) -> SlotResolver.BoxText {
+            // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
+            // are the ones the cache holds.
+            if valueChange, let old = run.adoptedText, !old.isEmpty, old != now.text || run.adoptedTabular != now.tabular {
+                let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+                text.release(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
+                             afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+            }
+            run.adoptedTemplate = template
+            run.adoptedText = now.text
+            run.adoptedTabular = now.tabular
+            run.adoptedValues = resolved.values
+            run.adoptedFrame = frame
+            if clocked { run.clockedSecond = second }
+            run.valueChange = valueChange
+            return now
         }
-        let held = SlotResolver.StaticText(text: adopted, tabular: run.adoptedTabular)
-        guard held != resolved else { return held }
-        if !adopted.isEmpty, !resolved.text.isEmpty, second == run.adoptedSecond { return held }
-        if !adopted.isEmpty {
-            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-            text.release(SlotResolver.textJob(adopted, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
-                         afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+        let hasClock = resolved.values.contains { $0.pacing == .clocked }
+        // "A box's first value ... show[s] at once"; so does new text, which is no value's change.
+        guard let adopted = run.adoptedText, run.adoptedTemplate == template else {
+            return take(valueChange: false, clocked: hasClock)
         }
-        run.adoptedText = resolved.text
-        run.adoptedTabular = resolved.tabular
-        run.adoptedSecond = second
-        return resolved
+        let held = SlotResolver.BoxText(text: adopted, tabular: run.adoptedTabular)
+        guard held != now else {
+            run.adoptedValues = resolved.values
+            return held
+        }
+        // What changed, value by value; a different list of values means a popup's text changed.
+        var changed: Set<VariablePacing> = []
+        var wentEmpty = now.text.isEmpty
+        let old = run.adoptedValues
+        let new = resolved.values
+        for index in 0..<max(old.count, new.count) {
+            guard index < old.count, index < new.count, old[index].written == new[index].written else {
+                changed.insert(.popup)
+                continue
+            }
+            guard old[index].value != new[index].value else { continue }
+            changed.insert(new[index].pacing)
+            if !old[index].value.isEmpty, new[index].value.isEmpty { wentEmpty = true }
+        }
+        if adopted.isEmpty || wentEmpty || changed.isEmpty || changed.contains(.context) {
+            return take(valueChange: true, clocked: changed.contains(.clocked))
+        }
+        if changed.contains(.popup) {
+            guard let last = run.adoptedFrame, frame - last < popupSpacingFrames else {
+                return take(valueChange: true, clocked: changed.contains(.clocked))
+            }
+            return held
+        }
+        guard second != run.clockedSecond else { return held }
+        return take(valueChange: true, clocked: true)
+    }
+
+    /// Spec 6 §5 — "at most ten times a second": the frames of the master tick
+    /// that make at least 100 ms (six at 60 Hz and at 59.94).
+    private var popupSpacingFrames: Int64 {
+        let rate = pacing.masterRate
+        let num = Int64(max(1, rate.num))
+        let den = Int64(max(1, rate.den))
+        return max(1, (100 * num + 1000 * den - 1) / (1000 * den))
     }
 
     /// Spec 4 §9 — box transitions; "Offset boxes ... cut rather than
@@ -1156,13 +1398,15 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// A box that no longer draws: if it drew before, its content transitions
-    /// out, unless it is a variable box without `transitionOnVariableChange`
-    /// (Spec 4 §8: "the rest swap").
-    private func endBox(_ key: BoxKey, frame: Int64, box: Box, slot: StackSlot, inputs: SlotResolver.Inputs, into boxes: inout [ResolvedBox]) {
+    /// out, unless a value going empty hid it and the box has no
+    /// `transitionOnVariableChange` (Spec 4 §8: "the rest swap"); `allowed`
+    /// says which.
+    private func endBox(_ key: BoxKey, frame: Int64, box: Box, allowed: Bool, slot: StackSlot, inputs: SlotResolver.Inputs,
+                        into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && SlotResolver.transitionAllowed(for: box), frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && allowed, frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }

@@ -36,9 +36,15 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
 
     /// Spec 1 §2 — "variations (a map of OpenType axis tag to value ... weight
     /// is the wght axis when the font is variable and the nearest instance
-    /// when it is not)". Spec 6 §4 — with `tabular`, "lays out its digits with
-    /// the font's tabular figures (`tnum`) when the font has them": the
-    /// number-spacing feature set to monospaced, which a font without it ignores.
+    /// when it is not)". On a variable font the style's `weight` sets `wght`,
+    /// clamped to the axis, when its variations name none; the variations set
+    /// the axes they name, the font's own settings standing for the rest. A
+    /// static font draws with the face of its family nearest the weight
+    /// (`FontLibrary.nearestFace`); so does the fallback, which the record still
+    /// names as the machine's fallback font. Spec 6 §4 — with `tabular`, "lays
+    /// out its digits with the font's tabular figures (`tnum`) when the font
+    /// has them": the number-spacing feature set to monospaced, which a font
+    /// without it ignores.
     func resolveFont(_ values: TextStyleValues, pixelSize: Double, tabular: Bool = false) -> ResolvedFont {
         var font: CTFont
         var substituted: String?
@@ -50,19 +56,36 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             font = fallback
             substituted = CTFontCopyPostScriptName(fallback) as String
         }
-        if !values.variations.isEmpty, let axes = CTFontCopyVariationAxes(font) as? [[CFString: Any]], !axes.isEmpty {
-            var variation: [CFNumber: CFNumber] = [:]
+        if let axes = CTFontCopyVariationAxes(font) as? [[CFString: Any]], !axes.isEmpty {
+            let current = (CTFontCopyVariation(font) as? [NSNumber: NSNumber]) ?? [:]
+            var variation = current
+            var named: Set<Int> = []
             for axis in axes {
                 guard let identifier = axis[kCTFontVariationAxisIdentifierKey] as? NSNumber,
                       let tag = axis[kCTFontVariationAxisNameKey] as? String ?? CoreTextLineRasterizer.axisTag(identifier.intValue) else { continue }
                 if let value = values.variations[tag] ?? values.variations[CoreTextLineRasterizer.axisTag(identifier.intValue) ?? ""] {
                     variation[identifier] = value as NSNumber
+                    named.insert(identifier.intValue)
                 }
             }
-            if !variation.isEmpty {
+            // Spec 1 §2 — "weight is the wght axis when the font is variable", unless the variations name it.
+            if !named.contains(CoreTextLineRasterizer.wghtAxis),
+               let axis = axes.first(where: { ($0[kCTFontVariationAxisIdentifierKey] as? NSNumber)?.intValue == CoreTextLineRasterizer.wghtAxis }) {
+                let low = (axis[kCTFontVariationAxisMinimumValueKey] as? NSNumber)?.doubleValue ?? values.weight
+                let high = (axis[kCTFontVariationAxisMaximumValueKey] as? NSNumber)?.doubleValue ?? values.weight
+                let base = (axis[kCTFontVariationAxisDefaultValueKey] as? NSNumber)?.doubleValue ?? 400
+                let target = min(max(values.weight, low), high)
+                if abs((current[NSNumber(value: CoreTextLineRasterizer.wghtAxis)]?.doubleValue ?? base) - target) > 0.5 {
+                    variation[NSNumber(value: CoreTextLineRasterizer.wghtAxis)] = NSNumber(value: target)
+                }
+            }
+            if variation != current {
                 let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontVariationAttribute: variation] as CFDictionary)
                 font = CTFontCreateCopyWithAttributes(font, pixelSize, nil, descriptor)
             }
+        } else {
+            // Spec 1 §2 — "and the nearest instance when it is not".
+            font = fonts.nearestFace(to: font, weight: values.weight, size: pixelSize)
         }
         if tabular {
             let settings: [[CFString: Any]] = [[kCTFontFeatureTypeIdentifierKey: kNumberSpacingType,
@@ -72,6 +95,9 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         }
         return ResolvedFont(font: font, substituted: substituted)
     }
+
+    /// The `wght` axis: its tag as a number.
+    static let wghtAxis = 0x7767_6874
 
     static func axisTag(_ identifier: Int) -> String? {
         let bytes = [UInt8((identifier >> 24) & 0xFF), UInt8((identifier >> 16) & 0xFF), UInt8((identifier >> 8) & 0xFF), UInt8(identifier & 0xFF)]

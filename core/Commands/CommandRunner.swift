@@ -101,10 +101,21 @@ public struct RunOutcome: Equatable, Sendable {
 /// group, from the library it leaves; each time only a version that still
 /// holds what the pointer names replaces a copy.
 public enum CommandRunner {
+    /// Spec 2 §8 — validate and execute `group`. Spec 6 §6 and §7 — `settle`
+    /// is the engine's say on a command's result where the result rests on
+    /// what the engine holds outside ShowState (Spec 3 §2): a timer command
+    /// that changes nothing is `noop`, and a `popup N set` that changes only
+    /// the pending clear is `ok`. It is called once for each command the
+    /// projection folds (a macro's own line and navigation lines aside), in
+    /// the order they run, with the projection's result; a macro's line then
+    /// follows what its commands did (Spec 2 §5).
     public static func run(_ group: CommandGroup, state: ShowState, context: ProjectionContext, validate: Bool = true,
-                           editing: EditContext = EditContext(), makeGroupID: () -> GroupID = { GroupID.random() },
+                           editing: EditContext = EditContext(),
+                           settle: ((Command, CommandSource, CommandResult) -> CommandResult)? = nil,
+                           makeGroupID: () -> GroupID = { GroupID.random() },
                            makeUUID: () -> UUID = { UUID() }) -> Result<RunOutcome, Rejection> {
         var runner = Runner(state: state, context: context, editing: editing)
+        runner.settle = settle
         var fire = group.fire
         for (index, entry) in group.commands.enumerated() {
             if validate {
@@ -158,6 +169,8 @@ struct Runner {
     /// wait for the fire to finish, in the order they were reached.
     var deferring = false
     var deferred: [DeferredEdit] = []
+    /// Spec 6 §6 and §7 — the engine's say on a folded command's result.
+    var settle: ((Command, CommandSource, CommandResult) -> CommandResult)?
 
     struct DeferredEdit {
         var edit: EditCommand
@@ -259,8 +272,9 @@ struct Runner {
         state = after
         // Spec 7 §4 — "Whenever the pointer moves": a playlist load.
         if before.pointer != after.pointer, !deferring { refreshKept() }
+        let result = CommandRunner.result(of: effects)
         executed.append(ExecutedCommand(group: group, source: source, command: command,
-                                        result: CommandRunner.result(of: effects), effects: effects, fire: fire))
+                                        result: settle?(command, source, result) ?? result, effects: effects, fire: fire))
     }
 
     /// Spec 5 §2 and §6 — one edit, checked and applied against the roots

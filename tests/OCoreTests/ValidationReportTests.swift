@@ -53,6 +53,38 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertTrue(effects.contains { if case .noop(.channelWrite) = $0 { return true } else { return false } }, "\(effects)")
     }
 
+    /// Spec 6 §5 — "A timer or popup number above the machine's count is
+    /// still a v1 name. It resolves empty and the reference report notes it,
+    /// since presets travel between campuses with different counts": a note
+    /// for each, in a static box's text, a cue's or a macro's text write, and
+    /// a popup's text, and none for a number within the count.
+    func test_aVariableAboveTheSlotCountIsNoted() throws {
+        var (library, machine) = fresh()
+        machine.settings.timers = 2
+        machine.settings.popups = 3
+        library.presets.append(Preset(number: 9, label: "Stage", uuid: F.presetUuid(9), layouts: [
+            .any: Layout(boxes: [Box(binding: .static(text: "[Timer 2] [Timer 3] [Popup 3] [[Timer 9]] [Chorus]"), frame: .full,
+                                     fit: .text(TextFit()), transition: BoxTransition(ref: 1))]),
+        ]))
+        library.lists = library.lists.map { list in
+            var list = list
+            if list.number == 7 {
+                list.cues[0].commands.append(GuardedCommand(.channelWrite(ChannelWrite(channel: .number(2),
+                                                                                       content: .text(fields: ["body": "[Popup 4]", "title": "[Timer 1]"])))))
+            }
+            return list
+        }
+        library.macros[0].commands.append(GuardedCommand(.popupSet(popup: 1, text: "Doors close in [Timer 5]", clearAfterMs: nil)))
+        let notes = report(library, machine).issues(.variableAboveSlotCount)
+        XCTAssertEqual(notes.map(\.subject), ["preset 9 layout * box 1", "list 7 cue 1 command 3", "macro \(library.macros[0].number) command \(library.macros[0].commands.count)"])
+        XCTAssertEqual(notes.map(\.severity), [.info, .info, .info])
+        XCTAssertTrue(notes[0].message.contains("[Timer 3]") && notes[0].message.contains("2 timer"), notes[0].message)
+        XCTAssertTrue(notes[1].message.contains("[Popup 4]"), notes[1].message)
+        XCTAssertTrue(notes[2].message.contains("[Timer 5]"), notes[2].message)
+        // Without a machine there are no counts to compare with.
+        XCTAssertEqual(report(library, nil).issues(.variableAboveSlotCount), [])
+    }
+
     /// "a slot naming a missing preset" → one line; degrade: Preset 1.
     func test_aSlotNamingAMissingPresetDegradesToPresetOne() {
         var (library, machine) = fresh()

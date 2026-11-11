@@ -116,6 +116,8 @@ final class CommandTextTests: XCTestCase {
         row("disarm", .disarm),
         // Timers, popups and audio
         row("timer 1 set 5:00", .timerSet(timer: 1, ms: 300_000)),
+        // Spec 2 §3 as Spec 6 §10 corrected it — `timer N set DURATION [up]`.
+        row("timer 1 set 0:00 up", .timerSet(timer: 1, ms: 0, up: true)),
         row("timer 1 start", .timerStart(timer: 1)),
         row("timer 2 pause", .timerPause(timer: 2)),
         row("timer 3 reset", .timerReset(timer: 3)),
@@ -269,6 +271,19 @@ final class CommandTextTests: XCTestCase {
         XCTAssertEqual(parsed("timer 1 set 0:00.033")?.command, .timerSet(timer: 1, ms: 33))
     }
 
+    /// Spec 2 §3 as Spec 6 §10 corrected it — "`timer N set DURATION [up]`,
+    /// which sets a countdown, or with `up` a count-up, and stops it"; Spec 2
+    /// §2 — "case is ignored for keywords"; Spec 6 §11 — "`timer 1 set 0:00
+    /// up` round-trips (`parse(print(x)) == x`)".
+    func test_timerSetUp() {
+        check("timer 1 set 0:00 up", prints: "timer 1 set 0:00 up")
+        check("TIMER 1 SET 5:00 UP", prints: "timer 1 set 5:00 up")
+        check("timer 2 set 90 Up", prints: "timer 2 set 1:30 up")
+        XCTAssertEqual(parsed("timer 1 set 0:00 up")?.command, .timerSet(timer: 1, ms: 0, up: true))
+        XCTAssertEqual(parsed("timer 1 set 5:00")?.command, .timerSet(timer: 1, ms: 300_000, up: false))
+        XCTAssertEqual(CommandText.print(.timerSet(timer: 1, ms: 300_000)), "timer 1 set 5:00", "a countdown prints no up")
+    }
+
     func test_durationText() {
         XCTAssertEqual(DurationText.ms("5:00"), 300_000)
         XCTAssertEqual(DurationText.ms("0:30"), 30_000)
@@ -404,6 +419,7 @@ final class CommandTextTests: XCTestCase {
             .playlistLoad(title: "Sunday"),
             .playlistLoad(title: ""),
             .timerSet(timer: 1, ms: 300_000), .timerSet(timer: 1, ms: 0), .timerSet(timer: 1, ms: 3_723_456),
+            .timerSet(timer: 1, ms: 0, up: true), .timerSet(timer: 2, ms: 3_723_456, up: true),
             .timerStart(timer: 1), .timerPause(timer: 2), .timerReset(timer: 3),
             .popupSet(popup: 3, text: "Nursery", clearAfterMs: 30_000), .popupSet(popup: 3, text: "", clearAfterMs: nil),
             .popupClear(popup: 3),
