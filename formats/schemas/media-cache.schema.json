@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-o.lcbcchurch.com/schemas/media-cache.schema.json",
+  "title": "media-cache.json",
+  "description": "Spec 8 §4 — the machine's media cache: a record for every file the media walk last found and hashed, with its folder (the media root or machine/media/), path, size, modification date and hash. Written by the engine; the loader leaves it alone.",
+  "type": "object",
+  "required": ["schema", "app", "kind", "records"],
+  "properties": {
+    "schema": { "type": "integer", "minimum": 1 },
+    "app": { "type": "string" },
+    "kind": { "const": "mediaCache" },
+    "records": { "type": "array", "items": { "$ref": "#/$defs/record" } }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "required": ["folder", "path", "size", "modified", "hash"],
+      "properties": {
+        "folder": { "enum": ["mediaRoot", "machineMedia", "absolute"] },
+        "path": { "type": "string", "minLength": 1 },
+        "size": { "type": "integer", "minimum": 0 },
+        "modified": { "type": "string" },
+        "hash": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64}|slide:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$" }
+      }
+    }
+  }
+}

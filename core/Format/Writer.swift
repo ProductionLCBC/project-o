@@ -70,6 +70,7 @@ public enum Writer {
         case .mediaLocal(let index): merge(encode(index))
         case .playlist(let playlist): merge(encode(playlist))
         case .state(let state): members["state"] = encode(state)
+        case .mediaCache(let cache): merge(encode(cache))
         }
         members["schema"] = .number(Double(document.kind.currentSchema))
         members["app"] = .string(OCore.appVersion)
