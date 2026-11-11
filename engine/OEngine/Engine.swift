@@ -126,6 +126,8 @@ public final class Engine: @unchecked Sendable {
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
+        // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.
+        for timer in control.lastTimerFeedback { publisher.publish(timer.event) }
         if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
         sweepReleases()
         warmThumbnailsIfTheListChanged()

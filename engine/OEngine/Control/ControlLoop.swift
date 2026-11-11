@@ -105,6 +105,24 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
     /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
     public private(set) var mutedAudioOutputs: Set<Int> = []
+    /// Spec 6 §6 — "Timers live in the engine, outside ShowState (Spec 3 §2),
+    /// and run on its monotonic clock ... Nothing about them is saved": one
+    /// slot per the machine's `timers`, counting the master tick's frames.
+    public private(set) var timers: TimerBank
+    /// Spec 6 §7 — each popup slot's pending `clearafter`: the frame it is
+    /// due. Engine memory, like the timers.
+    public private(set) var pendingClears: [Int: Int64] = [:]
+    /// Spec 6 §8 — what this build sends about timers, in order: after each
+    /// timer command that changed one, and once a second while one runs.
+    public private(set) var lastTimerFeedback: [TimerFeedback] = []
+    /// Spec 2 §6 — this build's `/o/channel/N/remaining`, "Once a second while
+    /// timed content plays, only to clients that subscribed".
+    public private(set) var lastRemaining: [OSCMessage] = []
+    /// The whole second each timer's and each channel's last feedback was in.
+    private var timerSecondsSent: [Int: Int] = [:]
+    private var remainingSent: [Int: (started: Int, second: Int)] = [:]
+    /// The timers this build's commands changed, with their lines' `seq`.
+    private var changedTimers: [(timer: Int, seq: Int)] = []
 
     public init(library: Library, machine: Machine, pacing: Pacing, mediaRoot: URL?, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -131,6 +149,8 @@ public final class ControlLoop: @unchecked Sendable {
         }
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
+        // Spec 6 §6 — "after a relaunch every timer is unset".
+        timers = TimerBank(count: machine.settings.timers)
         lastLive = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: KeptCopies())
         handlePool = (0..<Int32(sources.capacity)).reversed()
         // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, a preview per stack.
@@ -162,6 +182,33 @@ public final class ControlLoop: @unchecked Sendable {
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
     private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
+    private var timersSnapshot: [Int: TimerReading] = [:]
+    private var remainingSnapshot: [Int: Int] = [:]
+
+    /// Spec 2 §6 — "Any client may ask for a current value with `/o/query` ...
+    /// and receives the feedback message once": `/o/timer/N` (an unset
+    /// timer's `s:""` alone, Spec 6 §8), `/o/popup/N`, and
+    /// `/o/channel/N/remaining` while timed content plays, as the last build
+    /// left them; nil for any other address, or a slot outside the counts.
+    public func answerVariables(query address: String) -> OSCMessage? {
+        let parts = address.split(separator: "/").map(String.init)
+        guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
+        stateLock.lock()
+        let (timers, remaining, popups) = (timersSnapshot, remainingSnapshot, stateSnapshot.popups)
+        stateLock.unlock()
+        switch (parts[1], parts.count > 3 ? parts[3] : "") {
+        case ("timer", "") where parts.count == 3:
+            guard number >= 1, number <= variables.timerSlots else { return nil }
+            return (timers[number] ?? .unset).message(timer: number)
+        case ("popup", "") where parts.count == 3:
+            guard number >= 1, number <= variables.popupSlots else { return nil }
+            return OSCFeedback.popup(number, text: popups[number] ?? "")
+        case ("channel", "remaining") where parts.count == 4:
+            return remaining[number].map { OSCFeedback.channelRemaining(number, ms: $0) }
+        default:
+            return nil
+        }
+    }
 
     /// Spec 2 §6 — "Any client may ask for a current value with `/o/query`":
     /// the live reading after the last build, and that build's frame, for
@@ -247,6 +294,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastRejected = []
         lastLibraryEvents = []
         lastRootsChanged = false
+        changedTimers = []
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
         if let documents {
@@ -266,6 +314,8 @@ public final class ControlLoop: @unchecked Sendable {
         updateLive(frame: frame)
         syncTransports(frame)
         reconcileGrades(frame)
+        updateTimerFeedback(frame: frame)
+        let remaining = updateRemaining(frame: frame)
         let plan = buildPlan(frame)
         backend.prepare(plan)
         for channel in model.channels.keys { model.channels[channel]?.snapshotPending = false }
@@ -274,6 +324,8 @@ public final class ControlLoop: @unchecked Sendable {
         stateSnapshot = model.state
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         liveSnapshot = (lastLive, Int(frame))
+        timersSnapshot = timerReadings(at: frame)
+        remainingSnapshot = remaining
         stateLock.unlock()
         builtAt.store(now.nanoseconds, ordering: .releasing)
         return plan
@@ -368,14 +420,29 @@ public final class ControlLoop: @unchecked Sendable {
                                            commands: [Command.channelClear(channel: .number(channel))]))
             }
         }
+        // Spec 6 §7 — "`clearafter` clears the slot that many seconds after the set ... The clear is logged as a
+        // `popup N clear` from source `engine` (Spec 2 §5), so replaying the log reproduces it."
+        for popup in pendingClears.keys.sorted() {
+            guard let due = pendingClears[popup], due <= frame else { continue }
+            pendingClears[popup] = nil
+            groups.append(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .engine), commands: [Command.popupClear(popup: popup)]))
+        }
         return groups
     }
 
     func projectionContext(frame: Int64, source: CommandSource) -> ProjectionContext {
         let state = model.state
         let variables = self.variables
+        let timers = timerReadings(at: frame)
         return ProjectionContext(frame: Int(frame), rate: pacing.masterRate, library: library, machine: machine, missing: missing,
-                                 source: source, variables: { name in variables.value(name, state: state) }, kept: kept)
+                                 source: source, variables: { name in
+                                     // Spec 6 §6 — "the v1.5 guard `when [Timer 1] is 0:00` holds": a timer reads as it shows.
+                                     let words = name.split(separator: " ")
+                                     if words.count == 2, words[0].lowercased() == "timer", let n = Int(words[1]) {
+                                         return (timers[n] ?? .unset).text(format: VariableFormat.durations[0], overrun: false)
+                                     }
+                                     return variables.value(name, state: state)
+                                 }, kept: kept)
     }
 
     /// Spec 7 §6 — "The engine sends them on a fire, a load, an arm and a
@@ -413,7 +480,11 @@ public final class ControlLoop: @unchecked Sendable {
         let context = projectionContext(frame: frame, source: group.source)
         // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
         let editing = EditContext(today: variables.today())
-        switch CommandRunner.run(group, state: model.state, context: context, editing: editing) {
+        // Spec 6 §6 and §7 — the timers and the pending clears, settled as the group runs, kept only if it does.
+        let settler = GroupSettler(timers: timers, clears: pendingClears, frame: frame, rate: pacing.masterRate,
+                                   popupSlots: variables.popupSlots)
+        switch CommandRunner.run(group, state: model.state, context: context, editing: editing,
+                                 settle: { command, _, result in settler.settle(command, result: result) }) {
         case .failure(let rejection):
             // Spec 5 §5 — "any other command from that client closes the run early".
             if let client = group.client { commandLog.closeRun(of: client) }
@@ -423,8 +494,17 @@ public final class ControlLoop: @unchecked Sendable {
         case .success(let outcome):
             model.state = outcome.state
             kept = outcome.kept
+            timers = settler.timers
+            pendingClears = settler.clears
             lastExecuted.append(contentsOf: outcome.executed)
             let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
+            // Spec 6 §8 — "after every timer command that changes the timer", with that line's `seq` (Spec 2 §9).
+            for line in logged where line.executed.result == .ok {
+                switch line.executed.command {
+                case .timerSet(let n, _, _), .timerStart(let n), .timerPause(let n), .timerReset(let n): changedTimers.append((n, line.seq))
+                default: break
+                }
+            }
             let applied = AppliedEdits.groups(in: logged.map(\.executed))
             if !applied.isEmpty {
                 let before = (library: library, machine: machine)
@@ -519,9 +599,13 @@ public final class ControlLoop: @unchecked Sendable {
                 log.warning("designed slides are v2; a slide write renders nothing")
             }
         case .passthrough(let command):
-            if case .audioMute(let target, let switchState) = command {
+            switch command {
+            case .audioMute(let target, let switchState):
                 audioMute(target, switchState)
-            } else {
+            case .timerSet, .timerStart, .timerPause, .timerReset:
+                // Spec 6 §6 — run on the timers as the group settled (`GroupSettler`).
+                break
+            default:
                 log.info("passthrough \(command.cmd) (handled outside the spike)")
             }
         case .mute, .variable, .boundary, .pointer, .blocked, .applied, .noop:
@@ -1020,10 +1104,59 @@ public final class ControlLoop: @unchecked Sendable {
         var second: Int64
     }
 
-    /// Spec 6 §6 — the timers as they read at `frame` (Area 11's timers come
-    /// with its fourth step; until then every timer is unset).
+    /// Spec 6 §6 — the timers as they read at `frame`.
     func timerReadings(at frame: Int64) -> [Int: TimerReading] {
-        [:]
+        timers.readings(frame: frame, rate: pacing.masterRate)
+    }
+
+    /// Spec 6 §8 — "`/o/timer/N` ... It is sent once a second while the timer
+    /// runs, and after every timer command that changes the timer"; "The
+    /// `timers` topic sends one event per timer on the same cadence". After a
+    /// command, with its line's `seq`; while it runs, when the whole second
+    /// its value is in changes, on the timer's own second (Adam's answer to
+    /// the plan, 2026-11-11), past zero too, with the last line logged.
+    private func updateTimerFeedback(frame: Int64) {
+        lastTimerFeedback = []
+        var sent: Set<Int> = []
+        var seqs: [Int: Int] = [:]
+        for change in changedTimers { seqs[change.timer] = change.seq }
+        for timer in seqs.keys.sorted() {
+            let reading = timers.reading(timer, frame: frame, rate: pacing.masterRate)
+            lastTimerFeedback.append(TimerFeedback(timer: timer, reading: reading, seq: seqs[timer] ?? commandLog.lastSeq))
+            timerSecondsSent[timer] = reading.second
+            sent.insert(timer)
+        }
+        for timer in 1...max(1, timers.count) where timer <= timers.count && !sent.contains(timer) {
+            let reading = timers.reading(timer, frame: frame, rate: pacing.masterRate)
+            guard reading.state == .running, let second = reading.second, timerSecondsSent[timer] != second else { continue }
+            timerSecondsSent[timer] = second
+            lastTimerFeedback.append(TimerFeedback(timer: timer, reading: reading, seq: commandLog.lastSeq))
+        }
+    }
+
+    /// Spec 2 §6 — "`/o/channel/N/remaining` `i:ms` Once a second while timed
+    /// content plays": a channel whose media plays, ready, with an out point
+    /// or a known duration, sends its time to the out point when the whole
+    /// second it is in changes, and at once when the clip starts again; a
+    /// loop, the time left in the pass it is in (Adam's answer to the plan,
+    /// 2026-11-11). Paused, stopped, held at its end or untimed content sends
+    /// nothing more. The time left by channel, for `/o/query`.
+    private func updateRemaining(frame: Int64) -> [Int: Int] {
+        lastRemaining = []
+        var remaining: [Int: Int] = [:]
+        for channel in model.channels.keys.sorted() {
+            guard let rt = model.channels[channel], case .media(let m) = rt.live, !m.missing, m.ready, m.transport == .playing,
+                  !m.isStill, m.outMs.isFinite else { continue }
+            let ms = max(0, Int((m.outMs - mediaTime(m, at: frame)).rounded()))
+            remaining[channel] = ms
+            let started = model.state.channels[channel]?.content.media?.startedAtFrame ?? 0
+            let second = (ms + 999) / 1000
+            if let last = remainingSent[channel], last.started == started, last.second == second { continue }
+            remainingSent[channel] = (started, second)
+            lastRemaining.append(OSCFeedback.channelRemaining(channel, ms: ms))
+        }
+        remainingSent = remainingSent.filter { remaining[$0.key] != nil }
+        return remaining
     }
 
     /// Spec 6 §5 — a text box's variables resolved in the state being drawn,

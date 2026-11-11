@@ -41,7 +41,12 @@ public final class OSCServer: @unchecked Sendable {
     private let running = Atomic<Bool>(false)
     private let lock = NSLock()
     private var registrations: [OSCPeer: MonotonicTime] = [:]
-    private var subscriptions: [OSCPeer: Set<String>] = [:]
+    /// Spec 2 §6 — "High-rate feedback is opt-in per address ...
+    /// subscriptions expire with the client's registration": by the client's
+    /// host, since a client registers the port it listens on and may send from
+    /// another; they go to that host's peers and end once the host has neither
+    /// a live registration nor a configured target.
+    private var subscriptions: [String: Set<String>] = [:]
     /// Spec 2 §6 — "Errors go back to the sender": who sent each group still
     /// waiting for its build, and the address to name, with the order it came
     /// in so the oldest go first past `pendingLimit`.
@@ -188,15 +193,18 @@ public final class OSCServer: @unchecked Sendable {
         case .register(let host, let port):
             let client = OSCPeer(host: host.isEmpty ? peer.host : host, port: UInt16(clamping: port))
             lock.lock()
+            pruneLocked(now: now())
             registrations[client] = now().advanced(by: Int64(OSCClientRequest.registrationSeconds) * 1_000_000_000)
             lock.unlock()
         case .subscribe(let address):
             lock.lock()
-            subscriptions[peer, default: []].insert(address)
+            pruneLocked(now: now())
+            subscriptions[peer.host, default: []].insert(address)
             lock.unlock()
         case .unsubscribe(let address):
             lock.lock()
-            subscriptions[peer]?.remove(address)
+            subscriptions[peer.host]?.remove(address)
+            if subscriptions[peer.host]?.isEmpty == true { subscriptions[peer.host] = nil }
             lock.unlock()
         case .query(let address):
             if let reply = queryHandler?(address) {
@@ -240,6 +248,9 @@ public final class OSCServer: @unchecked Sendable {
         }
         // Spec 7 §6 — the live position and the countdown, from the live reading.
         messages += control.lastLiveFeedback?.messages ?? []
+        // Spec 6 §8 — the timers, to every target; Spec 2 §6 — the remaining time, to its subscribers.
+        messages += control.lastTimerFeedback.map(\.message)
+        messages += control.lastRemaining
         feedback(messages)
         let rejected = control.lastRejected
         guard !(executed.isEmpty && rejected.isEmpty) else { return }
@@ -264,19 +275,34 @@ public final class OSCServer: @unchecked Sendable {
     /// Spec 2 §6 — feedback to every target and every live registration.
     public func feedback(_ messages: [OSCMessage]) {
         guard !messages.isEmpty else { return }
-        let current = now()
         lock.lock()
-        registrations = registrations.filter { $0.value > current }
+        pruneLocked(now: now())
         let peers = Set(targets).union(registrations.keys)
         let subscribed = subscriptions
         lock.unlock()
         for message in messages {
             // Spec 2 §6 — "High-rate feedback is opt-in per address".
             let highRate = message.address.hasSuffix("/remaining")
-            for peer in peers where !highRate || subscribed[peer]?.contains(message.address) == true {
+            for peer in peers where !highRate || subscribed[peer.host]?.contains(message.address) == true {
                 send(message, to: peer)
             }
         }
+    }
+
+    /// Spec 2 §6 — registrations last 60 seconds; "subscriptions expire with
+    /// the client's registration". Called with the lock held.
+    private func pruneLocked(now current: MonotonicTime) {
+        registrations = registrations.filter { $0.value > current }
+        let hosts = Set(targets.map(\.host)).union(registrations.keys.map(\.host))
+        subscriptions = subscriptions.filter { hosts.contains($0.key) }
+    }
+
+    /// The hosts with a subscription, for the tests.
+    public var subscriptionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        pruneLocked(now: now())
+        return subscriptions.count
     }
 
     public func send(_ message: OSCMessage, to peer: OSCPeer) {

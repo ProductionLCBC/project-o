@@ -266,6 +266,8 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 7 §6 — the live position and the countdown, as the last build read them.
         let published = engine.control.publishedLive
         if let live = published.live.answer(query: address, frame: published.frame, rate: engine.pacing.masterRate) { return live }
+        // Spec 6 §8 — the timers, the popups and a channel's remaining time.
+        if let variable = engine.control.answerVariables(query: address) { return variable }
         let state = engine.control.publishedState
         let parts = address.split(separator: "/").map(String.init)
         guard parts.count >= 3, parts[0] == "o", let number = Int(parts[2]) else { return nil }
