@@ -82,7 +82,7 @@ public enum MediaFound: Equatable, Sendable {
 
 /// Spec 8 §4 — one change the walk made to an index: what the engine log
 /// records "by id" (Spec 9 §2), and what the `library` event names.
-public enum MediaIndexChange: Equatable, Sendable {
+public enum MediaIndexChange: Equatable, Hashable, Sendable {
     /// "A new id at a path no entry holds is a new entry with empty defaults";
     /// a landing's new id is a new entry too, "with the old item's defaults".
     case added(id: String, tier: MediaTier, location: MediaLocation)
