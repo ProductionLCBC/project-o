@@ -58,20 +58,23 @@ final class MetricsTests: XCTestCase {
         XCTAssertEqual(line, "{\"completion\":\"displayedLate\",\"dropsSinceStart\":3,\"frame\":10,\"kind\":\"present\",\"latencyNs\":4000000,\"output\":2,\"rePresented\":true}\n")
     }
 
-    func test_blackBoxRotatesDailyAndCapsTotalSize() throws {
+    /// Spec 4 §13 as Spec 9 §9 corrected it — "JSON lines in
+    /// `machine/blackbox/`, a file an hour"; Spec 9 §7 — "512 MB in all,
+    /// oldest first; only the current hour's file is spared, so the cap holds
+    /// within a day". `BlackBoxFileTests` has the rest.
+    func test_blackBoxRotatesHourlyAndCapsTotalSize() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("blackbox-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
         let box = BlackBox(folder: folder, maximumBytes: 2000)
-        var day = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 11, day: 1).date!
+        var hour = DateComponents(calendar: Calendar(identifier: .gregorian), timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 11, day: 1, hour: 23).date!
         for i in 0..<12 {
             var record = TickRecord()
             record.frame = Int64(i)
-            try box.append(record, at: day)
-            if i == 5 { day = day.addingTimeInterval(86_400) }
+            try box.append(record, at: hour)
+            if i == 5 { hour = hour.addingTimeInterval(3600) }
         }
         let files = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
-        XCTAssertEqual(files, ["blackbox-2026-11-02.jsonl"], "the cap removed the oldest day first")
-        let bytes = try files.map { try FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent($0).path)[.size] as? Int ?? 0 }.reduce(0, +)
-        XCTAssertLessThanOrEqual(bytes, 2000)
+        XCTAssertEqual(files, ["blackbox-2026-11-02-00.jsonl"], "the cap removed the oldest hour first, within the day's turn")
     }
 
     func test_summaryTracksP99AndTotals() {
