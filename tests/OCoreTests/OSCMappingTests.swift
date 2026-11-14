@@ -94,6 +94,9 @@ final class OSCMappingTests: XCTestCase {
         row(.systemClearAll, "/o/system/clearall"),
         row(.systemPreflight, "/o/system/preflight"),
         row(.systemSnapshot, "/o/system/snapshot"),
+        // Spec 2 §6 as Spec 9 §9 corrected it — "| `system restore list 42 version 16` | `/o/system/restore` `s:"list 42 version 16"` |".
+        row(.systemRestoreList(list: 42, version: 16), "/o/system/restore", [s("list 42 version 16")]),
+        row(.systemRestoreSnapshot(id: "2026-11-08-085959"), "/o/system/restore", [s("snapshot \"2026-11-08-085959\"")]),
         // Spec 2 §6 as Spec 8 §10 corrected it — "| `media rebuild` | `/o/media/rebuild` |", and the rest of the family typed.
         row(.media(.importFile(path: "/Users/Shared/Staging/a.mov")), "/o/media/import", [s("/Users/Shared/Staging/a.mov")]),
         row(.media(.rebuild), "/o/media/rebuild"),
@@ -161,6 +164,12 @@ final class OSCMappingTests: XCTestCase {
         }
         same(OSCMessage("/o/cue", [s("7")]), OSCMessage("/o/cue", [i(7)]))
         same(OSCMessage("/o/next", [s("")]), OSCMessage("/o/next"))
+        // Spec 2 §6 as Spec 9 §9 corrected it — a restore travels as one string, the rest of its text form.
+        same(OSCMessage("/o/system/restore", [s("LIST 42 Version 16")]), OSCMessage("/o/System/Restore", [s("list 42 version 16")]))
+        for refused in [OSCMessage("/o/system/restore"), OSCMessage("/o/system/restore", [s("list"), i(42), s("version"), i(16)]),
+                        OSCMessage("/o/system/restore/list", [i(42)])] {
+            if case .success(let command) = OSCMapping.command(from: refused) { XCTFail("\(refused) was accepted as \(command)") }
+        }
         same(OSCMessage("/o/channel/2/write", [s("media \(Self.dawn) loop transition 2 1.0 once")]),
              OSCMessage("/o/channel/2/write", [s("media sha256:55c84469c37e loop tr 2 1 once")]),
              options: ParseOptions(mediaIDs: [Self.dawn]))

@@ -19,10 +19,13 @@ public enum UndoClass: String, Codable, Equatable, Sendable {
     case edit
 }
 
-/// Spec 2 §9 — "`kind` is `runtime` or `edit`".
+/// Spec 2 §9 as Spec 9 §9 corrected it — "`kind` is `runtime`, `edit` or
+/// `note` (Spec 9 §2)". A command's line is `runtime` or `edit`; `note` is
+/// the kind of a note line (`LogNote`).
 public enum LogKind: String, Codable, Equatable, Sendable {
     case runtime
     case edit
+    case note
 }
 
 /// One row of the Spec 2 §3 table: the text skeleton (target word, number,
@@ -86,6 +89,9 @@ struct VocabularyRow: Sendable {
         /// a bare keyword that sets a boolean, written to the object only when
         /// true (Spec 1 §5) and sent over OSC as `s:"up"` (Spec 2 §6).
         case flag(String)
+        /// Spec 9 §6 — `system restore list N version V`: a word of the form
+        /// itself, read and printed in place and kept in no field.
+        case word(String)
         /// Spec 2 §2 — `write CONTENT [riders]`, parsed and printed by hand.
         case write
         /// Spec 5 §4 — `edit OBJECT ADDRESS [VERB] [ARGUMENTS]`.
@@ -106,6 +112,12 @@ struct VocabularyRow: Sendable {
     let target: String
     let number: Number
     let verb: Verb
+    /// Spec 9 §6 — `system restore list …` and `system restore snapshot …`:
+    /// two commands under one verb, told apart by the word after it. That
+    /// word is part of the text form and of the one string the command
+    /// travels as over OSC (Spec 2 §6, `/o/system/restore`), never of the
+    /// address.
+    let subverb: String?
     let args: [Arg]
     let lock: LockClass
     let undo: UndoClass
@@ -113,12 +125,13 @@ struct VocabularyRow: Sendable {
     /// the §2 examples' trailing `track` is accepted and never printed.
     let standaloneAttribute: Bool
 
-    init(_ cmd: String, target: String, number: Number = .none, verb: Verb = .none, args: [Arg] = [],
+    init(_ cmd: String, target: String, number: Number = .none, verb: Verb = .none, subverb: String? = nil, args: [Arg] = [],
          lock: LockClass, undo: UndoClass, standaloneAttribute: Bool = false) {
         self.cmd = cmd
         self.target = target
         self.number = number
         self.verb = verb
+        self.subverb = subverb
         self.args = args
         self.lock = lock
         self.undo = undo
@@ -127,6 +140,10 @@ struct VocabularyRow: Sendable {
 
     var hasNumber: Bool { number.key != nil }
     var hasVerb: Bool { !verb.isNone }
+
+    /// Spec 2 §6 — a write, an edit and a restore go over OSC as one string,
+    /// "the rest of the command", and never as typed arguments.
+    var travelsAsText: Bool { isSpecial || subverb != nil }
 
     /// Spec 2 §3 — whether this row's number may be the word `all`.
     var takesAll: Bool {
@@ -220,6 +237,11 @@ enum Vocabulary {
         VocabularyRow("system.clearAll", target: "system", verb: .word("clearall"), lock: .passes, undo: .runtime),
         VocabularyRow("system.preflight", target: "system", verb: .word("preflight"), lock: .passes, undo: .none),
         VocabularyRow("system.snapshot", target: "system", verb: .word("snapshot"), lock: .passes, undo: .none),
+        // Spec 2 §3 as Spec 9 §9 corrected it — the restore commands of Spec 9 §6, lock `passes`, undo `edit`.
+        VocabularyRow("system.restoreList", target: "system", verb: .word("restore"), subverb: "list",
+                      args: [Arg("list", .int), Arg("", .word("version")), Arg("version", .int)], lock: .passes, undo: .edit),
+        VocabularyRow("system.restoreSnapshot", target: "system", verb: .word("restore"), subverb: "snapshot",
+                      args: [Arg("id", .string)], lock: .passes, undo: .edit),
         // Spec 2 §3 as Spec 8 §2 corrected it — the media commands. "Channel lock
         // doesn't apply to any of them, so Spec 2's lock column reads `passes`."
         VocabularyRow("media.import", target: "media", verb: .word("import"), args: [Arg("path", .string)], lock: .passes, undo: .none),
@@ -281,6 +303,23 @@ enum Vocabulary {
             }
         }
     }
+
+    /// Spec 9 §6 — the words that may follow a verb shared by several rows
+    /// (`restore`: `list`, `snapshot`); empty for every other verb.
+    static func subverbs(target: String, verb: String) -> [String] {
+        rows(target: target).compactMap { row in
+            if case .word(let w) = row.verb, w == verb { return row.subverb }
+            return nil
+        }
+    }
+
+    /// The row a target, a verb and the word after it name.
+    static func row(target: String, verb: String, subverb: String) -> VocabularyRow? {
+        rows(target: target).first { row in
+            if case .word(let w) = row.verb { return w == verb && row.subverb == subverb }
+            return false
+        }
+    }
 }
 
 extension Command {
@@ -296,10 +335,23 @@ extension Command {
     }
 
     /// Spec 2 §9 — "`kind` is `runtime` or `edit`"; Spec 8 §2 — "`media
-    /// replace`, `media delete` and their inverses are ordinary edits".
+    /// replace`, `media delete` and their inverses are ordinary edits";
+    /// Spec 9 §6 — each restore command "is an edit group, logged with kind
+    /// `edit` and its inverse".
     public var logKind: LogKind {
-        if case .edit = self { return .edit }
-        if case .media(let m) = self, m.isEdit { return .edit }
-        return .runtime
+        switch self {
+        case .edit, .systemRestoreList, .systemRestoreSnapshot: return .edit
+        case .media(let m): return m.isEdit ? .edit : .runtime
+        default: return .runtime
+        }
+    }
+
+    /// Spec 9 §6 — the two restore commands, which "run through the edit
+    /// path as Spec 5 §9 says".
+    public var isRestore: Bool {
+        switch self {
+        case .systemRestoreList, .systemRestoreSnapshot: return true
+        default: return false
+        }
     }
 }

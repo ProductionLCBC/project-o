@@ -165,9 +165,10 @@ struct Fold {
         // Pass-through: no ShowState in them.
         case .timerSet, .timerStart, .timerPause, .timerReset,
              .audioMute, .undo, .redo, .historyJump,
-             .systemPreflight, .systemSnapshot, .edit, .media:
+             .systemPreflight, .systemSnapshot, .systemRestoreList, .systemRestoreSnapshot, .edit, .media:
             // Spec 3 §6 as Spec 8 corrected it — "Commands that do not touch state (`timer`, `history`,
-            // `system preflight`, `system snapshot`, `edit`, `media`) pass through".
+            // `system preflight`, `system snapshot`, `edit`, `media`) pass through". Spec 5 §9 — "A
+            // restore changes the library and never ShowState", so the restore commands pass too.
             effects.append(.passthrough(command))
 
         case .unknown, .invalid:

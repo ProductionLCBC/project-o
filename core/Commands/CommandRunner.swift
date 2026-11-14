@@ -28,10 +28,15 @@ public struct ExecutedCommand: Equatable, Sendable {
     /// Spec 2 §9 as Spec 8 §7 adds — "A `media import` result also carries
     /// the `job` its outcomes are reported under."
     public var job: String?
+    /// Spec 5 §8 — on a line of an undo's group, "the group it reverses".
+    public var undoes: GroupID?
+    /// Spec 5 §8 — on a line of a redo's group, the undone group it runs again.
+    public var redoes: GroupID?
 
     public init(group: GroupID, source: CommandSource, command: Command, result: CommandResult,
                 effects: [Effect], fire: FireRecord? = nil, refusal: Rejection? = nil, inverse: Command? = nil,
-                changes: [LibraryChange] = [], structure: [StructureChange] = [], warnings: [String] = [], job: String? = nil) {
+                changes: [LibraryChange] = [], structure: [StructureChange] = [], warnings: [String] = [], job: String? = nil,
+                undoes: GroupID? = nil, redoes: GroupID? = nil) {
         self.group = group
         self.source = source
         self.command = command
@@ -44,6 +49,8 @@ public struct ExecutedCommand: Equatable, Sendable {
         self.structure = structure
         self.warnings = warnings
         self.job = job
+        self.undoes = undoes
+        self.redoes = redoes
     }
 }
 
@@ -290,6 +297,12 @@ struct Runner {
             }
             return
         }
+        if case .historyJump = command {
+            // Spec 5 §8 — "`history jump N` is rejected with `notInV1`": the history view is v1.5.
+            refuse(command, Rejection(reason: .notInV1, message: "history jump comes with the history view, after v1"),
+                   group: group, source: source, fire: fire)
+            return
+        }
         var projectionContext = context
         projectionContext.source = source
         let before = state
@@ -353,6 +366,19 @@ struct Runner {
         let result = CommandRunner.result(of: effects)
         executed.append(ExecutedCommand(group: group, source: source, command: command,
                                         result: settle?(command, source, result) ?? result, effects: effects, fire: fire))
+    }
+
+    /// Spec 5 §2 — a command the edit path refuses: held by a cue, macro, key
+    /// binding or scheduler entry it "yields `blocked` with its reason ...
+    /// and the rest of the group runs"; sent from the UI, the API, the
+    /// command bar or OSC, the group is rejected.
+    mutating func refuse(_ command: Command, _ rejection: Rejection, group: GroupID, source: CommandSource, fire: FireRecord?) {
+        guard source.kind.holdsEdits else {
+            refused = rejection
+            return
+        }
+        executed.append(ExecutedCommand(group: group, source: source, command: command, result: .blocked,
+                                        effects: [], fire: fire, refusal: rejection))
     }
 
     /// Spec 5 §2 and §6 — one edit, checked and applied against the roots

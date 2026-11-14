@@ -223,8 +223,18 @@ struct CommandParser {
             guard let t = next() else { throw reject(.missingArgument, "\(target) needs a verb") }
             guard case .word(let w) = t else { throw reject(.unknownVerb, "\(t.described) is not a \(target) verb") }
             let verb = Vocabulary.canonicalVerb(w.lowercased(), target: target)
-            guard let found = Vocabulary.row(target: target, verb: verb) else {
+            guard var found = Vocabulary.row(target: target, verb: verb) else {
                 throw reject(.unknownVerb, "\(w) is not a \(target) verb")
+            }
+            // Spec 9 §6 — `system restore list …` and `system restore snapshot …`: the next word names the command.
+            if found.subverb != nil {
+                let choices = Vocabulary.subverbs(target: target, verb: verb).joined(separator: " or ")
+                guard let t = next() else { throw reject(.missingArgument, "\(target) \(verb) needs \(choices) after it") }
+                guard case .word(let second) = t,
+                      let named = Vocabulary.row(target: target, verb: verb, subverb: second.lowercased()) else {
+                    throw reject(.unknownVerb, "\(target) \(verb) takes \(choices), not \(t.described)")
+                }
+                found = named
             }
             row = found
             if saidAll, !row.takesAll {
@@ -331,6 +341,12 @@ struct CommandParser {
             guard peekWordLower() == word else { return }
             advance()
             object[arg.key] = .bool(true)
+        case .word(let word):
+            // Spec 9 §6 — a word of the form itself (`version`), kept in no field.
+            guard let t = next() else { throw reject(.missingArgument, "expected \(word)") }
+            guard case .word(let w) = t, w.lowercased() == word else {
+                throw reject(.badArgument, "expected \(word), not \(t.described)")
+            }
         case .hash:
             // Spec 2 §2 — "abbreviated to its first 12 hex characters in the
             // command bar as in a ref", "expanded on parse".

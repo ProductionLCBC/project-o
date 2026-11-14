@@ -59,14 +59,16 @@ public enum OSCMapping {
 
     /// Spec 2 §6 — the typed form: "integers for numbers and seconds, floats
     /// for decibels and decimal durations, strings for text and keywords". A
-    /// write or an edit travels as one string, the rest of its text form. Nil
-    /// for a command the vocabulary does not know.
+    /// write, an edit or a restore (Spec 2 §6 as Spec 9 §9 corrected it,
+    /// `/o/system/restore` `s:"list 42 version 16"`) travels as one string,
+    /// the rest of its text form. Nil for a command the vocabulary does not
+    /// know.
     public static func message(for command: Command) -> OSCMessage? {
         guard let row = Vocabulary.row(cmd: command.cmd), let text = CommandText.print(command),
               let object = (try? JSONCoding.encode(command))?.objectValue else { return nil }
         let head = CommandPrinter.head(row, object)
         let address = prefix + "/" + head.joined(separator: "/")
-        if row.isSpecial {
+        if row.travelsAsText {
             let pieces = text.split(separator: " ", maxSplits: head.count, omittingEmptySubsequences: true)
             let remainder = pieces.count > head.count ? String(pieces[head.count]) : ""
             return OSCMessage(address, [.string(remainder)])
@@ -91,7 +93,7 @@ public enum OSCMapping {
             case .flag(let word):
                 // Spec 2 §6 — "`up` follows as `s:"up"`".
                 if value.boolValue == true { arguments.append(.string(word)) }
-            case .write, .edit, .body:
+            case .write, .edit, .body, .word:
                 break
             }
         }
@@ -230,10 +232,10 @@ public enum OSCMapping {
                 guard entry.when == nil else { throw reject(.unexpectedToken, "a guard is not accepted over OSC") }
                 return entry.command
             case .failure(let rejection):
-                if row.isSpecial { throw rejection }
+                if row.travelsAsText { throw rejection }
             }
         }
-        if row.isSpecial {
+        if row.travelsAsText {
             if message.arguments.isEmpty {
                 throw reject(.missingArgument, "\(headText) needs one string argument: the rest of the command")
             }
