@@ -339,6 +339,94 @@ public enum MediaEdits {
                                 inverse: .replace(old: old, new: new, record: record), changes: changes))
     }
 
+    // MARK: - Delete and undelete (Spec 8 §6)
+
+    /// Spec 8 §6 — the checks a `media delete` or `media undelete` makes that
+    /// need no engine, before any file moves and again after: the item is in
+    /// an index; a delete's isn't deleted yet (deleting it again changes
+    /// nothing, `noop`), an undelete's is (`conflict` otherwise, Spec 5 §8);
+    /// and "Library mode ... apply (§2)": library media on a `readOnlyMasters`
+    /// machine is `readOnlyLibrary`. Operator lock is the runner's. `onAir`
+    /// and `noTrash` are the engine's.
+    public static func check(_ command: MediaCommand, library: Library, machine: Machine) -> Result<Bool, Rejection> {
+        let writable = machine.settings.libraryMode == .writable
+        switch command {
+        case .delete(let id, _):
+            guard let (entry, tier) = MediaResolver.entry(for: id, library: library.mediaIndex, machine: machine.mediaLocal) else {
+                return .failure(Rejection(reason: .unknownObject, message: "\(id) isn't in either media index"))
+            }
+            if tier == .library, !writable {
+                return .failure(Rejection(reason: .readOnlyLibrary, message: "\(id) is library media, which a readOnlyMasters machine doesn't delete"))
+            }
+            return .success(!entry.isDeleted)
+        case .undelete(let id, _):
+            guard let (entry, tier) = MediaResolver.entry(for: id, library: library.mediaIndex, machine: machine.mediaLocal) else {
+                return .failure(Rejection(reason: .unknownObject, message: "\(id) isn't in either media index"))
+            }
+            if tier == .library, !writable {
+                return .failure(Rejection(reason: .readOnlyLibrary, message: "\(id) is library media, which a readOnlyMasters machine doesn't change"))
+            }
+            guard entry.isDeleted else { return .failure(Rejection(reason: .conflict, message: "\(id) isn't deleted")) }
+            return .success(true)
+        default:
+            return .success(true)
+        }
+    }
+
+    /// Spec 8 §6, step 3 — "Applies ... the entry stays, with `deletedAt`
+    /// set and its `path` empty, and the command is logged with where each
+    /// file came from and where the Trash put it." Every reference to the item
+    /// then shows the missing badge, its id still known. Its inverse is
+    /// `media undelete` with the same files.
+    public static func delete(id: String, files: [MediaTrashedFile], at timestamp: String, library: Library, machine: Machine) -> Result<Outcome, Rejection> {
+        switch check(.delete(id: id, files: nil), library: library, machine: machine) {
+        case .failure(let rejection):
+            return .failure(rejection)
+        case .success(false):
+            return .success(Outcome(library: library, machine: machine, logged: .delete(id: id, files: files), inverse: nil, changes: []))
+        case .success(true):
+            break
+        }
+        var library = library
+        var machine = machine
+        func update(_ entry: inout MediaEntry) {
+            entry.deletedAt = timestamp
+            entry.path = ""
+        }
+        if let i = machine.mediaLocal.position(of: id) {
+            update(&machine.mediaLocal.entries[i])
+        } else if let i = library.mediaIndex.position(of: id) {
+            update(&library.mediaIndex.entries[i])
+        }
+        return .success(Outcome(library: library, machine: machine, logged: .delete(id: id, files: files),
+                                inverse: .undelete(id: id, files: files), changes: [media(id, ["path", "deletedAt"])]))
+    }
+
+    /// Spec 8 §6 — `media undelete`, delete's inverse: "moves the files back
+    /// to where they came from and clears `deletedAt`". `restored` is where
+    /// the engine put each file back, a numbered name where another file had
+    /// taken its path ("It never overwrites a file now at one of those
+    /// paths"); the entry takes the restored path of its first file in its
+    /// own folder (none when its location is an override's, which still
+    /// names its file). Its inverse is `media delete`.
+    public static func undelete(id: String, files: [MediaTrashedFile], restored: [MediaTrashedFile], library: Library, machine: Machine) -> Result<Outcome, Rejection> {
+        if case .failure(let rejection) = check(.undelete(id: id, files: files), library: library, machine: machine) { return .failure(rejection) }
+        var library = library
+        var machine = machine
+        func update(_ entry: inout MediaEntry, folder: MediaFolder) {
+            entry.deletedAt = nil
+            entry.path = restored.first { $0.location.folder == folder }?.location.path ?? ""
+            if !entry.path.isEmpty { entry.folder = MediaLocation(folder, entry.path)?.parent ?? entry.folder }
+        }
+        if let i = machine.mediaLocal.position(of: id) {
+            update(&machine.mediaLocal.entries[i], folder: .machineMedia)
+        } else if let i = library.mediaIndex.position(of: id) {
+            update(&library.mediaIndex.entries[i], folder: .mediaRoot)
+        }
+        return .success(Outcome(library: library, machine: machine, logged: .undelete(id: id, files: files),
+                                inverse: .delete(id: id, files: nil), changes: [media(id, ["path", "deletedAt"])]))
+    }
+
     /// An entry's defaults, and with them the poster name their in-point
     /// gives a video (Spec 8 §5, "The new in-point gives the poster a new name").
     static func setDefaults(of id: String, tier: MediaTier, to defaults: MediaDefaults, library: inout Library, machine: inout Machine) {

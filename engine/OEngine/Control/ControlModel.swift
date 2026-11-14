@@ -67,6 +67,9 @@ public struct MediaRuntime: Sendable {
     /// Spec 8 §9 — the poster this instance shows while it isn't playing, which
     /// it takes once it loads when the write landed before it had (Spec 4 §6).
     public var posterKey: PosterKey?
+    /// Spec 8 §6 (plan) — the write landed while its item's files were moving
+    /// for a delete: "its file opens only when the park ends".
+    public var parkedOpen = false
 
     public var isStill: Bool { entry?.kind == .image }
     public var loops: Bool { endBehavior == .loop && outMs.isFinite }

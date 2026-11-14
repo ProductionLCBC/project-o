@@ -111,6 +111,20 @@ public final class ControlLoop: @unchecked Sendable {
     var posterFilesChanged = false
     /// Spec 8 §5 — the pool tiles in `machine/thumbnails/pool/`, by name, as the worker last reported them.
     public internal(set) var mediaTiles: Set<String> = []
+    /// Spec 8 §6 — a delete or undelete waiting for its files to move: one at a time.
+    public internal(set) var mediaPark: MediaPark?
+    /// Spec 8 §6 and Adam's answer of 2026-11-11 (7) — what waits behind it, in the order it arrived.
+    var behindPark: [ParkWaiter] = []
+    var nextParkID = 1
+    /// Parks given up on, by id: when their moves report, the files go back.
+    var abandonedParks: [Int: [MediaMove]] = [:]
+    /// A park whose files are going back: parked opens wait for them.
+    var reopenAfterUndo: Int?
+    /// Spec 8 §6 — "The group's one `library` event waits for it": the
+    /// applied edits of groups with a held delete parked.
+    var heldEvents: [GroupID: HeldEvent] = [:]
+    /// Spec 8 §6 (plan) — "no report within ten seconds puts every moved file back".
+    public var mediaParkTimeout: Int64 = 10_000_000_000
     public private(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
@@ -340,7 +354,7 @@ public final class ControlLoop: @unchecked Sendable {
             }
         }
         // Spec 8 §2 — what the media worker found, "through the one queue", before the queued groups.
-        absorbMedia(now: now)
+        absorbMedia(frame: frame, now: now)
         for group in groups { run(group, frame: frame, now: now) }
         // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
         if let documents, documents.writeDue(library: &library, machine: &machine, now: now) {
@@ -526,66 +540,130 @@ public final class ControlLoop: @unchecked Sendable {
     /// the edits it applied change the roots the next group reads, and each
     /// log group of applied edits raises the revision by one and makes one
     /// `library` event carrying the `seq` of its last line.
-    private func run(_ group: CommandGroup, frame: Int64, now: MonotonicTime) {
+    func run(_ group: CommandGroup, frame: Int64, now: MonotonicTime) {
+        // Spec 8 §6 and Adam's answer of 2026-11-11 (7) — behind a parked delete, a group holding an edit
+        // or a media command waits, so every edit applies in the order it arrived; runtime commands run.
+        if mediaPark != nil, Self.waitsBehindPark(group) {
+            behindPark.append(.group(group))
+            return
+        }
+        // Spec 8 §6 — "A group that holds a `media delete` ... is validated whole; then every file it deletes moves".
+        if !group.source.kind.holdsEdits, group.commands.contains(where: { $0.command.movesFiles }) {
+            parkDirect(group, frame: frame, now: now)
+            return
+        }
+        runNow(group, frame: frame, now: now, moved: nil)
+    }
+
+    /// Spec 8 §6 — the edit context: the day, and the time a delete applies.
+    var editingContext: EditContext {
+        EditContext(today: variables.today(), timestamp: variables.timestamp())
+    }
+
+    /// Runs a group now. `moved` is what the worker did for its deletes and
+    /// undeletes (Spec 8 §6); true when the group applied.
+    @discardableResult
+    func runNow(_ group: CommandGroup, frame: Int64, now: MonotonicTime, moved: [String: Result<[MediaTrashedFile], Rejection>]?) -> Bool {
         let context = projectionContext(frame: frame, source: group.source)
         // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
-        let editing = EditContext(today: variables.today())
+        let editing = editingContext
         // Spec 6 §6 and §7 — the timers and the pending clears, settled as the group runs, kept only if it does.
         let settler = GroupSettler(timers: timers, clears: pendingClears, frame: frame, rate: pacing.masterRate,
                                    popupSlots: variables.popupSlots)
         switch CommandRunner.run(group, state: model.state, context: context, editing: editing,
                                  settle: { command, _, result in settler.settle(command, result: result) },
-                                 media: { [unowned self] command, source in prepareMedia(command, source: source) }) {
+                                 media: { [unowned self] command, source in prepareMedia(command, source: source) },
+                                 moved: moved, parking: mediaPark != nil) {
         case .failure(let rejection):
-            // Spec 5 §5 — "any other command from that client closes the run early".
-            if let client = group.client { commandLog.closeRun(of: client) }
-            rejections.append(rejection)
-            lastRejected.append(RejectedGroup(id: group.id, source: group.source, rejection: rejection))
-            log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
+            reject(group, rejection)
+            return false
         case .success(let outcome):
             model.state = outcome.state
             kept = outcome.kept
             timers = settler.timers
             pendingClears = settler.clears
-            lastExecuted.append(contentsOf: outcome.executed)
-            let logged = commandLog.record(outcome.executed, client: group.client, now: now, ts: variables.timestamp())
-            // Spec 6 §8 — "after every timer command that changes the timer", with that line's `seq` (Spec 2 §9).
-            for line in logged where line.executed.result == .ok {
-                switch line.executed.command {
-                case .timerSet(let n, _, _), .timerStart(let n), .timerPause(let n), .timerReset(let n): changedTimers.append((n, line.seq))
-                default: break
-                }
+            absorb(outcome, client: group.client, frame: frame, now: now)
+            return true
+        }
+    }
+
+    /// Spec 2 §8 — a rejected group: its rejection, answered to its sender.
+    func reject(_ group: CommandGroup, _ rejection: Rejection) {
+        // Spec 5 §5 — "any other command from that client closes the run early".
+        if let client = group.client { commandLog.closeRun(of: client) }
+        rejections.append(rejection)
+        lastRejected.append(RejectedGroup(id: group.id, source: group.source, rejection: rejection))
+        log.warning("rejected \(group.source.kind.rawValue) group: \(rejection.message)")
+    }
+
+    /// What an applied run leaves: its lines logged, the roots its edits
+    /// left, one `library` event per log group of applied edits (Spec 5 §2),
+    /// and its effects reaching the runtimes. Spec 8 §6 — "The group's one
+    /// `library` event waits for" a held delete still parked; held edits that
+    /// wait behind one park, or queue behind the park already there.
+    func absorb(_ outcome: RunOutcome, client: String?, frame: Int64, now: MonotonicTime) {
+        lastExecuted.append(contentsOf: outcome.executed)
+        let logged = commandLog.record(outcome.executed, client: client, now: now, ts: variables.timestamp())
+        // Spec 6 §8 — "after every timer command that changes the timer", with that line's `seq` (Spec 2 §9).
+        for line in logged where line.executed.result == .ok {
+            switch line.executed.command {
+            case .timerSet(let n, _, _), .timerStart(let n), .timerPause(let n), .timerReset(let n): changedTimers.append((n, line.seq))
+            default: break
             }
-            let applied = AppliedEdits.groups(in: logged.map(\.executed))
-            if !applied.isEmpty {
-                let before = (library: library, machine: machine)
-                library = outcome.library
-                machine = outcome.machine
-                lastRootsChanged = true
-                documents?.noteEdits(before: before, library: library, machine: machine, executed: outcome.executed, now: now)
-                for edits in applied {
+        }
+        let applied = AppliedEdits.groups(in: logged.map(\.executed))
+        let waiting = Set(outcome.parked.map(\.group)).union(mediaPark?.groups ?? [])
+        if !applied.isEmpty {
+            let before = (library: library, machine: machine)
+            library = outcome.library
+            machine = outcome.machine
+            lastRootsChanged = true
+            documents?.noteEdits(before: before, library: library, machine: machine, executed: outcome.executed, now: now)
+            for edits in applied {
+                let seq = logged.filter { $0.executed.group == edits.group }.map(\.seq).max() ?? commandLog.lastSeq
+                if waiting.contains(edits.group) || heldEvents[edits.group] != nil {
+                    var stash = heldEvents[edits.group] ?? HeldEvent(source: edits.source, changed: [], seq: seq)
+                    stash.changed += edits.changed
+                    stash.seq = max(stash.seq, seq)
+                    heldEvents[edits.group] = stash
+                } else {
                     revision += 1
-                    let seq = logged.filter { $0.executed.group == edits.group }.map(\.seq).max() ?? commandLog.lastSeq
                     lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .edit, group: edits.group, source: edits.source,
                                                           changed: edits.changed, seq: seq))
                 }
             }
-            for executed in outcome.executed {
-                for effect in executed.effects { apply(effect, frame: frame) }
-                // Spec 2 §5 — a macro that cannot run whole "runs nothing and is logged `noop`";
-                // the engine log says why (CLAUDE.md: unknown input is a noop and a log line).
-                if case .macro(let number) = executed.command, let refusal = executed.refusal {
-                    log.warning("macro \(number) ran nothing: \(refusal.message)")
-                }
-                // Spec 8 §3 and §4 — an import's job and a rebuild's walk start once their group applied.
-                if case .media(let media) = executed.command, executed.result == .ok { startMediaWork(media, job: executed.job) }
-                // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason"; Spec 8 §2 —
-                // "any refusal of a media command is `blocked` with its reason and logged".
-                if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media."),
-                   executed.result == .blocked, let refusal = executed.refusal {
-                    let text = CommandText.print(executed.command) ?? executed.command.cmd
-                    log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
-                }
+        }
+        // Spec 8 §6 — a held group whose delete resolved: its one event, now.
+        for (group, stash) in heldEvents.sorted(by: { $0.value.seq < $1.value.seq }) where !waiting.contains(group) {
+            heldEvents[group] = nil
+            guard !stash.changed.isEmpty else { continue }
+            revision += 1
+            lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .edit, group: group, source: stash.source,
+                                                  changed: LibraryChange.merged(stash.changed), seq: stash.seq))
+        }
+        for executed in outcome.executed {
+            for effect in executed.effects { apply(effect, frame: frame) }
+            // Spec 2 §5 — a macro that cannot run whole "runs nothing and is logged `noop`";
+            // the engine log says why (CLAUDE.md: unknown input is a noop and a log line).
+            if case .macro(let number) = executed.command, let refusal = executed.refusal {
+                log.warning("macro \(number) ran nothing: \(refusal.message)")
+            }
+            // Spec 8 §3 and §4 — an import's job and a rebuild's walk start once their group applied.
+            if case .media(let media) = executed.command, executed.result == .ok { startMediaWork(media, job: executed.job) }
+            // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason"; Spec 8 §2 —
+            // "any refusal of a media command is `blocked` with its reason and logged".
+            if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media."),
+               executed.result == .blocked, let refusal = executed.refusal {
+                let text = CommandText.print(executed.command) ?? executed.command.cmd
+                log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
+            }
+        }
+        // Spec 8 §6 — held edits behind a delete whose files must move first.
+        if !outcome.parked.isEmpty {
+            if mediaPark == nil {
+                parkHeld(outcome.parked, frame: frame, now: now)
+            } else {
+                behindPark.append(.held(outcome.parked))
             }
         }
     }
@@ -861,6 +939,11 @@ public final class ControlLoop: @unchecked Sendable {
                 ready: false, missing: m.missing || url == nil, clearIssued: false,
                 transport: m.transport, endBehavior: m.endBehavior, posterKey: posterKey)
             guard !runtime.missing, let entry, let url else { return .media(runtime) }
+            // Spec 8 §6 (plan) — "A write of a parked item lands, but its file opens only when the park ends."
+            if mediaPark?.ids.contains(entry.id) == true {
+                runtime.parkedOpen = true
+                return .media(runtime)
+            }
             guard let handle = allocateHandle() else {
                 log.error("no free instance slot for \(m.ref) on channel \(channel)")
                 runtime.missing = true
@@ -881,6 +964,20 @@ public final class ControlLoop: @unchecked Sendable {
             runtime.gainOverride = m.gainOverride
             attachAudio(to: &runtime, channel: channel, instance: m, url: url)
             return .media(runtime)
+        }
+    }
+
+    /// Spec 8 §6 (plan) — a park ended: each write that landed meanwhile
+    /// opens its file now, from the in-point, or shows missing if its item
+    /// was deleted.
+    func openParked(frame: Int64) {
+        for channel in model.channels.keys.sorted() {
+            guard var rt = model.channels[channel], case .media(let m) = rt.live, m.parkedOpen,
+                  let content = model.state.channels[channel]?.content, content.media?.ref == m.ref else { continue }
+            var runtime = makeRuntime(for: content, channel: channel, frame: frame)
+            if case .media(var fresh) = runtime, fresh.poster.isNone { fresh.poster = m.poster; runtime = .media(fresh) }
+            rt.live = runtime
+            model.channels[channel] = rt
         }
     }
 

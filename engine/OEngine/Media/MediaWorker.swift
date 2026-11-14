@@ -17,6 +17,42 @@ public struct MediaListing: Sendable {
     public var posters: Set<MediaLocation> = []
 }
 
+/// Spec 8 §6 — what a parked `media delete` or `media undelete` asks of the
+/// worker for one item.
+public struct MediaMove: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
+        /// "The worker moves the item's file, and any identical copy the walk found, to the Trash."
+        case trash([MediaLocation])
+        /// "moves the files back to where they came from ... and checks each file against the id".
+        case restore([MediaTrashedFile])
+    }
+
+    public var id: String
+    public var kind: Kind
+    /// The entry's own size and date, which confirm a restored file's id
+    /// without hashing it (Spec 8 §2, "otherwise from the entry's own size
+    /// and date when they match").
+    public var size: Int?
+    public var modified: String?
+
+    public init(id: String, kind: Kind, size: Int? = nil, modified: String? = nil) {
+        self.id = id
+        self.kind = kind
+        self.size = size
+        self.modified = modified
+    }
+
+    /// The locations whose files this move takes away while it runs, which
+    /// the walk doesn't count as gone (the plan's "in-flight moves hidden
+    /// from the walk").
+    public var locations: [MediaLocation] {
+        switch kind {
+        case .trash(let locations): return locations
+        case .restore(let files): return files.map(\.location)
+        }
+    }
+}
+
 /// Spec 8 §4 — what the walk found, ready for its rules on the control thread.
 public struct MediaFindings: Sendable {
     public var folders: Set<MediaFolder>
@@ -57,6 +93,8 @@ public final class MediaWorker: @unchecked Sendable {
         public var beforeCopy: (@Sendable (URL) -> Void)?
         /// Spec 8 §5 — "the frame at the video's default in-point ... taken exactly".
         public var frames: any MediaFrames
+        /// Spec 8 §6 — where `media delete` moves files, and `media undelete` finds them.
+        public var trash: any MediaTrash
 
         public init(now: @escaping @Sendable () -> Date = { Date() },
                     schedule: (@Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void)? = nil,
@@ -64,7 +102,8 @@ public final class MediaWorker: @unchecked Sendable {
                     freeBytes: @escaping @Sendable (URL) -> Int64? = MediaWorker.freeBytes,
                     blocked: @escaping @Sendable () -> Bool = { false },
                     beforeCopy: (@Sendable (URL) -> Void)? = nil,
-                    frames: any MediaFrames = AVMediaFrames()) {
+                    frames: any MediaFrames = AVMediaFrames(),
+                    trash: any MediaTrash = SystemTrash()) {
             self.now = now
             self.schedule = schedule
             self.probe = probe
@@ -72,6 +111,7 @@ public final class MediaWorker: @unchecked Sendable {
             self.blocked = blocked
             self.beforeCopy = beforeCopy
             self.frames = frames
+            self.trash = trash
         }
 
         /// The engine's own: the real clock, a timer, AVFoundation, the volume's free space.
@@ -147,6 +187,11 @@ public final class MediaWorker: @unchecked Sendable {
         case posters(made: [MediaPosters.Made], removed: [MediaLocation])
         /// Spec 8 §5 — the pool tiles there now, by name, after a pass drew some.
         case tiles(Set<String>)
+        /// Spec 8 §6 — a park's files moved, by id: where each came from and
+        /// where it went; or why not, every file already moved put back.
+        case moved(park: Int, Result<[String: [MediaTrashedFile]], Rejection>)
+        /// Spec 8 §6 — a park's files are back where they were.
+        case undone(park: Int)
     }
 
     /// Spec 8 §4 — "A file is read once its size and modification date have held for two seconds".
@@ -160,6 +205,8 @@ public final class MediaWorker: @unchecked Sendable {
     let seams: Seams
     let log: EngineLog
     private let queue = DispatchQueue(label: "o.engine.media", qos: .background)
+    /// Spec 8 §6 — "the worker's urgent queue, ahead of all background work": Trash moves.
+    private let urgent = DispatchQueue(label: "o.engine.media.urgent", qos: .userInitiated)
     private let lock = NSLock()
     private var snapshot = Snapshot()
     private var reports: [Report] = []
@@ -326,6 +373,7 @@ public final class MediaWorker: @unchecked Sendable {
     public func waitUntilIdle() {
         while true {
             let before = submitted
+            urgent.sync {}
             queue.sync {}
             if submitted == before { return }
         }
@@ -337,6 +385,13 @@ public final class MediaWorker: @unchecked Sendable {
         submissions += 1
         lock.unlock()
         queue.async(execute: work)
+    }
+
+    private func enqueueUrgent(_ work: @escaping @Sendable () -> Void) {
+        lock.lock()
+        submissions += 1
+        lock.unlock()
+        urgent.async(execute: work)
     }
 
     private var submitted: Int {
@@ -851,6 +906,149 @@ public final class MediaWorker: @unchecked Sendable {
             tilesReported = true
             report(.tiles(names))
         }
+    }
+
+    // MARK: - The Trash (Spec 8 §6)
+
+    /// Spec 8 §6 — a park's moves, on the urgent queue: every file of each
+    /// delete to the Trash, every file of each undelete back where it came
+    /// from. "If one move fails, the files already moved go back"; "Any
+    /// failure puts every moved file back and rejects the group".
+    public func moveFiles(park: Int, moves: [MediaMove]) {
+        enqueueUrgent { [self] in
+            var done: [String: [MediaTrashedFile]] = [:]
+            var failure: Rejection?
+            for move in moves where failure == nil {
+                switch move.kind {
+                case .trash(let locations):
+                    done[move.id] = []
+                    for location in locations where failure == nil {
+                        guard let url = folders.url(for: location), LocalFiles.mediaStat(url) != nil else { continue }
+                        switch seams.trash.trash(url) {
+                        case .success(let trashed):
+                            done[move.id, default: []].append(MediaTrashedFile(location: location, trash: trashed.path))
+                        case .failure(.noTrash):
+                            failure = Rejection(reason: .noTrash, message: "\(location.folder.rawValue) \(location.path) is on a volume with no Trash")
+                        case .failure(let other):
+                            failure = Rejection(reason: .conflict, message: "\(location.folder.rawValue) \(location.path) couldn't move to the Trash: \(other)")
+                        }
+                    }
+                case .restore(let files):
+                    done[move.id] = []
+                    for file in files where failure == nil {
+                        switch restore(file, of: move.id) {
+                        case .success(let back):
+                            done[move.id, default: []].append(back)
+                            if !holds(move, at: back.location) {
+                                failure = Rejection(reason: .conflict, message: "the file put back at \(back.location.path) isn't \(move.id)")
+                            }
+                        case .failure(let rejection):
+                            failure = rejection
+                        }
+                    }
+                }
+            }
+            if let failure {
+                undoNow(done, moves: moves)
+                log.warning("media: files moved back: \(failure.message)")
+                report(.moved(park: park, .failure(failure)))
+            } else {
+                report(.moved(park: park, .success(done)))
+            }
+        }
+    }
+
+    /// Spec 8 §6 — a park the control thread didn't apply (its second check
+    /// failed, or it gave up waiting): every file goes back where it was.
+    public func undoMoves(_ done: [String: [MediaTrashedFile]], moves: [MediaMove], park: Int) {
+        enqueueUrgent { [self] in
+            undoNow(done, moves: moves)
+            report(.undone(park: park))
+        }
+    }
+
+    private func undoNow(_ done: [String: [MediaTrashedFile]], moves: [MediaMove]) {
+        for move in moves {
+            for file in done[move.id] ?? [] {
+                switch move.kind {
+                case .trash:
+                    // Out of the Trash, to its place or a numbered name beside it.
+                    if case .failure(let why) = restore(file, of: move.id) { log.error("media: \(file.trash) couldn't go back: \(why.message)") }
+                case .restore:
+                    // Back into the Trash, where the delete's record says it is.
+                    guard let url = folders.url(for: file.location) else { continue }
+                    if case .failed(let why) = LocalFiles.moveMedia(url, to: URL(fileURLWithPath: file.trash)) {
+                        log.error("media: \(file.location.path) couldn't go back to the Trash: \(why)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Spec 8 §6 — one file out of the Trash: "It never overwrites a file now
+    /// at one of those paths, giving the restored one a numbered name
+    /// instead, as an import does (§3) ... if the Trash has been emptied, the
+    /// undo fails with `conflict`". Where it went, and where it came from.
+    /// The item's own entry doesn't count as holding its path: a delete
+    /// refused after its files moved leaves the entry where it was.
+    private func restore(_ file: MediaTrashedFile, of id: String) -> Result<MediaTrashedFile, Rejection> {
+        var target = file.location
+        let trashed = URL(fileURLWithPath: file.trash)
+        for _ in 0..<50 {
+            guard let url = folders.url(for: target) else {
+                return .failure(Rejection(reason: .conflict, message: "\(target.path) isn't where media may live now"))
+            }
+            if LocalFiles.mediaStat(url) != nil || named(target, except: id) {
+                guard let next = numbered(target, except: id) else { break }
+                target = next
+                continue
+            }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            switch seams.trash.putBack(trashed, to: url) {
+            case .success:
+                return .success(MediaTrashedFile(location: target, trash: file.trash))
+            case .failure(.taken):
+                continue
+            case .failure(.gone):
+                return .failure(Rejection(reason: .conflict, message: "the Trash no longer holds \(file.trash): it has been emptied"))
+            case .failure(let other):
+                return .failure(Rejection(reason: .conflict, message: "\(file.trash) couldn't come back: \(other)"))
+            }
+        }
+        return .failure(Rejection(reason: .conflict, message: "no free name for \(file.location.path)"))
+    }
+
+    /// The paths the entries of a location's folder hold, but one item's.
+    private func entryPaths(in folder: MediaFolder, except id: String) -> [String] {
+        let snap = current()
+        let entries = folder == .mediaRoot ? snap.library.entries : folder == .machineMedia ? snap.machine.entries : []
+        return entries.filter { $0.id != id && !$0.path.isEmpty }.map(\.path)
+    }
+
+    /// Whether another entry's path holds a location ("or that another entry's path holds").
+    private func named(_ location: MediaLocation, except id: String) -> Bool {
+        entryPaths(in: location.folder, except: id).contains { $0.lowercased() == location.path.lowercased() }
+    }
+
+    /// The next numbered name beside a location, as the Finder names copies.
+    private func numbered(_ location: MediaLocation, except id: String) -> MediaLocation? {
+        guard let url = folders.url(for: location) else { return nil }
+        let directory = url.deletingLastPathComponent()
+        let parent = location.parent
+        let prefix = parent.isEmpty ? "" : (location.folder == .absolute && parent == "/" ? "/" : parent + "/")
+        var taken = Set(((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []).map { prefix + $0 })
+        taken.insert(location.path)
+        taken.formUnion(entryPaths(in: location.folder, except: id))
+        return MediaImport.destination(name: location.name, importFolder: parent, folder: location.folder, taken: taken)
+    }
+
+    /// Spec 8 §6 — "checks each file against the id": by the entry's own
+    /// size and date when they match (Spec 8 §2), else by hashing it.
+    private func holds(_ move: MediaMove, at location: MediaLocation) -> Bool {
+        guard let url = folders.url(for: location), let stat = LocalFiles.mediaStat(url) else { return false }
+        if stat.size == move.size, stat.modified == move.modified { return true }
+        countHash()
+        return MediaHashing.identity(of: url) == move.id
     }
 
     // MARK: - Volumes

@@ -42,7 +42,7 @@ extension ControlLoop {
     /// with cause `media`, but they aren't in the command log and never join
     /// the undo stack ... Operator lock doesn't stop them ... The engine log
     /// records them, by id (Spec 9 §2)."
-    func absorbMedia(now: MonotonicTime) {
+    func absorbMedia(frame: Int64, now: MonotonicTime) {
         guard let worker = mediaWorker else { return }
         if mediaLaunchPending {
             mediaLaunchPending = false
@@ -50,8 +50,16 @@ extension ControlLoop {
         }
         for report in worker.takeReports() {
             switch report {
-            case .listed(let listing): applyListing(listing)
-            case .walked(let findings): applyWalk(findings, worker: worker, now: now)
+            // Spec 8 §6 (plan) — files moving for a parked delete are hidden from the walk: its looks are set
+            // aside while one is parked, and a fresh walk follows the park.
+            case .listed(let listing): if mediaPark == nil { applyListing(listing) }
+            case .walked(let findings): if mediaPark == nil { applyWalk(findings, worker: worker, now: now) }
+            case .moved(let park, let result): parkMoved(park, result, frame: frame, now: now)
+            case .undone(let park):
+                if reopenAfterUndo == park {
+                    reopenAfterUndo = nil
+                    openParked(frame: frame)
+                }
             case .event(let fields): mediaEvent(fields)
             case .copied(let job, let file, let copied): applyCopied(copied, job: job, file: file, worker: worker, now: now)
             case .decided(let job, let file, let outcome): done(job: job, file: file, outcome)
@@ -60,6 +68,7 @@ extension ControlLoop {
             case .tiles(let names): mediaTiles = names
             }
         }
+        checkParkTimeout(frame: frame, now: now)
     }
 
     /// Spec 8 §4 — "Only the launch walk prunes, before anything can be
@@ -254,6 +263,10 @@ extension ControlLoop {
     /// not live (Spec 8 §2) is never touched; "The result is `ok` with a
     /// `job` id once PATH is readable". `media rebuild` always runs.
     func prepareMedia(_ command: MediaCommand, source: CommandSource) -> Result<String?, Rejection> {
+        // Spec 8 §6 — "An item on air is refused with `onAir`", checked before its files move and again after.
+        if case .delete(let id, _) = command {
+            return onAirIDs().contains(id) ? .failure(Rejection(reason: .onAir, message: "\(id) is on air")) : .success(nil)
+        }
         guard case .importFile(let path) = command else { return .success(nil) }
         if let places = media.places, let problem = places.problem(with: URL(fileURLWithPath: path).standardizedFileURL.path) {
             return .failure(Rejection(reason: .unreadable, message: "\"\(path)\" \(problem.description), where the engine doesn't read"))

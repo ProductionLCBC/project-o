@@ -109,6 +109,13 @@ public final class FakeSourceFactory: SourceFactory, @unchecked Sendable {
         return prefetched.removeValue(forKey: request.prefetchKey)
     }
 
+    /// Spec 8 §6 — the items a prefetched reader holds open.
+    public var prefetchedIDs: Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return Set(prefetched.keys.map(SourceRequest.id(ofPrefetchKey:)))
+    }
+
     /// One tick passed: sources get closer to ready.
     public func advance() {
         lock.lock()

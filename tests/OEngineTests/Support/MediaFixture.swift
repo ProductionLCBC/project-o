@@ -64,6 +64,8 @@ final class MediaFixture {
     let library = TopicRecorder()
     /// Spec 8 §5 — the frames posters are made from, and the in-points asked for.
     let frames = FakeMediaFrames()
+    /// Spec 8 §6 — the Trash, a folder beside the roots.
+    let trash: FakeTrash
     private(set) var engine: HeadlessEngine!
     private(set) var worker: MediaWorker!
 
@@ -98,6 +100,7 @@ final class MediaFixture {
         self.places = places
         self.beforeCopy = beforeCopy
         try FileManager.default.copyItem(at: EngineFixtures.fixtureRoot, to: folder)
+        trash = FakeTrash(folder: folder.appendingPathComponent("Trash"))
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         try prepare(self)
         try launch(writable: writable, configure: configure)
@@ -127,7 +130,7 @@ final class MediaFixture {
         worker = try engine.attachMediaWorker(machineRoot: machineRoot, staging: staging,
                                               seams: MediaWorker.Seams(now: { clock.now() }, probe: FakeMediaProbe(),
                                                                        freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy,
-                                                                       frames: frames))
+                                                                       frames: frames, trash: trash))
         settle()
     }
 

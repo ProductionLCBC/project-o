@@ -39,6 +39,21 @@ public protocol SourceFactory: AnyObject, Sendable {
     func prefetch(_ request: SourceRequest)
     /// A prefetched source for the same media and in-point, if one is waiting.
     func adoptPrefetched(_ request: SourceRequest) -> (any ContentSource)?
+    /// Spec 8 §6 — the items whose files a prefetched reader holds open: "An
+    /// item on air is refused with `onAir` ... one whose file a channel has
+    /// open, for its content, an outgoing transition or a prefetched reader".
+    var prefetchedIDs: Set<String> { get }
+}
+
+public extension SourceFactory {
+    var prefetchedIDs: Set<String> { [] }
+}
+
+extension SourceRequest {
+    /// The item a prefetch key names: its id, before the `@` and in-point.
+    static func id(ofPrefetchKey key: String) -> String {
+        key.split(separator: "@", maxSplits: 1).first.map(String.init) ?? key
+    }
 }
 
 /// Spec 8 §9 — which poster: "The poster loader reads at the entry's

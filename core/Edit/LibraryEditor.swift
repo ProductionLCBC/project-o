@@ -22,12 +22,16 @@ public struct EditContext: Sendable {
     /// Spec 5 §6, check 8 — a held edit "is validated when its holder is
     /// saved": checked without lock and library mode, and never applied.
     var dryRun: Bool
+    /// Spec 8 §6 — the time a `media delete` applies, for the entry's
+    /// `deletedAt` (Spec 1 §5, an ISO date).
+    public var timestamp: String
 
-    public init(state: ShowState? = nil, today: String = "", restoring: Bool = false) {
+    public init(state: ShowState? = nil, today: String = "", restoring: Bool = false, timestamp: String = "") {
         self.state = state
         self.today = today
         self.restoring = restoring
         self.dryRun = false
+        self.timestamp = timestamp
     }
 }
 

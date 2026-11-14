@@ -176,6 +176,25 @@ public enum MediaCommand: Equatable, Sendable {
         }
     }
 
+    /// Spec 8 §6 — `media delete` and `media undelete`, which move files to
+    /// and from the Trash before they apply.
+    public var movesFiles: Bool {
+        switch self {
+        case .delete, .undelete: return true
+        case .importFile, .rebuild, .replace, .unreplace: return false
+        }
+    }
+}
+
+extension Command {
+    /// Spec 8 §6 — a `media delete` or `media undelete`.
+    public var movesFiles: Bool {
+        if case .media(let media) = self { return media.movesFiles }
+        return false
+    }
+}
+
+extension MediaCommand {
     /// The media ids the command names, in the order it names them.
     public var ids: [String] {
         switch self {

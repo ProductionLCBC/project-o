@@ -58,13 +58,37 @@ public struct RunOutcome: Equatable, Sendable {
     public var library: Library
     public var machine: Machine
     public var kept: KeptCopies
+    /// Spec 8 §6 and Adam's answer of 2026-11-11 (7) — held edits that wait
+    /// behind a parked delete, in the order they arrived: from a held delete
+    /// whose files must move first, or every held edit while a delete is
+    /// parked. The engine runs them once the files have moved.
+    public var parked: [HeldEdit]
 
-    public init(state: ShowState, executed: [ExecutedCommand], library: Library, machine: Machine, kept: KeptCopies = KeptCopies()) {
+    public init(state: ShowState, executed: [ExecutedCommand], library: Library, machine: Machine, kept: KeptCopies = KeptCopies(),
+                parked: [HeldEdit] = []) {
         self.state = state
         self.executed = executed
         self.library = library
         self.machine = machine
         self.kept = kept
+        self.parked = parked
+    }
+}
+
+/// Spec 5 §2 and Spec 8 §2 — an edit a cue, macro, key binding or scheduler
+/// entry holds: an `edit` or a media edit, with the group, source and fire it
+/// is logged under.
+public struct HeldEdit: Equatable, Sendable {
+    public var command: Command
+    public var group: GroupID
+    public var source: CommandSource
+    public var fire: FireRecord?
+
+    public init(command: Command, group: GroupID, source: CommandSource, fire: FireRecord?) {
+        self.command = command
+        self.group = group
+        self.source = source
+        self.fire = fire
     }
 }
 
@@ -120,11 +144,14 @@ public enum CommandRunner {
                            editing: EditContext = EditContext(),
                            settle: ((Command, CommandSource, CommandResult) -> CommandResult)? = nil,
                            media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)? = nil,
+                           moved: [String: Result<[MediaTrashedFile], Rejection>]? = nil, parking: Bool = false,
                            makeGroupID: () -> GroupID = { GroupID.random() },
                            makeUUID: () -> UUID = { UUID() }) -> Result<RunOutcome, Rejection> {
         var runner = Runner(state: state, context: context, editing: editing)
         runner.settle = settle
         runner.media = media
+        runner.moved = moved
+        runner.parking = parking
         var fire = group.fire
         for (index, entry) in group.commands.enumerated() {
             if validate {
@@ -143,7 +170,24 @@ public enum CommandRunner {
         }
         runner.refreshKept()
         return .success(RunOutcome(state: runner.state, executed: runner.executed,
-                                   library: runner.context.library, machine: runner.context.machine, kept: runner.context.kept))
+                                   library: runner.context.library, machine: runner.context.machine, kept: runner.context.kept,
+                                   parked: runner.parked))
+    }
+
+    /// Spec 8 §6 and Adam's answer of 2026-11-11 (7) — held edits that waited
+    /// behind a parked delete, run now in the order they arrived, against
+    /// the roots as they are now: a delete whose files moved applies with
+    /// them (`moved`), one whose move failed is `blocked` with the reason,
+    /// and a delete still to move parks the rest again.
+    public static func runHeld(_ held: [HeldEdit], state: ShowState, context: ProjectionContext, editing: EditContext = EditContext(),
+                               media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)? = nil,
+                               moved: [String: Result<[MediaTrashedFile], Rejection>], makeUUID: () -> UUID = { UUID() }) -> RunOutcome {
+        var runner = Runner(state: state, context: context, editing: editing)
+        runner.media = media
+        runner.moved = moved
+        for entry in held { runner.runDeferred(entry, makeUUID: makeUUID) }
+        return RunOutcome(state: runner.state, executed: runner.executed, library: runner.context.library, machine: runner.context.machine,
+                          kept: runner.context.kept, parked: runner.parked)
     }
 
     /// Spec 2 §8 — the result a command's effects add up to: `steppedOn` when
@@ -182,14 +226,16 @@ struct Runner {
     var settle: ((Command, CommandSource, CommandResult) -> CommandResult)?
     /// Spec 8 §2 — the engine's say on a media command it runs.
     var media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)?
+    /// Spec 8 §6 — what the worker did for each delete and undelete, by id:
+    /// the files it moved, or why it couldn't. Nil on the first check, before
+    /// any file moves.
+    var moved: [String: Result<[MediaTrashedFile], Rejection>]?
+    /// Spec 8 §6 and Adam's answer of 2026-11-11 (7) — a delete is parked:
+    /// held edits wait behind it, in `parked`.
+    var parking = false
+    var parked: [HeldEdit] = []
 
-    /// An edit a fired cue holds: `edit` or a media edit (Spec 8 §2, "ordinary edits").
-    struct DeferredEdit {
-        var command: Command
-        var group: GroupID
-        var source: CommandSource
-        var fire: FireRecord?
-    }
+    typealias DeferredEdit = HeldEdit
 
     /// Runs a held edit once the fire that reached it is done.
     mutating func runDeferred(_ entry: DeferredEdit, makeUUID: () -> UUID) {
@@ -317,6 +363,11 @@ struct Runner {
     /// sent directly, the group's rejection.
     mutating func runEdit(_ edit: EditCommand, group: GroupID, source: CommandSource, fire: FireRecord?,
                           makeUUID: () -> UUID) {
+        // Spec 8 §6, Adam's answer 7 — behind a parked delete, held edits wait in the order they arrived.
+        if parking, source.kind.holdsEdits {
+            parked.append(HeldEdit(command: .edit(edit), group: group, source: source, fire: fire))
+            return
+        }
         var editing = self.editing
         editing.state = state
         switch LibraryEditor.apply(edit, library: context.library, machine: context.machine, context: editing, makeUUID: makeUUID) {
@@ -351,9 +402,16 @@ struct Runner {
     /// command is `blocked` with its reason and logged, and the rest of the
     /// group runs"; sent directly, a refusal rejects the group.
     mutating func runMedia(_ media: MediaCommand, group: GroupID, source: CommandSource, fire: FireRecord?) {
+        if parking, media.isEdit, source.kind.holdsEdits {
+            parked.append(HeldEdit(command: .media(media), group: group, source: source, fire: fire))
+            return
+        }
         var outcome: Result<String?, Rejection> = .success(nil)
         if context.machine.settings.operatorLock.enabled, media != .rebuild {
             outcome = .failure(Rejection(reason: .operatorLock, message: "the operator lock is on: \(media.cmd) is refused"))
+        } else if media.movesFiles {
+            guard let rejection = runMove(media, group: group, source: source, fire: fire) else { return }
+            outcome = .failure(rejection)
         } else if media.isEdit {
             switch applyMediaEdit(media) {
             case .success(let applied):
@@ -381,6 +439,62 @@ struct Runner {
             }
             executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .blocked,
                                             effects: [], fire: fire, refusal: rejection))
+        }
+    }
+
+    /// Spec 8 §6 — `media delete` and `media undelete`: "Checks", here and the
+    /// engine's (`onAir`), against the roots and state the group's earlier
+    /// commands left. Held, one that passes parks: it applies once its files
+    /// have moved, after the rest of its group, which runs at once (§2).
+    /// Sent directly, the group is validated whole first, the delete applied
+    /// without files so what follows sees it; the engine moves the files,
+    /// then runs the group again, the checks with it, the delete applying
+    /// with the files the worker moved ("the group applies in one step").
+    /// Returns the refusal, if any.
+    mutating func runMove(_ media: MediaCommand, group: GroupID, source: CommandSource, fire: FireRecord?) -> Rejection? {
+        guard let id = media.ids.first else { return nil }
+        switch MediaEdits.check(media, library: context.library, machine: context.machine) {
+        case .failure(let rejection):
+            return rejection
+        case .success(false):
+            // Deleting an item already deleted changes nothing.
+            executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .noop, effects: [], fire: fire))
+            return nil
+        case .success(true):
+            break
+        }
+        if let check = self.media, case .failure(let rejection) = check(media, source) { return rejection }
+        let resolved = moved?[id]
+        if source.kind.holdsEdits, resolved == nil {
+            parking = true
+            parked.append(HeldEdit(command: .media(media), group: group, source: source, fire: fire))
+            return nil
+        }
+        var files: [MediaTrashedFile] = []
+        switch resolved {
+        case .failure(let rejection)?: return rejection
+        case .success(let done)?: files = done
+        case nil: break
+        }
+        let applied: Result<MediaEdits.Outcome, Rejection>
+        switch media {
+        case .delete(let id, _):
+            applied = MediaEdits.delete(id: id, files: files, at: editing.timestamp, library: context.library, machine: context.machine)
+        case .undelete(let id, let sent):
+            applied = MediaEdits.undelete(id: id, files: sent, restored: files, library: context.library, machine: context.machine)
+        default:
+            return nil
+        }
+        switch applied {
+        case .failure(let rejection):
+            return rejection
+        case .success(let outcome):
+            context.library = outcome.library
+            context.machine = outcome.machine
+            executed.append(ExecutedCommand(group: group, source: source, command: .media(outcome.logged),
+                                            result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
+                                            inverse: outcome.inverse.map(Command.media), changes: outcome.changes))
+            return nil
         }
     }
 
