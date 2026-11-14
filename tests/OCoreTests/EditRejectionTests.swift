@@ -87,7 +87,8 @@ final class EditRejectionTests: XCTestCase {
     }
 
     /// Spec 7 §7 — "other objects' edits wait for Areas 8, 14 and 17 and are
-    /// rejected until then": `notInV1`, naming the area.
+    /// rejected until then": `notInV1`, naming the area. Area 8 has built the
+    /// media defaults (MediaDefaultsEditTests).
     func test_otherObjectsWaitForTheirAreas() {
         var edits = Edits()
         let expected: [(String, String)] = [
@@ -95,7 +96,6 @@ final class EditRejectionTests: XCTestCase {
             ("edit textstyle 1 size.value 48", "Area 14"), ("edit stack 2 slot 3 remove", "Area 14"),
             ("edit output 1 defaultStack 2", "Areas 14 and 17"), ("edit audiooutput 1 delayMs 40", "Area 17"),
             ("edit keys keyboard \"space\" command null", "Area 17"), ("edit machine timers 8", "Area 17"),
-            ("edit media \(F.dawn) defaults.loop false", "Area 8"),
         ]
         for (text, area) in expected {
             let rejection = edits.refuse(text)

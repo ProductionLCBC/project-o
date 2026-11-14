@@ -210,7 +210,7 @@ struct Editor {
         case .slot: throw reject(.notInV1, "stack edits come with Area 14")
         case .key, .keys: throw reject(.notInV1, "key binding edits come with Area 17")
         case .machine: throw reject(.notInV1, "machine settings edits come with Area 17")
-        case .media: throw reject(.notInV1, "media edits come with Area 8")
+        case .media(let id): return try editMedia(id, edit.action)
         }
     }
 
@@ -241,7 +241,8 @@ struct Editor {
             case .macro: return number.map { library.macro($0) != nil || machine.macro($0) == nil } ?? true
             case .stack, .output, .audioOutput, .input: return false
             }
-        case .media(let id): return library.mediaIndex.entries.contains { $0.id == id }
+        // Spec 5 §3 — "whichever index tier holds the entry", the machine's first (Spec 1 §7).
+        case .media(let id): return MediaResolver.entry(for: id, library: library.mediaIndex, machine: machine.mediaLocal)?.tier == .library
         case .playlist, .item, .slot, .key, .keys, .machine: return false
         }
     }
