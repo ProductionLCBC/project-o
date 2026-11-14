@@ -156,6 +156,20 @@ extension LocalFiles {
                            stat: { folders.url(for: $0).flatMap(mediaStat) }, cache: cache)
     }
 
+    /// Spec 8 §5 — the poster files in the media root's and `machine/media/`'s
+    /// `.posters/` folders, from one look at each.
+    public static func mediaPosters(folders: MediaFolders) -> Set<MediaLocation> {
+        var out: Set<MediaLocation> = []
+        for folder in [MediaFolder.mediaRoot, .machineMedia] {
+            guard let root = folders.folder(folder) else { continue }
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(MediaPosters.posterFolder).path)) ?? []
+            for name in names where !name.hasPrefix(".") && name.hasSuffix(".png") {
+                if let location = MediaLocation(folder, MediaPosters.posterFolder + "/" + name) { out.insert(location) }
+            }
+        }
+        return out
+    }
+
     /// Spec 8 §9 — the launch's missing set over both folders (Spec 3 §6,
     /// `missing`), from `mediaStates`.
     public static func missingMedia(library: Library, machine: Machine?, folders: MediaFolders,

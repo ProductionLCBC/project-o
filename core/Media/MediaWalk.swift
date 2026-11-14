@@ -102,12 +102,16 @@ public enum MediaIndexChange: Equatable, Hashable, Sendable {
     /// "Only the launch walk prunes: replaced entries whose file is gone and
     /// that nothing on this machine names".
     case pruned(id: String, tier: MediaTier)
+    /// Spec 8 §5 — "The walk extracts missing posters": the entry's `poster`
+    /// names the frame extracted at its in-point, or is null "when extraction
+    /// fails, which is reported".
+    case poster(id: String, tier: MediaTier, path: String?)
 
     /// The id of the entry the change made or changed.
     public var id: String {
         switch self {
         case .added(let id, _, _), .moved(let id, _, _, _), .unmapped(let id, _, _), .broughtBack(let id, _, _),
-             .tookCopy(let id, _, _, _), .metadata(let id, _), .pruned(let id, _):
+             .tookCopy(let id, _, _, _), .metadata(let id, _), .pruned(let id, _), .poster(let id, _, _):
             return id
         case .landed(let old, _, _, _):
             return old
@@ -138,6 +142,7 @@ public enum MediaIndexChange: Equatable, Hashable, Sendable {
         case .unmapped(let id, _, _): return [media(id)]
         case .broughtBack(let id, _, _): return [media(id, ["path", "folder", "deletedAt"])]
         case .metadata(let id, _): return [media(id)]
+        case .poster(let id, _, _): return [media(id, ["poster"])]
         }
     }
 
@@ -154,6 +159,8 @@ public enum MediaIndexChange: Equatable, Hashable, Sendable {
         case .tookCopy(let id, let tier, let from, let l): return "media: \(id) (\(tier.rawValue)) took its copy at \(at(l)); its file at \(from) went"
         case .metadata(let id, let tier): return "media: read the metadata of \(id) (\(tier.rawValue))"
         case .pruned(let id, let tier): return "media: pruned replaced \(id) from the \(tier.rawValue) index"
+        case .poster(let id, let tier, let path?): return "media: the poster of \(id) (\(tier.rawValue)) is \(path)"
+        case .poster(let id, let tier, nil): return "media: no poster for \(id) (\(tier.rawValue)): its frame couldn't be extracted"
         }
     }
 }

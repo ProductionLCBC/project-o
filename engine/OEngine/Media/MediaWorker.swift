@@ -11,6 +11,10 @@ public struct MediaListing: Sendable {
     public var folders: Set<MediaFolder>
     public var files: [MediaLocation: MediaFileStat]
     public var overrideTargets: Set<MediaLocation>
+    /// Spec 8 §5 — the poster files in each folder's `.posters/`, which the
+    /// walk skips as media: what the poster loader and the thumbnail
+    /// versions know of posters (a change there "makes it look again").
+    public var posters: Set<MediaLocation> = []
 }
 
 /// Spec 8 §4 — what the walk found, ready for its rules on the control thread.
@@ -51,19 +55,23 @@ public final class MediaWorker: @unchecked Sendable {
         /// Tests only: runs with a file's source once it is hashed, before its
         /// copy is made (Spec 8 §11, "a file changed mid-import is refused").
         public var beforeCopy: (@Sendable (URL) -> Void)?
+        /// Spec 8 §5 — "the frame at the video's default in-point ... taken exactly".
+        public var frames: any MediaFrames
 
         public init(now: @escaping @Sendable () -> Date = { Date() },
                     schedule: (@Sendable (TimeInterval, @escaping @Sendable () -> Void) -> Void)? = nil,
                     probe: any MediaProbe = AVMediaProbe(),
                     freeBytes: @escaping @Sendable (URL) -> Int64? = MediaWorker.freeBytes,
                     blocked: @escaping @Sendable () -> Bool = { false },
-                    beforeCopy: (@Sendable (URL) -> Void)? = nil) {
+                    beforeCopy: (@Sendable (URL) -> Void)? = nil,
+                    frames: any MediaFrames = AVMediaFrames()) {
             self.now = now
             self.schedule = schedule
             self.probe = probe
             self.freeBytes = freeBytes
             self.blocked = blocked
             self.beforeCopy = beforeCopy
+            self.frames = frames
         }
 
         /// The engine's own: the real clock, a timer, AVFoundation, the volume's free space.
@@ -81,15 +89,19 @@ public final class MediaWorker: @unchecked Sendable {
         public var importFolder: String
         public var cache: MediaCache
         public var missing: Set<String>
+        /// Spec 8 §2 — what is known of each location, for each entry's own presence.
+        public var files: [MediaLocation: MediaFileState]
 
         public init(library: MediaIndex = MediaIndex(), machine: MediaLocalIndex = MediaLocalIndex(), libraryWritable: Bool = false,
-                    importFolder: String = "imports", cache: MediaCache = MediaCache(), missing: Set<String> = []) {
+                    importFolder: String = "imports", cache: MediaCache = MediaCache(), missing: Set<String> = [],
+                    files: [MediaLocation: MediaFileState] = [:]) {
             self.library = library
             self.machine = machine
             self.libraryWritable = libraryWritable
             self.importFolder = importFolder
             self.cache = cache
             self.missing = missing
+            self.files = files
         }
 
         func entry(_ id: String) -> MediaEntry? {
@@ -130,6 +142,11 @@ public final class MediaWorker: @unchecked Sendable {
         case decided(job: String, file: String, MediaImportOutcome)
         /// Spec 8 §3 — a file already in a folder, which the walk indexes where it is.
         case inPlace(job: String, file: String, MediaLocation)
+        /// Spec 8 §5 — posters made (or that failed), and the old files that
+        /// went once the new ones were written.
+        case posters(made: [MediaPosters.Made], removed: [MediaLocation])
+        /// Spec 8 §5 — the pool tiles there now, by name, after a pass drew some.
+        case tiles(Set<String>)
     }
 
     /// Spec 8 §4 — "A file is read once its size and modification date have held for two seconds".
@@ -148,6 +165,7 @@ public final class MediaWorker: @unchecked Sendable {
     private var reports: [Report] = []
     private var walkQueued = false
     private var walkScheduled = false
+    private var postersQueued = false
     private var hashes = 0
     private var submissions = 0
 
@@ -176,6 +194,14 @@ public final class MediaWorker: @unchecked Sendable {
     private var reportedIDs: Set<String> = []
     /// Paths an import's copy took, until the snapshot holds them.
     private var claimed: Set<MediaLocation> = []
+    /// Spec 8 §5 — posters whose extraction failed this run, with their
+    /// video's size and date then: tried again only once that file changes.
+    private var failedPosters: [MediaLocation: (source: MediaLocation, stat: MediaFileStat?)] = [:]
+    /// Whether the tiles there have been reported since launch.
+    private var tilesReported = false
+    /// Tiles that couldn't be drawn this run, with their source's size and
+    /// date then: drawn again only once that file changes.
+    private var failedTiles: [String: MediaFileStat?] = [:]
 
     public init(folders: MediaFolders, machineRoot: URL?, staging: URL?, seams: Seams = .live(), log: EngineLog) {
         self.folders = folders
@@ -218,6 +244,23 @@ public final class MediaWorker: @unchecked Sendable {
         }
     }
 
+    /// Spec 8 §5 — "by the walk when one is missing": the posters and tiles
+    /// the indexes as last adopted lack, made now. Asks made while a pass
+    /// waits are one pass.
+    public func requestPosters() {
+        lock.lock()
+        let queued = postersQueued
+        postersQueued = true
+        lock.unlock()
+        guard !queued else { return }
+        enqueue { [self] in
+            lock.lock()
+            postersQueued = false
+            lock.unlock()
+            posterPass()
+        }
+    }
+
     /// Spec 8 §3 — `media import "PATH"`, the job its result named.
     public func importPath(job: String, path: String) {
         enqueue { [self] in runImport(job: job, path: path) }
@@ -244,15 +287,29 @@ public final class MediaWorker: @unchecked Sendable {
         }
     }
 
-    /// Spec 8 §4 — the posters of the entries the launch pruned. Only files
-    /// in a `.posters/` folder are ever removed.
-    public func removePosters(_ locations: [MediaLocation]) {
+    /// Spec 8 §4 — the posters of the entries the launch pruned, and their
+    /// pool tiles. Only files in a `.posters/` folder or among the tiles are
+    /// ever removed.
+    public func removePosters(_ locations: [MediaLocation], tilesOf ids: [String] = []) {
         enqueue { [self] in
-            for location in locations where location.path.hasPrefix(".posters/") {
+            for location in locations where location.path.hasPrefix(MediaPosters.posterFolder + "/") {
                 guard let url = folders.url(for: location) else { continue }
                 try? FileManager.default.removeItem(at: url)
             }
+            if let tiles = tilesFolder, !ids.isEmpty {
+                for name in (try? FileManager.default.contentsOfDirectory(atPath: tiles.path)) ?? []
+                where ids.contains(where: { MediaPosters.belongs(name, to: $0) }) {
+                    try? FileManager.default.removeItem(at: tiles.appendingPathComponent(name))
+                }
+            }
         }
+    }
+
+    /// Whether anything waits for the control thread to take it.
+    public var hasReports: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !reports.isEmpty
     }
 
     /// Everything reported since the last call, in order.
@@ -325,7 +382,11 @@ public final class MediaWorker: @unchecked Sendable {
                 if let found = LocalFiles.mediaStatTime(url) { stats[target] = found }
             }
         }
-        report(.listed(MediaListing(folders: walked, files: stats.mapValues(\.stat), overrideTargets: targets)))
+        var posters: Set<MediaLocation> = []
+        for folder in [MediaFolder.mediaRoot, .machineMedia] where walked.contains(folder) {
+            posters.formUnion(posterFiles(in: folder))
+        }
+        report(.listed(MediaListing(folders: walked, files: stats.mapValues(\.stat), overrideTargets: targets, posters: posters)))
         report(.event(["op": .string("walk"), "state": .string("started"), "files": .number(Double(stats.count))]))
 
         var found: [MediaLocation: MediaFound] = [:]
@@ -620,16 +681,27 @@ public final class MediaWorker: @unchecked Sendable {
             }
             break
         }
-        // 5. Index: the metadata read, the entry made on the control thread.
+        // 5. Index: the metadata read, the poster extracted, the entry made on the control thread.
         event(job, file, "reading")
         guard let stat = LocalFiles.mediaStat(target) else { return done(.refused(.changed, nil)) }
+        var poster: String?
+        if metadata?.kind == .video, let path = MediaPosters.posterPath(id: id, inMs: 0), let location = MediaLocation(folder, path) {
+            // Spec 8 §5 — "At import": a new item's in-point is 0, its defaults being empty.
+            event(job, file, "poster")
+            if writePoster(of: destination, at: location, inMs: 0, alpha: metadata?.hasAlpha ?? false) {
+                poster = path
+            } else {
+                failedPosters[location] = (destination, stat)
+                log.warning("media import of \(file): no poster, its first frame couldn't be extracted")
+            }
+        }
         reportedIDs.insert(id)
         claimed.insert(destination)
         memo[destination] = Memo(stat: stat, id: id, read: metadata.map(MediaRead.media))
         report(.copied(job: job, file: file, MediaImport.Copied(location: destination,
                                                                  file: MediaFoundFile(id: id, size: stat.size, modified: stat.modified,
                                                                                       read: metadata.map(MediaRead.media)),
-                                                                 metadata: metadata, tier: tier, bringsBack: back)))
+                                                                 metadata: metadata, tier: tier, bringsBack: back, poster: poster)))
         if staged, !moved { try? FileManager.default.removeItem(at: url) }
     }
 
@@ -676,6 +748,109 @@ public final class MediaWorker: @unchecked Sendable {
         for item in items where (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true { removeEmptyFolders(item) }
         let rest = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         if rest.allSatisfy({ $0 == ".DS_Store" }) { try? FileManager.default.removeItem(at: folder) }
+    }
+
+    // MARK: - Posters and tiles (Spec 8 §5)
+
+    /// Spec 1 §5 — "thumbnails/ ...; pool tiles in pool/ (Spec 8 §5)", in the machine root.
+    var tilesFolder: URL? {
+        machineRoot?.appendingPathComponent(MediaPosters.tileFolder, isDirectory: true)
+    }
+
+    /// The poster files in a folder's `.posters/`.
+    func posterFiles(in folder: MediaFolder) -> Set<MediaLocation> {
+        guard let root = folders.folder(folder), folder != .absolute else { return [] }
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(MediaPosters.posterFolder).path)) ?? []
+        return Set(names.filter { !$0.hasPrefix(".") && $0.hasSuffix(".png") }
+            .compactMap { MediaLocation(folder, MediaPosters.posterFolder + "/" + $0) })
+    }
+
+    private func exists(_ location: MediaLocation) -> Bool {
+        folders.url(for: location).map { LocalFiles.mediaStat($0) != nil } ?? false
+    }
+
+    /// Spec 8 §5 — "The walk extracts missing posters", and "Tiles are a
+    /// machine cache, never synced, and made again when missing": every
+    /// poster the indexes this machine writes lack, then every tile missing,
+    /// from the indexes and file states the control thread last adopted.
+    private func posterPass() {
+        let snap = current()
+        var failed: Set<MediaLocation> = []
+        for (poster, recorded) in failedPosters {
+            let now = folders.url(for: recorded.source).flatMap(LocalFiles.mediaStat)
+            if now == recorded.stat { failed.insert(poster) } else { failedPosters[poster] = nil }
+        }
+        let tasks = MediaPosters.posters(library: snap.library, machine: snap.machine, libraryWritable: snap.libraryWritable,
+                                         state: { snap.files[$0] ?? .absent }, posterExists: exists, failed: failed)
+        var made: [MediaPosters.Made] = []
+        var removed: [MediaLocation] = []
+        for task in tasks {
+            waitWhileBlocked()
+            if task.extract, !writePoster(of: task.source, at: task.poster, inMs: task.inMs, alpha: task.alpha) {
+                failedPosters[task.poster] = (task.source, folders.url(for: task.source).flatMap(LocalFiles.mediaStat))
+                log.warning("media: no poster for \(task.id): its frame at \(task.inMs) ms couldn't be extracted from \(task.source.folder.rawValue) \(task.source.path)")
+                made.append(MediaPosters.Made(id: task.id, tier: task.tier, inMs: task.inMs, path: nil))
+                continue
+            }
+            made.append(MediaPosters.Made(id: task.id, tier: task.tier, inMs: task.inMs, path: task.poster.path))
+            removed += removeOldPosters(of: task.id, keeping: task.poster)
+        }
+        if !made.isEmpty { report(.posters(made: made, removed: removed)) }
+        makeTiles(snap)
+    }
+
+    /// Spec 8 §5 — the frame at the in-point, "a PNG fitted within 1920 ×
+    /// 1080, with alpha when the video has it", at `.posters/<hex>-<in>.png`.
+    private func writePoster(of source: MediaLocation, at poster: MediaLocation, inMs: Int, alpha: Bool) -> Bool {
+        guard let url = folders.url(for: source), let target = folders.url(for: poster),
+              let frame = seams.frames.frame(of: url, atMs: inMs, alpha: alpha),
+              let fitted = MediaImages.fitted(frame.image) else { return false }
+        return MediaImages.writePNG(fitted, to: target)
+    }
+
+    /// Spec 8 §5 — "The old file goes once the new one is written": the
+    /// other posters of the same id beside it.
+    private func removeOldPosters(of id: String, keeping poster: MediaLocation) -> [MediaLocation] {
+        var removed: [MediaLocation] = []
+        for other in posterFiles(in: poster.folder) where other != poster && MediaPosters.belongs(other.name, to: id) {
+            guard let url = folders.url(for: other) else { continue }
+            if (try? FileManager.default.removeItem(at: url)) != nil { removed.append(other) }
+        }
+        return removed
+    }
+
+    /// Spec 8 §5 — "Pool tiles (M3) are 480 px wide PNGs at
+    /// `machine/thumbnails/pool/<hex>-<in>.png` ..., made from the poster for
+    /// video and from the image for an image"; a new tile replaces the
+    /// item's old ones.
+    private func makeTiles(_ snap: Snapshot) {
+        guard let folder = tilesFolder else { return }
+        var names = Set(((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { !$0.hasPrefix(".") })
+        let tasks = MediaPosters.tiles(library: snap.library, machine: snap.machine, state: { snap.files[$0] ?? .absent },
+                                       posterExists: exists, tileExists: { names.contains($0) })
+        var drew = false
+        for task in tasks {
+            waitWhileBlocked()
+            let stat = folders.url(for: task.source).flatMap(LocalFiles.mediaStat)
+            if let failed = failedTiles[task.name], failed == stat { continue }
+            guard let source = folders.url(for: task.source), let tile = MediaImages.tile(from: source),
+                  MediaImages.writePNG(tile, to: folder.appendingPathComponent(task.name)) else {
+                failedTiles[task.name] = stat
+                log.warning("media: no pool tile for \(task.id): \(task.source.folder.rawValue) \(task.source.path) couldn't be drawn")
+                continue
+            }
+            failedTiles[task.name] = nil
+            names.insert(task.name)
+            drew = true
+            for other in names where other != task.name && MediaPosters.belongs(other, to: task.id) {
+                try? FileManager.default.removeItem(at: folder.appendingPathComponent(other))
+                names.remove(other)
+            }
+        }
+        if drew || !tilesReported {
+            tilesReported = true
+            report(.tiles(names))
+        }
     }
 
     // MARK: - Volumes

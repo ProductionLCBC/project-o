@@ -119,13 +119,18 @@ public enum MediaImport {
         public var metadata: MediaMetadata?
         public var tier: MediaTier
         public var bringsBack: String?
+        /// Spec 8 §3, step 5 — "extracts the poster (§5), writes the entry":
+        /// the poster made for a new video, relative to the copy's folder.
+        public var poster: String?
 
-        public init(location: MediaLocation, file: MediaFoundFile, metadata: MediaMetadata?, tier: MediaTier, bringsBack: String?) {
+        public init(location: MediaLocation, file: MediaFoundFile, metadata: MediaMetadata?, tier: MediaTier, bringsBack: String?,
+                    poster: String? = nil) {
             self.location = location
             self.file = file
             self.metadata = metadata
             self.tier = tier
             self.bringsBack = bringsBack
+            self.poster = poster
         }
     }
 
@@ -160,7 +165,8 @@ public enum MediaImport {
             return (.known(MediaResolver.resolve(id, library: library, machine: machine)?.id ?? id), [])
         }
         guard let metadata = copied.metadata else { return (.refused(.unsupported, nil), []) }
-        let entry = MediaWalk.entry(id: id, location: copied.location, file: copied.file, metadata: metadata, addedAt: now)
+        var entry = MediaWalk.entry(id: id, location: copied.location, file: copied.file, metadata: metadata, addedAt: now)
+        if entry.kind == .video { entry.poster = copied.poster }
         if copied.tier == .library { library.add(entry) } else { machine.add(entry) }
         return (.imported(id), [.added(id: id, tier: copied.tier, location: copied.location)])
     }

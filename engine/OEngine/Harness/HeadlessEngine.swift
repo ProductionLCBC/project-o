@@ -208,13 +208,19 @@ public final class HeadlessEngine: @unchecked Sendable {
 
     /// A tick runs what is queued (a `media import` starts its job, a `media
     /// rebuild` its walk); the worker does everything asked; the next tick
-    /// takes in what it reported; the worker writes the cache it was handed,
-    /// and the writer's queue the indexes.
+    /// takes in what it reported, which can ask for more (a walk's new video
+    /// asks for its poster, Spec 8 §5); and so on until the worker has
+    /// nothing left to report; then the worker writes the cache it was
+    /// handed, and the writer's queue the indexes.
     public func settleMedia() {
         tick()
         control.mediaWorker?.waitUntilIdle()
-        tick()
-        control.mediaWorker?.waitUntilIdle()
+        var rounds = 0
+        repeat {
+            tick()
+            control.mediaWorker?.waitUntilIdle()
+            rounds += 1
+        } while control.mediaWorker?.hasReports == true && rounds < 8
         waitForWrites()
     }
 

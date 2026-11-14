@@ -1,6 +1,9 @@
+import CoreGraphics
 import Foundation
+import ImageIO
 import OCore
 import OFormats
+import XCTest
 @testable import OEngine
 
 /// The wall clock the media worker reads, moved by the tests: files written
@@ -59,6 +62,8 @@ final class MediaFixture {
     let free: FreeSpace
     let media = TopicRecorder()
     let library = TopicRecorder()
+    /// Spec 8 §5 — the frames posters are made from, and the in-points asked for.
+    let frames = FakeMediaFrames()
     private(set) var engine: HeadlessEngine!
     private(set) var worker: MediaWorker!
 
@@ -121,7 +126,8 @@ final class MediaFixture {
         let free = self.free
         worker = try engine.attachMediaWorker(machineRoot: machineRoot, staging: staging,
                                               seams: MediaWorker.Seams(now: { clock.now() }, probe: FakeMediaProbe(),
-                                                                       freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy))
+                                                                       freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy,
+                                                                       frames: frames))
         settle()
     }
 
@@ -206,6 +212,30 @@ final class MediaFixture {
 
     func exists(_ folder: MediaFolder, _ path: String) -> Bool {
         FileManager.default.fileExists(atPath: url(folder, path).path)
+    }
+
+    /// Spec 8 §5 — a real PNG of `width` × `height`, for images and posters the tiles are drawn from.
+    func writePNG(_ folder: MediaFolder, _ path: String, width: Int = 64, height: Int = 36, gray: CGFloat = 0.3) throws {
+        let target = url(folder, path)
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)!
+        context.setFillColor(CGColor(gray: gray, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        XCTAssertTrue(MediaImages.writePNG(context.makeImage()!, to: target))
+    }
+
+    /// Spec 8 §5 — the pool tiles in `machine/thumbnails/pool/`, by name.
+    var tiles: Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: machineRoot.appendingPathComponent("thumbnails/pool").path)) ?? [])
+    }
+
+    /// The pixel size of a PNG on disk.
+    static func size(of url: URL) -> (width: Int, height: Int)? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let p = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let w = p[kCGImagePropertyPixelWidth] as? Int, let h = p[kCGImagePropertyPixelHeight] as? Int else { return nil }
+        return (w, h)
     }
 
     /// The id of some bytes, as the walk works it out.

@@ -103,6 +103,14 @@ public final class ControlLoop: @unchecked Sendable {
     var waitingInPlace: [(job: String, file: String, location: MediaLocation)] = []
     /// Spec 8 §4 — the walk's notes, each logged once a run.
     var mediaNotesLogged: Set<MediaWalkNote> = []
+    /// Spec 8 §5 — the poster files in each folder's `.posters/`: from a look
+    /// at launch, then the walk's first look and the posters the worker made.
+    /// The thumbnail versions note whether each poster was found.
+    public internal(set) var posterFiles: Set<MediaLocation>
+    /// Whether this build changed what is known of the poster files.
+    var posterFilesChanged = false
+    /// Spec 8 §5 — the pool tiles in `machine/thumbnails/pool/`, by name, as the worker last reported them.
+    public internal(set) var mediaTiles: Set<String> = []
     public private(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
@@ -168,6 +176,7 @@ public final class ControlLoop: @unchecked Sendable {
         let files = LocalFiles.mediaStates(library: library, machine: machine, folders: media, cache: mediaCache)
         mediaFiles = files
         self.mediaCache = mediaCache
+        posterFiles = LocalFiles.mediaPosters(folders: media)
         missing = MediaResolver.missingIds(library: library, machine: machine, state: { files[$0] ?? .absent })
         // Spec 3 §2 — "A fresh ShowState has every channel empty ... every output on its default stack".
         model = ControlModel(state: ShowState.fresh(library: library, machine: machine))
@@ -318,6 +327,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastMediaEvents = []
         lastRootsChanged = false
         mediaFilesChanged = false
+        posterFilesChanged = false
         changedTimers = []
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)

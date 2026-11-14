@@ -21,13 +21,15 @@ extension ControlLoop {
         worker.adopt(mediaSnapshot)
         worker.emptyStaging()
         worker.requestWalk()
+        // Spec 8 §5 — posters and tiles missing since the last run, after the launch walk.
+        worker.requestPosters()
     }
 
     /// What the worker reads: the indexes, the mode, the import folder, the cache and the missing set.
     var mediaSnapshot: MediaWorker.Snapshot {
         MediaWorker.Snapshot(library: library.mediaIndex, machine: machine.mediaLocal,
                              libraryWritable: machine.settings.libraryMode == .writable,
-                             importFolder: machine.settings.defaultImportFolder, cache: mediaCache, missing: missing)
+                             importFolder: machine.settings.defaultImportFolder, cache: mediaCache, missing: missing, files: mediaFiles)
     }
 
     var libraryWritable: Bool { machine.settings.libraryMode == .writable }
@@ -54,6 +56,8 @@ extension ControlLoop {
             case .copied(let job, let file, let copied): applyCopied(copied, job: job, file: file, worker: worker, now: now)
             case .decided(let job, let file, let outcome): done(job: job, file: file, outcome)
             case .inPlace(let job, let file, let location): waitingInPlace.append((job, file, location))
+            case .posters(let made, let removed): applyPosters(made, removed: removed, now: now)
+            case .tiles(let names): mediaTiles = names
             }
         }
     }
@@ -71,7 +75,11 @@ extension ControlLoop {
         library.mediaIndex = result.library
         machine.mediaLocal = result.machine
         indexesChanged(result.changes, before: before, now: now)
-        worker.removePosters(result.posters)
+        worker.removePosters(result.posters, tilesOf: result.changes.map(\.id))
+        if !result.posters.isEmpty {
+            posterFiles.subtract(result.posters)
+            posterFilesChanged = true
+        }
     }
 
     /// Spec 8 §4 — the walk's first look: a file that went is missing at
@@ -98,6 +106,13 @@ extension ControlLoop {
         if states != mediaFiles {
             mediaFiles = states
             mediaFilesChanged = true
+        }
+        // Spec 8 §5 — "a change under `.posters/` makes it look again".
+        var posters = posterFiles.filter { !listing.folders.contains($0.folder) }
+        posters.formUnion(listing.posters)
+        if posters != posterFiles {
+            posterFiles = posters
+            posterFilesChanged = true
         }
     }
 
@@ -157,12 +172,38 @@ extension ControlLoop {
         machine.mediaLocal = local
         mediaFiles[copied.location] = .holds(copied.file.id)
         mediaFilesChanged = true
+        if let poster = copied.poster, let location = MediaLocation(copied.location.folder, poster) {
+            posterFiles.insert(location)
+            posterFilesChanged = true
+        }
         mediaCache = MediaCache(records: mediaCache.records + [MediaCacheRecord(location: copied.location, size: copied.file.size,
                                                                                 modified: copied.file.modified, hash: copied.file.id)],
                                 extra: mediaCache.extra)
         worker.persist(mediaCache)
         indexesChanged(changes, before: before, now: now)
         done(job: job, file: file, outcome)
+    }
+
+    /// Spec 8 §5 — posters the worker made join their entries ("The entry's
+    /// `poster` holds that path ...; it's null until extracted, and when
+    /// extraction fails, which is reported"), as index changes with cause
+    /// `media`; the poster files follow.
+    func applyPosters(_ made: [MediaPosters.Made], removed: [MediaLocation], now: MonotonicTime) {
+        let before = (library: library, machine: machine)
+        var index = library.mediaIndex
+        var local = machine.mediaLocal
+        let changes = MediaPosters.apply(made, library: &index, machine: &local, libraryWritable: libraryWritable)
+        library.mediaIndex = index
+        machine.mediaLocal = local
+        indexesChanged(changes, before: before, now: now)
+        var posters = posterFiles.subtracting(removed)
+        for m in made {
+            if let path = m.path, let location = MediaLocation(MediaPosters.folder(of: m.tier), path) { posters.insert(location) }
+        }
+        if posters != posterFiles {
+            posterFiles = posters
+            posterFilesChanged = true
+        }
     }
 
     /// Spec 8 §2 — an index change that isn't a command: the revision, the
@@ -255,7 +296,7 @@ extension ControlLoop {
     /// aren't index changes", one event per item. The worker then reads what
     /// was applied.
     func refreshMedia() {
-        guard lastRootsChanged || mediaFilesChanged else { return }
+        guard lastRootsChanged || mediaFilesChanged || posterFilesChanged else { return }
         let files = mediaFiles
         let next = MediaResolver.missingIds(library: library, machine: machine, state: { files[$0] ?? .absent })
         if next != missing {
@@ -268,5 +309,8 @@ extension ControlLoop {
             mediaFilesChanged = true
         }
         mediaWorker?.adopt(mediaSnapshot)
+        // Spec 8 §5 — posters "by the walk when one is missing, and after an edit changes
+        // `defaults.trimInMs`", and tiles "made again when missing": a pass over what was just adopted.
+        mediaWorker?.requestPosters()
     }
 }

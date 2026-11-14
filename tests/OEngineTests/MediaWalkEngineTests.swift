@@ -60,10 +60,13 @@ final class MediaWalkEngineTests: XCTestCase {
         let id = MediaFixture.id("welcome, version one")
         XCTAssertEqual(media.control.library.mediaIndex.entry(id)?.path, "imports/Welcome.mov")
         XCTAssertEqual(media.control.library.mediaIndex.entry(id)?.defaults, MediaDefaults())
-        XCTAssertEqual(media.control.revision, 2)
-        XCTAssertEqual(media.mediaLibraryEvents.count, 1)
+        // The walk's change, then its poster's (Spec 8 §5, "The walk extracts missing posters"): one revision each.
+        XCTAssertEqual(media.control.revision, 3)
+        XCTAssertEqual(media.mediaLibraryEvents.count, 2)
         XCTAssertEqual(media.mediaLibraryEvents.first?["changed"],
                        .array([.object(["object": .string("media"), "media": .string(id), "paths": .array([])])]))
+        XCTAssertEqual(media.mediaLibraryEvents.last?["changed"],
+                       .array([.object(["object": .string("media"), "media": .string(id), "paths": .array([.string("poster")])])]))
         XCTAssertEqual(media.control.commandLog.entries.count, lines + 1)
         XCTAssertEqual(media.control.commandLog.entries.last?.command, .media(.rebuild))
         // Spec 8 §2 — the walk's index changes are written like any change.
