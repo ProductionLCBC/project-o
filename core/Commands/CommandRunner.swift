@@ -183,11 +183,21 @@ struct Runner {
     /// Spec 8 §2 — the engine's say on a media command it runs.
     var media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)?
 
+    /// An edit a fired cue holds: `edit` or a media edit (Spec 8 §2, "ordinary edits").
     struct DeferredEdit {
-        var edit: EditCommand
+        var command: Command
         var group: GroupID
         var source: CommandSource
         var fire: FireRecord?
+    }
+
+    /// Runs a held edit once the fire that reached it is done.
+    mutating func runDeferred(_ entry: DeferredEdit, makeUUID: () -> UUID) {
+        switch entry.command {
+        case .edit(let edit): runEdit(edit, group: entry.group, source: entry.source, fire: entry.fire, makeUUID: makeUUID)
+        case .media(let media): runMedia(media, group: entry.group, source: entry.source, fire: entry.fire)
+        default: break
+        }
     }
 
     init(state: ShowState, context: ProjectionContext, editing: EditContext) {
@@ -219,14 +229,19 @@ struct Runner {
         }
         if case .edit(let edit) = command {
             if deferring {
-                deferred.append(DeferredEdit(edit: edit, group: group, source: source, fire: fire))
+                deferred.append(DeferredEdit(command: command, group: group, source: source, fire: fire))
             } else {
                 runEdit(edit, group: group, source: source, fire: fire, makeUUID: makeUUID)
             }
             return
         }
         if case .media(let media) = command {
-            runMedia(media, group: group, source: source, fire: fire)
+            // Spec 8 §2 — replace, delete and their inverses are "ordinary edits": held, they wait for the fire as edits do.
+            if deferring, media.isEdit {
+                deferred.append(DeferredEdit(command: command, group: group, source: source, fire: fire))
+            } else {
+                runMedia(media, group: group, source: source, fire: fire)
+            }
             return
         }
         var projectionContext = context
@@ -258,8 +273,12 @@ struct Runner {
             let firstDeferred = deferred.count
             for entry in position.cue.commands {
                 // Spec 1 §6 — a guard on a cue command is reserved and not run; the command runs unguarded.
-                if case .edit(let edit) = entry.command {
-                    deferred.append(DeferredEdit(edit: edit, group: cueGroup, source: cueSource, fire: nil))
+                if case .edit = entry.command {
+                    deferred.append(DeferredEdit(command: entry.command, group: cueGroup, source: cueSource, fire: nil))
+                    continue
+                }
+                if case .media(let media) = entry.command, media.isEdit {
+                    deferred.append(DeferredEdit(command: entry.command, group: cueGroup, source: cueSource, fire: nil))
                     continue
                 }
                 run(entry.command, group: cueGroup, source: cueSource, fire: cueFire, nesting: cueNesting,
@@ -277,9 +296,7 @@ struct Runner {
                 deferring = false
                 let waiting = deferred
                 deferred = []
-                for entry in waiting {
-                    runEdit(entry.edit, group: entry.group, source: entry.source, fire: entry.fire, makeUUID: makeUUID)
-                }
+                for entry in waiting { runDeferred(entry, makeUUID: makeUUID) }
             }
             return
         }
@@ -338,7 +355,18 @@ struct Runner {
         if context.machine.settings.operatorLock.enabled, media != .rebuild {
             outcome = .failure(Rejection(reason: .operatorLock, message: "the operator lock is on: \(media.cmd) is refused"))
         } else if media.isEdit {
-            outcome = .failure(Rejection(reason: .notInV1, message: "\(media.cmd) isn't applied yet"))
+            switch applyMediaEdit(media) {
+            case .success(let applied):
+                // Spec 8 §2 — "ordinary edits": the roots the group's later commands read, a line with its inverse.
+                context.library = applied.library
+                context.machine = applied.machine
+                executed.append(ExecutedCommand(group: group, source: source, command: .media(applied.logged),
+                                                result: applied.isNoop ? .noop : .ok, effects: [], fire: fire,
+                                                inverse: applied.inverse.map(Command.media), changes: applied.changes))
+                return
+            case .failure(let rejection):
+                outcome = .failure(rejection)
+            }
         } else if let check = self.media {
             outcome = check(media, source)
         }
@@ -353,6 +381,20 @@ struct Runner {
             }
             executed.append(ExecutedCommand(group: group, source: source, command: .media(media), result: .blocked,
                                             effects: [], fire: fire, refusal: rejection))
+        }
+    }
+
+    /// Spec 8 §6 — a media edit against the roots the group's earlier
+    /// commands left. `media delete` and `undelete` move files, so the engine
+    /// applies them once its worker has; until then they are refused here.
+    func applyMediaEdit(_ media: MediaCommand) -> Result<MediaEdits.Outcome, Rejection> {
+        switch media {
+        case .replace(let old, let new, _):
+            return MediaEdits.replace(old: old, new: new, library: context.library, machine: context.machine)
+        case .unreplace(let old, let new, let record):
+            return MediaEdits.unreplace(old: old, new: new, record: record, library: context.library, machine: context.machine)
+        default:
+            return .failure(Rejection(reason: .notInV1, message: "\(media.cmd) isn't applied yet"))
         }
     }
 

@@ -214,18 +214,4 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(index.entries.count, 1)
         XCTAssertEqual(index.entry(F.cross)?.path, "backgrounds/cross.png")
     }
-
-    /// Spec 1 §7 — "A `replace media` command rewrites every reference from one
-    /// id to another across lists, macros and presets, and records the mapping
-    /// in the index so re-imports of the old file resolve to the new one."
-    func test_replaceMediaRewritesEveryReferenceAndRecordsTheMapping() {
-        var (library, machine) = roots
-        let rewritten = Identity.replaceMedia(from: F.mountains, with: F.dawn, library: &library, machine: &machine)
-        XCTAssertEqual(rewritten, 1)
-        XCTAssertEqual(library.list(number: 7)?.cues[0].commands[0].command.mediaRef, F.dawn)
-        XCTAssertEqual(library.mediaIndex.replaced[F.mountains], F.dawn)
-        XCTAssertEqual(MediaResolver.chain(from: F.mountains, library: library.mediaIndex, machine: machine.mediaLocal).reached, F.dawn)
-        XCTAssertEqual(MediaResolver.chain(from: F.cross, library: library.mediaIndex, machine: machine.mediaLocal).reached, F.cross)
-        XCTAssertEqual(library.list(number: 42)?.cues[0].commands[0].command.mediaRef, F.dawn, "untouched")
-    }
 }

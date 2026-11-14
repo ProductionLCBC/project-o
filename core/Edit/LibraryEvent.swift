@@ -65,11 +65,16 @@ public struct AppliedEdits: Equatable, Sendable {
     }
 
     /// The applied edits of `executed` (result `ok`; a `noop` or a `blocked`
-    /// edit applied nothing), one entry per log group.
+    /// edit applied nothing), one entry per log group. Spec 8 §2 — `media
+    /// replace`, `media delete` and their inverses "are ordinary edits".
     public static func groups(in executed: [ExecutedCommand]) -> [AppliedEdits] {
         var out: [AppliedEdits] = []
         for line in executed where line.result == .ok {
-            guard case .edit = line.command else { continue }
+            switch line.command {
+            case .edit: break
+            case .media(let media) where media.isEdit: break
+            default: continue
+            }
             if let index = out.firstIndex(where: { $0.group == line.group }) {
                 out[index].changed += line.changes
             } else {
