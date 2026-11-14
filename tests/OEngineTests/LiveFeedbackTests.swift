@@ -24,7 +24,7 @@ final class LiveFeedbackTests: XCTestCase {
     override func setUpWithError() throws {
         var machine = try E.spikeMachine()
         machine.settings.libraryMode = .writable
-        engine = try HeadlessEngine(library: E.library(), machine: machine, mediaRoot: E.mediaRoot)
+        engine = try HeadlessEngine(library: E.library(), machine: machine, media: E.media)
         events = EventRecorder()
         let events = self.events
         engine.engine.publisher.subscribe(["live"]) { events.record($0) }

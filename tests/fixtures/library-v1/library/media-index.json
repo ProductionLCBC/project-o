@@ -15,7 +15,7 @@
       "kind": "video",
       "modified": "2026-10-18T13:02:09Z",
       "path": "backgrounds/dawn.mp4",
-      "poster": "posters/dawn-55c84469.png",
+      "poster": ".posters/55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527-0.png",
       "size": 1292,
       "width": 64
     },
@@ -33,7 +33,7 @@
       "kind": "video",
       "modified": "2026-10-19T09:39:58Z",
       "path": "backgrounds/mountains.mp4",
-      "poster": "posters/mountains-9f2c6a1b.png",
+      "poster": ".posters/9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b9f2c6a1b-1500.png",
       "size": 48213774,
       "width": 1920
     },

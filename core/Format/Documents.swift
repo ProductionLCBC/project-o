@@ -8,6 +8,9 @@ import Foundation
 public enum DocumentKind: String, CaseIterable, Codable, Hashable, Sendable {
     case library, channels, textStyles, grades, transitions, audioTransitions, preset, macro, list, mediaIndex
     case machine, stacks, outputs, audioOutputs, inputs, clocks, keys, mediaLocal, playlist, state
+    /// Spec 8 §4 — `machine/media-cache.json`, "the header every document has
+    /// (Spec 1 §5), with kind `mediaCache`, and the loader leaves it alone".
+    case mediaCache
 
     /// Spec 1 §8 — "The app knows the highest schema it writes".
     public var currentSchema: Int { OCore.schemaVersion }
@@ -24,6 +27,7 @@ public enum DocumentKind: String, CaseIterable, Codable, Hashable, Sendable {
         case .mediaIndex: return "media-index"
         case .audioOutputs: return "audio-outputs"
         case .mediaLocal: return "media-local"
+        case .mediaCache: return "media-cache"
         default: return rawValue
         }
     }
@@ -113,6 +117,8 @@ public enum Document: Equatable, Sendable {
     case mediaLocal(MediaLocalIndex)
     case playlist(Playlist)
     case state(ShowState)
+    /// Spec 8 §4 — the media walk's cache, read and written by the engine alone.
+    case mediaCache(MediaCache)
 
     public var kind: DocumentKind {
         switch self {
@@ -136,6 +142,7 @@ public enum Document: Equatable, Sendable {
         case .mediaLocal: return .mediaLocal
         case .playlist: return .playlist
         case .state: return .state
+        case .mediaCache: return .mediaCache
         }
     }
 }

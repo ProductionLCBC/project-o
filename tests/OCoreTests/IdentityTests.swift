@@ -202,30 +202,16 @@ final class IdentityTests: XCTestCase {
 
     func test_hashingTheSameBytesAtTwoPathsYieldsOneIndexEntry() throws {
         let bytes = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("backgrounds/cross.png").path))
-        let again = try XCTUnwrap(FileManager.default.contents(atPath: F.mediaRoot.appendingPathComponent("local/cross-fast.png").path))
+        let again = try XCTUnwrap(FileManager.default.contents(atPath: F.machineMediaRoot.appendingPathComponent("cross-fast.png").path))
         XCTAssertEqual(MediaID.sha256(of: bytes), F.cross)
         XCTAssertEqual(MediaID.sha256(of: again), F.cross)
 
         var index = MediaIndex()
         let first = MediaEntry(id: MediaID.sha256(of: bytes), path: "backgrounds/cross.png", kind: .image, size: bytes.count)
-        let second = MediaEntry(id: MediaID.sha256(of: again), path: "local/cross-fast.png", kind: .image, size: again.count)
+        let second = MediaEntry(id: MediaID.sha256(of: again), path: "copies/cross-fast.png", kind: .image, size: again.count)
         XCTAssertTrue(index.add(first))
         XCTAssertFalse(index.add(second), "the same bytes are one identity")
         XCTAssertEqual(index.entries.count, 1)
         XCTAssertEqual(index.entry(F.cross)?.path, "backgrounds/cross.png")
-    }
-
-    /// Spec 1 §7 — "A `replace media` command rewrites every reference from one
-    /// id to another across lists, macros and presets, and records the mapping
-    /// in the index so re-imports of the old file resolve to the new one."
-    func test_replaceMediaRewritesEveryReferenceAndRecordsTheMapping() {
-        var (library, machine) = roots
-        let rewritten = Identity.replaceMedia(from: F.mountains, with: F.dawn, library: &library, machine: &machine)
-        XCTAssertEqual(rewritten, 1)
-        XCTAssertEqual(library.list(number: 7)?.cues[0].commands[0].command.mediaRef, F.dawn)
-        XCTAssertEqual(library.mediaIndex.replaced[F.mountains], F.dawn)
-        XCTAssertEqual(library.mediaIndex.resolveReplaced(F.mountains), F.dawn)
-        XCTAssertEqual(library.mediaIndex.resolveReplaced(F.cross), F.cross)
-        XCTAssertEqual(library.list(number: 42)?.cues[0].commands[0].command.mediaRef, F.dawn, "untouched")
     }
 }

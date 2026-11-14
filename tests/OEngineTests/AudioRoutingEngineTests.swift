@@ -1,5 +1,6 @@
 import XCTest
 import OCore
+import OFormats
 @testable import OEngine
 
 /// Spec 4 §11 — "Each channel's content may carry sound; the engine decodes
@@ -21,7 +22,7 @@ final class AudioRoutingEngineTests: XCTestCase {
         var machine = try EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270))
         machine.audioOutputs = [AudioOutput(number: 1, label: "A", device: .uid("A"), channels: [0, 1]),
                                 AudioOutput(number: 2, label: "B", device: .uid("B"), channels: [0, 1])]
-        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: ClipFixtures.folder, metal: metal)
+        let engine = try HeadlessEngine(library: library, machine: machine, media: MediaFolders(mediaRoot: ClipFixtures.folder), metal: metal)
         let system = try XCTUnwrap(engine.engine.audio)
         let factory = try XCTUnwrap(engine.audioFactory)
         XCTAssertEqual(system.graphs.map(\.key), ["A", "B"])

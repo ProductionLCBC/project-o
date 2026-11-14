@@ -14,7 +14,7 @@ final class MetalEngineTests: XCTestCase {
     override func setUpWithError() throws {
         let metal = try MetalHarness.backend()
         engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                                    mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+                                    media: EngineFixtures.media, metal: metal)
     }
 
     /// Where a stack's box lands, in the capture.
@@ -103,7 +103,7 @@ final class MetalEngineTests: XCTestCase {
         let metal = try MetalHarness.backend()
         var machine = try EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270))
         machine.outputs[1].format = VideoFormat(width: 480, height: 270, rate: .fps60, interlaced: false)
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, media: EngineFixtures.media, metal: metal)
         engine.send("list 42 cue 1")
         engine.tick(count: 2)
         let frame = try XCTUnwrap(engine.captured(output: 2))

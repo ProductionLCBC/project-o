@@ -117,8 +117,8 @@ public final class DocumentWriter: @unchecked Sendable {
     static func watched(_ root: Root, _ path: String) -> Bool {
         guard !FileLayout.isIgnored(path: path) else { return false }
         switch root {
-        case .library: return path.hasPrefix("lists/")
-        case .machine: return path.hasPrefix("playlists/") || path.hasPrefix("lists-local/")
+        case .library: return path.hasPrefix("lists/") || path == DocumentKind.mediaIndex.fixedPath
+        case .machine: return path.hasPrefix("playlists/") || path.hasPrefix("lists-local/") || path == DocumentKind.mediaLocal.fixedPath
         }
     }
 
@@ -205,13 +205,29 @@ public final class DocumentWriter: @unchecked Sendable {
     /// the disk as it is.
     func scan() -> DiskDelta {
         var delta = DiskDelta()
-        delta.library = scan(.library, under: ["lists"])
-        delta.machine = scan(.machine, under: ["playlists", "lists-local"])
+        delta.library = scan(.library, under: ["lists"], files: [DocumentKind.mediaIndex.fixedPath ?? "media-index.json"])
+        delta.machine = scan(.machine, under: ["playlists", "lists-local"], files: [DocumentKind.mediaLocal.fixedPath ?? "media-local.json"])
         return delta
     }
 
-    private func scan(_ root: Root, under tops: [String]) -> RootDelta {
+    private func scan(_ root: Root, under tops: [String], files single: [String]) -> RootDelta {
         var delta = RootDelta()
+        // Spec 8 §2 — the media indexes, at the top of their roots.
+        for path in single {
+            let full = url(root).appendingPathComponent(path).standardizedFileURL.path
+            guard let stamp = Stamp.of(full) else { continue }
+            delta.present[path] = stamp.modified / 1_000_000
+            let key = FileKey(root: root, path: path)
+            if let known = files[key], known.stamp == stamp { continue }
+            guard let data = FileManager.default.contents(atPath: full) else { continue }
+            let digest = Self.digest(data)
+            if let known = files[key], known.digest == digest {
+                files[key]?.stamp = stamp
+                continue
+            }
+            files[key] = Known(digest: digest, stamp: stamp)
+            delta.arrived.append(ArrivedFile.reading(path: path, data: data, digest: digest))
+        }
         var seenFolders: Set<String> = []
         var seenOthers: Set<String> = []
         let base = url(root).standardizedFileURL.path + "/"

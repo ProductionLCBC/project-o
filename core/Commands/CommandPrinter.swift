@@ -72,6 +72,10 @@ enum CommandPrinter {
     }
 
     static func argumentWords(_ arg: VocabularyRow.Arg, _ object: [String: JSONValue]) -> [String] {
+        // Spec 8 §2 — a recorded body prints as one JSON object of its keys, as an edit's picks do (Spec 5 §4).
+        if case .body(let keys, _) = arg.kind {
+            return bodyValue(keys, object).map { [JSONCanonical.line($0)] } ?? []
+        }
         guard let value = object[arg.key] else { return [] }
         switch arg.kind {
         case .int:
@@ -91,9 +95,20 @@ enum CommandPrinter {
             return [word, secondsText(ms: value.intValue ?? 0)]
         case .flag(let word):
             return value.boolValue == true ? [word] : []
-        case .write, .edit:
+        case .hash:
+            // Spec 2 §4 — "Printing is canonical: ... full hashes".
+            return [value.stringValue ?? ""]
+        case .write, .edit, .body:
             return []
         }
+    }
+
+    /// Spec 8 §2 — the members of a recorded body present in the command
+    /// object, as one JSON object; nil when none is.
+    static func bodyValue(_ keys: [String], _ object: [String: JSONValue]) -> JSONValue? {
+        var members: [String: JSONValue] = [:]
+        for key in keys { if let value = object[key] { members[key] = value } }
+        return members.isEmpty ? nil : .object(members)
     }
 
     // MARK: - Spec 2 §2, the write form

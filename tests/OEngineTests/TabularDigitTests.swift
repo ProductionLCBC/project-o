@@ -62,7 +62,7 @@ final class TabularDigitTests: XCTestCase {
         library.presets.append(StageFixtures.preset(9, "Caption", boxes: [StageFixtures.label("[Popup 1]", 0)]))
         var machine = try EngineFixtures.spikeMachine()
         machine.stacks[0].slots[1].preset = 9
-        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         let fake = try XCTUnwrap(engine.fakeText)
         fake.missAll = true
         engine.send("popup 1 set \"Doors close in [Timer 1]\"")

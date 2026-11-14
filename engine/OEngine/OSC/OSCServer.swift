@@ -33,7 +33,12 @@ public final class OSCServer: @unchecked Sendable {
     public let requestedPort: UInt16
     public let targets: [OSCPeer]
     private let enqueue: @Sendable (CommandGroup) -> Void
-    private let parseOptions: ParseOptions
+    /// Spec 2 §2 — the ids an abbreviated hash expands against; Spec 8 §9 —
+    /// "the id set the OSC parser uses to expand abbreviated hashes" follows
+    /// the indexes after every build that changed them. Under `lock`.
+    private var parseOptions: ParseOptions
+    /// The library revision the media ids were last taken at; the control side's own.
+    private var mediaRevision = 0
     private let log: EngineLog
     private let now: @Sendable () -> MonotonicTime
     private var socket: Int32 = -1
@@ -69,6 +74,20 @@ public final class OSCServer: @unchecked Sendable {
         parseOptions = ParseOptions(mediaIDs: mediaIDs)
         self.log = log
         self.now = now
+    }
+
+    /// The parse options as the last build left them.
+    var currentParseOptions: ParseOptions {
+        lock.lock()
+        defer { lock.unlock() }
+        return parseOptions
+    }
+
+    /// Spec 8 §9 — the ids the indexes name now: entries and `replaced` keys.
+    public func updateMediaIDs(_ ids: Set<String>) {
+        lock.lock()
+        parseOptions.mediaIDs = ids
+        lock.unlock()
     }
 
     public var received: Int64 { receivedCount.load(ordering: .relaxed) }
@@ -161,7 +180,7 @@ public final class OSCServer: @unchecked Sendable {
                 handle(request, from: peer)
                 return
             }
-            switch OSCMapping.command(from: message, options: parseOptions) {
+            switch OSCMapping.command(from: message, options: currentParseOptions) {
             case .success(let command):
                 let group = CommandGroup(id: GroupID.random(), source: CommandSource(kind: .osc), commands: [command],
                                          client: Self.client(peer))
@@ -173,7 +192,7 @@ public final class OSCServer: @unchecked Sendable {
             }
         case .success(.bundle(let bundle)):
             // Spec 2 §6 — "Bundles run as one group, in order, and either all validate or none run."
-            switch OSCMapping.commands(from: bundle, options: parseOptions) {
+            switch OSCMapping.commands(from: bundle, options: currentParseOptions) {
             case .success(let commands):
                 // A bundle with nothing in it runs nothing.
                 guard !commands.isEmpty else { return }
@@ -241,6 +260,11 @@ public final class OSCServer: @unchecked Sendable {
     /// rejected (Spec 2 §8), naming the message's address, or `#bundle` for a
     /// bundle. Runs on the control side, after every build.
     public func afterBuild(_ control: ControlLoop, library: Library, machine: Machine) {
+        // Spec 8 §9 — every index change raises the revision (Spec 5 §2), so the ids follow it.
+        if control.revision != mediaRevision {
+            mediaRevision = control.revision
+            updateMediaIDs(MediaResolver.knownIds(library: library.mediaIndex, machine: machine.mediaLocal))
+        }
         let executed = control.lastExecuted
         var messages: [OSCMessage] = []
         if !executed.isEmpty {
@@ -342,7 +366,7 @@ public enum OSCFeedbackDeriver {
             for effect in entry.effects {
                 switch effect {
                 case .transition(let t):
-                    out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library)))
+                    out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library, machine: machine)))
                     out.append(OSCFeedback.channelState(t.channel, feedbackState(of: t.to)))
                 case .applied(let command):
                     switch command {
@@ -377,14 +401,16 @@ public enum OSCFeedbackDeriver {
     }
 
     /// Spec 2 §6 — `s:label`: the first line of text, the media item's name,
-    /// the slide's or input's id.
-    static func label(of content: ContentInstance, library: Library) -> String {
+    /// the slide's or input's id. The item is the one the ref resolves to, in
+    /// either index (Spec 8 §2); one whose file has no path is named by its id.
+    static func label(of content: ContentInstance, library: Library, machine: Machine?) -> String {
         switch content {
         case .empty: return ""
         case .text(let t): return String((t.fields["body"] ?? t.fields.values.sorted().first ?? "").split(separator: "\n").first ?? "")
         case .media(let m):
-            let path = library.mediaIndex.entry(m.ref)?.path ?? m.ref
-            return String(path.split(separator: "/").last ?? Substring(path))
+            let path = MediaResolver.resolve(m.ref, library: library, machine: machine)?.entry.path ?? ""
+            let name = path.isEmpty ? m.ref : path
+            return String(name.split(separator: "/").last ?? Substring(name))
         case .slide(let s): return s.ref
         case .input(let i): return "input \(i.input)"
         }

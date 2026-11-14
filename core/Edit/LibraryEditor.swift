@@ -22,12 +22,16 @@ public struct EditContext: Sendable {
     /// Spec 5 §6, check 8 — a held edit "is validated when its holder is
     /// saved": checked without lock and library mode, and never applied.
     var dryRun: Bool
+    /// Spec 8 §6 — the time a `media delete` applies, for the entry's
+    /// `deletedAt` (Spec 1 §5, an ISO date).
+    public var timestamp: String
 
-    public init(state: ShowState? = nil, today: String = "", restoring: Bool = false) {
+    public init(state: ShowState? = nil, today: String = "", restoring: Bool = false, timestamp: String = "") {
         self.state = state
         self.today = today
         self.restoring = restoring
         self.dryRun = false
+        self.timestamp = timestamp
     }
 }
 
@@ -206,7 +210,7 @@ struct Editor {
         case .slot: throw reject(.notInV1, "stack edits come with Area 14")
         case .key, .keys: throw reject(.notInV1, "key binding edits come with Area 17")
         case .machine: throw reject(.notInV1, "machine settings edits come with Area 17")
-        case .media: throw reject(.notInV1, "media edits come with Area 8")
+        case .media(let id): return try editMedia(id, edit.action)
         }
     }
 
@@ -237,7 +241,8 @@ struct Editor {
             case .macro: return number.map { library.macro($0) != nil || machine.macro($0) == nil } ?? true
             case .stack, .output, .audioOutput, .input: return false
             }
-        case .media(let id): return library.mediaIndex.entries.contains { $0.id == id }
+        // Spec 5 §3 — "whichever index tier holds the entry", the machine's first (Spec 1 §7).
+        case .media(let id): return MediaResolver.entry(for: id, library: library.mediaIndex, machine: machine.mediaLocal)?.tier == .library
         case .playlist, .item, .slot, .key, .keys, .machine: return false
         }
     }
@@ -315,10 +320,13 @@ struct Editor {
         throw reject(mapped, rejection.message)
     }
 
-    /// Spec 5 §6 — the command validator's reasons as the edit path's codes.
+    /// Spec 5 §6 — the command validator's reasons as the edit path's codes;
+    /// a held media command naming an id neither index holds is a broken
+    /// reference too (check 5, "Every media id resolves to an entry in either
+    /// index", Spec 8 §2).
     static func editCode(_ reason: RejectionReason) -> RejectionReason {
         switch reason {
-        case .noSuchTarget, .noSuchReference, .unknownMedia: return .unknownReference
+        case .noSuchTarget, .noSuchReference, .unknownMedia, .unknownObject: return .unknownReference
         case .macroCycle, .macroDepth: return .cycle
         default: return .badValue
         }

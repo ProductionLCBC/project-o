@@ -19,11 +19,50 @@ public final class EnginePublisher: @unchecked Sendable {
         var deliver: @Sendable (JSONValue) -> Void
     }
 
+    /// Spec 2 §9 — what answers one query: the request's fields in, the
+    /// answer's fields or the refusal out.
+    public typealias Answerer = @Sendable ([String: JSONValue]) -> Result<[String: JSONValue], Rejection>
+
     private let lock = NSLock()
     private var subscribers: [Int: Subscriber] = [:]
+    private var answerers: [String: Answerer] = [:]
     private var nextID = 0
 
     public init() {}
+
+    /// Spec 2 §9 — an area's answer to the query of this `what`.
+    public func answer(_ what: String, with answerer: @escaping Answerer) {
+        lock.lock()
+        answerers[what] = answerer
+        lock.unlock()
+    }
+
+    /// Spec 2 §9 — "A query is answered with its request's `id` as `{"id": …,
+    /// "type": "answer", …}` and the fields its definition gives, and refused
+    /// with the rejected result Spec 10 §3 shows": `{"id": …, "type":
+    /// "result", "result": "rejected", "reason": "code: message"}`.
+    public func query(_ request: JSONValue) -> JSONValue {
+        let members = request.objectValue ?? [:]
+        let id = members["id"] ?? .null
+        let what = members["what"]?.stringValue ?? ""
+        lock.lock()
+        let answerer = answerers[what]
+        lock.unlock()
+        guard let answerer else { return Self.rejected(id, Rejection(reason: .badValue, message: "there is no \(what) query")) }
+        switch answerer(members) {
+        case .success(var fields):
+            fields["id"] = id
+            fields["type"] = .string("answer")
+            return .object(fields)
+        case .failure(let rejection):
+            return Self.rejected(id, rejection)
+        }
+    }
+
+    static func rejected(_ id: JSONValue, _ rejection: Rejection) -> JSONValue {
+        .object(["id": id, "type": .string("result"), "result": .string("rejected"),
+                 "reason": .string("\(rejection.reason.rawValue): \(rejection.message)")])
+    }
 
     /// Spec 2 §9 — `subscribe` to one or more topics.
     @discardableResult

@@ -135,6 +135,10 @@ final class CommandTextTests: XCTestCase {
         row("system clearall", .systemClearAll),
         row("system preflight", .systemPreflight),
         row("system snapshot", .systemSnapshot),
+        // Spec 2 §3 as Spec 8 §2 corrected it — the media commands; MediaCommandTests has every form.
+    ]
+    + MediaCommandTests.forms.map { row($0.text, .media($0.command)) }
+    + [
         // Spec 5 §4 — the edit family; every verb has its rows in EditTextTests.
         row("edit channel 2 label \"Lyrics\"",
             .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics"))))),

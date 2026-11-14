@@ -39,12 +39,80 @@ public protocol SourceFactory: AnyObject, Sendable {
     func prefetch(_ request: SourceRequest)
     /// A prefetched source for the same media and in-point, if one is waiting.
     func adoptPrefetched(_ request: SourceRequest) -> (any ContentSource)?
+    /// Spec 8 §6 — the items whose files a prefetched reader holds open: "An
+    /// item on air is refused with `onAir` ... one whose file a channel has
+    /// open, for its content, an outgoing transition or a prefetched reader".
+    var prefetchedIDs: Set<String> { get }
 }
 
-/// Spec 4 §5 — "Poster frame ... 1 per pool item, loaded on demand. For offset
-/// boxes and thumbnails." `.none` when the item has no poster.
+public extension SourceFactory {
+    var prefetchedIDs: Set<String> { [] }
+}
+
+extension SourceRequest {
+    /// The item a prefetch key names: its id, before the `@` and in-point.
+    static func id(ofPrefetchKey key: String) -> String {
+        key.split(separator: "@", maxSplits: 1).first.map(String.init) ?? key
+    }
+}
+
+/// Spec 8 §9 — which poster: "The poster loader reads at the entry's
+/// location and caches by the poster's path ... reads an image as its own
+/// poster". A video's poster is the PNG its entry names, "relative to the
+/// same folder as its `path`" (Spec 8 §5); an image's is the image, at the
+/// location it resolves to, with its id, since another item's file can take
+/// that path.
+public struct PosterKey: Hashable, Sendable {
+    public var location: MediaLocation
+    public var id: String
+
+    public init(location: MediaLocation, id: String) {
+        self.location = location
+        self.id = id
+    }
+
+    /// The poster of an entry from the tier that holds it, at its resolved
+    /// location; nil for audio, slides, a video with no poster yet and an
+    /// image with no location.
+    public static func of(_ entry: MediaEntry, tier: MediaTier, location: MediaLocation?) -> PosterKey? {
+        switch entry.kind {
+        case .video:
+            guard let path = entry.poster, let poster = MediaLocation(MediaPosters.folder(of: tier), path) else { return nil }
+            return PosterKey(location: poster, id: entry.id)
+        case .image:
+            return location.map { PosterKey(location: $0, id: entry.id) }
+        case .audio, .audioSet, .slide, .template:
+            return nil
+        }
+    }
+
+    /// The poster of what a resolution reached.
+    public static func of(_ resolution: MediaResolution?) -> PosterKey? {
+        resolution.flatMap { of($0.entry, tier: $0.tier, location: $0.location) }
+    }
+}
+
+/// Spec 4 §5 — "Poster frame: BGRA8Unorm sRGB, Half the channel render
+/// size, 1 per pool item, loaded on demand. For offset boxes and thumbnails."
+/// `.none` while a poster isn't loaded, and when there is none.
 public protocol PosterProvider: AnyObject, Sendable {
-    func poster(for entry: MediaEntry) -> TextureHandle
+    /// Spec 4 §5 — the poster's texture if it is loaded; otherwise it is
+    /// asked for and `.none` comes back at once. The control thread's call:
+    /// it never waits on a file or a decoder (Spec 4 §3).
+    func poster(_ key: PosterKey) -> TextureHandle
+    /// Spec 4 §10 — the poster's texture, loaded now on the calling thread if
+    /// it must be: the thumbnail job's call, on its background queue, so a
+    /// thumbnail never draws without a poster that is there.
+    func load(_ key: PosterKey) -> TextureHandle
+    /// Spec 8 §5 — "The poster loader doesn't remember a poster it couldn't
+    /// find, and a change under `.posters/` makes it look again": what it
+    /// couldn't find is forgotten.
+    func postersChanged()
+}
+
+public extension PosterProvider {
+    func load(_ key: PosterKey) -> TextureHandle { poster(key) }
+    func postersChanged() {}
 }
 
 /// Spec 4 §8 — one cache entry as the plan builder sees it: the line textures

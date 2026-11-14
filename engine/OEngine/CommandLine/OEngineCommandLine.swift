@@ -69,7 +69,8 @@ public enum OEngineCommandLine {
     // MARK: - run and soak
 
     static func runEngine(_ args: Arguments, soak: Bool) throws -> Int32 {
-        let roots = try LoadedRoots.load(libraryRoot: try args.url("--library"), machineRoot: try args.url("--machine"))
+        // Spec 8 §2, choice M-8 — the engine reads media only where media may live on this Mac.
+        let roots = try LoadedRoots.load(libraryRoot: try args.url("--library"), machineRoot: try args.url("--machine"), places: .thisMac())
         for line in roots.issueLines { fail(line) }
         if roots.hasErrors {
             fail("the roots did not load cleanly; fix the issues above")

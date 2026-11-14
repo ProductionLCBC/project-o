@@ -49,7 +49,8 @@ final class DiskFixture {
         configure(&machine)
         let clock = MovableWallClock(wallClock)
         self.clock = clock
-        engine = try HeadlessEngine(library: roots.library, machine: machine, mediaRoot: EngineFixtures.mediaRoot,
+        // Spec 8 §9 — "every test that launches the engine on a fixture runs on a temporary copy", its media included.
+        engine = try HeadlessEngine(library: roots.library, machine: machine, media: roots.media,
                                     wallClock: { clock.now })
         engine.attachDocuments(roots)
         let events = self.events

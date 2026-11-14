@@ -95,6 +95,7 @@ public enum Loader {
         case .state:
             let state = try JSONCoding.decode(ShowState.self, from: body["state"] ?? .object([:]))
             return (.state(state), body.removing("state").objectValue ?? [:])
+        case .mediaCache: return (.mediaCache(try JSONCoding.decode(MediaCache.self, from: body)), [:])
         }
     }
 
@@ -234,7 +235,8 @@ public enum Loader {
         var report = ValidationReport()
         var playlists: [(playlist: Playlist, path: String)] = []
         for (path, data) in snapshot.files.sorted(by: { $0.key < $1.key }) {
-            if FileLayout.isIgnored(path: path) { continue }
+            // Spec 8 §4 — the media cache: "the loader leaves it alone".
+            if FileLayout.isIgnored(path: path) || path == DocumentKind.mediaCache.fixedPath { continue }
             guard let expected = FileLayout.expectedKind(forPath: path), expected.belongsToMachine else {
                 report.add(.info, .ignoredFile, file: path, subject: path, message: "not a machine document; ignored")
                 continue

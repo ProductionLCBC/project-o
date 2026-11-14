@@ -26,7 +26,7 @@ final class AdoptionTests: XCTestCase {
         var machine = try E.spikeMachine()
         library.presets.append(S.preset(9, "Adoption", boxes: boxes))
         machine.stacks[1].slots[0].preset = 9
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: E.mediaRoot, wallClock: { clock.now })
+        return try HeadlessEngine(library: library, machine: machine, media: E.media, wallClock: { clock.now })
     }
 
     func shown(_ engine: HeadlessEngine, _ raw: String, offset: Int = 0) -> String? {

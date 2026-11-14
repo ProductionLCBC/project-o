@@ -30,7 +30,7 @@ final class StillTextureLifetimeTests: XCTestCase {
     /// time; through the engine, repeated writes and clears must settle.
     func test_repeatedStillWritesDoNotAccumulateTextures() throws {
         let metal = try MetalHarness.backend()
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media, metal: metal)
         func cycle() {
             engine.send("channel 1 write media \(EngineFixtures.cross)")
             XCTAssertTrue(waitUntil(5) { engine.tick(); return engine.control.model.channels[1]?.live.media?.ready == true })
@@ -59,7 +59,7 @@ final class VariableRasterTests: XCTestCase {
     func test_timeBoxKeepsOneRasterAcrossMinutes() throws {
         let metal = try MetalHarness.backend()
         let clock = MovingClock()
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot,
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media,
                                         metal: metal, wallClock: { clock.now })
         let cache = try XCTUnwrap(engine.textCache)
         engine.tick(count: 3)

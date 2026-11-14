@@ -1,4 +1,4 @@
-// OCore — Spec 1 §7, the media index and resolver.
+// OCore — Spec 1 §7, the media index; Spec 8 §2 and §6, deletedAt and the machine replaced map.
 
 import Foundation
 
@@ -61,12 +61,17 @@ public struct MediaDefaults: Codable, Equatable, Sendable {
     }
 }
 
-/// Spec 1 §7 — an index entry: `id`, `path` ("Relative to the media root,
-/// forward slashes; updated when the file moves"), `kind`, `size`, `modified`
-/// ("For change detection without re-hashing"), `durationMs`, `fps`, `width`,
-/// `height`, `hasAudio`, `hasAlpha`, `codec`, `poster`, `defaults`, `addedAt`,
-/// `folder`; for audio sets, `tracks` ("the member ids in play order") and
-/// `crossfadeMs`.
+/// Spec 1 §7 — an index entry: `id`, `path` ("Relative to the media root, or
+/// to `machine/media/` for a machine-index entry; forward slashes; updated
+/// when the file moves, and empty once another file took its place or the
+/// item was deleted"), `kind`, `size`, `modified` ("For change detection
+/// without re-hashing"), `durationMs`, `fps`, `width`, `height`, `hasAudio`,
+/// `hasAlpha`, `codec`, `poster`, `defaults`, `addedAt`, `folder`,
+/// `deletedAt` ("Set when `media delete` trashed the file; the entry stays,
+/// so references show missing", Spec 8 §6); for audio sets, `tracks` ("the
+/// member ids in play order") and `crossfadeMs`. `deletedAt`, like `tracks`,
+/// is written only when it is set, so the indexes written before Spec 8 read
+/// and write back unchanged.
 public struct MediaEntry: Codable, Equatable, Sendable {
     public var id: String
     public var path: String
@@ -84,6 +89,7 @@ public struct MediaEntry: Codable, Equatable, Sendable {
     public var defaults: MediaDefaults
     public var addedAt: String?
     public var folder: String?
+    public var deletedAt: String?
     public var tracks: [String]?
     public var crossfadeMs: Int?
     public var extra: [String: JSONValue]
@@ -91,7 +97,8 @@ public struct MediaEntry: Codable, Equatable, Sendable {
     public init(id: String, path: String, kind: MediaKind, size: Int, modified: String? = nil, durationMs: Int? = nil,
                 fps: FrameRate? = nil, width: Int? = nil, height: Int? = nil, hasAudio: Bool = false, hasAlpha: Bool = false,
                 codec: String? = nil, poster: String? = nil, defaults: MediaDefaults = MediaDefaults(), addedAt: String? = nil,
-                folder: String? = nil, tracks: [String]? = nil, crossfadeMs: Int? = nil, extra: [String: JSONValue] = [:]) {
+                folder: String? = nil, deletedAt: String? = nil, tracks: [String]? = nil, crossfadeMs: Int? = nil,
+                extra: [String: JSONValue] = [:]) {
         self.id = id
         self.path = path
         self.kind = kind
@@ -108,6 +115,7 @@ public struct MediaEntry: Codable, Equatable, Sendable {
         self.defaults = defaults
         self.addedAt = addedAt
         self.folder = folder ?? MediaEntry.folder(of: path)
+        self.deletedAt = deletedAt
         self.tracks = tracks
         self.crossfadeMs = crossfadeMs
         self.extra = extra
@@ -119,9 +127,12 @@ public struct MediaEntry: Codable, Equatable, Sendable {
         return String(path[..<slash])
     }
 
+    /// Spec 8 §6 — "the entry stays, with `deletedAt` set and its `path` empty".
+    public var isDeleted: Bool { deletedAt != nil }
+
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case id, path, kind, size, modified, durationMs, fps, width, height, hasAudio, hasAlpha, codec, poster, defaults
-        case addedAt, folder, tracks, crossfadeMs
+        case addedAt, folder, deletedAt, tracks, crossfadeMs
     }
 
     public init(from decoder: Decoder) throws {
@@ -142,6 +153,7 @@ public struct MediaEntry: Codable, Equatable, Sendable {
         defaults = try c.value(.defaults, default: MediaDefaults())
         addedAt = try c.decodeIfPresent(String.self, forKey: .addedAt)
         folder = try c.decodeIfPresent(String.self, forKey: .folder)
+        deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
         tracks = try c.decodeIfPresent([String].self, forKey: .tracks)
         crossfadeMs = try c.decodeIfPresent(Int.self, forKey: .crossfadeMs)
         extra = try decoder.unknownKeys(besides: CodingKeys.known)
@@ -166,29 +178,67 @@ public struct MediaEntry: Codable, Equatable, Sendable {
         try c.encode(defaults, forKey: .defaults)
         try c.encodeNullable(addedAt, forKey: .addedAt)
         try c.encodeNullable(folder, forKey: .folder)
+        // Spec 8 §6 — only once `media delete` trashed the file.
+        try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
         // Spec 1 §7 — audio sets only.
         try c.encodeIfPresent(tracks, forKey: .tracks)
         try c.encodeIfPresent(crossfadeMs, forKey: .crossfadeMs)
     }
 }
 
+/// Entries are kept in id order (Spec 1 §7, "`entries` (in id order)"), so a
+/// lookup is a binary search: lookahead resolves media on every build.
+enum MediaEntries {
+    /// The position of `id`, or of the first entry after it.
+    static func lowerBound(_ id: String, in entries: [MediaEntry]) -> Int {
+        var low = 0
+        var high = entries.count
+        while low < high {
+            let mid = (low + high) / 2
+            if entries[mid].id < id { low = mid + 1 } else { high = mid }
+        }
+        return low
+    }
+
+    static func position(of id: String, in entries: [MediaEntry]) -> Int? {
+        let at = lowerBound(id, in: entries)
+        return at < entries.count && entries[at].id == id ? at : nil
+    }
+
+    static func isSorted(_ entries: [MediaEntry]) -> Bool {
+        zip(entries, entries.dropFirst()).allSatisfy { $0.id <= $1.id }
+    }
+
+    static func sorted(_ entries: [MediaEntry]) -> [MediaEntry] {
+        isSorted(entries) ? entries : entries.sorted { $0.id < $1.id }
+    }
+}
+
 /// Spec 1 §7 — the library index (`library/media-index.json`), "synced with
-/// the library, written only by machines in writable library mode", with the
-/// `replaced` map `replace media` records "so re-imports of the old file
-/// resolve to the new one". Entries are kept in id order.
+/// the library, written only by machines in writable library mode", holding
+/// `entries` (in id order) and "the `replaced` map that `media replace` and
+/// the walk record (Spec 8 §4 and §6)".
 public struct MediaIndex: Codable, Equatable, Sendable {
-    public var entries: [MediaEntry]
+    public var entries: [MediaEntry] {
+        didSet { if !MediaEntries.isSorted(entries) { entries.sort { $0.id < $1.id } } }
+    }
     public var replaced: [String: String]
     public var extra: [String: JSONValue]
 
     public init(entries: [MediaEntry] = [], replaced: [String: String] = [:], extra: [String: JSONValue] = [:]) {
-        self.entries = entries.sorted { $0.id < $1.id }
+        self.entries = MediaEntries.sorted(entries)
         self.replaced = replaced
         self.extra = extra
     }
 
+    /// Spec 1 §7 — the entry for `id` in this index, if it holds one.
     public func entry(_ id: String) -> MediaEntry? {
-        entries.first { $0.id == id }
+        MediaEntries.position(of: id, in: entries).map { entries[$0] }
+    }
+
+    /// The position of `id`'s entry, for an edit that changes it in place.
+    public func position(of id: String) -> Int? {
+        MediaEntries.position(of: id, in: entries)
     }
 
     /// Spec 1 §4 — "Identical files anywhere under the root resolve to one
@@ -196,29 +246,17 @@ public struct MediaIndex: Codable, Equatable, Sendable {
     /// whether it was new.
     @discardableResult
     public mutating func add(_ entry: MediaEntry) -> Bool {
-        guard self.entry(entry.id) == nil else { return false }
-        entries.append(entry)
-        entries.sort { $0.id < $1.id }
+        let at = MediaEntries.lowerBound(entry.id, in: entries)
+        guard at == entries.count || entries[at].id != entry.id else { return false }
+        entries.insert(entry, at: at)
         return true
-    }
-
-    /// Follows the `replaced` map, at most a few steps, so a replaced id
-    /// resolves to its replacement.
-    public func resolveReplaced(_ id: String) -> String {
-        var current = id
-        var steps = 0
-        while let next = replaced[current], next != current, steps < 8 {
-            current = next
-            steps += 1
-        }
-        return current
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable { case entries, replaced }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        entries = try c.value(.entries, default: [MediaEntry]()).sorted { $0.id < $1.id }
+        entries = MediaEntries.sorted(try c.value(.entries, default: [MediaEntry]()))
         replaced = try c.value(.replaced, default: [:])
         extra = try decoder.unknownKeys(besides: CodingKeys.known)
     }
@@ -226,92 +264,87 @@ public struct MediaIndex: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         try encoder.encode(unknownKeys: extra)
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(entries.sorted { $0.id < $1.id }, forKey: .entries)
+        try c.encode(MediaEntries.sorted(entries), forKey: .entries)
         try c.encode(replaced, forKey: .replaced)
     }
 }
 
 /// Spec 1 §7 — the machine index (`machine/media-local.json`) "for media that
-/// exists only on this machine plus any path overrides": `overrides` maps an
-/// id to a local path, so "the library index is never edited" when a campus
-/// relocates media.
+/// exists only on this machine plus any path overrides (that media lives in
+/// the machine's own folder, `machine/media/`, Spec 8 §2)": `entries`,
+/// `overrides` ("id to a path relative to `machine/media/`, or absolute") and
+/// "its own `replaced` map". The map is written only while it holds a
+/// mapping, so machine indexes written before Spec 8 read and write back
+/// unchanged.
 public struct MediaLocalIndex: Codable, Equatable, Sendable {
-    public var entries: [MediaEntry]
+    public var entries: [MediaEntry] {
+        didSet { if !MediaEntries.isSorted(entries) { entries.sort { $0.id < $1.id } } }
+    }
     public var overrides: [String: String]
+    public var replaced: [String: String]
     public var extra: [String: JSONValue]
 
-    public init(entries: [MediaEntry] = [], overrides: [String: String] = [:], extra: [String: JSONValue] = [:]) {
-        self.entries = entries.sorted { $0.id < $1.id }
+    public init(entries: [MediaEntry] = [], overrides: [String: String] = [:], replaced: [String: String] = [:],
+                extra: [String: JSONValue] = [:]) {
+        self.entries = MediaEntries.sorted(entries)
         self.overrides = overrides
+        self.replaced = replaced
         self.extra = extra
     }
 
+    /// Spec 1 §7 — the entry for `id` in this index, if it holds one.
     public func entry(_ id: String) -> MediaEntry? {
-        entries.first { $0.id == id }
+        MediaEntries.position(of: id, in: entries).map { entries[$0] }
     }
 
-    private enum CodingKeys: String, CodingKey, CaseIterable { case entries, overrides }
+    /// The position of `id`'s entry, for an edit that changes it in place.
+    public func position(of id: String) -> Int? {
+        MediaEntries.position(of: id, in: entries)
+    }
+
+    /// Spec 1 §4 — one entry per identity; returns whether it was new.
+    @discardableResult
+    public mutating func add(_ entry: MediaEntry) -> Bool {
+        let at = MediaEntries.lowerBound(entry.id, in: entries)
+        guard at == entries.count || entries[at].id != entry.id else { return false }
+        entries.insert(entry, at: at)
+        return true
+    }
+
+    private enum CodingKeys: String, CodingKey, CaseIterable { case entries, overrides, replaced }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        entries = try c.value(.entries, default: [MediaEntry]()).sorted { $0.id < $1.id }
+        entries = MediaEntries.sorted(try c.value(.entries, default: [MediaEntry]()))
         overrides = try c.value(.overrides, default: [:])
+        replaced = try c.value(.replaced, default: [:])
         extra = try decoder.unknownKeys(besides: CodingKeys.known)
     }
 
     public func encode(to encoder: Encoder) throws {
         try encoder.encode(unknownKeys: extra)
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(entries.sorted { $0.id < $1.id }, forKey: .entries)
+        try c.encode(MediaEntries.sorted(entries), forKey: .entries)
         try c.encode(overrides, forKey: .overrides)
+        if !replaced.isEmpty { try c.encode(replaced, forKey: .replaced) }
     }
 }
 
-/// Spec 1 §7 — what a lookup found: the entry, the path to use for it, and
-/// which tier answered.
-public struct ResolvedMedia: Equatable, Sendable {
-    public enum Tier: Equatable, Sendable { case machine, library }
-
-    public var entry: MediaEntry
-    public var path: String
-    public var tier: Tier
-
-    public init(entry: MediaEntry, path: String, tier: Tier) {
-        self.entry = entry
-        self.path = path
-        self.tier = tier
-    }
-}
-
-/// Spec 1 §7 — the resolver. "Lookup order. Resolve an id in the machine
-/// index first, then the library index... the machine index carries
-/// `overrides` from id to local path". A replaced id means its replacement
-/// before either index is consulted ("so re-imports of the old file resolve
-/// to the new one"). Missing state is computed from the file list, never
-/// stored.
-public enum MediaResolver {
-    public static func resolve(_ id: String, library: Library, machine: Machine?) -> ResolvedMedia? {
-        let candidate = library.mediaIndex.resolveReplaced(id)
-        if let entry = machine?.mediaLocal.entry(candidate) {
-            return ResolvedMedia(entry: entry, path: machine?.mediaLocal.overrides[candidate] ?? entry.path, tier: .machine)
-        }
-        if let entry = library.mediaIndex.entry(candidate) {
-            return ResolvedMedia(entry: entry, path: machine?.mediaLocal.overrides[candidate] ?? entry.path, tier: .library)
-        }
-        return nil
+/// Spec 5 §2 as Spec 8 §2 adds — the `library` event names "the media by
+/// id": what differs between two versions of an index.
+public enum MediaIndexDiff {
+    /// One changed item, as the event names it.
+    public static func change(_ id: String) -> LibraryChange {
+        LibraryChange(object: "media", address: ["media": .string(id)])
     }
 
-    /// Spec 1 §7 — "an id whose path no longer exists stays in the index, is
-    /// shown with a missing badge wherever it is referenced, and is listed by
-    /// pre-flight." The ids of every indexed entry whose resolved path is not
-    /// among the files that exist.
-    public static func missingIds(library: Library, machine: Machine?, existingPaths: Set<String>) -> Set<String> {
-        var missing: Set<String> = []
-        let ids = (machine?.mediaLocal.entries.map(\.id) ?? []) + library.mediaIndex.entries.map(\.id)
-        for id in ids {
-            guard let resolved = resolve(id, library: library, machine: machine) else { continue }
-            if !existingPaths.contains(resolved.path) { missing.insert(id) }
-        }
-        return missing
+    /// Each id whose entry or mapping differs, in id order.
+    public static func changes(_ oldEntries: [MediaEntry], _ oldReplaced: [String: String],
+                               _ newEntries: [MediaEntry], _ newReplaced: [String: String]) -> [LibraryChange] {
+        let old = Dictionary(oldEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let new = Dictionary(newEntries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var ids = Set(old.keys).union(new.keys).filter { old[$0] != new[$0] }
+        ids.formUnion(Set(oldReplaced.keys).union(newReplaced.keys).filter { oldReplaced[$0] != newReplaced[$0] })
+        return ids.sorted().map(change)
     }
 }

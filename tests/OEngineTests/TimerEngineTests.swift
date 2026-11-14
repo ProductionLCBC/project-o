@@ -20,7 +20,7 @@ final class TimerEngineTests: XCTestCase {
         var machine = try E.spikeMachine()
         library.presets.append(S.preset(9, "Timers", boxes: boxes))
         machine.stacks[1].slots[0].preset = 9
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: E.mediaRoot, wallClock: { clock.now })
+        return try HeadlessEngine(library: library, machine: machine, media: E.media, wallClock: { clock.now })
     }
 
     func shown(_ engine: HeadlessEngine, _ raw: String) -> String? {
@@ -198,7 +198,7 @@ final class TimerEngineTests: XCTestCase {
 /// source `engine` (Spec 2 §5), so replaying the log reproduces it."
 final class PopupClearTests: XCTestCase {
     func engine() throws -> HeadlessEngine {
-        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
     }
 
     func clears(_ engine: HeadlessEngine) -> [LogEntry] {
@@ -286,7 +286,7 @@ final class TimerFeedbackTests: XCTestCase {
     typealias E = EngineFixtures
 
     func engine() throws -> HeadlessEngine {
-        try HeadlessEngine(library: E.library(), machine: E.spikeMachine(), mediaRoot: E.mediaRoot)
+        try HeadlessEngine(library: E.library(), machine: E.spikeMachine(), media: E.media)
     }
 
     /// Spec 6 §8 — "It is sent once a second while the timer runs, and after

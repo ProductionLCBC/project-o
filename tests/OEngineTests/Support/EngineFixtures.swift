@@ -22,6 +22,10 @@ enum EngineFixtures {
     static var libraryRoot: URL { fixtureRoot.appendingPathComponent("library") }
     static var machineRoot: URL { fixtureRoot.appendingPathComponent("machine") }
     static var mediaRoot: URL { libraryRoot.appendingPathComponent("media") }
+    /// Spec 8 §2 — the machine's own media folder, `machine/media/`.
+    static var machineMediaRoot: URL { machineRoot.appendingPathComponent("media") }
+    /// Spec 8 §2 — the two folders the fixture's locations read against.
+    static var media: MediaFolders { MediaFolders(mediaRoot: mediaRoot, machineMedia: machineMediaRoot) }
 
     static func uuid(_ prefix: String, _ n: Int) -> UUID {
         let head = prefix.padding(toLength: 8, withPad: "0", startingAt: 0)

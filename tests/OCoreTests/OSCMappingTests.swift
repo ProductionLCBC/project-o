@@ -94,6 +94,15 @@ final class OSCMappingTests: XCTestCase {
         row(.systemClearAll, "/o/system/clearall"),
         row(.systemPreflight, "/o/system/preflight"),
         row(.systemSnapshot, "/o/system/snapshot"),
+        // Spec 2 §6 as Spec 8 §10 corrected it — "| `media rebuild` | `/o/media/rebuild` |", and the rest of the family typed.
+        row(.media(.importFile(path: "/Users/Shared/Staging/a.mov")), "/o/media/import", [s("/Users/Shared/Staging/a.mov")]),
+        row(.media(.rebuild), "/o/media/rebuild"),
+        row(.media(.replace(old: Self.dawn, new: F.cross, record: nil)), "/o/media/replace", [s(Self.dawn), s(F.cross)]),
+        row(.media(.delete(id: Self.dawn, files: nil)), "/o/media/delete", [s(Self.dawn)]),
+        row(.media(.undelete(id: Self.dawn, files: MediaCommandTests.files)), "/o/media/undelete",
+            [s(Self.dawn), s(MediaCommandTests.filesBody)]),
+        row(.media(.unreplace(old: Self.dawn, new: F.cross, record: MediaCommandTests.record)), "/o/media/unreplace",
+            [s(Self.dawn), s(F.cross), s(MediaCommandTests.recordBody)]),
         row(.edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             "/o/edit", [s("channel 2 label \"Lyrics\"")]),
     ]

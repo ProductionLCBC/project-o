@@ -12,7 +12,7 @@ final class OSCServerTests: XCTestCase {
     var client: UDPTestClient!
 
     override func setUpWithError() throws {
-        engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         let ids = Set(engine.engine.library.mediaIndex.entries.map(\.id))
         let enqueue: @Sendable (CommandGroup) -> Void = { [weak engine] group in engine?.send(group) }
         server = OSCServer(port: 0, targets: [], mediaIDs: ids, log: engine.log, enqueue: enqueue)

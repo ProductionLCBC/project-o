@@ -24,7 +24,7 @@ final class VariableBoxGateTests: XCTestCase {
         library.presets.append(Preset(number: 8, label: "Caption", uuid: EngineFixtures.uuid("c0de", 8), layouts: [.any: Layout(boxes: [box])]))
         var machine = try EngineFixtures.spikeMachine()
         machine.stacks[0].slots[1].preset = 8
-        return try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, wallClock: { clock.now })
+        return try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media, wallClock: { clock.now })
     }
 
     func captionBox(_ engine: HeadlessEngine) -> ResolvedBox? {
@@ -92,7 +92,7 @@ final class VariableBoxGateTests: XCTestCase {
         library.presets.append(dissolving)
         var machine = try EngineFixtures.spikeMachine()
         machine.stacks[1].slots[1].preset = 8
-        let engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot, wallClock: { clock.now })
+        let engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media, wallClock: { clock.now })
         func timeBox() -> ResolvedBox? {
             engine.lastPlan?.stackPasses.first { $0.stack == 2 }?.boxes.first { if case .static = $0.binding.kind { return true } else { return false } }
         }
@@ -254,7 +254,7 @@ final class PressureTests: XCTestCase {
     func test_theEngineOwnsBothMonitorsOverItsTextCache() throws {
         let metal = try MetalHarness.backend()
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
-                                        mediaRoot: EngineFixtures.mediaRoot, metal: metal)
+                                        media: EngineFixtures.media, metal: metal)
         engine.send("list 42 cue 1")
         engine.tick(count: 2)
         let cache = try XCTUnwrap(engine.textCache)

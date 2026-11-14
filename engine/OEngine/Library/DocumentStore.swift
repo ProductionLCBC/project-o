@@ -57,7 +57,7 @@ final class DocumentStore {
         self.reload = reload
         self.log = log
         self.wallMilliseconds = wallMilliseconds
-        var onDisk: Set<DocumentRef> = [.keys]
+        var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal]
         for list in library.lists where library.documentPaths[FileLayout.documentKey(list: list.uuid)] != nil { onDisk.insert(.list(list.uuid)) }
         for macro in library.macros where library.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.libraryMacro(macro.number)) }
         for macro in machine.macros where machine.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.machineMacro(macro.number)) }
@@ -212,6 +212,17 @@ final class DocumentStore {
         case .keys:
             let plan = Writer.save(.keys(machine.keys), extras: machine.documentExtras[.keys] ?? [:])
             issue(ref, .machine, plan.operations, path: FileLayout.path(for: .keys(machine.keys)), recorded: nil, wasOnDisk: true)
+        case .mediaIndex:
+            // Spec 1 §7 — the library index is "written only by machines in writable library mode".
+            guard machine.settings.libraryMode == .writable else {
+                log.error("the library media index changed on a readOnlyMasters machine; it is not written")
+                return
+            }
+            let plan = Writer.save(.mediaIndex(library.mediaIndex), extras: library.documentExtras[.mediaIndex] ?? [:])
+            issue(ref, .library, plan.operations, path: FileLayout.path(for: .mediaIndex(library.mediaIndex)), recorded: nil, wasOnDisk: true)
+        case .mediaLocal:
+            let plan = Writer.save(.mediaLocal(machine.mediaLocal), extras: machine.documentExtras[.mediaLocal] ?? [:])
+            issue(ref, .machine, plan.operations, path: FileLayout.path(for: .mediaLocal(machine.mediaLocal)), recorded: nil, wasOnDisk: true)
         }
     }
 
@@ -344,7 +355,7 @@ final class DocumentStore {
             if let recorded = revert.recorded, library.documentPaths["macro/\(number)"] == revert.planned { library.documentPaths["macro/\(number)"] = recorded }
         case .machineMacro(let number):
             if let recorded = revert.recorded, machine.documentPaths["macro/\(number)"] == revert.planned { machine.documentPaths["macro/\(number)"] = recorded }
-        case .localList, .keys:
+        case .localList, .keys, .mediaIndex, .mediaLocal:
             break
         }
     }

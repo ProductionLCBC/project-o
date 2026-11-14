@@ -331,6 +331,26 @@ struct CommandParser {
             guard peekWordLower() == word else { return }
             advance()
             object[arg.key] = .bool(true)
+        case .hash:
+            // Spec 2 §2 — "abbreviated to its first 12 hex characters in the
+            // command bar as in a ref", "expanded on parse".
+            guard let t = next() else { throw reject(.missingArgument, "\(arg.key) needs a media id, sha256: and the hex") }
+            guard case .word(let w) = t else { throw reject(.badArgument, "\(arg.key) must be a media id, not \(t.described)") }
+            object[arg.key] = .string(try mediaRef(w))
+        case .body(let keys, let optional):
+            // Spec 8 §2 — "The two inverses carry their recorded details as a JSON body".
+            guard case .json(let value)? = peek() else {
+                if optional { return }
+                throw reject(.missingArgument, "needs its recorded details as a JSON object of \(keys.joined(separator: ", "))")
+            }
+            advance()
+            guard case .object(let members) = value else { throw reject(.badArgument, "the recorded details must be a JSON object") }
+            for (key, member) in members.sorted(by: { $0.key < $1.key }) {
+                guard keys.contains(key) else {
+                    throw reject(.unexpectedToken, "\(key) is not one of the recorded details (\(keys.joined(separator: ", ")))")
+                }
+                object[key] = member
+            }
         case .write, .edit:
             break
         }

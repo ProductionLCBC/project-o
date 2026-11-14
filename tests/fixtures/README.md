@@ -21,16 +21,20 @@ uuid, §5), list 7 (*Doxology*, Thomas Ken, 1674; a timecode trigger, a missing 
 write, a macro call), and `media-index.json`.
 
 `library/media/` holds synthetic media only: `backgrounds/dawn.mp4` (64×36, eight frames of a
-colour wash, written by AVAssetWriter), `backgrounds/cross.png`, `local/cross-fast.png` (the same
-bytes at a second path: one identity, Spec 1 §4), `local/announcement.png` (local-only media,
-indexed in the machine root), a poster frame, and `slides/welcome.oslide` (the §7 envelope). The
-index also lists `backgrounds/mountains.mp4`, which does not exist: the missing state of §7.
+colour wash, written by AVAssetWriter), `backgrounds/cross.png`, dawn's poster frame at
+`.posters/<hex>-0.png` (Spec 8 §5: the frame at the default in-point, named by the hash and the
+in-point, beside its media), and `slides/welcome.oslide` (the §7 envelope). The index also lists
+`backgrounds/mountains.mp4`, whose video and poster (`.posters/<hex>-1500.png`, at its 1500 ms
+in-point) are both absent: the missing state of §7.
 
-`machine/` is the machine root: settings, stacks (Spec 6 §9's: Main holds channels 1 and 2,
+`machine/` is the machine root: settings (with Spec 8 §8's first-run `dropChannels`), stacks (Spec 6 §9's: Main holds channels 1 and 2,
 Confidence channels 2 and 3, neither with a default preset, so each slot takes its channel's
 preset: the confidence stack draws Preset 1's `"2"` layout for channel 2 and the Clock for channel
 3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
-entry, the machine index with a path override, the machine-level macro 2 (Preshow, which names a
+entry, the machine index with a path override, `media/` (the machine's own media folder, Spec 8 §2:
+`announcement.png`, local-only media indexed in the machine root, and `cross-fast.png`, the same
+bytes as `backgrounds/cross.png` and the target of cross's override: one identity, Spec 1 §4), the
+machine-level macro 2 (Preshow, which names a
 stack and an output), three playlists named from their titles (Spec 7 §8: "Sunday", dated, in
 `sunday.json`; "Sunday Night", which links list 42 twice, for the pointer tests; and "Sunday
 2026-11-01", the archived copy of "Sunday"), each item with the uuid Spec 7 §3's `KIND:KEY:N`
@@ -64,6 +68,14 @@ output), the two stacks of `library-v1/` and one audio output on the default dev
 roots are in canonical form and covered by the round-trip and schema tests like `library-v1/`, and
 the round-trip test checks that the shared documents still match. A bench machine that holds an
 older copy of these roots needs a fresh copy from here (Spec 6 §9 changed the stacks and presets).
+
+Run the spike through `scripts/soak.sh`, never with `oengine` on these roots in place. Since Area 8
+the engine walks the media at launch (Spec 8 §4), and an item is present only when its file holds
+its id (Spec 8 §2): the generated files' hashes aren't the index's fixed ids, so on the spike's
+`readOnlyMasters` machine every item would turn missing once the walk had hashed it. `soak.sh`
+runs on APFS clones of both roots, with `libraryMode` set to `writable` in the clone, where the
+launch walk lands each generated file on its fixed id as a re-export (Spec 8 §4, choice M-2): the
+cues keep playing it, with their defaults. The clones are removed when the run ends.
 
 `../soak/spike.json` is the Spec 4 §15 script: the list on repeat with `next` every five seconds,
 a stack switch and a blackout every ten minutes. Large soak media stays on the test bench.

@@ -33,7 +33,11 @@ public struct ProjectionContext: Sendable {
     public var rate: FrameRate
     public var library: Library
     public var machine: Machine
-    /// The set of media ids the resolver cannot find.
+    /// Spec 3 §6 — "`missing` (the set of media ids the resolver cannot
+    /// find)": as Spec 8 §2 works it out per location, every id the indexes
+    /// name whose resolution isn't present (`MediaResolver.missingIds`). The
+    /// fold checks the id a ref's chain reaches, through the roots as the
+    /// group's earlier commands left them (`media(_:)`).
     public var missing: Set<String>
     /// Spec 2's source record, for lock decisions.
     public var source: CommandSource
@@ -54,5 +58,20 @@ public struct ProjectionContext: Sendable {
         self.source = source
         self.variables = variables
         self.kept = kept
+    }
+
+    /// Spec 3 §4 and §6 as Spec 8 corrected them — a media or slide ref as the
+    /// fold reads it. `entry` is "the pool item the ref resolves to (Spec 8
+    /// §2)", in either index, whose defaults a write falls back to. `missing`
+    /// is Spec 3 §4's flag: the id the ref's chain reaches is in the caller's
+    /// `missing` set, or its entry is deleted (Spec 8 §6). Both follow the
+    /// roots as the group's earlier commands left them, so a `media replace`
+    /// or a defaults edit earlier in the group counts. A ref no index names
+    /// keeps the flag off: validation rejects it before it reaches the fold
+    /// (Spec 2 §8), and the engine draws it as missing.
+    public func media(_ ref: String) -> (entry: MediaEntry?, missing: Bool) {
+        let chain = MediaResolver.chain(from: ref, library: library.mediaIndex, machine: machine.mediaLocal)
+        let entry = MediaResolver.entry(for: chain.reached, library: library.mediaIndex, machine: machine.mediaLocal)?.entry
+        return (entry, missing.contains(chain.reached) || entry?.isDeleted == true)
     }
 }

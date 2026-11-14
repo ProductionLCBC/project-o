@@ -3,6 +3,7 @@
 
 import Foundation
 import OCore
+import OFormats
 import Synchronization
 
 /// The engine assembled from its parts. One `Engine` owns the control loop,
@@ -64,9 +65,10 @@ public final class Engine: @unchecked Sendable {
     /// Signalled by the control thread when it leaves its loop.
     private let controlDone = DispatchSemaphore(value: 0)
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, clock: any MasterClock,
+    public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, clock: any MasterClock,
                 fallbackClocks: [any MasterClock] = [], sinks: [any OutputSink], sourceFactory: any SourceFactory, posters: any PosterProvider,
-                text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, log: EngineLog = EngineLog(category: "engine")) throws {
+                text: any TextProvider, variables: VariableProvider, audio: AudioSystem? = nil, mediaCache: MediaCache = MediaCache(),
+                log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
         self.pacing = try Pacing(machine: machine)
         self.backend = backend
@@ -92,11 +94,41 @@ public final class Engine: @unchecked Sendable {
         audio?.onRecovery = { [watchdog] recovery in watchdog.recordRecovery(recovery) }
         pressure = MemoryPressureMonitor(caches: [text as? ShrinkableCache].compactMap { $0 }, log: log)
         thermal = ThermalMonitor(log: log)
-        control = ControlLoop(library: library, machine: machine, pacing: pacing, mediaRoot: mediaRoot, backend: backend,
+        control = ControlLoop(library: library, machine: machine, pacing: pacing, media: media, backend: backend,
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
-                              encodeKinds: byOutput.mapValues(\.encode), audio: audio, log: log)
+                              encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
+        answerMediaQueries()
+    }
+
+    /// Spec 8 §7 and Spec 10 §3 — the `mediaUse` and `media` queries,
+    /// answered from what the last build published (Adam's answer of
+    /// 2026-11-11, 4: Area 8 answers them through the engine's publisher,
+    /// Area 19 puts them on the API).
+    private func answerMediaQueries() {
+        let control = self.control
+        publisher.answer("mediaUse") { request in
+            guard let id = request["media"]?.stringValue else {
+                return .failure(Rejection(reason: .badValue, message: "mediaUse names its item as \"media\""))
+            }
+            let roots = control.publishedRoots
+            guard MediaResolver.knownIds(library: roots.library.mediaIndex, machine: roots.machine.mediaLocal).contains(id) else {
+                return .failure(Rejection(reason: .unknownObject, message: "\(id) isn't in either media index"))
+            }
+            return .success(MediaUse.of(id, library: roots.library, machine: roots.machine).fields)
+        }
+        publisher.answer("media") { _ in
+            let roots = control.publishedRoots
+            let published = control.publishedMedia
+            let folder = control.mediaWorker?.tilesFolder
+            let entries = MediaCatalog.entries(library: roots.library, machine: roots.machine, files: { published.files[$0] ?? .absent },
+                                               tile: { entry in
+                guard let name = MediaPosters.tileName(of: entry), published.tiles.contains(name), let folder else { return nil }
+                return folder.appendingPathComponent(name).path
+            })
+            return .success(["media": .array(entries)])
+        }
     }
 
     /// Spec 2 §8 — a group lands on the next tick boundary.
@@ -124,11 +156,15 @@ public final class Engine: @unchecked Sendable {
     func finishBuild() {
         afterBuild?(control)
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
+        // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
+        for event in control.lastMediaEvents { publisher.publish(event) }
         // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.
         for timer in control.lastTimerFeedback { publisher.publish(timer.event) }
-        if control.lastRootsChanged { thumbnails?.update(library: control.library, machine: control.machine) }
+        if control.lastRootsChanged || control.mediaFilesChanged || control.posterFilesChanged {
+            thumbnails?.update(library: control.library, machine: control.machine, missing: control.missing, posters: control.posterFiles)
+        }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
     }

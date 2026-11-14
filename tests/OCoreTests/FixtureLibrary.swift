@@ -77,18 +77,32 @@ enum FixtureLibrary {
         return (lib.library, mac.machine, report)
     }
 
-    /// The relative paths of every file under the media root, forward slashes.
-    static var existingMediaPaths: Set<String> {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: mediaRoot, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }
-        let prefix = mediaRoot.standardizedFileURL.path + "/"
-        var out: Set<String> = []
-        for case let url as URL in enumerator {
-            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
-            let path = url.standardizedFileURL.path
-            if path.hasPrefix(prefix) { out.insert(String(path.dropFirst(prefix.count))) }
+    /// Spec 8 §2 — the machine's own media folder, `machine/media/`.
+    static var machineMediaRoot: URL { machineRoot.appendingPathComponent("media") }
+
+    /// The file a location names in the fixture (Spec 8 §2).
+    static func url(for location: MediaLocation) -> URL {
+        switch location.folder {
+        case .mediaRoot: return mediaRoot.appendingPathComponent(location.path)
+        case .machineMedia: return machineMediaRoot.appendingPathComponent(location.path)
+        case .absolute: return URL(fileURLWithPath: location.path)
         }
-        return out
+    }
+
+    /// Spec 8 §2 — what is known of the fixture's file at a location before
+    /// any walk: a file is there and not hashed yet, or nothing is.
+    static func mediaState(_ location: MediaLocation) -> MediaFileState {
+        var isFolder: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: url(for: location).path, isDirectory: &isFolder)
+        return exists && !isFolder.boolValue ? .unhashed : .absent
+    }
+
+    /// Spec 8 §2 — the same, with each file's identity known: its bytes'
+    /// hash, or a slide's embedded uuid.
+    static func hashedMediaState(_ location: MediaLocation) -> MediaFileState {
+        guard case .unhashed = mediaState(location), let data = FileManager.default.contents(atPath: url(for: location).path),
+              let identity = MediaID.identity(of: data, path: location.path) else { return .absent }
+        return .holds(identity)
     }
 
     // MARK: - Fixed identities (tests/fixtures/README.md)

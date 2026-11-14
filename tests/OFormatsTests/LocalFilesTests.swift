@@ -221,14 +221,26 @@ final class LocalFilesTests: XCTestCase {
         let mediaRoot = Self.fixtureRoot.appendingPathComponent("library/media")
         XCTAssertEqual(try LocalFiles.hash(fileAt: mediaRoot.appendingPathComponent("backgrounds/dawn.mp4")),
                        "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527")
-        let existing = try LocalFiles.existingMediaPaths(mediaRoot: mediaRoot)
-        XCTAssertTrue(existing.contains("backgrounds/dawn.mp4"))
-        XCTAssertTrue(existing.contains("local/cross-fast.png"))
-        XCTAssertFalse(existing.contains("backgrounds/mountains.mp4"))
-
+        let machineRoot = Self.fixtureRoot.appendingPathComponent("machine")
         let library = Loader.library(from: try LocalFiles.snapshot(ofRoot: Self.fixtureRoot.appendingPathComponent("library"))).library
-        let machine = Loader.machine(from: try LocalFiles.snapshot(ofRoot: Self.fixtureRoot.appendingPathComponent("machine"))).machine
-        let report = Validator.validate(library: library, machine: machine, environment: ValidationEnvironment(existingMediaPaths: existing))
+        let machine = Loader.machine(from: try LocalFiles.snapshot(ofRoot: machineRoot)).machine
+        // Spec 8 §2 — a library entry reads against the media root, a machine
+        // entry and a relative override against `machine/media/`.
+        let folders = MediaFolders.of(machineRoot: machineRoot, settings: machine.settings)
+        XCTAssertEqual(folders.mediaRoot?.standardizedFileURL, mediaRoot.standardizedFileURL)
+        XCTAssertEqual(folders.machineMedia?.lastPathComponent, "media")
+        let states = LocalFiles.mediaStates(library: library, machine: machine, folders: folders)
+        XCTAssertEqual(states[MediaLocation(.mediaRoot, "backgrounds/dawn.mp4")!], .unhashed)
+        XCTAssertEqual(states[MediaLocation(.machineMedia, "cross-fast.png")!], .unhashed, "cross's override")
+        XCTAssertEqual(states[MediaLocation(.machineMedia, "announcement.png")!], .unhashed)
+        XCTAssertEqual(states[MediaLocation(.mediaRoot, "backgrounds/mountains.mp4")!], .absent)
+        XCTAssertNil(states[MediaLocation(.mediaRoot, "backgrounds/cross.png")!], "an overridden entry's own path isn't where it is read")
+        XCTAssertEqual(LocalFiles.missingMedia(library: library, machine: machine, folders: folders), ["sha256:" + String(repeating: "9f2c6a1b", count: 8)])
+        XCTAssertEqual(LocalFiles.missingMedia(library: library, machine: machine, folders: MediaFolders(mediaRoot: folders.mediaRoot)).count, 3,
+                       "without machine/media/, mountains, announcement and cross (by its override) are missing")
+
+        let report = Validator.validate(library: library, machine: machine,
+                                        environment: ValidationEnvironment(mediaState: { states[$0] ?? .absent }))
         XCTAssertEqual(report.issues.map(\.code), [.missingMedia])
         XCTAssertEqual(report.issues.first?.subject, "sha256:" + String(repeating: "9f2c6a1b", count: 8))
     }

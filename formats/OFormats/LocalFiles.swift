@@ -94,23 +94,6 @@ public enum LocalFiles {
         return snapshot
     }
 
-    /// Spec 1 §7 — the relative paths of every file under the media root, for
-    /// the missing state. Hidden files are not media.
-    public static func existingMediaPaths(mediaRoot: URL) throws -> Set<String> {
-        var paths: Set<String> = []
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: mediaRoot, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else {
-            return paths
-        }
-        let prefix = mediaRoot.standardizedFileURL.path + "/"
-        for case let url as URL in enumerator {
-            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
-            let path = url.standardizedFileURL.path
-            if path.hasPrefix(prefix) { paths.insert(String(path.dropFirst(prefix.count))) }
-        }
-        return paths
-    }
-
     /// Spec 1 §4 — the id of a file's bytes, streamed through OCore's SHA-256.
     public static func hash(fileAt url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)

@@ -101,7 +101,7 @@ final class FormatRoundTripTests: XCTestCase {
         XCTAssertEqual(machine.playlists.map(\.uuid), [F.sundayNightUuid, F.playlistUuid, F.archivedSundayUuid])
         XCTAssertEqual(machine.localLists.map(\.uuid), [F.localCopyUuid])
         XCTAssertEqual(machine.mediaLocal.entries.map(\.id), [F.announcement])
-        XCTAssertEqual(machine.mediaLocal.overrides, [F.cross: "local/cross-fast.png"])
+        XCTAssertEqual(machine.mediaLocal.overrides, [F.cross: "cross-fast.png"])
         XCTAssertEqual(machine.lastState?.channels.count, 2)
 
         let validation = Validator.validate(library: library, machine: machine)

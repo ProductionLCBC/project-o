@@ -13,7 +13,7 @@ final class PlanBuilderTests: XCTestCase {
     override func setUpWithError() throws {
         library = try EngineFixtures.library()
         machine = try EngineFixtures.spikeMachine()
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
     }
 
     // MARK: - Due passes (§2)
@@ -61,7 +61,7 @@ final class PlanBuilderTests: XCTestCase {
         // A 30p main output: its stack, and so channel 1, are due every second tick.
         machine = try EngineFixtures.spikeMachine()
         machine.outputs[0].format.rate = FrameRate(num: 30)
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         var channelPassesPerTick: [Int] = []
         var stackPassesPerTick: [[Int]] = []
@@ -111,7 +111,7 @@ final class PlanBuilderTests: XCTestCase {
 
         // A stack default outranks the channels' own: preset 3, the lower third, by its layout for stack 2.
         machine.stacks[1].defaultPreset = 3
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         engine.send("list 42 cue 1")
         engine.tick()
         confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
@@ -121,7 +121,7 @@ final class PlanBuilderTests: XCTestCase {
 
         // A slot's preset outranks the stack default: the clock's slot names the Clock again.
         machine.stacks[1].slots[1].preset = 2
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         engine.tick()
         confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
         XCTAssertEqual(confidence.boxes.filter { $0.channel == 3 }.map(\.binding), [.static(text: "[Time]")])
@@ -156,7 +156,7 @@ final class PlanBuilderTests: XCTestCase {
 
     func test_slotOpacityMultiplies() throws {
         machine.stacks[0].slots[1].opacity = 0.25
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         engine.send("channel 2 write text \"x\"")
         engine.tick()
         let main = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 1 })
@@ -185,7 +185,7 @@ final class PlanBuilderTests: XCTestCase {
         library.presets.append(Preset(number: 8, label: "Next picture", uuid: EngineFixtures.uuid("c0de", 8),
                                       layouts: [.any: Layout(boxes: [Box(binding: .pixels, fit: .pixels(.fit), offset: 1)])]))
         machine.stacks[1].slots.append(StackSlot(channel: 1, preset: 8))
-        engine = try HeadlessEngine(library: library, machine: machine, mediaRoot: EngineFixtures.mediaRoot)
+        engine = try HeadlessEngine(library: library, machine: machine, media: EngineFixtures.media)
         engine.send("playlist \"Sunday\"")
         engine.tick()
         let confidence = try XCTUnwrap(engine.lastPlan?.stackPasses.first { $0.stack == 2 })
@@ -433,5 +433,46 @@ final class PlanBuilderTests: XCTestCase {
         pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
         guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
         XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001, "and the dissolve starts now")
+    }
+
+    // MARK: - Posters that aren't loaded yet (Spec 8 §9)
+
+    /// Spec 8 §9 — the poster loader works off the control thread: a write
+    /// that lands before its poster is loaded holds the previous picture
+    /// until its first frame (Spec 4 §6, "with no poster, the previous
+    /// picture holds"), and doesn't swap to the poster when it loads midway.
+    func test_aColdWriteBeforeItsPosterLoadsHoldsThePreviousPicture() throws {
+        engine.fakeSources?.readyAfterTicks = 3
+        engine.send("channel 1 write media \(EngineFixtures.cross)")
+        engine.tick(count: 4)
+        let crossPass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        engine.fakePosters?.holdBack([EngineFixtures.dawn])
+        engine.send("channel 1 write media \(EngineFixtures.dawn) transition 2 1.0 once")
+        engine.tick()
+        var pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, crossPass.incoming.source, "the previous picture holds")
+        XCTAssertTrue(engine.fakePosters?.lookups.contains { $0.id == EngineFixtures.dawn } ?? false, "the poster was asked for")
+        engine.fakePosters?.arrive([EngineFixtures.dawn])
+        engine.tick()
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, crossPass.incoming.source, "still the previous picture: no swap to the poster midway")
+        engine.tick(count: 3)
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
+        XCTAssertNotNil(pass.transition, "and the dissolve runs from the previous picture")
+    }
+
+    /// Spec 8 §9 — "A stopped or not-yet-ready instance takes its poster once it loads".
+    func test_aStoppedInstanceTakesItsPosterOnceItLoads() throws {
+        engine.fakePosters?.holdBack([EngineFixtures.dawn])
+        engine.send("channel 1 write media \(EngineFixtures.dawn)")
+        engine.tick()
+        engine.send("channel 1 stop")
+        engine.tick()
+        XCTAssertNotEqual(engine.lastPlan?.channelPasses.first?.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.dawn)))
+        engine.fakePosters?.arrive([EngineFixtures.dawn])
+        engine.tick()
+        let pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.dawn)), "the poster shows once it loads")
     }
 }

@@ -5,6 +5,7 @@ import CoreGraphics
 import ImageIO
 import Metal
 import OCore
+import OFormats
 import Synchronization
 
 public enum StillError: Error {
@@ -98,51 +99,3 @@ public final class StillSource: ContentSource, @unchecked Sendable {
     }
 }
 
-/// Spec 4 §5 — "Poster frame: BGRA8Unorm sRGB ... 1 per pool item, loaded on
-/// demand. For offset boxes and thumbnails." Loaded with ImageIO into a
-/// premultiplied sRGB bitmap and uploaded as an sRGB-typed texture.
-public final class ImagePosterProvider: PosterProvider, @unchecked Sendable {
-    private let backend: MetalBackend
-    private let mediaRoot: URL
-    private let log: EngineLog?
-    private let lock = NSLock()
-    private var handles: [String: TextureHandle] = [:]
-
-    public init(backend: MetalBackend, mediaRoot: URL, log: EngineLog? = nil) {
-        self.backend = backend
-        self.mediaRoot = mediaRoot
-        self.log = log
-    }
-
-    public func poster(for entry: MediaEntry) -> TextureHandle {
-        guard let path = entry.poster else { return .none }
-        lock.lock()
-        defer { lock.unlock() }
-        if let handle = handles[entry.id] { return handle }
-        let handle = load(mediaRoot.appendingPathComponent(path), label: "poster " + entry.id.prefix(15))
-        handles[entry.id] = handle
-        return handle
-    }
-
-    func load(_ url: URL, label: String) -> TextureHandle {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            log?.warning("poster not readable: \(url.lastPathComponent)")
-            return .none
-        }
-        let width = image.width
-        let height = image.height
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        let drawn = bytes.withUnsafeMutableBytes { raw -> Bool in
-            let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-            guard let context = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                                          space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(), bitmapInfo: info.rawValue) else { return false }
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            return true
-        }
-        guard drawn else { return .none }
-        let handle = backend.makeTexture(TextureDescriptor(role: .poster, size: PixelSize(width: width, height: height), label: label))
-        backend.upload(bgra8: Data(bytes), bytesPerRow: width * 4, into: handle)
-        return handle
-    }
-}

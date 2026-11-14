@@ -2,6 +2,7 @@
 
 import Foundation
 import OCore
+import OFormats
 
 /// Spec 4 §14 — "the engine is constructed with its backend, its clock and its
 /// sinks injected, so tests can run it headless with a software clock and a
@@ -39,16 +40,18 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     /// The harness over the recording backend and the fakes: no GPU, no decoder.
-    public convenience init(library: Library, machine: Machine, mediaRoot: URL?, backend: RecordingBackend = RecordingBackend(),
-                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock) throws {
-        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, sourceFactory: FakeSourceFactory(),
-                      posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock)
+    public convenience init(library: Library, machine: Machine, media: MediaFolders, backend: RecordingBackend = RecordingBackend(),
+                            wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock,
+                            mediaCache: MediaCache = MediaCache()) throws {
+        try self.init(library: library, machine: machine, media: media, backend: backend, sourceFactory: FakeSourceFactory(),
+                      posters: FakePosterProvider(backend: backend), text: FakeTextProvider(backend: backend), wallClock: wallClock,
+                      mediaCache: mediaCache)
     }
 
     /// The harness over a Metal backend with the real sources, posters and
     /// text cache (rasterizing synchronously), so a tick renders for real and
     /// the capturing sinks read the pixels back.
-    public convenience init(library: Library, machine: Machine, mediaRoot: URL, metal: MetalBackend,
+    public convenience init(library: Library, machine: Machine, media: MediaFolders, metal: MetalBackend,
                             wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, thumbnailFolder: URL? = nil) throws {
         let log = EngineLog(category: "harness")
         // Spec 6 §4 — the bundled fonts, registered before the first raster as the engine process does.
@@ -57,15 +60,17 @@ public final class HeadlessEngine: @unchecked Sendable {
         // Spec 4 §11 — one graph per device: the software factory hands out a pullable
         // device per key; an `sdiEmbedded` output's feed has no card here and consumes silently.
         let factory = SoftwareAudioDeviceFactory()
-        let posters = ImagePosterProvider(backend: metal, mediaRoot: mediaRoot, log: log)
-        try self.init(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal,
+        // Spec 4 §5 — posters at half the largest channel render size; the harness loads them in the lookup itself.
+        let channels = library.channels.map { MachineGeometry(library: library, machine: machine).channelSize($0.number) }
+        let posters = ImagePosterProvider(backend: metal, media: media, fit: ImagePosterProvider.fit(channels: channels), synchronous: true, log: log)
+        try self.init(library: library, machine: machine, media: media, backend: metal,
                       sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: posters,
                       text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
                       audio: AudioSystem(outputs: machine.audioOutputs, factory: factory, log: log), wallClock: wallClock, log: log)
         audioFactory = factory
         // Spec 4 §10 — the thumbnail job over the same posters and variables, its cache in a folder of the test's choosing.
         let folder = thumbnailFolder ?? FileManager.default.temporaryDirectory.appendingPathComponent("oengine-thumbnails-\(UUID().uuidString)")
-        engine.thumbnails = try ThumbnailService(library: library, machine: machine, mediaRoot: mediaRoot, backend: metal, posters: posters,
+        engine.thumbnails = try ThumbnailService(library: library, machine: machine, media: media, backend: metal, posters: posters,
                                                  variables: variables, cacheFolder: folder, log: log)
         engine.audio?.start()
         for sink in sinks.values {
@@ -80,9 +85,10 @@ public final class HeadlessEngine: @unchecked Sendable {
         }
     }
 
-    public init(library: Library, machine: Machine, mediaRoot: URL?, backend: any RenderBackend, sourceFactory: any SourceFactory,
+    public init(library: Library, machine: Machine, media: MediaFolders, backend: any RenderBackend, sourceFactory: any SourceFactory,
                 posters: any PosterProvider, text: any TextProvider, audio: AudioSystem? = nil,
-                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, log: EngineLog = EngineLog(category: "harness")) throws {
+                wallClock: @escaping @Sendable () -> Date = HeadlessEngine.fixedWallClock, mediaCache: MediaCache = MediaCache(),
+                log: EngineLog = EngineLog(category: "harness")) throws {
         self.backend = backend
         self.sourceFactory = sourceFactory
         self.posters = posters
@@ -91,9 +97,9 @@ public final class HeadlessEngine: @unchecked Sendable {
         var sinks: [Int: CapturingSink] = [:]
         for output in machine.outputs { sinks[output.number] = CapturingSink(output: output.number) }
         self.sinks = sinks
-        engine = try Engine(library: library, machine: machine, mediaRoot: mediaRoot, backend: backend, clock: clock,
+        engine = try Engine(library: library, machine: machine, media: media, backend: backend, clock: clock,
                             sinks: sinks.values.map { $0 }, sourceFactory: sourceFactory, posters: posters, text: text,
-                            variables: variables, audio: audio, log: log)
+                            variables: variables, audio: audio, mediaCache: mediaCache, log: log)
         let backendRef = backend
         for sink in sinks.values {
             // Spec 4 §12 — a frame whose GPU work failed is never presented; the previous one holds.
@@ -119,7 +125,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// the library as it is now; `client` names the sender for typing (§5).
     @discardableResult
     public func send(_ text: String, source: SourceKind = .osc, client: String? = nil) -> Rejection? {
-        let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
+        let ids = MediaResolver.knownIds(library: engine.library.mediaIndex, machine: engine.machine.mediaLocal)
         switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
         case .success(let guarded):
             engine.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: source), commands: [guarded], client: client))
@@ -133,7 +139,7 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// Several commands in their text forms as one group (Spec 2 §8, Spec 5 §5).
     @discardableResult
     public func send(group texts: [String], source: SourceKind = .osc, client: String? = nil) -> Rejection? {
-        let ids = Set(engine.library.mediaIndex.entries.map(\.id) + engine.machine.mediaLocal.entries.map(\.id))
+        let ids = MediaResolver.knownIds(library: engine.library.mediaIndex, machine: engine.machine.mediaLocal)
         var commands: [GuardedCommand] = []
         for text in texts {
             switch CommandText.parse(text, options: ParseOptions(mediaIDs: ids, library: engine.library, machine: engine.machine)) {
@@ -172,6 +178,54 @@ public final class HeadlessEngine: @unchecked Sendable {
         tick()
     }
 
+    /// What the harness refuses.
+    public enum HarnessError: Error, Equatable {
+        /// Spec 8 §9 — a media worker on a fixture in the repository, which it would write.
+        case fixtureInPlace(String)
+    }
+
+    /// Spec 8 §2 — the media worker, which walks and imports, as the engine
+    /// process attaches it. Spec 8 §9 — "A launch on any fixture walks it and
+    /// writes tiles and the cache, and can write the machine index, so every
+    /// test that launches the engine on a fixture runs on a temporary copy":
+    /// the harness refuses media folders inside the repository's fixtures.
+    public func attachMediaWorker(machineRoot: URL, staging: URL? = nil, seams: MediaWorker.Seams) throws -> MediaWorker {
+        let folders = control.media
+        for folder in [folders.mediaRoot, folders.machineMedia, Optional(machineRoot)].compactMap({ $0 }) where
+            folder.standardizedFileURL.path.contains("/tests/fixtures/") {
+            throw HarnessError.fixtureInPlace(folder.path)
+        }
+        let worker = MediaWorker(folders: folders, machineRoot: machineRoot, staging: staging, seams: seams, log: log)
+        control.attachMedia(worker)
+        return worker
+    }
+
+    /// Spec 8 §4 — what the watcher does when a media folder changes: a walk,
+    /// then the ticks that apply what it found.
+    public func walkMedia() {
+        guard let worker = control.mediaWorker else { return }
+        worker.requestWalk()
+        settleMedia()
+    }
+
+    /// A tick runs what is queued (a `media import` starts its job, a `media
+    /// rebuild` its walk); the worker does everything asked; the next tick
+    /// takes in what it reported, which can ask for more (a walk's new video
+    /// asks for its poster, Spec 8 §5); and so on until the worker has
+    /// nothing left to report; then the worker writes the cache it was
+    /// handed, and the writer's queue the indexes.
+    public func settleMedia() {
+        tick()
+        control.mediaWorker?.waitUntilIdle()
+        var rounds = 0
+        repeat {
+            tick()
+            control.mediaWorker?.waitUntilIdle()
+            rounds += 1
+        } while control.mediaWorker?.hasReports == true && rounds < 8
+        waitForWrites()
+    }
+
     /// One master tick.
     public func tick() {
         clock.advance()
@@ -203,9 +257,10 @@ public final class HeadlessEngine: @unchecked Sendable {
         return records
     }
 
+    /// The poster a media ref shows, as the control thread looks it up.
     public func posterHandle(for ref: String) -> TextureHandle {
-        guard let entry = MediaResolver.resolve(ref, library: engine.library, machine: engine.machine)?.entry else { return .none }
-        return posters.poster(for: entry)
+        guard let key = PosterKey.of(MediaResolver.resolve(ref, library: engine.library, machine: engine.machine)) else { return .none }
+        return posters.poster(key)
     }
 
     public func sources(onChannel channel: Int) -> [InstanceHandle] {

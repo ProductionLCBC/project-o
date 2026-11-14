@@ -64,33 +64,6 @@ public enum Identity {
         return .renumbered
     }
 
-    /// Spec 1 §7 — "A `replace media` command rewrites every reference from
-    /// one id to another across lists, macros and presets, and records the
-    /// mapping in the index so re-imports of the old file resolve to the new
-    /// one." Returns how many references were rewritten.
-    @discardableResult
-    public static func replaceMedia(from old: String, with new: String, library: inout Library, machine: inout Machine) -> Int {
-        var count = 0
-        func rewrite(_ entries: inout [GuardedCommand]) {
-            for i in entries.indices {
-                let before = entries[i].command
-                entries[i].command = before.mapMediaRefs { $0 == old ? new : $0 }
-                if entries[i].command != before { count += 1 }
-            }
-        }
-        for l in library.lists.indices { for c in library.lists[l].cues.indices { rewrite(&library.lists[l].cues[c].commands) } }
-        for l in machine.localLists.indices { for c in machine.localLists[l].cues.indices { rewrite(&machine.localLists[l].cues[c].commands) } }
-        for m in library.macros.indices { rewrite(&library.macros[m].commands) }
-        for m in machine.macros.indices { rewrite(&machine.macros[m].commands) }
-        for k in machine.keys.indices {
-            let before = machine.keys[k].command
-            machine.keys[k].command = before.mapMediaRefs { $0 == old ? new : $0 }
-            if machine.keys[k].command != before { count += 1 }
-        }
-        library.mediaIndex.replaced[old] = new
-        return count
-    }
-
     // MARK: - Implementation
 
     static func exists(_ type: NumberedType, _ number: Int, _ library: Library, _ machine: Machine) -> Bool {

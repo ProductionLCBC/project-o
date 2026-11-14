@@ -147,15 +147,60 @@ final class ValidationReportTests: XCTestCase {
         XCTAssertTrue(issue?.message.contains(ghost) == true)
     }
 
-    /// Spec 1 §7 — "Missing state is computed, never stored": with the file
-    /// list in hand, an indexed id whose file is absent is listed once.
+    /// Spec 1 §7 — "Missing state is computed, never stored": with what is
+    /// known of each location in hand (Spec 8 §2), an indexed id whose file
+    /// is absent is listed once.
     func test_anIndexedIdWhoseFileIsAbsentIsListedByPreflight() {
         let (library, machine) = fresh()
-        let environment = ValidationEnvironment(existingMediaPaths: F.existingMediaPaths)
+        let environment = ValidationEnvironment(mediaState: { F.mediaState($0) })
         let issue = only(.missingMedia, in: report(library, machine, environment: environment))
         XCTAssertEqual(issue?.subject, F.mountains)
         XCTAssertTrue(issue?.message.contains("backgrounds/mountains.mp4") == true)
-        XCTAssertEqual(MediaResolver.missingIds(library: library, machine: machine, existingPaths: F.existingMediaPaths), [F.mountains])
+        XCTAssertEqual(MediaResolver.missingIds(library: library, machine: machine, state: { F.mediaState($0) }), [F.mountains])
+        XCTAssertEqual(MediaResolver.missingIds(library: library, machine: machine, state: { F.hashedMediaState($0) }), [F.mountains],
+                       "hashed, every other fixture file holds its id's bytes, the override's copy of cross included")
+    }
+
+    /// Spec 8 §11, the walk — "a hand-made loop in the map stops and is
+    /// reported"; Spec 8 §2 — "the reference report names the loop", once.
+    func test_aLoopInTheReplacedMapsIsReportedOnce() {
+        var (library, machine) = fresh()
+        library.mediaIndex.replaced = [F.dawn: F.cross]
+        machine.mediaLocal.replaced = [F.cross: F.dawn]
+        let issue = only(.mediaLoop, in: report(library, machine))
+        XCTAssertEqual(issue?.subject, min(F.dawn, F.cross))
+    }
+
+    /// Spec 8 §9 — "The reference report names a deleted item only while
+    /// something references it."
+    func test_aDeletedItemIsReportedOnlyWhileReferenced() throws {
+        var (library, machine) = fresh()
+        let at = try XCTUnwrap(machine.mediaLocal.position(of: F.announcement))
+        machine.mediaLocal.entries[at].deletedAt = "2026-11-11T09:00:00Z"
+        machine.mediaLocal.entries[at].path = ""
+        let environment = ValidationEnvironment(mediaState: { F.mediaState($0) })
+        XCTAssertEqual(report(library, machine, environment: environment).issues.map(\.code), [.missingMedia],
+                       "mountains' absent file alone: a deleted item nothing names isn't reported")
+        library.lists[1].cues[1].commands.append(GuardedCommand(.channelWrite(ChannelWrite(channel: .number(1), content: .media(MediaContent(ref: F.announcement))))))
+        let issues = report(library, machine, environment: environment).issues.filter { $0.code == .deletedMedia }
+        XCTAssertEqual(issues.map(\.subject), [F.announcement])
+        XCTAssertTrue(issues.first?.message.contains("list 42 cue 2") == true)
+    }
+
+    /// Spec 8 §2 — "the reference report lists an override that points
+    /// elsewhere", and a media root where media may not live; a path that
+    /// would leave its folder is named too.
+    func test_placesMediaMayNotLiveAreReported() {
+        var (library, machine) = fresh()
+        machine.mediaLocal.overrides[F.dawn] = "/Users/av/Downloads/dawn.mp4"
+        let at = library.mediaIndex.position(of: F.mountains) ?? 0
+        library.mediaIndex.entries[at].path = "../outside/mountains.mp4"
+        let places = MediaPlaces(home: "/Users/av", isOnStartupVolume: { _ in true })
+        let environment = ValidationEnvironment(mediaPlaces: places, mediaRootPath: "/Volumes/Media/library/media")
+        let issues = report(library, machine, environment: environment).issues.filter { $0.code == .mediaPlace }
+        XCTAssertEqual(Set(issues.map(\.subject)), [F.dawn, F.mountains, "the media root"])
+        XCTAssertTrue(issues.contains { $0.subject == F.dawn && $0.message.contains("Downloads") })
+        XCTAssertTrue(issues.contains { $0.subject == "the media root" && $0.message.contains("startup volume") })
     }
 
     /// Spec 1 §8 (corrected by Spec 6 §10) — "fonts neither installed nor

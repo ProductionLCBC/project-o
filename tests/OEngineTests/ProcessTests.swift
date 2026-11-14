@@ -74,7 +74,7 @@ final class ProcessTests: XCTestCase {
     /// cycle of the six lists, no rejection, the confidence +1 slot right.
     func test_scenarioPlaysThroughTheHeadlessEngine() throws {
         let roots = try Self.roots()
-        let engine = try HeadlessEngine(library: roots.library, machine: roots.machine, mediaRoot: roots.mediaRoot)
+        let engine = try HeadlessEngine(library: roots.library, machine: roots.machine, media: roots.media)
         let scenario = try SoakScenario.load(Self.scenarioURL)
         let ticksPerMs = 60.0 / 1000
         var ticksDone = 0

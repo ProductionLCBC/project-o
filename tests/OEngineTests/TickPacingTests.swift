@@ -13,7 +13,7 @@ final class TickPacingTests: XCTestCase {
 
     override func setUpWithError() throws {
         engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.pacingMachine(),
-                                    mediaRoot: EngineFixtures.mediaRoot)
+                                    media: EngineFixtures.media)
         backend = try XCTUnwrap(engine.recording)
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.send("channel 2 write text \"x\"")

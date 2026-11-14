@@ -56,6 +56,13 @@ public final class MediaSourceFactory: SourceFactory, @unchecked Sendable {
         return prefetched.removeValue(forKey: request.prefetchKey)
     }
 
+    /// Spec 8 §6 — the items a prefetched reader holds open.
+    public var prefetchedIDs: Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        return Set(prefetched.keys.map(SourceRequest.id(ofPrefetchKey:)))
+    }
+
     /// Prefetched sources nobody adopted: released, so decoders do not pile up.
     public func dropPrefetched(except keep: Set<String>) {
         lock.lock()

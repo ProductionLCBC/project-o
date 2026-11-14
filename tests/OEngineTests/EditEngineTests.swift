@@ -39,7 +39,7 @@ final class EditEngineTests: XCTestCase {
         var machine = try E.spikeMachine()
         machine.settings.libraryMode = .writable
         configure(&machine)
-        engine = try HeadlessEngine(library: library ?? E.library(), machine: machine, mediaRoot: E.mediaRoot)
+        engine = try HeadlessEngine(library: library ?? E.library(), machine: machine, media: E.media)
         events = EventRecorder()
         let events = self.events
         engine.engine.publisher.subscribe(["library"]) { events.record($0) }
@@ -263,7 +263,7 @@ final class EditEngineTests: XCTestCase {
         machine.settings.libraryMode = .writable
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-thumbnails-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
-        let harness = try HeadlessEngine(library: E.library(), machine: machine, mediaRoot: E.mediaRoot, metal: metal, thumbnailFolder: folder)
+        let harness = try HeadlessEngine(library: E.library(), machine: machine, media: E.media, metal: metal, thumbnailFolder: folder)
         harness.send("edit list 42 title \"Faithfulness\"", source: .osc)
         harness.tick()
         XCTAssertEqual(harness.engine.thumbnails?.library.list(number: 42)?.title, "Faithfulness")

@@ -56,7 +56,7 @@ final class WatchdogTests: XCTestCase {
 
     func test_headlessEngineReportsItsLiveness() throws {
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(),
-                                        mediaRoot: EngineFixtures.mediaRoot)
+                                        media: EngineFixtures.media)
         engine.tick(count: 3)
         let reading = engine.livenessReading()
         XCTAssertEqual(reading.lastPlanConsumed, engine.clock.now())

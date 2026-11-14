@@ -17,7 +17,7 @@ final class PresentLatencyTests: XCTestCase {
     /// every completed frame carries its tick's reference time; the capturing
     /// sink's latency is the present time minus it.
     func test_completedFramesCarryTheirTicksReferenceAndTheCapturingSinkMeasuresFromIt() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         engine.tick(count: 3)
         let sink = try XCTUnwrap(engine.sinks[1])
         let newest = try XCTUnwrap(sink.ring.newest)
@@ -143,7 +143,7 @@ final class MetricsSnapshotTests: XCTestCase {
 
     /// The answer over the socket, through the server's query handler.
     func test_theQueryReachesAClientOverUDP() throws {
-        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), mediaRoot: EngineFixtures.mediaRoot)
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
         let server = OSCServer(port: 0, targets: [], mediaIDs: [], log: engine.log) { _ in }
         try server.start()
         defer { server.stop() }
