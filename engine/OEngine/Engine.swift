@@ -42,7 +42,18 @@ public final class Engine: @unchecked Sendable {
     private let controlSignal = DispatchSemaphore(value: 0)
     private let nextFrameToBuild = Atomic<Int64>(0)
     private let running = Atomic<Bool>(false)
+    private let stopped = Atomic<Bool>(false)
     public private(set) var recoveries: Int64 = 0
+    /// Spec 9 §2 — "Runs ... The engine's `start` note opens each run with
+    /// the run's uuid, so a run and a `seq` name one line, whichever day's
+    /// file it is in": this run's.
+    public let run = UUID()
+    /// Spec 9 §2 — the command log and the engine log on disk, once the
+    /// engine has gone through its launch (`launch(_:)`); nil for an engine
+    /// built in memory, whose lines stay in `control.commandLog` and `log`.
+    public internal(set) var logs: LogWriter?
+    /// Spec 9 §2 — "each file is synced once a second": the threaded engine's pulse.
+    private var logTimer: DispatchSourceTimer?
 
     /// Spec 4 §11 — the audio system, one mix graph per device; nil runs silent.
     public let audio: AudioSystem?
@@ -99,7 +110,41 @@ public final class Engine: @unchecked Sendable {
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
+        // Spec 4 §2 — "the wall clock is read only to stamp log lines": the engine's own, so its log's lines and
+        // the command log's are stamped by one clock.
+        log.setClock { variables.now() }
         answerMediaQueries()
+        takeNotes()
+    }
+
+    /// Spec 9 §2 — the `note` request: "A client sends `{ "id": 31, "type":
+    /// "note", "note": { … }, "text": "…" }`; the engine stamps `ts`, `seq`
+    /// and the client's source, writes the line, and answers `ok` with the
+    /// `seq`." An oversized note is refused with `badValue`; past ten a
+    /// second from one client it "is answered `noop` and not written". Through
+    /// the engine's own publisher until the API carries it (Area 19).
+    private func takeNotes() {
+        let control = self.control
+        let clock = self.clock
+        publisher.handle("note") { request, source, client in
+            guard case .object(let note)? = request["note"], let text = request["text"]?.stringValue else {
+                return .failure(Rejection(reason: .badValue, message: "a note carries its note as an object and its text as a string"))
+            }
+            switch control.commandLog.clientNote(note, text: text, source: source, client: client, now: clock.now().nanoseconds,
+                                                 ts: control.variables.timestamp()) {
+            case .written(let seq): return .success((result: "ok", fields: ["seq": .number(Double(seq))]))
+            case .capped: return .success((result: "noop", fields: [:]))
+            case .refused(let rejection): return .failure(rejection)
+            }
+        }
+    }
+
+    /// Spec 9 §2 — "a copy of each minute record (Spec 4 §13)" in the engine
+    /// log, as the black box's recorder writes each one.
+    public func recordMinute(_ record: MinuteRecord) {
+        guard let logs else { return }
+        let fields = (try? JSONValue.parse(BlackBox.line(for: record)))?.objectValue ?? [:]
+        logs.engine(LogWriter.EngineRecord(at: control.variables.now(), kind: "minute", fields: fields))
     }
 
     /// Spec 8 §7 and Spec 10 §3 — the `mediaUse` and `media` queries,
@@ -147,6 +192,8 @@ public final class Engine: @unchecked Sendable {
             finishBuild()
         }
         render.tick(time)
+        // Spec 9 §2 — "each file is synced once a second", on the harness's engine time.
+        logs?.pulse(now: time.reference)
     }
 
     /// The control side's work once a plan is published: OSC's feedback and
@@ -274,9 +321,18 @@ public final class Engine: @unchecked Sendable {
                 (sink as? DisplaySink)?.presents ?? (sink as? DeckLinkSink)?.presents ?? (sink as? CapturingSink)?.presents
             }
             let recorder = BlackBoxRecorder(box: blackBox, ticks: metrics, presents: presentRings, tickNanoseconds: pacing.tickNanoseconds,
-                                            sources: minuteSources, log: log)
+                                            sources: minuteSources, log: log, onMinute: { [weak self] record, _ in self?.recordMinute(record) })
             self.recorder = recorder
             recorder.start()
+        }
+
+        // Spec 9 §2 — "each file is synced once a second", whatever the control thread is doing.
+        if let logs {
+            let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+            timer.schedule(deadline: .now() + .milliseconds(250), repeating: .milliseconds(250))
+            timer.setEventHandler { logs.pulse(now: MonotonicClock.now()) }
+            timer.resume()
+            logTimer = timer
         }
 
         if let metal = backend as? MetalBackend {
@@ -303,25 +359,62 @@ public final class Engine: @unchecked Sendable {
         log.info("engine started: master \(clock.name) at \(pacing.masterRate.num)/\(pacing.masterRate.den), outputs \(sinks.keys.sorted())")
     }
 
-    public func stop() {
-        guard running.exchange(false, ordering: .acquiringAndReleasing) else { return }
-        scheduler?.stop()
-        controlSignal.signal()
-        // Spec 9 §4 — with the control thread out of its loop, every unwritten edit is written.
-        if controlThread != nil, controlDone.wait(timeout: .now() + 2) == .success {
-            control.flushDocuments(now: clock.now())
+    /// Spec 9 §4 and §7 — what a stop on request leaves: the documents the
+    /// engine "still can't write", each by its root and its path in it, which
+    /// "are named in its answer to the request that stopped it".
+    public struct StopReport: Equatable, Sendable {
+        public var unsaved: [String]
+
+        public init(unsaved: [String] = []) {
+            self.unsaved = unsaved
         }
-        watchdog.stop()
-        pressure.stop()
-        thermal.stop()
-        recorder?.stop()
-        audio?.stop()
-        // Spec 5 §5 — an open typing run writes its line before the engine stops.
-        control.commandLog.flush()
-        for sink in sinks.values { sink.stop() }
-        controlThread = nil
-        readbackThread = nil
+    }
+
+    /// Spec 9 §4 — "When the engine stops on request, such as the app's quit
+    /// or the Mac shutting down": the control thread leaves its loop, every
+    /// unwritten edit is written (one more try, §7), open typing runs write
+    /// their lines, the `stop` note names what couldn't be written (§2), and
+    /// the logs are synced. The threads and sinks then stop. The request that
+    /// stops the engine (Area 19's `stop`) and a terminate signal both come
+    /// here; a kill never does. Once: a second call does nothing.
+    @discardableResult
+    public func stop() -> StopReport {
+        guard !stopped.exchange(true, ordering: .acquiringAndReleasing) else { return StopReport() }
+        let threaded = running.exchange(false, ordering: .acquiringAndReleasing)
+        var quiet = true
+        if threaded {
+            scheduler?.stop()
+            controlSignal.signal()
+            quiet = controlThread == nil || controlDone.wait(timeout: .now() + 2) == .success
+        }
+        var report = StopReport()
+        // With the control thread out of its loop, its state is this thread's to use.
+        if quiet {
+            control.flushDocuments(now: clock.now())
+            // Spec 5 §5 — an open typing run writes its line before the engine stops.
+            control.commandLog.flush()
+            report.unsaved = control.unsavedDocuments
+            control.note("stop", ["unsaved": .array(report.unsaved.map(JSONValue.string))],
+                         text: report.unsaved.isEmpty ? "Engine stopped" : "Engine stopped with \(report.unsaved.count) document(s) unwritten")
+        } else {
+            log.error("the control thread did not stop in time: the last edits and the stop note are not written")
+        }
+        if threaded {
+            watchdog.stop()
+            pressure.stop()
+            thermal.stop()
+            recorder?.stop()
+            audio?.stop()
+            for sink in sinks.values { sink.stop() }
+            controlThread = nil
+            readbackThread = nil
+        }
+        logTimer?.cancel()
+        logTimer = nil
+        for path in report.unsaved { log.error("not written when the engine stopped: \(path)") }
         log.info("engine stopped")
+        logs?.flush()
+        return report
     }
 
     public var isRunning: Bool { running.load(ordering: .relaxed) }

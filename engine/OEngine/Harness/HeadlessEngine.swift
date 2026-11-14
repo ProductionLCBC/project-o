@@ -158,10 +158,30 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     /// Spec 5 §2 — write edits to the roots on disk the library and machine
-    /// were loaded from (`LoadedRoots`), as the engine process does.
-    public func attachDocuments(_ roots: LoadedRoots) {
+    /// were loaded from (`LoadedRoots`), as the engine process does. Spec 9
+    /// §8 — through `disk`, the seam a test fills or fails.
+    public func attachDocuments(_ roots: LoadedRoots, disk: Disk = .live) {
         control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
-                                librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+                                librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot, disk: disk)
+    }
+
+    /// Spec 9 §4 — the launch order on roots on disk, as the engine process
+    /// goes through it; the harness of a test that doesn't launch skips it.
+    @discardableResult
+    public func launch(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live) -> LaunchReport {
+        engine.launch(LaunchOptions(machineRoot: machineRoot, relaunch: relaunch, disk: disk))
+    }
+
+    /// Spec 9 §4 — the engine stops on request: what is unwritten is
+    /// written, the `stop` note ends the run's log, the logs are synced.
+    @discardableResult
+    public func stop() -> Engine.StopReport {
+        engine.stop()
+    }
+
+    /// The log thread has written everything handed to it so far.
+    public func settleLogs() {
+        engine.logs?.waitUntilIdle()
     }
 
     /// The writer's queue has done everything queued so far; the next tick

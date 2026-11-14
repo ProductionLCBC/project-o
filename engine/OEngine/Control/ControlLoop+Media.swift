@@ -224,7 +224,8 @@ extension ControlLoop {
         revision += 1
         lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .media, changed: LibraryChange.merged(changes.flatMap(\.libraryChanges)),
                                               seq: commandLog.lastSeq))
-        for change in changes { log.info(change.logText) }
+        // Spec 9 §2 — the engine log's `media` line: "an index change, with its operation and ids".
+        for change in changes { log.info(change.logText, record: "media", change.record) }
     }
 
     // MARK: - The media topic (Spec 8 §7)

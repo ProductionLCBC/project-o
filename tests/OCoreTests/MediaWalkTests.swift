@@ -286,6 +286,36 @@ final class MediaWalkTests: XCTestCase {
         XCTAssertEqual(world.presence(a, found), .ok)
     }
 
+    /// Spec 9 §2 — the engine log's `media` line is "an index change, with
+    /// its operation and ids"; Spec 8 §2 — "The engine log records them, by
+    /// id". Every kind of change names its operation, its id and its index,
+    /// and none carries a path.
+    func test_anIndexChangesRecordNamesItsOperationAndIdsAndNoPath() {
+        let (a, n) = (Self.id("a"), Self.id("b"))
+        let at = Self.loc("Private folder/Welcome.mov")
+        let changes: [(MediaIndexChange, String, [String: JSONValue])] = [
+            (.added(id: a, tier: .library, location: at), "added", [:]),
+            (.moved(id: a, tier: .machine, from: "Old/Welcome.mov", location: at), "moved", [:]),
+            (.landed(old: a, new: n, tier: .library, location: at), "landed", ["new": .string(n)]),
+            (.unmapped(id: a, tier: .library, was: n), "unmapped", ["was": .string(n)]),
+            (.broughtBack(id: a, tier: .library, location: at), "broughtBack", [:]),
+            (.tookCopy(id: a, tier: .library, from: "Old/Welcome.mov", location: at), "tookCopy", [:]),
+            (.metadata(id: a, tier: .library), "metadata", [:]),
+            (.pruned(id: a, tier: .library), "pruned", [:]),
+            (.poster(id: a, tier: .library, path: ".posters/aaaa-0.png"), "poster", ["made": .bool(true)]),
+            (.poster(id: a, tier: .library, path: nil), "poster", ["made": .bool(false)]),
+        ]
+        for (change, op, more) in changes {
+            var expected = more
+            expected["op"] = .string(op)
+            expected["id"] = .string(a)
+            expected["index"] = .string(op == "moved" ? "machine" : "library")
+            XCTAssertEqual(change.record, expected, op)
+            XCTAssertFalse(JSONCanonical.line(.object(change.record)).contains("Welcome"), "\(op): no path")
+            XCTAssertFalse(JSONCanonical.line(.object(change.record)).contains(".posters"), "\(op): no path")
+        }
+    }
+
     /// Spec 8 §11 — "A file whose id the other folder's index holds is left
     /// alone and reported", either way round.
     func test_aFileWhoseIdTheOtherFoldersIndexHoldsIsLeftAlone() {

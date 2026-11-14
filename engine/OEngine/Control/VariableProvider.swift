@@ -60,10 +60,21 @@ public final class VariableProvider: @unchecked Sendable {
     /// Spec 2 §9 — a log line's `ts`, "2026-11-01T09:14:03.117-05:00": the
     /// machine's local time with milliseconds and its offset.
     public func timestamp() -> String {
-        let now = wallClock()
+        timestamp(at: wallClock())
+    }
+
+    /// Spec 2 §9, Spec 9 §2 — `date` as a line's `ts`, in the machine's time
+    /// zone: the stamp of a line logged a moment ago, printed on the log thread.
+    public func timestamp(at date: Date) -> String {
         lock.lock()
         defer { lock.unlock() }
-        return stampFormatter.string(from: now)
+        return stampFormatter.string(from: date)
+    }
+
+    /// Spec 4 §2 — the wall clock, now: "read only to stamp log lines and
+    /// resolve `[Time]`, `[Date]` and `[Service In]`".
+    public func now() -> Date {
+        wallClock()
     }
 
     /// Spec 5 §10 — a conflict file is "named with the time and the file's

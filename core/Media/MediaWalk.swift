@@ -163,6 +163,31 @@ public enum MediaIndexChange: Equatable, Hashable, Sendable {
         case .poster(let id, let tier, nil): return "media: no poster for \(id) (\(tier.rawValue)): its frame couldn't be extracted"
         }
     }
+
+    /// Spec 9 §2 — the change as the engine log's `media` line carries it:
+    /// "an index change, with its operation and ids". The operation is the
+    /// walk's name for it, `index` the index that changed, and no path is in
+    /// it (the plan's reading of "by id", Spec 8 §2).
+    public var record: [String: JSONValue] {
+        func fields(_ op: String, _ id: String, _ tier: MediaTier, _ more: [String: JSONValue] = [:]) -> [String: JSONValue] {
+            var out = more
+            out["op"] = .string(op)
+            out["id"] = .string(id)
+            out["index"] = .string(tier.rawValue)
+            return out
+        }
+        switch self {
+        case .added(let id, let tier, _): return fields("added", id, tier)
+        case .moved(let id, let tier, _, _): return fields("moved", id, tier)
+        case .landed(let old, let new, let tier, _): return fields("landed", old, tier, ["new": .string(new)])
+        case .unmapped(let id, let tier, let was): return fields("unmapped", id, tier, ["was": .string(was)])
+        case .broughtBack(let id, let tier, _): return fields("broughtBack", id, tier)
+        case .tookCopy(let id, let tier, _, _): return fields("tookCopy", id, tier)
+        case .metadata(let id, let tier): return fields("metadata", id, tier)
+        case .pruned(let id, let tier): return fields("pruned", id, tier)
+        case .poster(let id, let tier, let path): return fields("poster", id, tier, ["made": .bool(path != nil)])
+        }
+    }
 }
 
 /// Spec 8 §4 — what the walk reports and leaves alone.

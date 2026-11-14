@@ -294,14 +294,26 @@ public final class ControlLoop: @unchecked Sendable {
         queue.enqueue(group)
     }
 
+    /// Spec 9 §2 — a note of the engine's own, "source `engine` (Spec 2 §5)":
+    /// its `event`, the event's fields, and a line of words. Stamped and
+    /// given the next `seq` like any line; "A note changes nothing and is
+    /// never undone." Returns its `seq`.
+    @discardableResult
+    public func note(_ event: String, _ fields: [String: JSONValue] = [:], text: String) -> Int {
+        var note = fields
+        note["event"] = .string(event)
+        return commandLog.note(note, text: text, source: CommandSource(kind: .engine), ts: variables.timestamp())
+    }
+
     /// Spec 5 §2 — "The engine writes a changed document": the roots the
     /// library and machine were loaded from, with the snapshots they were
     /// loaded from, so the writer knows what the files hold. Called once,
     /// before the engine starts.
-    public func attachDocuments(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot) {
+    public func attachDocuments(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot,
+                                disk: Disk = .live) {
         let variables = self.variables
         let writer = DocumentWriter(libraryRoot: libraryRoot, machineRoot: machineRoot, librarySnapshot: librarySnapshot,
-                                    machineSnapshot: machineSnapshot, fileStamp: { variables.fileStamp() })
+                                    machineSnapshot: machineSnapshot, disk: disk, fileStamp: { variables.fileStamp() })
         let reload = ReloadState.loaded(library: library, machine: machine, librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
         documents = DocumentStore(writer: writer, library: library, machine: machine, kept: KeptVersions.reading(librarySnapshot.versions),
                                   reload: reload, log: log, wallMilliseconds: { variables.wallMilliseconds })
@@ -321,6 +333,13 @@ public final class ControlLoop: @unchecked Sendable {
         documents.writeDue(library: &library, machine: &machine, now: now, everything: true)
         documents.writer.waitUntilIdle()
         _ = documents.absorbReports(library: &library, machine: &machine, now: now)
+    }
+
+    /// Spec 9 §2 and §7 — the documents with edits that aren't on disk, each
+    /// by its root and its path in it: after `flushDocuments`, the ones the
+    /// engine "couldn't write". On the control side.
+    public var unsavedDocuments: [String] {
+        documents?.unsaved(library: library, machine: machine) ?? []
     }
 
     public var queuedGroups: Int { queue.count }
@@ -356,6 +375,11 @@ public final class ControlLoop: @unchecked Sendable {
         commandLog.closeRuns(now: now)
         if let documents {
             let changes = documents.absorbReports(library: &library, machine: &machine, now: now)
+            // Spec 9 §2 — `conflict`: "When a file arriving on disk loses to unwritten edits (Spec 5 §10)".
+            for conflict in documents.takeKeptConflicts() {
+                note("conflict", ["document": .string(conflict.document), "kept": .string(conflict.kept)],
+                     text: "\(conflict.document) changed on disk while it had unwritten edits; the arriving file was kept as \(conflict.kept)")
+            }
             if !changes.isEmpty {
                 reloaded(changes)
                 // Spec 7 §4 — "after every applied edit group, reload or library restore".
@@ -666,6 +690,9 @@ public final class ControlLoop: @unchecked Sendable {
                executed.result == .blocked, let refusal = executed.refusal {
                 let text = CommandText.print(executed.command) ?? executed.command.cmd
                 log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
+            } else if case .historyJump = executed.command, executed.result == .blocked, let refusal = executed.refusal {
+                // Spec 5 §8 — `history jump N` held by a cue, macro or key: `notInV1`, and the rest of its group ran.
+                log.warning("blocked \(executed.source.kind.rawValue) history jump: \(refusal.reason.rawValue): \(refusal.message)")
             }
         }
         // Spec 8 §6 — held edits behind a delete whose files must move first.
