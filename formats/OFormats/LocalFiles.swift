@@ -21,22 +21,32 @@ public struct SimulatedCrash: Error, Sendable {
     public init() {}
 }
 
-/// A file operation that failed, with the system's reason.
+/// A file operation that failed, with the system's reason and its error
+/// number, so "a write fails for want of space" (Spec 9 §7) is told from
+/// every other failure without reading the words.
 public struct FileError: Error, Equatable, Sendable, CustomStringConvertible {
     public var operation: String
     public var path: String
     public var reason: String
+    /// The system's `errno` for the failure; 0 when it had none.
+    public var code: Int32
 
-    public init(operation: String, path: String, reason: String) {
+    public init(operation: String, path: String, reason: String, code: Int32 = 0) {
         self.operation = operation
         self.path = path
         self.reason = reason
+        self.code = code
     }
 
     public var description: String { "\(operation) \(path): \(reason)" }
 
+    /// Spec 9 §7 — "When a write fails for want of space": the volume is
+    /// full, or the user's quota is.
+    public var isOutOfSpace: Bool { code == ENOSPC || code == EDQUOT }
+
     static func last(_ operation: String, _ path: String) -> FileError {
-        FileError(operation: operation, path: path, reason: String(cString: strerror(errno)))
+        let code = errno
+        return FileError(operation: operation, path: path, reason: String(cString: strerror(code)), code: code)
     }
 }
 
@@ -227,7 +237,7 @@ public enum LocalFiles {
             let failure = errno
             unlink(temporary.path)
             if failure == EEXIST { return }
-            throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)))
+            throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)), code: failure)
         }
         syncFolder(folder)
     }

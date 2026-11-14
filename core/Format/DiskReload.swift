@@ -83,6 +83,10 @@ public struct KeptConflict: Equatable, Sendable {
     public var name: String
     public var data: Data
     public var about: String
+    /// Spec 9 §2 — the `conflict` note's `document`: the file that lost, by
+    /// its root and its path in it, as a snapshot names documents (Spec 9 §3):
+    /// `library/lists/Hymns/042-great-is-thy-faithfulness.json`.
+    public var document: String = ""
 }
 
 /// What the engine remembers between reloads.
@@ -281,7 +285,8 @@ struct Reload {
         let key = FileLayout.documentKey(list: list.uuid)
         let about = "list \(list.number) at \(path)"
         if deleting.contains(ref) {
-            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about + ", which an edit deleted,"))
+            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about + ", which an edit deleted,",
+                                                  document: "library/" + path))
             return
         }
         guard let index = outcome.library.lists.firstIndex(where: { $0.uuid == list.uuid }) else {
@@ -353,7 +358,7 @@ struct Reload {
     /// `machine/conflicts/` ... writes its own document". Its next write goes
     /// above the arriving file's version.
     mutating func winOver(_ file: ArrivedFile, about: String, ref: DocumentRef, index: Int, arriving: List) {
-        outcome.conflicts.append(KeptConflict(name: Self.name(file.path), data: file.data, about: about))
+        outcome.conflicts.append(KeptConflict(name: Self.name(file.path), data: file.data, about: about, document: "library/" + file.path))
         outcome.rewrite.append(ref)
         if arriving.version > outcome.library.lists[index].version { outcome.library.lists[index].version = arriving.version }
     }
@@ -419,7 +424,8 @@ struct Reload {
     mutating func arriveIndex(_ file: ArrivedFile, _ ref: DocumentRef) {
         guard case .success(let loaded) = file.document else { return }
         if unwritten.contains(ref) {
-            outcome.conflicts.append(KeptConflict(name: Self.name(file.path), data: file.data, about: "\(ref) at \(file.path)"))
+            outcome.conflicts.append(KeptConflict(name: Self.name(file.path), data: file.data, about: "\(ref) at \(file.path)",
+                                                  document: (ref == .mediaIndex ? "library/" : "machine/") + file.path))
             outcome.rewrite.append(ref)
             outcome.warnings.append("\(ref) changed on disk while the engine held unwritten changes to it: the engine's win")
             return
@@ -507,7 +513,8 @@ struct Reload {
         let key = FileLayout.documentKey(playlist: playlist.uuid)
         let about = "playlist \"\(playlist.title)\" at \(path)"
         if deleting.contains(ref) {
-            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about + ", which an edit deleted,"))
+            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about + ", which an edit deleted,",
+                                                  document: "machine/" + path))
             return
         }
         guard let index = outcome.machine.playlists.firstIndex(where: { $0.uuid == playlist.uuid }) else {
@@ -519,7 +526,7 @@ struct Reload {
             return
         }
         if unwritten.contains(ref) {
-            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about))
+            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: about, document: "machine/" + path))
             outcome.rewrite.append(ref)
             return
         }
@@ -578,7 +585,8 @@ struct Reload {
             return
         }
         if unwritten.contains(ref) {
-            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: "local copy of list \(list.number) at \(path)"))
+            outcome.conflicts.append(KeptConflict(name: Self.name(path), data: file.data, about: "local copy of list \(list.number) at \(path)",
+                                                  document: "machine/" + path))
             outcome.rewrite.append(ref)
             return
         }

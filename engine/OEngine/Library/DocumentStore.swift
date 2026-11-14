@@ -41,6 +41,16 @@ final class DocumentStore {
     private var removing: Set<DocumentRef> = []
     /// Spec 7 §2 — spare files and the three-second window.
     private(set) var reload: ReloadState
+    /// Spec 9 §2 — the arriving files kept since the control loop last asked,
+    /// for its `conflict` notes: the document that lost and where the
+    /// arriving file was kept, each by its root and path.
+    private var keptConflicts: [(document: String, kept: String)] = []
+
+    /// The conflicts kept since this was last asked.
+    func takeKeptConflicts() -> [(document: String, kept: String)] {
+        defer { keptConflicts.removeAll() }
+        return keptConflicts
+    }
 
     /// What a planned save changed in memory, put back if it fails.
     private struct Revert {
@@ -74,6 +84,46 @@ final class DocumentStore {
 
     static func localKey(_ uuid: UUID) -> String {
         "local/" + uuid.uuidString.lowercased()
+    }
+
+    // MARK: - What is waiting (Spec 9 §7)
+
+    /// Spec 9 §7 — the documents with edits that aren't on disk: changed and
+    /// not yet handed to the queue, handed and not yet reported, or failed.
+    var waiting: Set<DocumentRef> {
+        Set(dirty.keys).union(inFlight).union(failing)
+    }
+
+    /// Spec 9 §2 and §7 — the documents the engine "couldn't write", for the
+    /// `stop` note's `unsaved` and the answer to the request that stopped it:
+    /// each by its root and its path in it, as a snapshot names documents
+    /// (Spec 9 §3), sorted.
+    func unsaved(library: Library, machine: Machine) -> [String] {
+        waiting.map { path(of: $0, library: library, machine: machine) }.sorted()
+    }
+
+    /// A document's file, by its root and its path in it.
+    func path(of ref: DocumentRef, library: Library, machine: Machine) -> String {
+        switch ref {
+        case .list(let uuid):
+            let path = library.documentPaths[FileLayout.documentKey(list: uuid)] ?? library.list(uuid: uuid).map { FileLayout.path(for: .list($0)) }
+            return "library/" + (path ?? "lists/" + uuid.uuidString.lowercased())
+        case .libraryMacro(let number):
+            return "library/" + (library.documentPaths["macro/\(number)"] ?? library.macro(number).map { FileLayout.path(for: .macro($0)) } ?? "macros/\(number)")
+        case .playlist(let uuid):
+            let path = playlistFiles[uuid] ?? machine.documentPaths[FileLayout.documentKey(playlist: uuid)]
+            return "machine/" + (path ?? "playlists/" + uuid.uuidString.lowercased())
+        case .localList(let uuid):
+            return "machine/" + (machine.documentPaths[Self.localKey(uuid)] ?? "lists-local/" + uuid.uuidString.lowercased())
+        case .machineMacro(let number):
+            return "machine/" + (machine.documentPaths["macro/\(number)"] ?? machine.macro(number).map { FileLayout.path(for: .macro($0)) } ?? "macros/\(number)")
+        case .keys:
+            return "machine/" + FileLayout.path(for: .keys(machine.keys))
+        case .mediaIndex:
+            return "library/" + FileLayout.path(for: .mediaIndex(library.mediaIndex))
+        case .mediaLocal:
+            return "machine/" + FileLayout.path(for: .mediaLocal(machine.mediaLocal))
+        }
     }
 
     // MARK: - After an applied group
@@ -292,8 +342,9 @@ final class DocumentStore {
                     changes.append(LibraryChange(object: "list", address: ["list": .number(Double(list.number)),
                                                                            "listUuid": .string(uuid.uuidString.lowercased())]))
                 }
-            case .kept(let path, let about):
+            case .kept(let path, let about, let document):
                 log.warning("\(about) changed on disk while the engine held unwritten edits: the arriving file is kept as \(path), and the engine's document is written")
+                keptConflicts.append((document: document, kept: "machine/" + path))
             case .keepFailed(let about, let reason):
                 log.error("\(about) changed on disk while the engine held unwritten edits, and the arriving file could not be kept: \(reason)")
             case .scanned(let delta):
@@ -334,7 +385,7 @@ final class DocumentStore {
             if case .playlist(let uuid) = ref { playlistFiles[uuid] = path }
         }
         for conflict in outcome.conflicts {
-            writer.submit(.keep(conflict.data, name: conflict.name, about: conflict.about))
+            writer.submit(.keep(conflict.data, name: conflict.name, about: conflict.about, document: conflict.document))
         }
         for ref in outcome.rewrite where dirty[ref] == nil { dirty[ref] = now }
         for note in outcome.notes { log.info(note) }

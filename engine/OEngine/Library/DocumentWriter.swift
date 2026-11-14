@@ -32,8 +32,9 @@ public final class DocumentWriter: @unchecked Sendable {
         /// moved, a document's file removed (Spec 7 §2).
         case structure(StructureChange, Root, [FileOperation])
         /// Spec 5 §10 — an arriving file the engine's edits beat, kept under
-        /// its file name in `machine/conflicts/`.
-        case keep(Data, name: String, about: String)
+        /// its file name in `machine/conflicts/`. `document` is the file that
+        /// lost, by its root and path (Spec 9 §2, the `conflict` note).
+        case keep(Data, name: String, about: String, document: String)
         /// Spec 5 §10 — look for what changed on disk since the queue last
         /// read or wrote the watched folders.
         case scan
@@ -47,8 +48,9 @@ public final class DocumentWriter: @unchecked Sendable {
         case saveFailed(seq: Int, ref: DocumentRef, reason: String)
         case structured(seq: Int, change: StructureChange)
         case structureFailed(seq: Int, change: StructureChange, reason: String)
-        /// A file kept in `machine/conflicts/`, by its path in the machine root.
-        case kept(path: String, about: String)
+        /// A file kept in `machine/conflicts/`, by its path in the machine
+        /// root, and the document that lost, by its root and path.
+        case kept(path: String, about: String, document: String)
         case keepFailed(about: String, reason: String)
         /// What a scan found; never the queue's own writes.
         case scanned(DiskDelta)
@@ -83,6 +85,8 @@ public final class DocumentWriter: @unchecked Sendable {
     public let libraryRoot: URL
     public let machineRoot: URL
     private let fileStamp: @Sendable () -> String
+    /// Spec 9 §8 — the seam every write goes through.
+    public let disk: Disk
     private let queue = DispatchQueue(label: "o.engine.writer", qos: .utility)
     private let lock = NSLock()
     private var nextSeq = 0
@@ -97,9 +101,10 @@ public final class DocumentWriter: @unchecked Sendable {
     /// were loaded from: what the engine knows the watched files hold.
     /// `fileStamp` names a conflict's time, `2026-11-08-085959`.
     public init(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot,
-                fileStamp: @escaping @Sendable () -> String) {
+                disk: Disk = .live, fileStamp: @escaping @Sendable () -> String) {
         self.libraryRoot = libraryRoot
         self.machineRoot = machineRoot
+        self.disk = disk
         self.fileStamp = fileStamp
         for (path, data) in librarySnapshot.files where Self.watched(.library, path) {
             files[FileKey(root: .library, path: path)] = Known(digest: Self.digest(data), stamp: nil)
@@ -183,8 +188,8 @@ public final class DocumentWriter: @unchecked Sendable {
             save(ref, root: root, operations: operations, path: path, seq: seq)
         case .structure(let change, let root, let operations):
             structure(change, root: root, operations: operations, seq: seq)
-        case .keep(let data, let name, let about):
-            keep(data, name: name, about: about)
+        case .keep(let data, let name, let about, let document):
+            keep(data, name: name, about: about, document: document)
         case .scan:
             lock.lock()
             scanQueued = false
@@ -301,7 +306,7 @@ public final class DocumentWriter: @unchecked Sendable {
                 default:
                     break
                 }
-                try LocalFiles.execute(WritePlan(operations: [operation]), in: url(root))
+                try disk.execute(WritePlan(operations: [operation]), in: url(root))
                 note(operation, root: root)
             }
             report(.saved(seq: seq, ref: ref, path: path, skippedCopies: skipped))
@@ -315,7 +320,7 @@ public final class DocumentWriter: @unchecked Sendable {
         _ = keepArrivals(in: operations, root: root, about: Self.describe(change))
         do {
             for operation in operations {
-                try LocalFiles.execute(WritePlan(operations: [operation]), in: url(root))
+                try disk.execute(WritePlan(operations: [operation]), in: url(root))
                 note(operation, root: root)
             }
             report(.structured(seq: seq, change: change))
@@ -354,7 +359,7 @@ public final class DocumentWriter: @unchecked Sendable {
         var changed: Set<String> = []
         for path in paths where Self.watched(root, path) && !changed.contains(path) {
             guard let data = arrival(FileKey(root: root, path: path)) else { continue }
-            keep(data, name: (path as NSString).lastPathComponent, about: about + " at " + path)
+            keep(data, name: (path as NSString).lastPathComponent, about: about + " at " + path, document: root.rawValue + "/" + path)
             files[FileKey(root: root, path: path)] = Known(digest: Self.digest(data), stamp: nil)
             changed.insert(path)
         }
@@ -378,7 +383,7 @@ public final class DocumentWriter: @unchecked Sendable {
     /// Spec 5 §10 — "named with the time and the file's name", in the machine
     /// root, which is never synced; a second conflict in the same second takes
     /// `-2`, `-3` and so on.
-    private func keep(_ data: Data, name: String, about: String) {
+    private func keep(_ data: Data, name: String, about: String, document: String) {
         let stamp = fileStamp()
         let stem = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
@@ -389,8 +394,8 @@ public final class DocumentWriter: @unchecked Sendable {
             n += 1
         }
         do {
-            try LocalFiles.execute(WritePlan(operations: [.replace(path: candidate, data: data)]), in: machineRoot)
-            report(.kept(path: candidate, about: about))
+            try disk.execute(WritePlan(operations: [.replace(path: candidate, data: data)]), in: machineRoot)
+            report(.kept(path: candidate, about: about, document: document))
         } catch {
             report(.keepFailed(about: about, reason: "\(error)"))
         }
