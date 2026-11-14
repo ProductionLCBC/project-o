@@ -9,6 +9,12 @@ import Foundation
 /// carry `inverse`. A rejected result carries its `reason`. Unknown keys
 /// survive (Spec 1 §8). The timestamp and the sequence number are the
 /// engine's: nothing here reads a clock.
+///
+/// Spec 5 §8 — an undo's group "is logged with source `restore` and an
+/// `undoes` field naming the group it reverses", a redo's "with source
+/// `restore` and a `redoes` field" (Spec 9 §8: "`LogEntry` gains note lines
+/// and the `undoes` and `redoes` fields"). A note line is `LogNote`, and
+/// `LogLine` reads either.
 public struct LogEntry: Codable, Equatable, Sendable {
     public var ts: String
     public var seq: Int
@@ -22,11 +28,15 @@ public struct LogEntry: Codable, Equatable, Sendable {
     public var snapshot: String?
     public var fire: FireRecord?
     public var inverse: Command?
+    /// Spec 5 §8 — the group this line's group reverses.
+    public var undoes: GroupID?
+    /// Spec 5 §8 — the undone group this line's group runs again.
+    public var redoes: GroupID?
     public var extra: [String: JSONValue]
 
     public init(ts: String, seq: Int, group: GroupID, source: CommandSource, kind: LogKind, undo: UndoClass,
                 result: CommandResult, command: Command, text: String, snapshot: String? = nil, fire: FireRecord? = nil,
-                inverse: Command? = nil, extra: [String: JSONValue] = [:]) {
+                inverse: Command? = nil, undoes: GroupID? = nil, redoes: GroupID? = nil, extra: [String: JSONValue] = [:]) {
         self.ts = ts
         self.seq = seq
         self.group = group
@@ -39,6 +49,8 @@ public struct LogEntry: Codable, Equatable, Sendable {
         self.snapshot = snapshot
         self.fire = fire
         self.inverse = inverse
+        self.undoes = undoes
+        self.redoes = redoes
         self.extra = extra
     }
 
@@ -55,7 +67,7 @@ public struct LogEntry: Codable, Equatable, Sendable {
         self.init(ts: ts, seq: seq, group: executed.group, source: executed.source,
                   kind: executed.command.logKind, undo: executed.command.undoClass, result: executed.result,
                   command: executed.command, text: CommandText.print(executed.command) ?? "", fire: executed.fire,
-                  inverse: executed.inverse)
+                  inverse: executed.inverse, undoes: executed.undoes, redoes: executed.redoes)
     }
 
     /// Spec 2 §9 — the entry as one JSON line with sorted keys.
@@ -69,7 +81,7 @@ public struct LogEntry: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case ts, seq, group, source, kind, undo, result, reason, command, text, snapshot, fire, inverse
+        case ts, seq, group, source, kind, undo, result, reason, command, text, snapshot, fire, inverse, undoes, redoes
     }
 
     public init(from decoder: Decoder) throws {
@@ -97,6 +109,8 @@ public struct LogEntry: Codable, Equatable, Sendable {
         snapshot = try c.decodeIfPresent(String.self, forKey: .snapshot)
         fire = try c.decodeIfPresent(FireRecord.self, forKey: .fire)
         inverse = try c.decodeIfPresent(Command.self, forKey: .inverse)
+        undoes = try c.decodeIfPresent(GroupID.self, forKey: .undoes)
+        redoes = try c.decodeIfPresent(GroupID.self, forKey: .redoes)
         extra = try decoder.unknownKeys(besides: CodingKeys.known)
     }
 
@@ -118,6 +132,8 @@ public struct LogEntry: Codable, Equatable, Sendable {
         try c.encodeIfPresent(snapshot, forKey: .snapshot)
         try c.encodeIfPresent(fire, forKey: .fire)
         try c.encodeIfPresent(inverse, forKey: .inverse)
+        try c.encodeIfPresent(undoes, forKey: .undoes)
+        try c.encodeIfPresent(redoes, forKey: .redoes)
     }
 
     /// `reason` is written as `code: message`.
