@@ -132,8 +132,8 @@ public final class Engine: @unchecked Sendable {
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.
         for timer in control.lastTimerFeedback { publisher.publish(timer.event) }
-        if control.lastRootsChanged || control.mediaFilesChanged {
-            thumbnails?.update(library: control.library, machine: control.machine, missing: control.missing)
+        if control.lastRootsChanged || control.mediaFilesChanged || control.posterFilesChanged {
+            thumbnails?.update(library: control.library, machine: control.machine, missing: control.missing, posters: control.posterFiles)
         }
         sweepReleases()
         warmThumbnailsIfTheListChanged()

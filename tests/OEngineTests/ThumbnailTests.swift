@@ -145,6 +145,14 @@ final class ThumbnailTests: XCTestCase {
         elsewhere.mediaIndex.entries[try XCTUnwrap(elsewhere.mediaIndex.position(of: EngineFixtures.mountains))].poster = ".posters/x-0.png"
         elsewhere.mediaIndex.add(MediaEntry(id: "sha256:" + String(repeating: "ab", count: 32), path: "imports/new.mov", kind: .video, size: 1))
         XCTAssertEqual(version(elsewhere, list, missing: [EngineFixtures.mountains]), base, "an import elsewhere redraws none")
+        // Spec 8 §5 — "a change under `.posters/` makes it look again and redraws the tiles and thumbnails that
+        // went without it": the version notes whether each poster was found; a poster arriving for another item redraws none.
+        let dawnPoster = MediaLocation(.mediaRoot, ".posters/\(String(EngineFixtures.dawn.dropFirst(7)))-0.png")!
+        let mountainsPoster = MediaLocation(.mediaRoot, ".posters/\(String(EngineFixtures.mountains.dropFirst(7)))-1500.png")!
+        let found = LibraryVersion.hash(library: library, machine: machine, list: list, missing: [], posters: [dawnPoster])
+        XCTAssertNotEqual(found, base, "dawn's poster found: list 42's thumbnails redraw")
+        XCTAssertEqual(LibraryVersion.hash(library: library, machine: machine, list: list, missing: [], posters: [dawnPoster, mountainsPoster]),
+                       found, "a poster arriving for an item list 42 doesn't use redraws none of its thumbnails")
         var newer = list
         newer.version += 1
         XCTAssertNotEqual(version(library, newer), base, "the list's version, incremented on every save")

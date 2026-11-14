@@ -60,7 +60,9 @@ public final class HeadlessEngine: @unchecked Sendable {
         // Spec 4 §11 — one graph per device: the software factory hands out a pullable
         // device per key; an `sdiEmbedded` output's feed has no card here and consumes silently.
         let factory = SoftwareAudioDeviceFactory()
-        let posters = ImagePosterProvider(backend: metal, media: media, log: log)
+        // Spec 4 §5 — posters at half the largest channel render size; the harness loads them in the lookup itself.
+        let channels = library.channels.map { MachineGeometry(library: library, machine: machine).channelSize($0.number) }
+        let posters = ImagePosterProvider(backend: metal, media: media, fit: ImagePosterProvider.fit(channels: channels), synchronous: true, log: log)
         try self.init(library: library, machine: machine, media: media, backend: metal,
                       sourceFactory: MediaSourceFactory(backend: metal, log: log), posters: posters,
                       text: TextCache(renderer: renderer, backend: metal, synchronous: true, log: log),
@@ -255,9 +257,10 @@ public final class HeadlessEngine: @unchecked Sendable {
         return records
     }
 
+    /// The poster a media ref shows, as the control thread looks it up.
     public func posterHandle(for ref: String) -> TextureHandle {
-        guard let resolved = MediaResolver.resolve(ref, library: engine.library, machine: engine.machine) else { return .none }
-        return posters.poster(for: resolved.entry, tier: resolved.tier)
+        guard let key = PosterKey.of(MediaResolver.resolve(ref, library: engine.library, machine: engine.machine)) else { return .none }
+        return posters.poster(key)
     }
 
     public func sources(onChannel channel: Int) -> [InstanceHandle] {

@@ -388,6 +388,18 @@ public final class ControlLoop: @unchecked Sendable {
     private func advanceRuntimes(_ frame: Int64) {
         for channel in model.channels.keys.sorted() {
             guard var rt = model.channels[channel] else { continue }
+            // Spec 8 §9 — a stopped or not-yet-ready instance whose poster wasn't loaded when its write
+            // landed takes it once it loads; one holding the previous picture for its transition keeps holding it.
+            if case .media(var m) = rt.live, m.poster.isNone, !m.missing, let key = m.posterKey,
+               !m.ready || m.transport == .stopped, rt.outgoing == nil {
+                let poster = posters.poster(key)
+                if !poster.isNone {
+                    m.poster = poster
+                    rt.live = .media(m)
+                    // As a write that found its poster loaded: the transition starts from the poster.
+                    if !m.ready, let t = rt.transition, t.startFrame == nil, t.durationFrames > 0 { pendingSnapshotWhenReady.insert(channel) }
+                }
+            }
             if case .media(var m) = rt.live, !m.missing, !m.ready, let source = m.source, source.isReady {
                 m.ready = true
                 m.clock = MediaClock(anchorFrame: frame, anchorMs: m.inMs, playing: m.transport == .playing)
@@ -839,13 +851,15 @@ public final class ControlLoop: @unchecked Sendable {
             let inMs = Double(m.inMs ?? 0)
             let duration = entry?.durationMs.map(Double.init) ?? .infinity
             let outMs = m.outMs.map(Double.init) ?? duration
+            // Spec 8 §9 — the poster is looked up, never waited for: one not yet loaded is asked for now.
+            let posterKey = PosterKey.of(resolved)
             var runtime = MediaRuntime(
                 ref: m.ref, handle: InstanceHandle(rawValue: -1), source: nil,
-                poster: resolved.map { posters.poster(for: $0.entry, tier: $0.tier) } ?? .none, entry: entry,
+                poster: posterKey.map(posters.poster) ?? .none, entry: entry,
                 layout: .nv12, size: PixelSize(width: entry?.width ?? 0, height: entry?.height ?? 0), matrix: .bt709, range: .limited,
                 inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: true),
                 ready: false, missing: m.missing || url == nil, clearIssued: false,
-                transport: m.transport, endBehavior: m.endBehavior)
+                transport: m.transport, endBehavior: m.endBehavior, posterKey: posterKey)
             guard !runtime.missing, let entry, let url else { return .media(runtime) }
             guard let handle = allocateHandle() else {
                 log.error("no free instance slot for \(m.ref) on channel \(channel)")
@@ -1236,6 +1250,7 @@ public final class ControlLoop: @unchecked Sendable {
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
                 if let after = lookaheadState(offset + 1, frame: frame, scratch: &scratch) {
                     prefetchText(inputs: inputs, slot: slot, offset: offset, state: after, resolving: resolving)
+                    prefetchPosters(inputs: inputs, slot: slot, offset: offset, state: after)
                 }
             }
             let results = SlotResolver.resolve(
@@ -1286,11 +1301,24 @@ public final class ControlLoop: @unchecked Sendable {
                                             contentPixels: bound.size, mips: pass.generateMips)
         }
         guard let media = content?.media, !media.missing,
-              let resolved = MediaResolver.resolve(media.ref, library: library, machine: machine) else { return nil }
+              let resolved = MediaResolver.resolve(media.ref, library: library, machine: machine),
+              let key = PosterKey.of(resolved) else { return nil }
         let entry = resolved.entry
-        let poster = posters.poster(for: entry, tier: resolved.tier)
+        // Spec 8 §9 — looked up, never waited for: a poster still loading draws from the next build.
+        let poster = posters.poster(key)
         guard !poster.isNone else { return nil }
         return SlotResolver.PixelSource(texture: poster, content: .full, contentPixels: PixelSize(width: entry.width ?? 16, height: entry.height ?? 9))
+    }
+
+    /// Spec 4 §8 and Spec 8 §9 — the lookahead warms posters beside the text
+    /// it pre-rasterizes: what the pixel boxes at `offset` will draw one cue
+    /// later, the next cue's media for a box at 0, so a fire or an offset box
+    /// rarely finds its poster still loading.
+    private func prefetchPosters(inputs: SlotResolver.Inputs, slot: StackSlot, offset: Int, state: ShowState) {
+        guard let layout = inputs.layout(for: slot), layout.boxes.contains(where: { $0.offset == offset && !$0.binding.isText }),
+              let media = state.channels[slot.channel]?.content.media, !media.missing,
+              let key = PosterKey.of(MediaResolver.resolve(media.ref, library: library, machine: machine)) else { return }
+        _ = posters.poster(key)
     }
 
     /// Spec 6 §3 — "The engine rasterizes the text one cue beyond each offset

@@ -154,7 +154,10 @@ public final class EngineProcess: @unchecked Sendable {
         // Sources, posters, text, variables (Spec 4 §6, §8). Spec 6 §4 — the bundled fonts are registered "at
         // launch and before the first raster".
         let sourceFactory = MediaSourceFactory(backend: backend, log: log)
-        let posters = ImagePosterProvider(backend: backend, media: roots.media, log: log)
+        // Spec 4 §5 — "Half the channel render size": half the largest channel's, loaded off the control thread.
+        let geometry = MachineGeometry(library: library, machine: machine)
+        let posters = ImagePosterProvider(backend: backend, media: roots.media,
+                                          fit: ImagePosterProvider.fit(channels: library.channels.map { geometry.channelSize($0.number) }), log: log)
         FontLibrary.shared.register(log: log)
         textCache = TextCache(renderer: CoreTextLineRasterizer(fallbackFont: machine.settings.fallbackFont), backend: backend, log: log)
         let variables = VariableProvider(settings: machine.settings)

@@ -64,6 +64,9 @@ public struct MediaRuntime: Sendable {
     public var audioDecoder: AudioFileDecoder?
     public var syncOffsetMs: Int = 0
     public var gainOverride: Double?
+    /// Spec 8 §9 — the poster this instance shows while it isn't playing, which
+    /// it takes once it loads when the write landed before it had (Spec 4 §6).
+    public var posterKey: PosterKey?
 
     public var isStill: Bool { entry?.kind == .image }
     public var loops: Bool { endBehavior == .loop && outMs.isFinite }

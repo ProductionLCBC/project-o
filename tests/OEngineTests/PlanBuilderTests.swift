@@ -434,4 +434,45 @@ final class PlanBuilderTests: XCTestCase {
         guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
         XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001, "and the dissolve starts now")
     }
+
+    // MARK: - Posters that aren't loaded yet (Spec 8 §9)
+
+    /// Spec 8 §9 — the poster loader works off the control thread: a write
+    /// that lands before its poster is loaded holds the previous picture
+    /// until its first frame (Spec 4 §6, "with no poster, the previous
+    /// picture holds"), and doesn't swap to the poster when it loads midway.
+    func test_aColdWriteBeforeItsPosterLoadsHoldsThePreviousPicture() throws {
+        engine.fakeSources?.readyAfterTicks = 3
+        engine.send("channel 1 write media \(EngineFixtures.cross)")
+        engine.tick(count: 4)
+        let crossPass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        engine.fakePosters?.holdBack([EngineFixtures.dawn])
+        engine.send("channel 1 write media \(EngineFixtures.dawn) transition 2 1.0 once")
+        engine.tick()
+        var pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, crossPass.incoming.source, "the previous picture holds")
+        XCTAssertTrue(engine.fakePosters?.lookups.contains { $0.id == EngineFixtures.dawn } ?? false, "the poster was asked for")
+        engine.fakePosters?.arrive([EngineFixtures.dawn])
+        engine.tick()
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, crossPass.incoming.source, "still the previous picture: no swap to the poster midway")
+        engine.tick(count: 3)
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
+        XCTAssertNotNil(pass.transition, "and the dissolve runs from the previous picture")
+    }
+
+    /// Spec 8 §9 — "A stopped or not-yet-ready instance takes its poster once it loads".
+    func test_aStoppedInstanceTakesItsPosterOnceItLoads() throws {
+        engine.fakePosters?.holdBack([EngineFixtures.dawn])
+        engine.send("channel 1 write media \(EngineFixtures.dawn)")
+        engine.tick()
+        engine.send("channel 1 stop")
+        engine.tick()
+        XCTAssertNotEqual(engine.lastPlan?.channelPasses.first?.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.dawn)))
+        engine.fakePosters?.arrive([EngineFixtures.dawn])
+        engine.tick()
+        let pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.dawn)), "the poster shows once it loads")
+    }
 }

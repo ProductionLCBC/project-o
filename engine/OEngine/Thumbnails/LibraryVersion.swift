@@ -17,8 +17,10 @@ import OCore
 public enum LibraryVersion {
     /// Sixteen hex characters of FNV-1a over the canonical JSON of the
     /// rendering documents, the list's media and the list's version; stable
-    /// across runs.
-    public static func hash(library: Library, machine: Machine?, list: List, missing: Set<String>) -> String {
+    /// across runs. Spec 8 §5 — each video's poster notes whether its file
+    /// was found (`posters`), so "a change under `.posters/` ... redraws the
+    /// tiles and thumbnails that went without it".
+    public static func hash(library: Library, machine: Machine?, list: List, missing: Set<String>, posters: Set<MediaLocation> = []) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         var hash: UInt64 = 0xcbf29ce484222325
@@ -39,9 +41,12 @@ public enum LibraryVersion {
         feed(library.channels)
         feed(media(of: list, library: library, machine: machine).sorted().map { ref -> MediaState in
             let chain = MediaResolver.chain(from: ref, library: library.mediaIndex, machine: machine?.mediaLocal)
-            let entry = MediaResolver.entry(for: chain.reached, library: library.mediaIndex, machine: machine?.mediaLocal)?.entry
+            let found = MediaResolver.entry(for: chain.reached, library: library.mediaIndex, machine: machine?.mediaLocal)
+            let entry = found?.entry
+            let poster = found.flatMap { f in f.entry.poster.flatMap { MediaLocation(MediaPosters.folder(of: f.tier), $0) } }
             return MediaState(ref: ref, id: chain.reached, poster: entry?.poster,
-                              present: entry != nil && entry?.isDeleted == false && !missing.contains(chain.reached))
+                              present: entry != nil && entry?.isDeleted == false && !missing.contains(chain.reached),
+                              posterFound: poster.map(posters.contains) ?? false)
         })
         feed(ListVersion(uuid: list.uuid.uuidString.lowercased(), version: list.version))
         // Spec 6 §3 — a field box with no such field in the write draws the list's title, author,
@@ -73,6 +78,7 @@ public enum LibraryVersion {
         var id: String
         var poster: String?
         var present: Bool
+        var posterFound: Bool
     }
 
     private struct ListVersion: Encodable {

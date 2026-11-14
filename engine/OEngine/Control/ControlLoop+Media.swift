@@ -308,6 +308,9 @@ extension ControlLoop {
             missing = next
             mediaFilesChanged = true
         }
+        // Spec 8 §5 — "a change under `.posters/` makes it look again", and so does a change in the media,
+        // an image being its own poster.
+        if posterFilesChanged || mediaFilesChanged { posters.postersChanged() }
         mediaWorker?.adopt(mediaSnapshot)
         // Spec 8 §5 — posters "by the walk when one is missing, and after an edit changes
         // `defaults.trimInMs`", and tiles "made again when missing": a pass over what was just adopted.

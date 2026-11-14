@@ -190,19 +190,6 @@ final class StillSourceTests: XCTestCase {
         let back = try XCTUnwrap(backend.readback(still.handle))
         XCTAssertEqual(back.width, 64)
     }
-
-    func test_posterProviderLoadsOnceAndCaches() throws {
-        let backend = try MetalHarness.backend()
-        let library = try EngineFixtures.library()
-        let provider = ImagePosterProvider(backend: backend, media: EngineFixtures.media)
-        let entry = try XCTUnwrap(library.mediaIndex.entry(EngineFixtures.dawn))
-        let handle = provider.poster(for: entry, tier: .library)
-        XCTAssertFalse(handle.isNone)
-        XCTAssertEqual(provider.poster(for: entry, tier: .library), handle)
-        XCTAssertEqual(backend.resources.descriptor(handle)?.role, .poster)
-        let noPoster = try XCTUnwrap(library.mediaIndex.entry(EngineFixtures.cross))
-        XCTAssertTrue(provider.poster(for: noPoster, tier: .library).isNone)
-    }
 }
 
 /// Spec 4 §6 — the real source factory with prefetch.

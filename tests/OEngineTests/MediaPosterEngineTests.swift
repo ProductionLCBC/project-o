@@ -191,8 +191,10 @@ final class MediaPosterEngineTests: XCTestCase {
         XCTAssertFalse(media.control.posterFiles.contains(MediaLocation(.mediaRoot, poster)!))
         XCTAssertFalse(media.tiles.contains("\(hex)-1500.png"))
         try media.writePNG(.mediaRoot, poster, width: 1920, height: 1080)
+        let changes = media.engine.fakePosters?.changeCount ?? 0
         media.walk()
         XCTAssertTrue(media.control.posterFiles.contains(MediaLocation(.mediaRoot, poster)!), "a change under .posters/ is seen")
+        XCTAssertGreaterThan(media.engine.fakePosters?.changeCount ?? 0, changes, "and the poster loader is told to look again")
         XCTAssertTrue(media.tiles.contains("\(hex)-1500.png"), "its tile is drawn, though the video itself is still missing")
         XCTAssertEqual(tileSize("\(hex)-1500.png")?.width, 480)
     }

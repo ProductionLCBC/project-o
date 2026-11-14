@@ -124,31 +124,72 @@ public final class FakeSourceFactory: SourceFactory, @unchecked Sendable {
     }
 }
 
-/// Spec 4 §5 — posters by handle, allocated on demand in the backend's table.
+/// Spec 4 §5 — posters by handle, allocated on demand in the backend's
+/// table. A poster whose id is in `notYet` isn't loaded until `arrive` is
+/// called: the lookup asks for it and comes back `.none`, as the engine's
+/// loader does while it reads (Spec 8 §9).
 public final class FakePosterProvider: PosterProvider, @unchecked Sendable {
     private let backend: any RenderBackend
     private let lock = NSLock()
-    private var handles: [String: TextureHandle] = [:]
+    private var handles: [PosterKey: TextureHandle] = [:]
+    private var waiting: Set<String> = []
+    private var asked: [PosterKey] = []
+    private var changes = 0
 
     public init(backend: any RenderBackend) {
         self.backend = backend
     }
 
-    public func poster(for entry: MediaEntry, tier: MediaTier) -> TextureHandle {
-        guard entry.poster != nil else { return .none }
+    public func poster(_ key: PosterKey) -> TextureHandle {
         lock.lock()
         defer { lock.unlock() }
-        if let handle = handles[entry.id] { return handle }
-        let size = PixelSize(width: max(2, (entry.width ?? 1920) / 2), height: max(2, (entry.height ?? 1080) / 2))
-        let handle = backend.makeTexture(TextureDescriptor(role: .poster, size: size, label: "poster " + entry.id.prefix(15)))
-        handles[entry.id] = handle
+        asked.append(key)
+        if let handle = handles[key] { return handle }
+        if waiting.contains(key.id) { return .none }
+        let handle = backend.makeTexture(TextureDescriptor(role: .poster, size: PixelSize(width: 960, height: 540), label: "poster " + key.id.prefix(15)))
+        handles[key] = handle
         return handle
     }
 
+    public func postersChanged() {
+        lock.lock()
+        changes += 1
+        lock.unlock()
+    }
+
+    /// The posters of these ids stay unloaded until `arrive`.
+    public func holdBack(_ ids: Set<String>) {
+        lock.lock()
+        waiting.formUnion(ids)
+        lock.unlock()
+    }
+
+    /// The posters of these ids load at the next lookup.
+    public func arrive(_ ids: Set<String>) {
+        lock.lock()
+        waiting.subtract(ids)
+        lock.unlock()
+    }
+
+    /// The handle a poster of this id was given, if it was.
     public func handle(for id: String) -> TextureHandle {
         lock.lock()
         defer { lock.unlock() }
-        return handles[id] ?? .none
+        return handles.first { $0.key.id == id }?.value ?? .none
+    }
+
+    /// Every lookup so far, in order.
+    public var lookups: [PosterKey] {
+        lock.lock()
+        defer { lock.unlock() }
+        return asked
+    }
+
+    /// How many times `.posters/` or the media was said to change.
+    public var changeCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return changes
     }
 }
 
