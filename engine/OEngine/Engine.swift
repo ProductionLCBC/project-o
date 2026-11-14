@@ -99,6 +99,36 @@ public final class Engine: @unchecked Sendable {
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
+        answerMediaQueries()
+    }
+
+    /// Spec 8 §7 and Spec 10 §3 — the `mediaUse` and `media` queries,
+    /// answered from what the last build published (Adam's answer of
+    /// 2026-11-11, 4: Area 8 answers them through the engine's publisher,
+    /// Area 19 puts them on the API).
+    private func answerMediaQueries() {
+        let control = self.control
+        publisher.answer("mediaUse") { request in
+            guard let id = request["media"]?.stringValue else {
+                return .failure(Rejection(reason: .badValue, message: "mediaUse names its item as \"media\""))
+            }
+            let roots = control.publishedRoots
+            guard MediaResolver.knownIds(library: roots.library.mediaIndex, machine: roots.machine.mediaLocal).contains(id) else {
+                return .failure(Rejection(reason: .unknownObject, message: "\(id) isn't in either media index"))
+            }
+            return .success(MediaUse.of(id, library: roots.library, machine: roots.machine).fields)
+        }
+        publisher.answer("media") { _ in
+            let roots = control.publishedRoots
+            let published = control.publishedMedia
+            let folder = control.mediaWorker?.tilesFolder
+            let entries = MediaCatalog.entries(library: roots.library, machine: roots.machine, files: { published.files[$0] ?? .absent },
+                                               tile: { entry in
+                guard let name = MediaPosters.tileName(of: entry), published.tiles.contains(name), let folder else { return nil }
+                return folder.appendingPathComponent(name).path
+            })
+            return .success(["media": .array(entries)])
+        }
     }
 
     /// Spec 2 §8 — a group lands on the next tick boundary.

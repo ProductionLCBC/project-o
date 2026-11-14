@@ -226,6 +226,7 @@ public final class ControlLoop: @unchecked Sendable {
     private let stateLock = NSLock()
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
+    private var publishedMediaState: (files: [MediaLocation: MediaFileState], tiles: Set<String>)?
     private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
     private var timersSnapshot: [Int: TimerReading] = [:]
     private var remainingSnapshot: [Int: Int] = [:]
@@ -278,6 +279,14 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return rootsSnapshot ?? (library, machine)
+    }
+
+    /// Spec 8 §2 and §5 — what the last build knew of each location's file
+    /// and of the pool tiles, for the `media` query (Spec 10 §3).
+    public var publishedMedia: (files: [MediaLocation: MediaFileState], tiles: Set<String>) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return publishedMediaState ?? (mediaFiles, mediaTiles)
     }
 
     /// Spec 2 §8 — groups land on the next tick boundary.
@@ -375,6 +384,7 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         stateSnapshot = model.state
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
+        publishedMediaState = (mediaFiles, mediaTiles)
         liveSnapshot = (lastLive, Int(frame))
         timersSnapshot = timerReadings(at: frame)
         remainingSnapshot = remaining
