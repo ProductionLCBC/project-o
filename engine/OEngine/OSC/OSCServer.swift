@@ -267,8 +267,12 @@ public final class OSCServer: @unchecked Sendable {
         }
         let executed = control.lastExecuted
         var messages: [OSCMessage] = []
+        // Spec 3 §8 — a restored state's effects first: what the build's commands did came after it.
+        if !control.lastReplaced.isEmpty {
+            messages = OSCFeedbackDeriver.messages(forEffects: control.lastReplaced, state: control.model.state, library: library, machine: machine)
+        }
         if !executed.isEmpty {
-            messages = OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine)
+            messages += OSCFeedbackDeriver.messages(for: executed, state: control.model.state, library: library, machine: machine)
         }
         // Spec 7 §6 — the live position and the countdown, from the live reading.
         messages += control.lastLiveFeedback?.messages ?? []
@@ -361,9 +365,16 @@ public final class OSCServer: @unchecked Sendable {
 /// (Spec 7 §6, `LiveSnapshot`), since an edit or a reload changes them too.
 public enum OSCFeedbackDeriver {
     public static func messages(for executed: [ExecutedCommand], state: ShowState, library: Library, machine: Machine) -> [OSCMessage] {
+        messages(forEffects: executed.flatMap(\.effects), state: state, library: library, machine: machine)
+    }
+
+    /// Spec 2 §6 — the same messages from effects no command made: Spec 3
+    /// §8's, when a restore replaced the state (Spec 9 §4), so a console
+    /// hears the content, stacks, blackout, popups and locks that came back.
+    public static func messages(forEffects effects: [Effect], state: ShowState, library: Library, machine: Machine) -> [OSCMessage] {
         var out: [OSCMessage] = []
-        for entry in executed {
-            for effect in entry.effects {
+        do {
+            for effect in effects {
                 switch effect {
                 case .transition(let t):
                     out.append(OSCFeedback.channelContent(t.channel, kind: t.to.kind, label: label(of: t.to, library: library, machine: machine)))

@@ -122,6 +122,8 @@ final class MediaFixture {
         var machine = roots.machine
         machine.outputs = try EngineFixtures.spikeMachine().outputs
         machine.settings.libraryMode = writable ? .writable : .readOnlyMasters
+        // Spec 9 §4, step 5 — the fixture's startup macro runs only for a test that asks for it.
+        machine.settings.startupMacro = nil
         configure(&machine)
         engine = try HeadlessEngine(library: roots.library, machine: machine, media: roots.media,
                                     mediaCache: LocalFiles.mediaCache(machineRoot: machineRoot))

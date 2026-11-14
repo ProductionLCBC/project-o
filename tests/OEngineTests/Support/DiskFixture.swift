@@ -61,6 +61,7 @@ final class DiskFixture {
                      relaunch: Bool = false) throws {
         previous.engine.waitForWrites()
         previous.engine.settleLogs()
+        previous.engine.settleState()
         previous.handedOn = true
         try self.init(folder: previous.folder, clock: previous.clock, disk: previous.disk, configure: configure, launch: launch,
                       relaunch: relaunch)
@@ -76,6 +77,9 @@ final class DiskFixture {
         var machine = roots.machine
         machine.outputs = try EngineFixtures.spikeMachine().outputs
         machine.settings.libraryMode = .writable
+        // Spec 9 §4, step 5 — the fixture names a startup macro (its preshow); a test that launches runs it only
+        // when it says so, so the others start from an empty stage.
+        machine.settings.startupMacro = nil
         configure(&machine)
         // Spec 8 §9 — "every test that launches the engine on a fixture runs on a temporary copy", its media included.
         engine = try HeadlessEngine(library: roots.library, machine: machine, media: roots.media,

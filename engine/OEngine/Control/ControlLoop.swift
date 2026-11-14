@@ -165,6 +165,14 @@ public final class ControlLoop: @unchecked Sendable {
     private var remainingSent: [Int: (started: Int, second: Int)] = [:]
     /// The timers this build's commands changed, with their lines' `seq`.
     private var changedTimers: [(timer: Int, seq: Int)] = []
+    /// Spec 9 §4 — the writer of `state/last.json`, once the engine has
+    /// launched on roots on disk; nil for an engine that was only built.
+    var lastStateKeeper: LastStateKeeper?
+    /// Spec 3 §8 — the effects of a state replaced since the last build
+    /// (restore-last-state): what feedback mirrors after this build, as it
+    /// mirrors a command's effects. Reset every build.
+    public private(set) var lastReplaced: [Effect] = []
+    private var pendingReplacement: [Effect] = []
 
     public init(library: Library, machine: Machine, pacing: Pacing, media: MediaFolders, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -364,6 +372,8 @@ public final class ControlLoop: @unchecked Sendable {
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
+        lastReplaced = pendingReplacement
+        pendingReplacement = []
         lastRejected = []
         lastLibraryEvents = []
         lastMediaEvents = []
@@ -394,6 +404,9 @@ public final class ControlLoop: @unchecked Sendable {
             lastRootsChanged = true
             kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
         }
+        // Spec 9 §4 — the last state: "After a runtime group, within a second ... At least once a minute".
+        lastStateKeeper?.keep(state: model.state, pendingClears: pendingClears.keys.sorted(),
+                              changed: !lastExecuted.isEmpty || !lastReplaced.isEmpty, now: now)
         // Spec 8 §2 — missing state, worked out again when the indexes or what is known of the files changed.
         refreshMedia()
         updateLive(frame: frame)
@@ -549,9 +562,10 @@ public final class ControlLoop: @unchecked Sendable {
     /// a pointer effect is a fire, a load or a disarm.
     private func updateLive(frame: Int64) {
         lastLiveFeedback = nil
-        guard !lastExecuted.isEmpty || lastRootsChanged else { return }
+        guard !lastExecuted.isEmpty || lastRootsChanged || !lastReplaced.isEmpty else { return }
         let live = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: kept)
-        var moved = false
+        // Spec 3 §8 — a restore's `pointer` effect moves the live marker like a fire's.
+        var moved = lastReplaced.contains { if case .pointer = $0 { return true } else { return false } }
         var boundary: Bool?
         for line in lastExecuted {
             for effect in line.effects {
@@ -714,6 +728,50 @@ public final class ControlLoop: @unchecked Sendable {
         lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .file, changed: changes, seq: commandLog.lastSeq))
         // Spec 8 §2 — an index that reloaded may name files no walk has looked at.
         if changes.contains(where: { $0.object == "media" }) { mediaWorker?.requestWalk() }
+    }
+
+    /// Spec 9 §4 — "When the engine stops on request ... writes the file at
+    /// once with `clean: true`": the state and the pending clears as they
+    /// are, on disk when this returns. Nothing to do for an engine that
+    /// never launched on roots on disk. On the control side, the loop stopped.
+    func endLastState(now: MonotonicTime) {
+        lastStateKeeper?.end(state: model.state, pendingClears: pendingClears.keys.sorted(), now: now)
+    }
+
+    // MARK: - Restores (Spec 3 §8)
+
+    /// Spec 3 §8 — "Restores replace ShowState wholesale: in v1
+    /// restore-last-state does, from `state/last.json` (Spec 9 §4), and in
+    /// v1.5 runtime undo does ... the engine diffs old and new state and
+    /// synthesizes `transition` effects as cuts, `attribute` effects for
+    /// every changed attribute, and a `pointer` effect". Spec 9 §4 — "Every
+    /// change is a cut ... and outgoing instances are dropped."
+    ///
+    /// `new` is the state to hold from `frame` on, already made for this
+    /// library and machine (`LastState.restored`). Each channel whose
+    /// content differs gets a new runtime from its in-point, the old one
+    /// released; each output lands on its stack with no switch or blackout
+    /// running; pending popup clears go, since the state that set them is
+    /// gone; and the kept copies are taken for the pointer (Spec 7 §4: "at a
+    /// launch or a state restore"). Timers aren't in ShowState and are left
+    /// as they are. On the control side, between builds.
+    public func replaceState(_ new: ShowState, frame: Int64) {
+        let effects = StateReplacement.effects(from: model.state, to: new)
+        model.state = new
+        for effect in effects { apply(effect, frame: frame) }
+        for output in machine.outputs {
+            var runtime = model.outputs[output.number] ?? OutputRuntime()
+            runtime.switchRun = nil
+            runtime.blackout = nil
+            let stack = new.outputs[output.number] ?? output.defaultStack
+            runtime.blackoutMix = new.stacks[stack]?.blackout == true ? 1 : 0
+            model.outputs[output.number] = runtime
+        }
+        // A box has no earlier text to dissolve from: what it shows next is a cut too.
+        model.boxRuns.removeAll()
+        pendingClears = [:]
+        kept = KeptCopies().refreshed(for: new.pointer, library: library, machine: machine)
+        pendingReplacement.append(contentsOf: effects)
     }
 
     // MARK: - Effects to runtimes (Spec 3 §6, "Who acts": the engine)
@@ -972,7 +1030,8 @@ public final class ControlLoop: @unchecked Sendable {
                 ref: m.ref, handle: InstanceHandle(rawValue: -1), source: nil,
                 poster: posterKey.map(posters.poster) ?? .none, entry: entry,
                 layout: .nv12, size: PixelSize(width: entry?.width ?? 0, height: entry?.height ?? 0), matrix: .bt709, range: .limited,
-                inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: true),
+                // Spec 9 §4 — a restored instance's "transport is as it was": one that was paused or stopped doesn't play.
+                inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: m.transport == .playing),
                 ready: false, missing: m.missing || url == nil, clearIssued: false,
                 transport: m.transport, endBehavior: m.endBehavior, posterKey: posterKey)
             guard !runtime.missing, let entry, let url else { return .media(runtime) }

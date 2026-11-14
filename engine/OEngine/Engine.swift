@@ -390,12 +390,21 @@ public final class Engine: @unchecked Sendable {
         var report = StopReport()
         // With the control thread out of its loop, its state is this thread's to use.
         if quiet {
+            // Spec 9 §4 — "it runs the shutdown macro": one last build, the macro its first group (Spec 2 §5,
+            // source `shutdown`), with whatever was still queued behind it.
+            if let macro = control.machine.settings.shutdownMacro {
+                control.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .shutdown), commands: [Command.macro(macro)]))
+                planRing.publish(control.build(for: control.model.frame + 1, now: clock.now()))
+                finishBuild()
+            }
             control.flushDocuments(now: clock.now())
             // Spec 5 §5 — an open typing run writes its line before the engine stops.
             control.commandLog.flush()
             report.unsaved = control.unsavedDocuments
             control.note("stop", ["unsaved": .array(report.unsaved.map(JSONValue.string))],
                          text: report.unsaved.isEmpty ? "Engine stopped" : "Engine stopped with \(report.unsaved.count) document(s) unwritten")
+            // Spec 9 §4 — "then writes the file at once with `clean: true`."
+            control.endLastState(now: clock.now())
         } else {
             log.error("the control thread did not stop in time: the last edits and the stop note are not written")
         }

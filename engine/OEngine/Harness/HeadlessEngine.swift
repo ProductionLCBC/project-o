@@ -184,6 +184,11 @@ public final class HeadlessEngine: @unchecked Sendable {
         engine.logs?.waitUntilIdle()
     }
 
+    /// Spec 9 §4 — every write of `state/last.json` handed over so far is on disk.
+    public func settleState() {
+        control.lastStateKeeper?.waitUntilIdle()
+    }
+
     /// The writer's queue has done everything queued so far; the next tick
     /// reads what it reported.
     public func waitForWrites() {
