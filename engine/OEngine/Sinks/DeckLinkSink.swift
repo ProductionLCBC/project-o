@@ -176,6 +176,16 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
         return phase
     }
 
+    /// Spec 10 §3 — the output's state as the `outputs` topic reports it: a
+    /// card that was never there is `absent`, one that went is `paused`.
+    public var standing: OutputStanding {
+        switch currentPhase {
+        case .running: return .presenting
+        case .paused: return .paused
+        case .stopped, .unavailable: return .absent
+        }
+    }
+
     public static var sdkAvailable: Bool { odl_sdk_available() }
 
     // MARK: - Lifecycle

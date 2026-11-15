@@ -239,6 +239,46 @@ public final class HALOutputDevice: AudioDevice, @unchecked Sendable {
         }
     }
 
+    /// Spec 10 §3, the `devices` query — "audio output devices (UID, name,
+    /// channel count, whether it is the system default)": every device with
+    /// at least one output channel, in Core Audio's order.
+    public static func outputDevices() -> [DetectedAudioDevice] {
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr else { return [] }
+        var devices = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &devices) == noErr else { return [] }
+        let systemDefault = deviceID(forUID: nil)
+        return devices.compactMap { device in
+            let channels = outputChannelCount(of: device)
+            guard channels > 0, let uid = string(kAudioDevicePropertyDeviceUID, of: device) else { return nil }
+            return DetectedAudioDevice(uid: uid, name: string(kAudioObjectPropertyName, of: device) ?? uid, channels: channels,
+                                       isDefault: device == systemDefault)
+        }
+    }
+
+    private static func string(_ selector: AudioObjectPropertySelector, of device: AudioDeviceID) -> String? {
+        var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var size = UInt32(MemoryLayout<CFString?>.size)
+        var value: Unmanaged<CFString>?
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr, let value else { return nil }
+        return value.takeUnretainedValue() as String
+    }
+
+    /// The channels a device can play: the sum over its output streams.
+    private static func outputChannelCount(of device: AudioDeviceID) -> Int {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamConfiguration, mScope: kAudioDevicePropertyScopeOutput,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr, size >= UInt32(MemoryLayout<AudioBufferList>.size) else { return 0 }
+        let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+        defer { raw.deallocate() }
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, raw) == noErr else { return 0 }
+        let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+        return list.reduce(0) { $0 + Int($1.mNumberChannels) }
+    }
+
     public var isRunning: Bool { running.load(ordering: .relaxed) }
 
     public func start(render: @escaping AudioRenderCallback) throws {

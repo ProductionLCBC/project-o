@@ -25,6 +25,7 @@
 
 #include <atomic>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -270,6 +271,65 @@ bool odl_sdk_available(void) {
     if (!iterator) return false;
     iterator->Release();
     return true;
+}
+
+int32_t odl_list_output_ports(odl_port_t *ports, int32_t capacity) {
+    IDeckLinkIterator *iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) return 0;
+    int32_t count = 0;
+    IDeckLink *deckLink = nullptr;
+    while (succeeded(iterator->Next(&deckLink)) && deckLink) {
+        IDeckLinkOutput *output = nullptr;
+        if (succeeded(deckLink->QueryInterface(IID_IDeckLinkOutput, reinterpret_cast<void **>(&output))) && output) {
+            if (ports && count < capacity) {
+                odl_port_t *port = &ports[count];
+                std::memset(port, 0, sizeof(*port));
+                CFStringRef name = nullptr;
+                if (succeeded(deckLink->GetDisplayName(&name)) && name) {
+                    CFStringGetCString(name, port->name, ODL_PORT_NAME_BYTES, kCFStringEncodingUTF8);
+                    CFRelease(name);
+                }
+                // The persistent id as outputs.json holds it; a card without one is known by its name, which odl_open also takes.
+                IDeckLinkProfileAttributes *attributes = nullptr;
+                int64_t persistent = 0;
+                bool have = false;
+                if (succeeded(deckLink->QueryInterface(IID_IDeckLinkProfileAttributes, reinterpret_cast<void **>(&attributes))) && attributes) {
+                    have = succeeded(attributes->GetInt(BMDDeckLinkPersistentID, &persistent));
+                    attributes->Release();
+                }
+                if (have) {
+                    std::snprintf(port->persistent_id, ODL_PORT_ID_BYTES, "%llx", static_cast<unsigned long long>(persistent));
+                } else {
+                    std::snprintf(port->persistent_id, ODL_PORT_ID_BYTES, "%s", port->name);
+                }
+                IDeckLinkDisplayModeIterator *modes = nullptr;
+                if (succeeded(output->GetDisplayModeIterator(&modes)) && modes) {
+                    IDeckLinkDisplayMode *mode = nullptr;
+                    while (port->mode_count < ODL_PORT_MODES && succeeded(modes->Next(&mode)) && mode) {
+                        BMDTimeValue duration = 0;
+                        BMDTimeScale scale = 0;
+                        if (succeeded(mode->GetFrameRate(&duration, &scale)) && duration > 0 && scale > 0) {
+                            odl_mode_t *entry = &port->modes[port->mode_count++];
+                            entry->width = static_cast<int32_t>(mode->GetWidth());
+                            entry->height = static_cast<int32_t>(mode->GetHeight());
+                            entry->rate_num = static_cast<int32_t>(scale);
+                            entry->rate_den = static_cast<int32_t>(duration);
+                            entry->interlaced = mode->GetFieldDominance() != bmdProgressiveFrame;
+                        }
+                        mode->Release();
+                        mode = nullptr;
+                    }
+                    modes->Release();
+                }
+            }
+            count += 1;
+            output->Release();
+        }
+        deckLink->Release();
+        deckLink = nullptr;
+    }
+    iterator->Release();
+    return count;
 }
 
 odl_status_t odl_open(const char *persistent_id, odl_device_t **out_device) {

@@ -72,6 +72,25 @@ typedef void (*odl_playback_stopped_cb)(void *context);
 /// on a Mac without the driver.
 bool odl_sdk_available(void);
 
+#define ODL_PORT_ID_BYTES 32
+#define ODL_PORT_NAME_BYTES 128
+#define ODL_PORT_MODES 64
+
+/// Spec 10 §3, the `devices` query — "DeckLink output ports (`decklink:<id>`,
+/// name, the modes it plays)": one port that can play.
+typedef struct odl_port {
+    char persistent_id[ODL_PORT_ID_BYTES];   // the SDK's persistent id as lowercase hex, the form outputs.json holds
+    char name[ODL_PORT_NAME_BYTES];          // the port's display name, UTF-8
+    int32_t mode_count;                      // how many of `modes` are filled
+    odl_mode_t modes[ODL_PORT_MODES];
+} odl_port_t;
+
+/// Spec 10 §13 — "ports in the order the driver lists them": fills `ports`
+/// with up to `capacity` output ports in that order and returns how many the
+/// driver has in all, which may be more than `capacity`. Zero from the stub,
+/// without the driver and without a card.
+int32_t odl_list_output_ports(odl_port_t *ports, int32_t capacity);
+
 /// Opens the output of the card whose persistent id is `persistent_id`
 /// (Spec 1 §3: "DeckLink port persistent ID"). Returns ODL_ERR_UNAVAILABLE
 /// from the stub.

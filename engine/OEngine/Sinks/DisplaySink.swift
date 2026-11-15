@@ -8,10 +8,16 @@ import OCore
 import Synchronization
 
 /// Spec 4 §12 — "Display disconnected: Pause that sink, keep its ring; resume
-/// at the configured mode when it returns." The sink's state, kept apart so
-/// it can be tested without a screen.
+/// when it returns, at its current mode." Spec 10 §2 — "A display output
+/// whose screen isn't there stays `absent` and opens when a screen with its
+/// id appears; it never falls back to another screen." Spec 10 §9 — an
+/// output taken off its screen is `released` for the rest of the run. The
+/// sink's state, kept apart so it can be tested without a screen.
 public struct DisplaySinkState: Equatable, Sendable {
-    public enum Phase: Equatable, Sendable { case stopped, running, paused }
+    /// `absent`: started, and its screen has not been there yet. `paused`:
+    /// it presented, and its screen went. `released`: taken off its screen
+    /// until the engine ends.
+    public enum Phase: Equatable, Sendable { case stopped, running, paused, absent, released }
 
     public var phase: Phase = .stopped
     public var presented: Int64 = 0
@@ -34,12 +40,44 @@ public struct DisplaySinkState: Equatable, Sendable {
 
     public init() {}
 
-    /// A screen-configuration change: the sink's screen is there or not.
+    /// Spec 10 §2 — the sink starts: with its screen there it presents, and
+    /// without it it waits, `absent`. A released sink stays released.
+    public mutating func started(screenPresent: Bool) {
+        guard phase == .stopped else { return }
+        phase = screenPresent ? .running : .absent
+    }
+
+    /// A screen-configuration change: the sink's screen is there or not. A
+    /// screen that goes pauses a running sink; one that comes resumes a
+    /// paused sink and opens an absent one, each from the newest frame.
     public mutating func screenChanged(available: Bool) {
         switch (phase, available) {
-        case (.running, false): phase = .paused
-        case (.paused, true): phase = .running
-        default: break
+        case (.running, false):
+            phase = .paused
+        case (.paused, true), (.absent, true):
+            phase = .running
+            // What was due before the screen went is long gone: latch again, one frame behind the newest.
+            expectedTick = -1
+            lastPresentedTick = -1
+            tickPhase = 0
+        default:
+            break
+        }
+    }
+
+    /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
+    /// `released`": from any phase, and no change of screens brings it back.
+    public mutating func released() {
+        phase = .released
+    }
+
+    /// Spec 10 §3 — the output's state as the `outputs` topic reports it.
+    public var standing: OutputStanding {
+        switch phase {
+        case .running: return .presenting
+        case .paused: return .paused
+        case .released: return .released
+        case .stopped, .absent: return .absent
         }
     }
 
@@ -96,54 +134,69 @@ public struct DisplaySinkState: Equatable, Sendable {
 }
 
 /// Spec 4 §10 — "Display sink. One borderless, opaque window per screen at
-/// the screen's native mode, above every other window, hosting a
-/// CAMetalLayer: pixel format bgr10a2Unorm (10-bit; bgra8Unorm_srgb as a
-/// fallback the sink reports), colour space sRGB/Rec.709, extended dynamic
-/// range off, displaySyncEnabled on, presentsWithTransaction off,
-/// maximumDrawableCount 3. ... The sink's CADisplayLink callback, not the
-/// render thread, takes the newest completed frame from the output's ring,
-/// requests a drawable, encodes the trivial encode pass into it and
-/// presents; if no drawable is available within the callback it skips and
-/// counts a drop."
+/// the screen's current mode, on every Space, above every other window but
+/// the few of the operator app's that must sit over an output (Spec 10 §2,
+/// §11), hosting a CAMetalLayer: pixel format bgr10a2Unorm (10-bit;
+/// bgra8Unorm_srgb as a fallback the sink reports), colour space
+/// sRGB/Rec.709, extended dynamic range off, displaySyncEnabled on,
+/// presentsWithTransaction off, maximumDrawableCount 3. ... The sink's
+/// CADisplayLink callback, not the render thread, takes the newest completed
+/// frame from the output's ring, requests a drawable, encodes the trivial
+/// encode pass into it and presents; if no drawable is available within the
+/// callback it skips and counts a drop."
+///
+/// Spec 10 §2 — the sink exists whether or not its screen does. `place(on:)`
+/// gives it the screen whose id its output names, at launch and at every
+/// change of screens, or takes it away: "A display output whose screen isn't
+/// there stays `absent` and opens when a screen with its id appears; it never
+/// falls back to another screen." The window is an `OutputPanel`.
 ///
 /// AppKit is main-actor bound, so the window and the display link are made on
 /// the main actor; the refresh callback then runs on the sink's own thread.
 public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     public let output: Int
+    /// Spec 1 §3 — the display's uuid the output's `device` names
+    /// (`display:<uuid>`), in capitals; nil when it names no display.
+    public let screenUUID: String?
     public let encode: EncodeKind = .display10Bit
     public let ring = FrameRing()
     public let presents = PresentRing()
     private let backend: MetalBackend
     private let log: EngineLog
-    private let screenName: String
-    private let screenFrame: CGRect
-    private let screenScale: CGFloat
-    private let screenRefreshRate: Double
-    private var masterRate = FrameRate(num: 60)
-    private var lastRefreshTimestamp: CFTimeInterval = 0
-    private let makeLink: @MainActor (DisplaySink) -> CADisplayLink
     private let lastPresentNs = Atomic<Int64>(0)
-    private let lock = NSLock()
-    private var state = DisplaySinkState()
-    private var window: NSWindow?
-    private var layer: CAMetalLayer?
-    private var link: CADisplayLink?
-    private var thread: Thread?
     private let running = Atomic<Bool>(false)
     private let queue: MTLCommandQueue?
     public private(set) var usesEightBitFallback = false
-    private var screenObserver: NSObjectProtocol?
+
+    // Read by the refresh thread and written on the main actor, under the lock.
+    private let lock = NSLock()
+    private var state = DisplaySinkState()
+    private var masterRate = FrameRate(num: 60)
+    private var screenRefreshRate: Double = 60
+    private var lastRefreshTimestamp: CFTimeInterval = 0
+    private var layer: CAMetalLayer?
+    private var link: CADisplayLink?
+
+    // The main actor's own: the screen the sink was given, and what is open on it.
+    private var placed: NSScreen?
+    private var window: OutputPanel?
+    private var linkAlive: LinkToken?
+    private var attachedDisplay: CGDirectDisplayID?
+    private var attachedFrame = CGRect.zero
+    private var attachedScale: CGFloat = 0
+    private var screenName = ""
+
+    /// One display link's thread runs while its token says so.
+    private final class LinkToken: Sendable {
+        let alive = Atomic<Bool>(true)
+    }
 
     @MainActor
-    public init(output: Int, screen: NSScreen, backend: MetalBackend, log: EngineLog) {
+    public init(output: Int, device: String, backend: MetalBackend, log: EngineLog) {
         self.output = output
+        screenUUID = DetectedScreen.uuid(ofDevice: device)
         self.backend = backend
         self.log = log
-        screenName = screen.localizedName
-        screenFrame = screen.frame
-        screenScale = screen.backingScaleFactor
-        screenRefreshRate = screen.maximumFramesPerSecond > 0 ? Double(screen.maximumFramesPerSecond) : 60
-        makeLink = { sink in screen.displayLink(target: sink, selector: #selector(DisplaySink.refresh(_:))) }
         queue = backend.device.makeCommandQueue()
         super.init()
     }
@@ -154,9 +207,14 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
         lock.lock()
         self.masterRate = masterRate
         state.ticksPerFrame = max(1, ticksPerFrame)
-        let outputRate = masterRate.perSecond / Double(max(1, ticksPerFrame))
-        state.screenMatchesOutput = screenRefreshRate <= outputRate * 1.01
+        matchScreenToOutput()
         lock.unlock()
+    }
+
+    /// With the lock held: whether the screen refreshes no faster than the output.
+    private func matchScreenToOutput() {
+        let outputRate = masterRate.perSecond / Double(max(1, state.ticksPerFrame))
+        state.screenMatchesOutput = screenRefreshRate <= outputRate * 1.01
     }
 
     public var lastPresent: MonotonicTime { MonotonicTime(nanoseconds: lastPresentNs.load(ordering: .acquiring)) }
@@ -167,46 +225,127 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
         return state
     }
 
+    /// Spec 10 §3 — the output's state as the `outputs` topic reports it.
+    public var standing: OutputStanding { currentState.standing }
+
     // MARK: - Lifecycle
 
+    /// Spec 10 §2 — the sink starts: on its screen when `place(on:)` gave it
+    /// one, else `absent` until a screen with its id appears. A sink released
+    /// before it started (`--released`) stays released.
     public func start() throws {
         guard !running.exchange(true, ordering: .acquiringAndReleasing) else { return }
-        lock.lock()
-        state.phase = .running
-        lock.unlock()
-        let boxed: DisplayLinkBox
-        if Thread.isMainThread {
-            boxed = MainActor.assumeIsolated { DisplayLinkBox(openWindow()) }
-        } else {
-            boxed = DispatchQueue.main.sync { MainActor.assumeIsolated { DisplayLinkBox(openWindow()) } }
-        }
-        let link = boxed.link
-        self.link = link
-        let thread = Thread { [self] in
-            link.add(to: RunLoop.current, forMode: .common)
-            while self.running.load(ordering: .relaxed) {
-                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
-            }
-            link.invalidate()
-        }
-        thread.name = "o.engine.sink.display.\(output)"
-        thread.qualityOfService = .userInteractive
-        self.thread = thread
-        thread.start()
-        log.info("display sink \(output) on \(screenName) at \(Int(screenFrame.width))x\(Int(screenFrame.height)) scale \(screenScale)")
+        onMain { self.open() }
     }
 
     @MainActor
-    private func openWindow() -> CADisplayLink {
-        let window = NSWindow(contentRect: screenFrame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) + 1)
-        window.isOpaque = true
-        window.backgroundColor = .black
-        window.hasShadow = false
-        window.ignoresMouseEvents = true
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        let view = NSView(frame: CGRect(origin: .zero, size: screenFrame.size))
-        view.wantsLayer = true
+    private func open() {
+        lock.lock()
+        state.started(screenPresent: placed != nil)
+        let phase = state.phase
+        lock.unlock()
+        if phase == .running, let placed {
+            attach(placed)
+        } else if phase == .absent {
+            log.warning("display sink \(output): its screen (\(screenUUID ?? "none named")) isn't there; absent until it appears")
+        }
+    }
+
+    /// Spec 10 §2 — the sink's screen as the Mac has it now: the screen whose
+    /// id the output names, or nil when no screen has it. Called before the
+    /// sink starts and at every change of screens. A screen that appears
+    /// opens the window on it; one that goes pauses the sink, which keeps its
+    /// ring (Spec 4 §12) and hides its window, so macOS can't move an output
+    /// onto another screen; one whose frame or mode changed is followed.
+    @MainActor
+    public func place(on screen: NSScreen?) {
+        placed = screen
+        guard running.load(ordering: .relaxed) else { return }
+        lock.lock()
+        let before = state.phase
+        lock.unlock()
+        guard before == .running || before == .paused || before == .absent else { return }
+        if let screen {
+            attach(screen)
+            lock.lock()
+            state.screenChanged(available: true)
+            lock.unlock()
+            if before != .running { log.info("display sink \(output): \(before == .paused ? "screen back, resumed" : "screen appeared, opened")") }
+        } else if before == .running {
+            detach()
+            lock.lock()
+            state.screenChanged(available: false)
+            lock.unlock()
+            log.warning("display sink \(output): screen lost, paused")
+        }
+    }
+
+    /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
+    /// `released`": for the rest of the run, whatever the screens do.
+    @MainActor
+    public func release() {
+        detach()
+        window?.close()
+        window = nil
+        lock.lock()
+        layer = nil
+        state.released()
+        lock.unlock()
+        log.info("display sink \(output): released from its screen")
+    }
+
+    /// Opens the window on `screen`, or moves it to the screen's frame and
+    /// mode as they are now, with a display link of that screen. Nothing to
+    /// do when the sink is already on this screen as it is.
+    @MainActor
+    private func attach(_ screen: NSScreen) {
+        let display = SystemDevices.displayID(of: screen)
+        let frame = screen.frame, scale = screen.backingScaleFactor
+        if linkAlive != nil, attachedDisplay == display, attachedFrame == frame, attachedScale == scale { return }
+        endLink()
+        attachedDisplay = display
+        attachedFrame = frame
+        attachedScale = scale
+        screenName = screen.localizedName
+
+        let panel = window ?? OutputPanel(frame: frame)
+        let metal = currentLayer() ?? makeLayer()
+        metal.contentsScale = scale
+        metal.drawableSize = CGSize(width: frame.width * scale, height: frame.height * scale)
+        if panel.contentView?.layer !== metal {
+            panel.contentView?.wantsLayer = true
+            panel.contentView?.layer = metal
+        }
+        panel.setFrame(frame, display: true)
+        panel.orderFrontRegardless()
+        window = panel
+
+        let link = screen.displayLink(target: self, selector: #selector(DisplaySink.refresh(_:)))
+        let token = LinkToken()
+        lock.lock()
+        layer = metal
+        self.link = link
+        screenRefreshRate = screen.maximumFramesPerSecond > 0 ? Double(screen.maximumFramesPerSecond) : 60
+        lastRefreshTimestamp = 0
+        matchScreenToOutput()
+        lock.unlock()
+        linkAlive = token
+        let boxed = DisplayLinkBox(link)
+        let thread = Thread {
+            boxed.link.add(to: RunLoop.current, forMode: .common)
+            while token.alive.load(ordering: .relaxed) {
+                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
+            }
+            boxed.link.invalidate()
+        }
+        thread.name = "o.engine.sink.display.\(output)"
+        thread.qualityOfService = .userInteractive
+        thread.start()
+        log.info("display sink \(output) on \(screenName) at \(Int(frame.width))x\(Int(frame.height)) scale \(scale)")
+    }
+
+    @MainActor
+    private func makeLayer() -> CAMetalLayer {
         let layer = CAMetalLayer()
         layer.device = backend.device
         layer.pixelFormat = .bgr10a2Unorm
@@ -217,35 +356,52 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
         layer.maximumDrawableCount = 3
         layer.framebufferOnly = true
         layer.isOpaque = true
-        layer.contentsScale = screenScale
-        layer.drawableSize = CGSize(width: screenFrame.width * screenScale, height: screenFrame.height * screenScale)
-        view.layer = layer
-        window.contentView = view
-        window.setFrame(screenFrame, display: true)
-        window.orderFrontRegardless()
-        self.window = window
-        self.layer = layer
-        screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            MainActor.assumeIsolated { self.screensChanged() }
-        }
-        return makeLink(self)
+        return layer
+    }
+
+    private func currentLayer() -> CAMetalLayer? {
+        lock.lock()
+        defer { lock.unlock() }
+        return layer
+    }
+
+    /// Ends the display link's thread; the window stays as it is.
+    @MainActor
+    private func endLink() {
+        linkAlive?.alive.store(false, ordering: .releasing)
+        linkAlive = nil
+        lock.lock()
+        link = nil
+        lock.unlock()
+    }
+
+    /// Takes the sink off its screen: no link, and the window out of sight.
+    @MainActor
+    private func detach() {
+        endLink()
+        window?.orderOut(nil)
+        attachedDisplay = nil
     }
 
     public func stop() {
         running.store(false, ordering: .releasing)
-        let close = { [self] in
-            MainActor.assumeIsolated {
-                if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
-                screenObserver = nil
-                window?.orderOut(nil)
-                window = nil
-            }
+        onMain {
+            self.detach()
+            self.window?.close()
+            self.window = nil
         }
-        if Thread.isMainThread { close() } else { DispatchQueue.main.sync(execute: close) }
         lock.lock()
         state.phase = .stopped
         lock.unlock()
+    }
+
+    /// AppKit's work, from whichever thread asks.
+    private func onMain(_ body: @MainActor () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { body() }
+        } else {
+            DispatchQueue.main.sync { MainActor.assumeIsolated { body() } }
+        }
     }
 
     /// Spec 4 §13 — "present latency (tick to vsync ...)": the vsync this
@@ -253,18 +409,6 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     /// both on the display link's clock.
     public static func presentLatency(targetNs: Int64, referenceNs: Int64) -> Int64 {
         max(0, targetNs - referenceNs)
-    }
-
-    /// Spec 4 §12 — pause when the screen leaves, resume when it returns.
-    @MainActor
-    func screensChanged() {
-        let available = NSScreen.screens.contains { $0.localizedName == screenName }
-        lock.lock()
-        let before = state.phase
-        state.screenChanged(available: available)
-        let after = state.phase
-        lock.unlock()
-        if before != after { log.warning("display sink \(output): \(after == .paused ? "screen lost, paused" : "screen back, resumed")") }
     }
 
     // MARK: - Refresh (the sink's own cadence)
@@ -275,7 +419,12 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     }
 
     private func refreshInPool(_ link: CADisplayLink) {
-        guard let layer, let queue else { return }
+        lock.lock()
+        let layer = self.layer
+        let current = self.link
+        lock.unlock()
+        // A link the sink has moved on from (its screen went, or changed) presents nothing more.
+        guard let layer, let queue, current === link else { return }
         let ring = self.ring
         let backend = self.backend
         let isComplete: (Int64) -> Bool = { tick in

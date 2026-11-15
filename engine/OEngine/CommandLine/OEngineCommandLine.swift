@@ -38,6 +38,8 @@ public enum OEngineCommandLine {
                 return try makeFixtures(rest)
             case "mach-proof":
                 return try machProof(rest)
+            case "devices":
+                return devices()
             default:
                 fail("unknown command \(first)\n" + usage)
                 return 2
@@ -67,12 +69,16 @@ public enum OEngineCommandLine {
            judge a black box folder against the thresholds; exit 1 on a failure
       make-fixtures <media-folder> [--scale X]
            write the synthetic spike clips and still (tests/fixtures/spike/library/media)
+      devices
+           print this Mac's screens (display:<uuid>), DeckLink output ports and audio output devices as JSON,
+           as the devices query answers them (Spec 10 §3); the ids are what an output's device holds
       mach-proof serve <name> [--register]
            register <name> as a Mach service (bootstrap_check_in, or the deprecated bootstrap_register with
            --register) and answer each lookup with one surface until killed; opens no screen (Spec 10 §2)
       mach-proof lookup <name> [<result-file>]
            look <name> up, read the surface it sends and say what was read; exit 1 when it isn't there
-    With fewer screens than display outputs, the last outputs share the last screen, the later one on top.
+    A display output opens only on the screen its device names (display:<uuid>); while that screen isn't there
+    the output is absent, and it opens when the screen appears.
     """
 
     // MARK: - run and soak
@@ -131,7 +137,10 @@ public enum OEngineCommandLine {
         let seconds: Int? = soak ? (try args.int("--minutes") ?? 180) * 60 : try args.int("--seconds")
 
         // The process runs the main thread's run loop for AppKit (the display sinks' windows); the engine is on its own threads.
-        _ = MainActor.assumeIsolated { NSApplication.shared.setActivationPolicy(.accessory) }
+        // Spec 10 §2 — "It runs as an accessory process ... they never ... make the engine the active app". macOS makes an
+        // accessory process the active app as its launch finishes, which would take the keyboard from the operator's app.
+        // So it launches as a process that can't be activated, and becomes an accessory process once launched (the delegate).
+        _ = MainActor.assumeIsolated { NSApplication.shared.setActivationPolicy(.prohibited) }
         let process = try MainActor.assumeIsolated { try EngineProcess(roots: roots, options: options) }
         process.start()
         print("oengine: running on \(roots.machine.settings.campusName); OSC on port \(process.osc?.boundPort ?? 0); black box in \(blackBoxFolder.path)")
@@ -171,6 +180,13 @@ public enum OEngineCommandLine {
             }
         }
         installSignalHandlers { finish(0) }
+        // Spec 10 §2 — "When macOS asks it to quit (logout, restart, shutdown) or sends it a terminate signal, it stops on
+        // request as Spec 9 §4 says."
+        MainActor.assumeIsolated {
+            let delegate = EngineAppDelegate(onQuit: { finish(0) })
+            appDelegate = delegate
+            NSApplication.shared.delegate = delegate
+        }
         if let seconds {
             DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(seconds)) { finish(0) }
         }
@@ -187,6 +203,9 @@ public enum OEngineCommandLine {
     }
 
     nonisolated(unsafe) static var signalSources: [DispatchSourceSignal] = []
+
+    /// The application's delegate, which AppKit holds only weakly.
+    @MainActor static var appDelegate: EngineAppDelegate?
 
     static func installSignalHandlers(_ handler: @escaping @Sendable () -> Void) {
         for number in [SIGINT, SIGTERM] {
@@ -255,6 +274,21 @@ public enum OEngineCommandLine {
         return 0
     }
 
+    // MARK: - devices
+
+    /// Spec 10 §3, the `devices` query — what this Mac has, as the query
+    /// answers it: the way to learn which `display:<uuid>` is which screen
+    /// when an output is bound by hand, as on the bench.
+    static func devices() -> Int32 {
+        let list = MainActor.assumeIsolated {
+            _ = NSApplication.shared
+            return SystemDevices().devices()
+        }
+        guard let json = try? JSONCoding.encode(list) else { return 1 }
+        print(JSONCanonical.string(json), terminator: "")
+        return 0
+    }
+
     // MARK: - mach-proof
 
     /// Spec 10 §2 — "Area 19 proves the call on the dev Mac at its first stop
@@ -299,6 +333,36 @@ public enum OEngineCommandLine {
         default:
             throw ProcessError.badArgument("mach-proof", args.positional[0])
         }
+    }
+}
+
+/// Spec 10 §2, "The engine as a process" — "It runs as an accessory process,
+/// with no Dock icon and no menu bar ... they never take the keyboard or make
+/// the engine the active app", and "When macOS asks it to quit (logout,
+/// restart, shutdown) ... it stops on request as Spec 9 §4 says."
+///
+/// macOS makes an accessory process the active app as its launch finishes
+/// (found on the dev Mac, macOS 26.3: the operator's keys would then go
+/// nowhere until someone clicked the app). A process that can't be activated
+/// isn't, so the engine launches as one and becomes an accessory process here,
+/// once launched; nothing activates it after that, since its only windows are
+/// non-activating panels.
+@MainActor
+final class EngineAppDelegate: NSObject, NSApplicationDelegate {
+    private let onQuit: @Sendable () -> Void
+
+    init(onQuit: @escaping @Sendable () -> Void) {
+        self.onQuit = onQuit
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.setActivationPolicy(.accessory)
+    }
+
+    /// The stop on request runs, and the process exits when it is done; AppKit is told to wait for that.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        onQuit()
+        return .terminateLater
     }
 }
 

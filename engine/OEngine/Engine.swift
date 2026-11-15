@@ -73,6 +73,9 @@ public final class Engine: @unchecked Sendable {
             thumbnails.auxBlocked = { render.isSkippingAux }
         }
     }
+    /// Spec 10 §2 — "while any output presents it keeps the displays and the
+    /// system from sleeping": told the outputs' states after every build.
+    public var power: OutputPower?
     private var lastLiveList: UUID?
     private var lastLiveVersion: Int?
     /// Signalled by the control thread when it leaves its loop.
@@ -243,6 +246,17 @@ public final class Engine: @unchecked Sendable {
         }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
+        power?.update(outputStandings())
+    }
+
+    /// Spec 10 §3, the `outputs` topic — each output's state, by number:
+    /// "`presenting`, `paused` while its screen or card is gone, `released`,
+    /// or `absent` when its device isn't there". An output with no sink (a
+    /// kind v1 doesn't present) is `absent`. Control side.
+    public func outputStandings() -> [Int: OutputStanding] {
+        var standings: [Int: OutputStanding] = [:]
+        for output in control.machine.outputs { standings[output.number] = sinks[output.number]?.standing ?? .absent }
+        return standings
     }
 
     /// Spec 4 §10 and the Area 5 reading approved on 2026-11-03: "when the
@@ -446,6 +460,8 @@ public final class Engine: @unchecked Sendable {
             recorder?.stop()
             audio?.stop()
             for sink in sinks.values { sink.stop() }
+            // Spec 10 §2 — nothing presents any more, so the displays and the system may sleep.
+            power?.end()
             controlThread = nil
             readbackThread = nil
         }

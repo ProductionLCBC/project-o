@@ -19,9 +19,18 @@ public protocol OutputSink: AnyObject, Sendable {
     var ring: FrameRing { get }
     /// Spec 4 §12 — when the sink last presented or scheduled a frame, for the watchdog.
     var lastPresent: MonotonicTime { get }
+    /// Spec 10 §3 — the output's state as the `outputs` topic reports it:
+    /// "`presenting`, `paused` while its screen or card is gone, `released`,
+    /// or `absent` when its device isn't there".
+    var standing: OutputStanding { get }
 
     func start() throws
     func stop()
+}
+
+extension OutputSink {
+    /// A sink with no device to lose, such as the harness's, presents.
+    public var standing: OutputStanding { .presenting }
 }
 
 /// Spec 4 §4 step 4 — "when its sink pass completes, publish the frame into
