@@ -1,6 +1,10 @@
 {
   "app": "0.1.0",
+  "clean": false,
   "kind": "state",
+  "pendingClears": [],
+  "restored": false,
+  "run": "51e20000-0000-4000-8000-000000000001",
   "schema": 1,
   "state": {
     "channels": {
@@ -48,5 +52,6 @@
       "1": { "blackout": false, "muted": [] },
       "2": { "blackout": false, "muted": [] }
     }
-  }
+  },
+  "writtenAt": "2026-11-08T09:41:07.002-05:00"
 }

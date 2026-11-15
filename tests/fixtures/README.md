@@ -39,7 +39,8 @@ stack and an output), three playlists named from their titles (Spec 7 §8: "Sund
 `sunday.json`; "Sunday Night", which links list 42 twice, for the pointer tests; and "Sunday
 2026-11-01", the archived copy of "Sunday"), each item with the uuid Spec 7 §3's `KIND:KEY:N`
 rule gives it and each linked item with its list's uuid, a local copy of list 42 with
-provenance, and `state/last.json`.
+provenance, and `state/last.json`, with the facts Spec 9 §4 gives it: `writtenAt`, the `run` that
+wrote it, `clean: false`, `restored: false` and `pendingClears: []`, as a run that was killed leaves it.
 
 Identities are fixed: UUIDs are `XXXXXXXX-0000-4000-8000-NNNNNNNNNNNN` with a readable prefix
 and the object's number at the end; media ids are the real SHA-256 of the files.
