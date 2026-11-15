@@ -19,7 +19,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | shipped |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | shipped |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | in review |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | shipped |
@@ -340,7 +340,10 @@ state with the normal stack pass (Area 5), the API's queries with their answer s
 side first: the edits Spec 7 §7 gives this area (channels, stacks, presets, text styles,
 grades, transitions and macros), with those of audio transitions and of an output's
 default stack and transitions, their checks, warnings and inverses, a macro's move
-between the roots, stack edits between ticks, and a box's move by position; then the
+between the roots, stack edits between ticks, a box's move by position, and the channel
+list rebuilt between ticks when a channel is added, removed or resized, which lifts the
+notInV1 Area 12's snapshot restore answers for a snapshot with another channel list
+(Spec 9 §6, Adam's answer of 2026-11-14); then the
 render query on the thumbnail job's queue, with its canvases, files and errors, on the
 local socket only, and the uses query over both roots (§3). Then the app: the frame with
 the edit bar, the ways in and out, the lock and the keys (§2), turning on the ways in

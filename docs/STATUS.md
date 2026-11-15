@@ -27,31 +27,45 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | not started | Next, in its own session: Spec 9 accepted 2026-11-07, its prompt block in `docs/build-order.md` and under Next below; it can start now. It writes Area 9's in-memory log to the day's file and builds undo, redo and the restores on its edit path and writer, runs the startup macro at launch (Spec 9 §4), takes the kept copies when it restores the last state, marks restored content `restored`, saves the popups' pending clears, undoes `media replace` and `media delete`, which Area 8 made edits, and drops the undo steps the media walk names (Spec 8 §4), which Area 8 returns and logs. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), and the pool tab and the staging copy for drops build on Area 8's import, topic and queries. |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | brief waiting for approval | In review on `area/saving` (6f1fdd0, pushed, hosted CI green on both jobs), built tests first with three stops Adam reviewed in the session: the command log and the engine log on disk with the notes and the hourly black box; the last state with the launch order and the stop sequence; snapshots; edit undo and redo with the `history` topic; the two restore commands through the edit gate, with the `versions` and `snapshots` queries; retention, the low and full disk and the `saving` topic. The brief, the session's final message (2026-11-15), waits for Adam's `approved`; it proposes one Spec 9 §6 correction. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). |
-| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 12; engine-only, so no bench run. It runs the shutdown macro on `stop` (Spec 10 §18) and puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, and Area 8's `media` topic and `mediaUse` and `media` queries (the publisher's query hook). Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
+| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Next, once Area 12 is merged: Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md` and under Next below; engine-only, so no bench run. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Nothing is in review; everything is on `main`.** Area 8, media pool, shipped on
-2026-11-14. Adam approved it as built, with every reading in the brief and its recommended
-answers, and no spec correction was proposed; it was merged with `--no-ff` (2c1b3d6) and
-pushed. Area 12, log and saving, is next, in its own session. The bench run with a card
-stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Area 12, log and saving, is in review on `area/saving`** (6f1fdd0, pushed, hosted CI
+green on both jobs). It was built tests first with three stops Adam reviewed in the
+session, and its brief, the session's final message (2026-11-15), waits for his
+`approved`. Only its status documents are on `main`: the code, the tests and the fixture's
+`last.json` stay on the branch until then. Area 19, engine API and first run, is next, in
+its own session, once Area 12 is merged. The bench run with a card stays deferred to a
+window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. The Area 8 brief (the final message of the Area 8 session, 2026-11-14) was answered
-the same day: approved as built, with its recommended answers, merged (2c1b3d6).
+- **Area 12, log and saving.** The brief is the final message of the Area 12 session
+  (2026-11-15). It asks for `approved`, and for a word on any of these he wants the other
+  way; each is built as recommended:
+  - `system snapshot`'s log line doesn't name the snapshot it wrote; its result does, and
+    the snapshot's manifest points back at the log by `run` and `seq`. Recommended: leave
+    it, since Spec 2 §9's `snapshot` key on a line is kept for runtime undo.
+  - An undo that fails is `conflict`, but `diskFull`, `noTrash` and `onAir` keep their own
+    code, because they say what the operator must fix. Recommended: as built.
+  - `system restore list N` where only a local copy has number N answers `notInV1`.
+    Recommended: as built.
+  - The shutdown macro's picture is never shown: the stop halts the frame clock first, so
+    a stop can't hang on a macro. Recommended: as built.
+  - Retention counts its ages to and including 7, 30 and 365 days. Recommended: as built.
+  - The Spec 9 §6 correction below, applied on the branch before the merge.
 
 ### Decisions
 
@@ -75,7 +89,9 @@ the same day: approved as built, with its recommended answers, merged (2c1b3d6).
   would show only the time. Since Area 8, `soak.sh` runs the spike on APFS clones of both
   roots with `libraryMode` writable (Adam's answer to Area 8's plan), so the launch walk
   lands each generated file on its fixed id; the bench run is the first end-to-end run of
-  that script change.
+  that script change. Once Area 12 is merged, an `oengine run` on that root also writes its
+  logs, its hourly black box, its snapshots and `state/last.json` there; the soak keeps its
+  own black box folder.
 
 ### The attended run
 
@@ -90,9 +106,17 @@ the same day: approved as built, with its recommended answers, merged (2c1b3d6).
 - **The engine writes to the roots it runs on.** Since Area 9 it writes edits; since Area 8
   every launch also walks the media and writes the hash cache (`machine/media-cache.json`),
   pool tiles (`machine/thumbnails/pool/`) and, on a writable machine, posters (`.posters/`)
-  and index changes. Running `oengine` against `tests/fixtures/library-v1` therefore changes
-  the fixture in the repository; the tests run on temporary copies (the harness refuses a
-  media worker on `tests/fixtures/`), and the spike runs through `soak.sh` on clones.
+  and index changes. With Area 12 a launched engine also writes `machine/logs/`,
+  `machine/blackbox/`, `machine/snapshots/` and `machine/state/last.json`, removes the
+  snapshots and logs retention no longer keeps, and a list restore writes a kept version
+  under `library/versions/`. Running `oengine` against `tests/fixtures/library-v1` therefore
+  changes the fixture in the repository; the tests run on temporary copies (the harness
+  refuses a media worker on `tests/fixtures/`), and the spike runs through `soak.sh` on
+  clones.
+- **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
+  for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
+  before the job finished, and it passed on the next full run and alone. It doesn't touch
+  Area 12's code. Worth watching on the bench; nothing was changed for it.
 - **The real-Trash check.** `O_REAL_TRASH=1 swift test --filter MediaTrashTests` moves a
   few-byte file into the Trash and back; it passed on the dev Mac on 2026-11-14 from a
   process without Full Disk Access, and ordinary runs skip it. Worth rerunning by hand after
@@ -110,7 +134,8 @@ the same day: approved as built, with its recommended answers, merged (2c1b3d6).
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 8's task is `shipped`.
+  dependencies from the block's "Starts after" line. Area 12's task is `in review`; Area
+  14's task carries its block as changed on 2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -135,72 +160,121 @@ the same day: approved as built, with its recommended answers, merged (2c1b3d6).
 
 ### Spec interpretations made so far
 
-None outstanding. Area 8's readings, below, were approved as built on 2026-11-14, with the
-recommended answers, and are recorded here and in its brief. "Adam's answer" marks a choice
-he made when he approved the plan on 2026-11-11, "with the plan" a reading he approved with
-it, "at stop 1", "at stop 2" and "at stop 3" one he saw in the report at that stop and let
-the session go on from, and "new" one first named in the brief. Earlier areas' readings were
-approved with their briefs and are in the specs' text, the briefs, or this page as it stood
-before: Area 11's at 4096ede, approved on 2026-11-11; Area 6's at a77bf69; Area 9's at
-f4b43ac; Area 15's on 2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area
-4's in 7032182.
+Area 12's readings, below, wait for Adam's answer to its brief. "Adam's answer" marks a
+choice he made on 2026-11-14 before he approved the plan, "with the plan" a reading he
+approved with it, "at stop 1", "at stop 2" and "at stop 3" one he saw in the report at that
+stop and let the session go on from, and "new" one first named in the brief. Earlier areas'
+readings were approved with their briefs and are in the specs' text, the briefs, or this
+page as it stood before: Area 8's at a8e741b, approved on 2026-11-14; Area 11's at 4096ede,
+approved on 2026-11-11; Area 6's at a77bf69; Area 9's at f4b43ac; Area 15's on 2026-11-10,
+Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
-| Spec 8 §9, the spike | How the spike runs once presence checks bytes, since its index names generated media by fixed ids | `scripts/soak.sh` runs on APFS clones of both roots with `libraryMode` writable, and the launch walk lands each generated file on its fixed id as a re-export (M-2); no fixture change (Adam's answer) | Commit hashed spike media, or rewrite the spike index |
-| Spec 8 §2, hashing | Which SHA-256 the engine uses | CryptoKit, without an ADR; OCore's own SHA-256 stays for Linux and cross-checks it in a test (Adam's answer) | OCore's pure-Swift hash everywhere |
-| Spec 8 §2 and §10, M-8 | Who builds the `mediaRoot` check | Area 8 builds the check; Area 17 opens `edit machine mediaRoot`; a launch with a root where media may not live reports it and reads nothing there (Adam's answer) | Area 8 opens the edit too |
-| Spec 8 §7 and Spec 10 §3, queries | Who answers `mediaUse` and `media` before the API exists | The engine's publisher, which gains a query hook; Area 19 puts them on the API (Adam's answer) | Wait for Area 19 |
-| Spec 8 §6, replace | Which references `media replace` rewrites | Write refs in cues, macros, key bindings and scheduler entries, and in cues' held `cueChannel` edits; held media commands and `edit media` keep naming OLD, and local copies follow the mapping (Adam's answer) | Every id in every document |
-| Spec 8 §2, presence at launch | A file at an item's location that isn't hashed yet | Present until hashed, unless the cache names other bytes for it (Adam's answer) | Missing until hashed |
-| Spec 8 §6, the edit gate | What runs while a delete's files move | Runtime commands run; edits and media commands, and edits held by cues fired meanwhile, wait behind it in the order they arrived (Adam's answer) | Everything waits |
-| Spec 8 §6, the Trash | Whether an engine without Full Disk Access can use the user's Trash | Checked first: a few-byte file moved into `~/.Trash` and back by an opt-in test, from a process that can't list the Trash; it passed (Adam's answer) | Stop and bring the options |
-| Spec 8 §6, failed moves | The code for a move that fails, or a worker that never answers | `conflict`, every moved file put back; no report within ten seconds counts as a failure (with the plan) | `noTrash` for every failure |
-| Spec 8 §3, kinds | ProRes 4444 XQ, ProRes RAW, a movie with only audio | 4444 XQ counts as 4444, RAW is refused, an MPEG-4 or QuickTime file with only AAC or ALAC audio is audio (with the plan) | By extension |
-| Spec 8 §3, PATH | A relative PATH, or one where media may not live | `unreadable`, and the place is never touched (with the plan) | Resolved against the engine's folder |
-| Spec 8 §2, paths outside the rules | An override where media may not live, a path that leaves its folder, a symbolic link | Missing and reported by the reference report; the walk doesn't follow links (with the plan) | Read anyway |
-| Spec 8 §3, numbered names | Whether names compare by case | Without regard to case, as APFS does (with the plan) | By case |
-| Spec 8 §4, the settle | What "held for two seconds" means | A modification date at least two seconds old and unchanged when read, so the launch walk reads old files at once (with the plan) | Watching every file for two seconds |
-| Spec 8 §4 and §3, mappings | A landing over an entry that already maps; an import of an id both replaced and deleted | The landing's mapping replaces the old one; the import resolves to the replacement, `known` (with the plan) | Keep the old mapping; bring the deleted item back |
-| Spec 8 §6, what a delete moves | Which files | The file at the item's location, an override's target included, and every copy the walk found, in either folder (with the plan) | The item's own file alone |
-| Spec 8 §6, replace on a `readOnlyMasters` machine | NEW is library media with empty defaults | Its defaults stay empty, since the library isn't written (with the plan) | Copy them into the machine index |
-| Spec 8 §7, `mediaUse` | Where scheduler entries count | Under `keys`, with key bindings (with the plan) | A field of their own |
-| Spec 8 §4, undo | The undo steps the walk drops | Area 12's; Area 8 returns the entries the walk maps or brings back and logs them (with the plan) | — |
-| Spec 8 §8, `dropChannels` | A `machine.json` without it, and first run | All null, so the pool asks; `DropChannels.firstRun` holds `{1, 1, null}` for Area 19's first-run writer (with the plan) | First run's values |
-| Spec 2 §2 and §9, the logged forms | How a logged replace and delete carry what they did | One JSON object at the end of the text form, as an edit's picks print, so `parse(print(x)) == x` (with the plan) | A field beside the command in the log entry |
-| Spec 1 §8 and Spec 8 §2, the reference report | A missing entry that a `replaced` map leads from; a loop | Not reported as missing, since its references resolve elsewhere; a loop reported once; a held media command naming an unknown id is `unknownReference` when its holder is saved (at stop 1) | Every missing entry |
-| Spec 8 §3, files already in a folder | An import of a file where it lies | Its outcome comes from the walk that reads it; a file in `machine/media/` whose id the library holds is `known`, not copied (at stop 2) | Copied into the import folder |
-| Spec 8 §3, refusals the table doesn't name | A file that vanishes or can't be read mid-import; an import into a media root that may not be read | `changed`; `readOnlyLibrary` (at stop 2) | `unsupported`; `unreadable` |
-| Spec 8 §3, staged files | Moving or copying, and the 1 GB check | A staged file on the same volume is moved in and skips the check; any other file is copied and never moved or removed (at stop 2) | Always copy |
-| Spec 8 §2, an index file deleted from disk | What the engine holds | The index it holds, written again at its next change (at stop 2) | An empty index |
-| Spec 8 §4, a file still being written at an entry's path | What it stops | Not a move; but the entry doesn't take a copy's path while it is there, so a stalled export still lands (at stop 2) | Both |
-| Spec 8 §4, several landings in one walk | Their order | Path order (at stop 2) | — |
-| Spec 8 §4, what the walk reports | Copies, ids the other folder's index holds, kinds v1 doesn't take | The engine log, once per run; the reference report at launch comes with pre-flight (at stop 2) | The reference report at every launch |
-| Spec 8 §2, places | Which folders M-8 checks | The media root and absolute overrides; `machine/media/` goes with its machine root (at stop 2) | Every folder |
-| Spec 8 §2, an index reload | A location the reloaded index newly names, before the walk looks | Absent until the walk's first look lists it, a moment later (at stop 2) | Present until hashed |
-| Spec 8 §5, "taken exactly" | An in-point between two frames | The first frame at or after it, the one playback publishes first, decoded from playback's own pre-roll; a test compares the two (at stop 3) | The frame on screen at that instant |
-| Spec 8 §4 and §5, a new video the walk finds | How many index changes | Two `library` events with cause `media`: the entry, then its poster; an import writes the entry with its poster, one (at stop 3) | One, after the poster |
-| Spec 8 §5, failures | A poster or a tile that can't be made | Logged, the poster null, not tried again until its source file changes (at stop 3) | Tried at every walk |
-| Spec 8 §9 and Spec 4 §6, a write before its poster loads | What shows | With a transition, the previous picture until the first frame, with no jump to the poster midway; with a cut, or stopped, the poster once it loads (at stop 3) | Wait for the poster |
-| Spec 8 §6, replace's details | Shadowing mappings, the poster, nothing to do, a reference edited since | A machine mapping of a library OLD goes too; NEW's poster name follows the defaults it takes, in the same edit; a replace that changes nothing is `noop`; an unreplace whose reference no longer names NEW is `conflict` (at stop 3) | — |
-| Spec 8 §6 and Spec 5 §8, "exactly" | A list's `version` after a replace and its inverse | Every document comes back byte for byte but a list's `version`, which rises on every save (Spec 1 §4) (at stop 3) | — |
-| Spec 8 §6, delete's details | Deleting a deleted item; undeleting one that isn't; checking a restored file; the entry's path after undelete | `noop`; `conflict`; by the entry's own size and date, else by hashing; the first restored file in its own folder, a numbered name when another file holds the path (at stop 3) | `badValue`; always hash |
-| Spec 8 §6, "the group applies in one step" | A group sent directly that holds a delete | It waits whole while the files move, its runtime commands included; held, the rest of its group runs at once and only the delete and the edits after it wait (at stop 3) | Its runtime commands run at once |
-| Spec 8 §6, while a delete waits | The walk, and a write of the item meanwhile | The walk's looks are set aside and a fresh walk follows; the write lands and its file opens when the wait ends, missing if the delete went through, playing once the files are back if not (at stop 3) | — |
-| Spec 8 §6, no media worker | A delete where no worker runs (the bare test harness only) | `noTrash` (at stop 3) | — |
-| Spec 8 §7, `mediaUse` | What counts as a use | Each holder once (a cue, local copies' included, a macro, a key binding or scheduler entry), by the item each reference resolves to: a reference to a replaced item counts for its replacement, so the replaced item shows none (new) | Also count the id a reference names |
-| Spec 10 §3, the `media` query | Its fields | Each entry as its index holds it, with `index`, `presence` of its own file at its own location, `replacedBy` (where its chain ends, or null), `uses` (the total) and `tile` (the file's path, or null), in an array named `media` (new) | The four `mediaUse` counts per item |
-| Spec 2 §9, query refusals | An unknown `what`, an unknown id | `badValue`; `unknownObject` (new) | — |
-| Spec 5 §6 and Spec 1 §7, the defaults' values | Ranges Spec 1 doesn't give | Trims whole, 0 or more and within the item's duration, the out-point after the in-point; a grade or channel that exists; `unset` back to none (`loop` false); the entry's other fields `readOnlyField`; an item in both indexes edited in the machine's; a deleted item's defaults still editable (new) | Spec 2 §8's ranges alone |
+| Spec 9 §3, the zip | Which deflate | Apple's Compression framework in `engine/`, without an ADR, as CryptoKit was taken for Spec 8; the zip container and CRC-32 are written in Swift, and a test opens the result with `unzip` (Adam's answer) | A zip library, with an ADR |
+| Spec 9 §4 and Spec 10 §2, the stop | Who builds the stop sequence | Area 12: the shutdown macro, one more try at unwritten documents, the `stop` note with `unsaved`, `last.json` clean; the terminate and interrupt signals and the `--seconds` end reach it. Area 19 adds the `stop` request and its answer (Adam's answer) | Area 19 builds it |
+| Spec 9 §4, the relaunch rule | Who decides a launch is a relaunch | Area 12 builds the decision with "this launch is a relaunch" as an input; Area 19 adds `--relaunch` and the detection (Adam's answer) | Area 12 detects it |
+| Spec 9 §3, `system snapshot` | When its line is logged, and what waits | Logged `ok` once the zip is complete; a failed write rejects it; a group sent directly waits whole; held by a cue, macro or key the rest runs at once; it never holds an edit back (Adam's answer) | Logged at once |
+| Spec 9 §6, channels | A snapshot that adds, removes or resizes a channel | Refused with `notInV1`, naming the channels, until Area 14 rebuilds the channels between ticks; a channel on air that would go still answers `onAir` first; labels, defaults and decoder caps restore (Adam's answer) | Rebuild the channels in Area 12 |
+| Spec 9 §6, a list version | Where its file is read | On the worker, behind the same gate as a snapshot, so the control thread never waits for the disk (with the plan) | In the tick |
+| Spec 9 §6, "kept as a version first" | The number the current document is kept under | Its own when its file holds that document and the number isn't kept; else the next above every kept one. The inverse names it (with the plan) | Always its own |
+| Spec 9 §6 and §5, undoing a snapshot restore | Whether the undo takes a snapshot of its own | Yes: every snapshot restore takes one, an undo's included (with the plan) | None for an undo |
+| Spec 9 §6, the worker | A worker that never answers; a file arriving meanwhile | No answer in thirty seconds is `conflict`; an arriving file is looked at after the restore applies and then meets Spec 5 §10 (with the plan) | Wait; reject the restore |
+| Spec 9 §6, the renumber check | Which objects | Every numbered type of both roots, stacks and outputs included (with the plan) | Library types only |
+| Spec 9 §6, folders | A folder the snapshot doesn't list that still holds other files | Kept, with the folders above it; one with nothing visible left is removed (with the plan) | Refuse the restore |
+| Spec 5 §8, the `undo` line | Whether `undo` and `redo` log a line of their own | Yes, not undoable, before the group with source `restore`; with nothing to undo it is `noop` (with the plan) | The group's lines alone |
+| Spec 2 §3, `history jump` | Held by a cue, macro or key | `blocked` with `notInV1`; sent directly, rejected (with the plan) | Always rejected |
+| Spec 9 §4, an older `last.json` | A file without `writtenAt` or `clean`; no file | Without `writtenAt` it isn't restored, reason `old`; without `clean` it counts as not clean; no file starts empty with no `lastStateSkipped` and `previous: none` (with the plan) | Restore it |
+| Spec 9 §4, what else is gone | An output, a stack or a popup slot the machine no longer has | Left out and named in `left`, as a vanished channel is (with the plan) | Refuse the restore |
+| Spec 9 §4, "after a runtime group" | What makes a write due | ShowState or the pending clears differing from what was last written, so a `noop` writes nothing and an edit never does (with the plan) | Every runtime group |
+| Spec 9 §4, stop on request | Which ends are clean | The terminate and interrupt signals and the `--seconds` end; a kill is not (with the plan) | The terminate signal only |
+| Spec 9 §3, "copies the documents on the control thread" | Copy or encode | The roots are copied as values there, one consistent moment; encoding and zipping happen on the worker (with the plan) | Encode on the control thread |
+| Spec 9 §3, equal content | How it is compared | Each document's bytes against the newest zip's, on the worker; no key added to the manifest (with the plan) | A digest in the manifest |
+| Spec 9 §3, the ten minutes | Which clock | Engine time since the last timer snapshot was due (with the plan) | The wall clock |
+| Spec 9 §7, retention ages | How days are counted | Local calendar days between the day in the name and today; a year is 365 days; a file the engine didn't name is never touched (with the plan) | Hours since `takenAt` |
+| Spec 9 §7, a full disk | Which failures; what is retried; what the memory cap drops | `ENOSPC` and `EDQUOT` from any of the engine's writers; every thirty seconds the waiting documents, or with none the held log lines; the first write that succeeds ends it; past the cap the oldest lines go, counted in `lost` (with the plan) | Any failure; a scratch file; drop the newest |
+| Spec 9 §2, the note cap and limits | The second, and the sizes | A sliding second of engine time per client; `note` at most 4 KB as its one-line JSON in UTF-8; `text` at most 1,000 characters as a reader counts them (with the plan) | A calendar second |
+| Spec 9 §2, a `media` line | Its fields | The walk's operation name and the ids, no paths (with the plan) | With paths |
+| Spec 9 §2, the engine log | A media index change beside its worded log line | Written once, as its `media` line; the worded line stays in the engine's memory and the unified log (at stop 1) | Both lines |
+| Spec 9 §2, `conflict` and `unsaved` | How a document is named | By its root and its path in it, `library/lists/007-a.json` (at stop 1) | By object and number |
+| Spec 9 §2, a typing run's line | Which day's file | The day of its own stamp, the last keystroke's, though it is written when the run closes (at stop 1) | The day it is written |
+| Spec 9 §2, "A group's lines go out in one write" | A navigation and the cue it fires | One write for both groups, as one call logs them (at stop 1) | A write per group |
+| Spec 9 §2, the sync | Which files, on which clock | Only a file written since its last sync, once a second of engine time (at stop 1) | Every file, on the wall clock |
+| Spec 9 §2, the engine's notes | What `text` holds | A plain line of words for a reader of the log (at stop 1) | Empty |
+| Spec 9 §2, `dropped` | Counted for whom | Per client: the next note that client writes carries its own count (at stop 1) | One count for all |
+| Spec 9 §2, a malformed `note` request | Its answer | `badValue` (at stop 1) | Ignored |
+| Spec 2 §6, the restores over OSC | Their arguments | One string after `/o/system/restore`, as Spec 9 §9's row shows; no typed form (at stop 1) | Typed arguments too |
+| Spec 9 §2 and §7, old daily black box files | What becomes of them | Trimmed with the earlier hours under the same cap (at stop 1) | Left for ever |
+| Spec 9 §4, the stop | Whether the shutdown macro's picture is shown | No: the stop halts the frame clock first, then runs the macro in one last build with whatever was queued; its commands run and are logged (at stop 2) | Present until its transitions end |
+| Spec 9 §4 and Spec 3 §8, a restore | Timers, and text | Timers are left as the launch has them; running text transitions are dropped, so restored text appears at once (at stop 2) | — |
+| Spec 9 §4, a `writtenAt` ahead of the clock | How old it is | By its distance from now, so more than two hours ahead is `old` (at stop 2) | Any future stamp is `old` |
+| Spec 9 §4, `lastStateSkipped` | The reason when more than one holds; a missing `writtenAt` | The first of `clean`, `old`, `restoredBefore`; `writtenAt` null (at stop 2) | Every reason |
+| Spec 9 §2, `lastStateRestored` | The shape of `left` | A list of `{"channel": 9, "why": "gone"}`, `{"popup": 2, "why": "clearing"}`, `{"channel": 1, "why": "missing", "media": "ID"}` (at stop 2) | Words |
+| Spec 9 §4, what comes back | An output whose stack is gone; what the file doesn't mention; an empty channel never written | The output stays on its default stack; the rest starts fresh; no provenance (at stop 2) | — |
+| Spec 9 §4, the launch write | What it holds when a state comes back | The state about to be put back, with `restored: true`, so a kill during the restore gives `restoredBefore` (at stop 2) | The empty state |
+| Spec 9 §4, the restore | Which frame, which clocks | The first frame built; the write cadence on engine time and `writtenAt` on the wall clock (at stop 2) | — |
+| Spec 9 §4, the startup macro | A macro that doesn't exist | Its group is rejected and logged, and the launch goes on (at stop 2) | Stop the launch |
+| Spec 3 §8, the replacement's effects | What feedback mirrors | The cuts and attributes, and stack, blackout, mute, popup and lock without a transition, once (at stop 2) | The spec's three kinds alone |
+| Spec 4 §6, a restored paused channel | Its clock | A media clock starts as the channel's transport says; before, it always started playing (at stop 2) | — |
+| Spec 9 §3, the `system snapshot` line | Whether it names the snapshot | No: the result names it, and the manifest names the last line logged by `run` and `seq`; Spec 2 §9's `snapshot` key is kept for runtime undo (at stop 3) | A key on the line |
+| Spec 5 §8, a failed undo | Its code | `conflict` when a rule would break; `diskFull`, `noTrash` and `onAir` keep their own (at stop 3) | `conflict` always |
+| Spec 9 §6, `system restore list N` | A number only a local copy has | `notInV1`; a number nothing has is `unknownObject` (at stop 3) | `unknownObject` |
+| Spec 9 §6, a restore that changes nothing | Its result | `noop`, with no inverse and no undo step; the snapshot taken before it stays, as it does when the second checks refuse (at stop 3) | `ok` |
+| Spec 9 §3, a group with `system snapshot` and edits | What the snapshot holds | The documents as they were before that group's own edits (at stop 3) | After them |
+| Spec 9 §3, equal content | What counts | The documents and the library's folders (at stop 3) | Documents alone |
+| Spec 9 §6, reading a snapshot | Which documents must read | All of them, those a restore leaves alone included, since the renumber check reads them (at stop 3) | The replaced kinds |
+| Spec 5 §8, after a redo | Which group a later `undoes` names | The redo's; the step's `source` stays where the edits first came from (at stop 3) | The first group |
+| Spec 5 §5, an undo during typing | Which runs close | Every open run, whichever client typed it (at stop 3) | The sender's |
+| Spec 9 §3, paths in the zip | Where a document sits | Where its file is, or where its first save will put it; two never share a path (at stop 3) | The canonical name always |
+| Spec 9 §3, a snapshot that can't be written | Its code | `diskFull` for want of space, else `conflict`; an engine with no roots on disk answers `conflict` (at stop 3) | — |
+| Spec 9 §6, a snapshot id | What may be one | Letters, digits, `-`, `_` and `.`; anything else is `unknownObject` (at stop 3) | Any string |
+| Spec 9 §6, a restored list's `version` | In memory, before its save | Never below the current one; a list that differs only by `version` isn't touched (at stop 3) | The snapshot's |
+| Spec 9 §6, `readOnlyMasters` | Which checks run | The channel checks are skipped; the renumber check runs over both roots (at stop 3) | — |
+| Spec 9 §6, while a restore is read | The writer's own reports | Taken in as usual; only what a scan of the disk found waits (at stop 3) | Everything waits |
+| Spec 9 §2, the launch snapshot's note | Its place in the log | It takes the next `seq` when the worker's report is read, at the first tick or later (at stop 3) | — |
+| Spec 5 §2, an undo, redo or restore a cue holds | When it runs | After the fire, in order with the cue's edits (new) | At its place in the cue |
+| Spec 5 §8, a direct group with several undos | Which wait for the worker | The step on top is read first; a later one that needs a read the group didn't get is `conflict` (new) | — |
+| Spec 5 §8, "A reload drops steps" | Which documents count | Those whose content a reload changed or took away, not ones the engine's edits won for; a step also touches the lists and playlists whose files it moved or removed (new) | Every file that arrived |
+| Spec 9 §6, a version's file | Whose it is | The file at the list's uuid folder and `vNNNN`; its own `uuid` must be the list's (new) | Its inner `version` too |
+| Spec 9 §6, a restore's refusals | Their order for a list | Operator lock, library mode, the full disk, the list, the version (new) | — |
+| Spec 9 §6, a snapshot's library | How it is known | The manifest's `library` and the zip's `library.json` must both be this library's; a zip without one is `badValue` (new) | The manifest alone |
+| Spec 9 §6, on air | When a channel that would go refuses | It has content and sits in a stack an output now shows; "resized" means its `renderSize` differs (new) | — |
+| Spec 9 §6, a restored list's folder and file | Where it goes | Back to the folder the snapshot had it in, by a move; its name follows its number and title at its save; a playlist's file is renamed when its title's slug changed (new) | Left where it is |
+| Spec 5 §2, a restore's `library` event | What `changed` names | Each list, folder, playlist and local copy, and each numbered object of a catalog, that changed, came or went; `library` and `keys` for those documents (new) | One entry for all |
+| Spec 9 §6, a version that arrived by sync | Whether it counts | Yes: the worker lists the folder, and nothing is written over what it finds (new) | Only those the engine kept |
+| Spec 9 §6, the queries | `keptAt`, and a file that doesn't read | A stamp in the machine's zone; a version or a snapshot whose file doesn't read is left out (new) | — |
+| Spec 9 §5, the `history` topic | Before any edit | Sent on subscribe with both stacks null and `seq` 0 (new) | Nothing until a change |
+| Spec 8 §6 and Spec 9 §6, the gate's timeout | Where it is checked | On every build, whichever workers run; before, only with a media worker (new) | — |
+| Spec 9 §7, retention's ages | The boundaries | To and including 7, 30 and 365 days; a log more than 90 days old goes (new) | Up to but not including |
+| Spec 9 §7, a week that straddles thirty days | What stays | Each day's newest among its newer days, and the week's newest among its older ones (new) | One for the week |
+| Spec 9 §7, when the pass runs | The logs and the snapshots | The logs' on the log thread when a day's file starts, that day being today; the snapshots' on their worker at launch and after each one written (new) | One pass for both |
+| Spec 9 §7, "the newest of each day" | Two in one second | The one with the higher `-N` is the newer (new) | — |
+| Spec 9 §7, the named snapshots | When they are read | As the steps named them when a plan was last built (new) | — |
+| Spec 9 §7, a low disk | The black box's minute records; a paused snapshot | The minute records go on in the black box too; a paused automatic snapshot is taken by the next timer once there is space (new) | Minute records in the engine log only |
+| Spec 9 §7, the full state | When it starts and ends | With any writer's failure for want of space, for all of them; it ends when a waiting document's write or the logs' own try succeeds, each thirty seconds apart (new) | Per writer |
+| Spec 9 §7, between tries | What the engine knows | Nothing until the next try: `system snapshot` and the restores stay `diskFull` for up to thirty seconds after space returns (new) | Probe on every command |
+| Spec 9 §7, `last.json` at a stop on a full disk | Whether it is written | No: it stays removed, so the next launch finds none and starts empty (new) | Try once more |
+| Spec 9 §2, `lost` | What it counts | Lines of either log dropped while they were in memory, as one number; `logToMemory` carries what was lost by then (new) | Per log |
+| Spec 9 §7, `saving` | `unsaved` and `lastSnapshot` | Documents whose first unwritten edit is more than a second old, with those whose write failed; the newest snapshot this run knows of, one it wrote or one its launch matched, null before (new) | — |
+| Spec 5 §2 and Spec 9 §7, a save that fails after its rename | The file's name | Put back, so the document is named where its file still is (new) | Left under the new name |
+| Spec 9 §8, the fixture | The values of the new keys | `writtenAt` 2026-11-08T09:41:07.002-05:00 and a fixed `run`; no test restores from it, since its machine has `restoreLastState` off and the tests' clock is days away (new) | — |
 
 ### Spec corrections proposed
 
-None. Area 8 proposed none.
+- **Spec 9 §6, "A snapshot", and §10's Snapshot restore tests.** The spec has a restore
+  replace the channels like any authored document, refusing only a channel on air that
+  would go (`onAir`). The code also refuses, with `notInV1` and the channels named, a
+  snapshot that adds, removes or resizes a channel, because the engine sizes its channel
+  textures, source slots and ShowState from the channel list once at launch (Adam's answer
+  of 2026-11-14). The fix: one sentence in §6 and one clause in §10 saying so, until Area 14
+  rebuilds the channel list between ticks; Area 14's block in `docs/build-order.md` already
+  carries the lift.
 
 ## Next
 
-**Area 12 — Log and saving** (branch `area/saving`). It runs in its own session from the
-common preamble in `docs/build-order.md` and its own block there, verbatim:
+**Area 19 — Engine API and first run** (branch `area/api`), once Area 12 is merged. It
+runs in its own session from the common preamble in `docs/build-order.md` and its own
+block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -217,42 +291,50 @@ message under the four headings in CLAUDE.md. Then stop. Merge only when I write
 ```
 
 ```
-Area: 12, log and saving. Spec: docs/specs/9-log-and-saving.md, with §10's tests; Spec 5
-§8 and §9 for edit undo and the restores; Spec 1 §3–§5, Spec 2 §3, §6 and §9, Spec 3 §3
-and §8, Spec 4 §12 and §13, Spec 5 §2, §6 and §9, Spec 6 §7, Spec 7 §2 and Spec 8 §2 as
-Spec 9 corrected them. Starts after Area 9 is merged: it builds on Area 9's edit path,
-its debounced write and its versions filed by list uuid. On main: LogEntry and its line,
-the atomic writer and write plans, the versions file, the restoreLastState and snapshots
-settings, Machine.lastState read from state/last.json, the black box writing to the
-folder the command line names, and EngineLog in unified logging. Build the core changes
-first: LogEntry's note lines and its undoes and redoes fields; the two restore commands
-in the grammar, parser, printer and OSC form; last.json's new keys. Then the logs (§2):
-the command log and the engine log per local day, a group's lines in one write, synced
-each second, a partial last line ended on opening, seq per run, the engine's notes, the
-API's note request with its cap, and the black box moved to machine/blackbox/ in hourly
-files, trimmed within the day, its reader following. Then the last state (§4): its
-writes, the clean and restored flags, the minute refresh, the pending clears, the
-two-hour limit and the once-only guard, Spec 3 §8's replacement of ShowState, and the
-launch order. Then snapshots (§3), edit undo and redo with the history topic (§5), and
-the restore commands with the two queries, the renumber check and the worker and queue
-handling (§6). Last, retention, the low and full disk and the saving topic (§7), and
-§8's fixture. Tests first from §10. Stop for review after the logs, after the last
-state, and after the restore commands. Nothing in app/.
+Area: 19, engine API and first run. Spec: docs/specs/10-show-mode-ui.md §2 (the engine
+side), §3, §13 and §16, with §18's Area 19 tests; Spec 2 §5, §8 and §9, Spec 4 §2, §5,
+§10, §12 and §14, Spec 5 §6 and Spec 9 §2–§5 as Spec 10 corrected them. Starts after
+Area 12 is merged: until then Areas 8, 9, 11 and 12 publish their topics and answer their
+queries and requests through the engine's own publisher, and this area puts them on the
+API. It is engine-only and needs no bench run. On main: the engine driven over OSC, a
+quarter-size preview texture per stack backed by an IOSurface (Area 5), cue thumbnails
+and pool tiles as files, and EngineProcess, whose screen(for:) falls back to the next
+screen. Prove the Mach call first, on the dev Mac: bootstrap_check_in, or
+bootstrap_register behind its seam, looked up from an app that didn't start the engine;
+stop for review there, and if neither works, propose the per-user launchd agent before
+anything else. Then the engine as a process (§2): the local socket with its owner-only
+mode, the peer check, and hello once the engine takes commands; sources taken from that
+socket only; the lock file with the process id and exit status 3; the console log
+trimmed in place; the accessory process with its activity and sleep assertions; output
+windows as non-activating panels on every Space that absorb clicks; and display outputs
+that wait for their own screen. Then §3: subscriptions with answers and events in the
+order produced and their seq, the topics and the queries, each answered with its
+request's id or refused (Spec 2 §9 as Spec 11 corrected it), results with group and
+applied, the requests the LAN refuses with localOnly, the notes, and Spec 2 §8's group
+validation against the state the earlier commands leave. Then the Mach channel's
+payloads: three preview surfaces per stack and three picture surfaces per channel with
+their frame messages and the pictures' aux pass (choice U-3), and the meters. Then the
+LAN listener with the token read on a background thread, Bonjour and the preview topic;
+the first-run writer of §13 with output detection and --campus; the relaunch rule with
+--relaunch and --released (Spec 9 §4 as corrected); the soak client that holds the Mach
+channel; and the fixture's clear-all binding moved to shift+escape (§16). Tests first
+from §18. Stop for review after the Mach proof, after the socket and §3, and after first
+run. Nothing in app/.
 ```
 
-**After Area 12:**
+**After Area 19:**
 
-- **Area 12 meets Area 8's work on `main`.** `media replace`, `media delete` and their
-  inverses are edits with their inverses logged, so edit undo takes them like any edit
-  (Spec 5 §8); the media walk returns and logs the entries it maps or brings back, whose
-  undo steps Area 12 drops (Spec 8 §4).
-- **Engine-side, no bench run.** Area 19 starts after Area 12, from its block in
-  `docs/build-order.md`, which its Build tracker task carries verbatim.
+- **Area 19 meets Area 12's work.** The engine's publisher already holds the `history` and
+  `saving` topics (each sent to a new subscriber at once), the `note` request and the
+  `versions` and `snapshots` queries; the stop sequence returns what it couldn't write, for
+  the `stop` request's answer; the launch returns what became of the last state, for the
+  `engine` topic; and the launch decision takes the relaunch as an input that `--relaunch`
+  and the detection set.
 - **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
   follows 14, 17 follows 13 and 14, and 18 follows 17.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
   machine root copied again from the spike fixtures first. It must pass before anything in
   `app/` starts and before Area 7's bench verification.
-- **Spec 5 has no area of its own.** Its engine side lands with Area 9 (the edit path, the
-  writer and changes on disk), Area 8 (the media edits and the defaults edits), both on
-  `main`, and Area 12 (edit undo and redo, and the restores).
+- **Spec 5 has no area of its own.** Its engine side landed with Area 9 (the edit path, the
+  writer and changes on disk) and Area 8 (the media edits and the defaults edits), both on
+  `main`, and with Area 12 (edit undo and redo, and the restores), in review.
