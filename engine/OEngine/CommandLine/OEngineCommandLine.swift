@@ -57,7 +57,8 @@ public enum OEngineCommandLine {
       version
       run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio]
            the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port;
-           the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder
+           the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder;
+           exits with status 3 when another engine holds the machine root, 4 when the roots don't load
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure
       drive --to host:port --scenario <file> --library <root> [--seconds N]
@@ -76,13 +77,49 @@ public enum OEngineCommandLine {
 
     // MARK: - run and soak
 
+    /// Spec 10 §2 — status 3 belongs to "another engine holds the root", which
+    /// the app doesn't count as an end, so roots that don't load exit with a
+    /// status of their own.
+    static let rootsExitStatus: Int32 = 4
+
+    /// Spec 10 §2 — the root's lock, held for as long as the process runs.
+    nonisolated(unsafe) static var engineLock: EngineLock?
+
     static func runEngine(_ args: Arguments, soak: Bool) throws -> Int32 {
+        let libraryRoot = try args.url("--library"), machineRoot = try args.url("--machine")
+        // Spec 10 §2 — "One engine per machine root": the lock first, before the roots are read or anything is written.
+        switch EngineLock.acquire(machineRoot: machineRoot) {
+        case .success(let lock):
+            engineLock = lock
+        case .failure(let failure):
+            fail("\(failure): \(machineRoot.path)")
+            if case .held = failure { return EngineLock.heldExitStatus }
+            return 1
+        }
+        // Spec 10 §2 — "the engine trims the file in place to its last 10 MB at launch".
+        ConsoleLog.trim(ConsoleLog.url(machineRoot: machineRoot))
+        do {
+            return try runLocked(args, soak: soak, libraryRoot: libraryRoot, machineRoot: machineRoot)
+        } catch {
+            releaseLock()
+            throw error
+        }
+    }
+
+    /// Lets the machine root go: at a stop, and when a launch gives up.
+    static func releaseLock() {
+        engineLock?.release()
+        engineLock = nil
+    }
+
+    private static func runLocked(_ args: Arguments, soak: Bool, libraryRoot: URL, machineRoot: URL) throws -> Int32 {
         // Spec 8 §2, choice M-8 — the engine reads media only where media may live on this Mac.
-        let roots = try LoadedRoots.load(libraryRoot: try args.url("--library"), machineRoot: try args.url("--machine"), places: .thisMac())
+        let roots = try LoadedRoots.load(libraryRoot: libraryRoot, machineRoot: machineRoot, places: .thisMac())
         for line in roots.issueLines { fail(line) }
         if roots.hasErrors {
             fail("the roots did not load cleanly; fix the issues above")
-            return 3
+            releaseLock()
+            return rootsExitStatus
         }
         var options = EngineProcess.Options()
         options.oscPort = try args.int("--osc-port")
