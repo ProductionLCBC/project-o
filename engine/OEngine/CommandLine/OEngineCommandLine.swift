@@ -36,6 +36,8 @@ public enum OEngineCommandLine {
                 return try evaluate(rest)
             case "make-fixtures":
                 return try makeFixtures(rest)
+            case "mach-proof":
+                return try machProof(rest)
             default:
                 fail("unknown command \(first)\n" + usage)
                 return 2
@@ -64,6 +66,11 @@ public enum OEngineCommandLine {
            judge a black box folder against the thresholds; exit 1 on a failure
       make-fixtures <media-folder> [--scale X]
            write the synthetic spike clips and still (tests/fixtures/spike/library/media)
+      mach-proof serve <name> [--register]
+           register <name> as a Mach service (bootstrap_check_in, or the deprecated bootstrap_register with
+           --register) and answer each lookup with one surface until killed; opens no screen (Spec 10 §2)
+      mach-proof lookup <name> [<result-file>]
+           look <name> up, read the surface it sends and say what was read; exit 1 when it isn't there
     With fewer screens than display outputs, the last outputs share the last screen, the later one on top.
     """
 
@@ -209,6 +216,52 @@ public enum OEngineCommandLine {
         let written = try SpikeFixtures.write(into: URL(fileURLWithPath: folder), scale: scale)
         for url in written { print(url.path) }
         return 0
+    }
+
+    // MARK: - mach-proof
+
+    /// Spec 10 §2 — "Area 19 proves the call on the dev Mac at its first stop
+    /// for review": each side of `MachProof` in a process of its own, so the
+    /// lookup can come "from an app that didn't start the engine" (Spec 10
+    /// §18). `scripts/mach-proof.sh` runs both and prints what they say.
+    static func machProof(_ args: Arguments) throws -> Int32 {
+        guard args.positional.count >= 2 else { throw ProcessError.missingArgument("serve|lookup <name>") }
+        let name = args.positional[1]
+        switch args.positional[0] {
+        case "serve":
+            let service = BootstrapMachService(calls: args.flag("--register") ? [.register] : [.checkIn, .register])
+            let registration = try service.register(name: name)
+            print("serve: pid \(getpid()) registered \(name) with \(registration.call == .checkIn ? "bootstrap_check_in" : "bootstrap_register")")
+            while true {
+                switch MachProof.answerOne(on: registration, timeoutMs: 1000) {
+                case .success(let caller): print("serve: sent a surface to pid \(caller.pid), user \(caller.uid)")
+                case .failure(.receive(MACH_RCV_TIMED_OUT)): continue
+                case .failure(let failure): print("serve: \(failure)")
+                }
+            }
+        case "lookup":
+            var lines = ["lookup: pid \(getpid()), started by pid \(getppid()), user \(getuid())"]
+            var code: Int32 = 0
+            do {
+                let reading = try MachProof.lookUp(name: name)
+                let intact = reading.firstPixel == MachProof.pixel && reading.lastPixel == MachProof.pixel
+                lines.append("lookup: found \(name), served by pid \(reading.serverPID), registered with \(reading.call == .checkIn ? "bootstrap_check_in" : "bootstrap_register")")
+                lines.append("lookup: the server saw pid \(reading.seenPID), user \(reading.seenUID) in the audit token")
+                lines.append("lookup: surface \(reading.width) by \(reading.height), first pixel \(reading.firstPixel), last pixel \(reading.lastPixel): \(intact ? "as sent" : "NOT as sent")")
+                if !intact { code = 1 }
+            } catch {
+                lines.append("lookup: \(error)")
+                code = 1
+            }
+            let text = lines.joined(separator: "\n") + "\n"
+            print(text, terminator: "")
+            if args.positional.count > 2 {
+                try Data(text.utf8).write(to: URL(fileURLWithPath: args.positional[2]))
+            }
+            return code
+        default:
+            throw ProcessError.badArgument("mach-proof", args.positional[0])
+        }
     }
 }
 
