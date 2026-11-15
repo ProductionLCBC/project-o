@@ -58,6 +58,9 @@ public final class SnapshotWorker: @unchecked Sendable {
     /// Called on the queue after each snapshot is written (Spec 9 §7: "The
     /// retention pass runs ... after each snapshot").
     public var afterSnapshot: (@Sendable () -> Void)?
+    /// A seam for tests: called on the queue before a restore's files are
+    /// read, so a test can hold the worker there and look at what waits.
+    public var beforeRead: (@Sendable () -> Void)?
 
     /// `folder` is `machine/snapshots/`; `libraryRoot` holds `versions/`.
     public init(folder: URL, libraryRoot: URL, disk: Disk = .live, timeZone: TimeZone) {
@@ -80,6 +83,7 @@ public final class SnapshotWorker: @unchecked Sendable {
     /// and before the answer goes back.
     public func read(park: Int, _ keys: [RestoreKey], before: Take?) {
         queue.async { [self] in
+            beforeRead?()
             var results: [RestoreKey: Result<RestoreMaterial, Rejection>] = [:]
             for key in keys {
                 switch key {

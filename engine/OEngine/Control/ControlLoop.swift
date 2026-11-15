@@ -413,8 +413,8 @@ public final class ControlLoop: @unchecked Sendable {
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
         // Spec 9 §6 (plan) — while a restore is read, "An arriving file is looked at after the restore applies".
-        if let documents, !restoreIsParked {
-            let changes = documents.absorbReports(library: &library, machine: &machine, now: now)
+        if let documents {
+            let changes = documents.absorbReports(library: &library, machine: &machine, now: now, holdingScans: restoreIsParked)
             // Spec 9 §2 — `conflict`: "When a file arriving on disk loses to unwritten edits (Spec 5 §10)".
             for conflict in documents.takeKeptConflicts() {
                 note("conflict", ["document": .string(conflict.document), "kept": .string(conflict.kept)],

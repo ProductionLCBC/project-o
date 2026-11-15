@@ -304,8 +304,6 @@ extension ControlLoop {
         }
         // The walk's looks were set aside meanwhile: a fresh one.
         mediaWorker?.requestWalk()
-        // Spec 9 §6 (plan) — files that arrived while a restore was read are looked at now.
-        if !park.reads.isEmpty { documents?.writer.requestScan() }
         releaseBehindPark(frame: frame, now: now)
     }
 

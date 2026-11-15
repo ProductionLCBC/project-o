@@ -56,6 +56,8 @@ final class DocumentStore {
     /// and redo step that touches it is dropped": the documents a reload
     /// changed or took away since this was last asked.
     private var reloaded: Set<DocumentRef> = []
+    /// Spec 9 §6 (plan) — what scans found while a restore was read, in order.
+    private var heldScans: [DiskDelta] = []
 
     func takeReloaded() -> Set<DocumentRef> {
         defer { reloaded.removeAll() }
@@ -385,8 +387,22 @@ final class DocumentStore {
     /// found is reloaded (Spec 5 §10), and the lists whose files have been
     /// gone three seconds are deleted. Returns what changed, for one
     /// `library` event with cause `file`.
-    func absorbReports(library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
+    ///
+    /// Spec 9 §6 (plan) — with `holdingScans`, while a restore is read, what
+    /// a scan found waits ("An arriving file is looked at after the restore
+    /// applies"); the queue's reports of its own writes are still taken in,
+    /// so a document that was written isn't counted unwritten.
+    func absorbReports(library: inout Library, machine: inout Machine, now: MonotonicTime, holdingScans: Bool = false) -> [LibraryChange] {
         var changes: [LibraryChange] = []
+        if !holdingScans, !heldScans.isEmpty {
+            let held = heldScans
+            heldScans = []
+            for delta in held {
+                let outcome = DiskReload.apply(delta, library: library, machine: machine, state: reload,
+                                               unwritten: Set(dirty.keys).union(inFlight), deleting: removing, now: now.nanoseconds)
+                changes += adopt(outcome, library: &library, machine: &machine, now: now)
+            }
+        }
         for report in writer.takeReports() {
             switch report {
             case .saved(let seq, let ref, _, let skipped):
@@ -424,12 +440,16 @@ final class DocumentStore {
             case .keepFailed(let about, let reason):
                 log.error("\(about) changed on disk while the engine held unwritten edits, and the arriving file could not be kept: \(reason)")
             case .scanned(let delta):
+                if holdingScans {
+                    heldScans.append(delta)
+                    continue
+                }
                 let outcome = DiskReload.apply(delta, library: library, machine: machine, state: reload,
                                                unwritten: Set(dirty.keys).union(inFlight), deleting: removing, now: now.nanoseconds)
                 changes += adopt(outcome, library: &library, machine: &machine, now: now)
             }
         }
-        if !reload.pending.isEmpty {
+        if !reload.pending.isEmpty, !holdingScans {
             let outcome = DiskReload.expire(library: library, machine: machine, state: reload,
                                             unwritten: Set(dirty.keys).union(inFlight), now: now.nanoseconds)
             changes += adopt(outcome, library: &library, machine: &machine, now: now)
