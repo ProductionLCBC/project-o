@@ -185,6 +185,9 @@ public final class ControlLoop: @unchecked Sendable {
     public internal(set) var snapshots: SnapshotWorker?
     /// The snapshots asked of the worker and not yet reported, by token.
     var snapshotWaits: [Int: SnapshotWait] = [:]
+    /// Spec 9 §3 — the worker's answer for a group whose `system snapshot` is
+    /// written, when the group then had to wait behind a parked restore.
+    var snapshotAnswers: [GroupID: SnapshotAnswer] = [:]
     var nextSnapshotToken = 1
     /// Spec 9 §3 — whether the roots changed since a snapshot was last asked
     /// for, so "the ten-minute timer writes one only when something has changed".
@@ -432,6 +435,8 @@ public final class ControlLoop: @unchecked Sendable {
         absorbSnapshots(frame: frame, now: now)
         // Spec 8 §2 — what the media worker found, "through the one queue", before the queued groups.
         absorbMedia(frame: frame, now: now)
+        // Spec 8 §6 and Spec 9 §6 (plan) — a park neither worker has answered in time fails, whichever workers run here.
+        checkParkTimeout(frame: frame, now: now)
         for group in groups { run(group, frame: frame, now: now) }
         // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
         if let documents, documents.writeDue(library: &library, machine: &machine, now: now) {
@@ -634,6 +639,11 @@ public final class ControlLoop: @unchecked Sendable {
         // or a media command waits, so every edit applies in the order it arrived; runtime commands run.
         if mediaPark != nil, Self.waitsBehindPark(group) {
             behindPark.append(.group(group))
+            return
+        }
+        // Spec 9 §3 — its snapshot is written, and whatever it waited behind has applied.
+        if let answer = snapshotAnswers.removeValue(forKey: group.id) {
+            runNow(group, frame: frame, now: now, moved: nil, snapshot: answer)
             return
         }
         let commands = group.commands.map(\.command)

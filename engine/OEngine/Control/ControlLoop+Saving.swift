@@ -158,7 +158,13 @@ extension ControlLoop {
         switch wait {
         case .group(let group)?:
             // "A direct group holding it waits whole": it runs now, or is rejected with the failure.
-            runNow(group, frame: frame, now: now, moved: nil, snapshot: answer)
+            // Spec 9 §6 — unless it holds an edit and a restore is being read: then it waits its turn behind that.
+            if mediaPark != nil, Self.waitsBehindPark(group) {
+                snapshotAnswers[group.id] = answer
+                behindPark.append(.group(group))
+            } else {
+                runNow(group, frame: frame, now: now, moved: nil, snapshot: answer)
+            }
         case .held(let held)?:
             var line = ExecutedCommand(group: held.group, source: held.source, command: held.command, result: .ok, effects: [], fire: held.fire)
             switch answer {

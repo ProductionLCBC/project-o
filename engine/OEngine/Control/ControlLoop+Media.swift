@@ -68,7 +68,6 @@ extension ControlLoop {
             case .tiles(let names): mediaTiles = names
             }
         }
-        checkParkTimeout(frame: frame, now: now)
     }
 
     /// Spec 8 §4 — "Only the launch walk prunes, before anything can be
