@@ -27,45 +27,32 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | brief waiting for approval | In review on `area/saving` (6f1fdd0, pushed, hosted CI green on both jobs), built tests first with three stops Adam reviewed in the session: the command log and the engine log on disk with the notes and the hourly black box; the last state with the launch order and the stop sequence; snapshots; edit undo and redo with the `history` topic; the two restore commands through the edit gate, with the `versions` and `snapshots` queries; retention, the low and full disk and the `saving` topic. The brief, the session's final message (2026-11-15), waits for Adam's `approved`; it proposes one Spec 9 §6 correction. |
+| 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Next, once Area 12 is merged: Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md` and under Next below; engine-only, so no bench run. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | not started | Next, in its own session: Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md` and under Next below; engine-only, so no bench run, and it can start now. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Area 12, log and saving, is in review on `area/saving`** (6f1fdd0, pushed, hosted CI
-green on both jobs). It was built tests first with three stops Adam reviewed in the
-session, and its brief, the session's final message (2026-11-15), waits for his
-`approved`. Only its status documents are on `main`: the code, the tests and the fixture's
-`last.json` stay on the branch until then. Area 19, engine API and first run, is next, in
-its own session, once Area 12 is merged. The bench run with a card stays deferred to a
-window Adam sets aside; it gates `app/` and Area 7.
+**Nothing is in review; everything is on `main`.** Area 12, log and saving, shipped on
+2026-11-15. Adam approved it as built, with every reading in the brief and its recommended
+answers; its Spec 9 §6 and §10 correction was applied on the branch (7dbdf7d), and it was
+merged with `--no-ff` (327454f) and pushed. Area 19, engine API and first run, is next, in
+its own session. The bench run with a card stays deferred to a window Adam sets aside; it
+gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 12, log and saving.** The brief is the final message of the Area 12 session
-  (2026-11-15). It asks for `approved`, and for a word on any of these he wants the other
-  way; each is built as recommended:
-  - `system snapshot`'s log line doesn't name the snapshot it wrote; its result does, and
-    the snapshot's manifest points back at the log by `run` and `seq`. Recommended: leave
-    it, since Spec 2 §9's `snapshot` key on a line is kept for runtime undo.
-  - An undo that fails is `conflict`, but `diskFull`, `noTrash` and `onAir` keep their own
-    code, because they say what the operator must fix. Recommended: as built.
-  - `system restore list N` where only a local copy has number N answers `notInV1`.
-    Recommended: as built.
-  - The shutdown macro's picture is never shown: the stop halts the frame clock first, so
-    a stop can't hang on a macro. Recommended: as built.
-  - Retention counts its ages to and including 7, 30 and 365 days. Recommended: as built.
-  - The Spec 9 §6 correction below, applied on the branch before the merge.
+None. The Area 12 brief (the final message of the Area 12 session, 2026-11-15) was answered
+the same day: approved as built, with its recommended answers, merged (327454f).
 
 ### Decisions
 
@@ -89,7 +76,7 @@ window Adam sets aside; it gates `app/` and Area 7.
   would show only the time. Since Area 8, `soak.sh` runs the spike on APFS clones of both
   roots with `libraryMode` writable (Adam's answer to Area 8's plan), so the launch walk
   lands each generated file on its fixed id; the bench run is the first end-to-end run of
-  that script change. Once Area 12 is merged, an `oengine run` on that root also writes its
+  that script change. Since Area 12, an `oengine run` on that root also writes its
   logs, its hourly black box, its snapshots and `state/last.json` there; the soak keeps its
   own black box folder.
 
@@ -134,7 +121,7 @@ window Adam sets aside; it gates `app/` and Area 7.
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 12's task is `in review`; Area
+  dependencies from the block's "Starts after" line. Area 12's task is `shipped`; Area
   14's task carries its block as changed on 2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
@@ -160,7 +147,8 @@ window Adam sets aside; it gates `app/` and Area 7.
 
 ### Spec interpretations made so far
 
-Area 12's readings, below, wait for Adam's answer to its brief. "Adam's answer" marks a
+None outstanding. Area 12's readings, below, were approved as built on 2026-11-15, with the
+recommended answers, and are recorded here and in its brief. "Adam's answer" marks a
 choice he made on 2026-11-14 before he approved the plan, "with the plan" a reading he
 approved with it, "at stop 1", "at stop 2" and "at stop 3" one he saw in the report at that
 stop and let the session go on from, and "new" one first named in the brief. Earlier areas'
@@ -261,20 +249,14 @@ Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 ### Spec corrections proposed
 
-- **Spec 9 §6, "A snapshot", and §10's Snapshot restore tests.** The spec has a restore
-  replace the channels like any authored document, refusing only a channel on air that
-  would go (`onAir`). The code also refuses, with `notInV1` and the channels named, a
-  snapshot that adds, removes or resizes a channel, because the engine sizes its channel
-  textures, source slots and ShowState from the channel list once at launch (Adam's answer
-  of 2026-11-14). The fix: one sentence in §6 and one clause in §10 saying so, until Area 14
-  rebuilds the channel list between ticks; Area 14's block in `docs/build-order.md` already
-  carries the lift.
+None. Area 12's one proposal was accepted and applied (7dbdf7d): Spec 9 §6 and §10 now say
+that, until Area 14 rebuilds the channel list between ticks, a snapshot that adds, removes
+or resizes a channel is refused with `notInV1`, naming the channels.
 
 ## Next
 
-**Area 19 — Engine API and first run** (branch `area/api`), once Area 12 is merged. It
-runs in its own session from the common preamble in `docs/build-order.md` and its own
-block there, verbatim:
+**Area 19 — Engine API and first run** (branch `area/api`). It runs in its own session from
+the common preamble in `docs/build-order.md` and its own block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -324,7 +306,7 @@ run. Nothing in app/.
 
 **After Area 19:**
 
-- **Area 19 meets Area 12's work.** The engine's publisher already holds the `history` and
+- **Area 19 meets Area 12's work on `main`.** The engine's publisher already holds the `history` and
   `saving` topics (each sent to a new subscriber at once), the `note` request and the
   `versions` and `snapshots` queries; the stop sequence returns what it couldn't write, for
   the `stop` request's answer; the launch returns what became of the last state, for the
@@ -336,5 +318,5 @@ run. Nothing in app/.
   machine root copied again from the spike fixtures first. It must pass before anything in
   `app/` starts and before Area 7's bench verification.
 - **Spec 5 has no area of its own.** Its engine side landed with Area 9 (the edit path, the
-  writer and changes on disk) and Area 8 (the media edits and the defaults edits), both on
-  `main`, and with Area 12 (edit undo and redo, and the restores), in review.
+  writer and changes on disk), Area 8 (the media edits and the defaults edits) and Area 12
+  (edit undo and redo, and the restores), all on `main`.
