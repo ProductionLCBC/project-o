@@ -135,6 +135,9 @@ final class CommandTextTests: XCTestCase {
         row("system clearall", .systemClearAll),
         row("system preflight", .systemPreflight),
         row("system snapshot", .systemSnapshot),
+        // Spec 2 §3 as Spec 9 §9 corrected it — the two restore commands (Spec 9 §6).
+        row("system restore list 42 version 16", .systemRestoreList(list: 42, version: 16)),
+        row("system restore snapshot \"2026-11-08-085959\"", .systemRestoreSnapshot(id: "2026-11-08-085959")),
         // Spec 2 §3 as Spec 8 §2 corrected it — the media commands; MediaCommandTests has every form.
     ]
     + MediaCommandTests.forms.map { row($0.text, .media($0.command)) }
@@ -151,6 +154,47 @@ final class CommandTextTests: XCTestCase {
         let seen = Set(vocabulary.map(\.command.cmd))
         let expected = Command.knownNames.subtracting(["macro", "next", "previous", "cue", "undo", "redo"])
         XCTAssertEqual(expected.subtracting(seen), [], "rows missing")
+    }
+
+    /// Spec 9 §6 — "`system restore list N version V`" and "`system restore
+    /// snapshot "ID"`": two commands under one verb, told apart by the word
+    /// after it. Spec 2 §2 — "case is ignored for keywords".
+    func test_theRestoreCommandsShareAVerbAndAreToldApartByTheirSecondWord() {
+        check("SYSTEM Restore List 42 Version 16", prints: "system restore list 42 version 16")
+        check("system restore SNAPSHOT \"2026-11-08-085959-2\"", prints: "system restore snapshot \"2026-11-08-085959-2\"")
+        // The object forms Spec 9 §6's table gives.
+        XCTAssertEqual(try JSONCoding.encode(Command.systemRestoreList(list: 42, version: 16)),
+                       .object(["cmd": .string("system.restoreList"), "list": .number(42), "version": .number(16)]))
+        XCTAssertEqual(try JSONCoding.encode(Command.systemRestoreSnapshot(id: "2026-11-08-085959")),
+                       .object(["cmd": .string("system.restoreSnapshot"), "id": .string("2026-11-08-085959")]))
+        func reason(_ text: String) -> RejectionReason? {
+            if case .failure(let rejection) = CommandText.parse(text) { return rejection.reason }
+            return nil
+        }
+        XCTAssertEqual(reason("system restore"), .missingArgument)
+        XCTAssertEqual(reason("system restore playlist \"Sunday\""), .unknownVerb)
+        XCTAssertEqual(reason("system restore list 42"), .missingArgument)
+        XCTAssertEqual(reason("system restore list 42 16"), .badArgument, "the word version is part of the form")
+        XCTAssertEqual(reason("system restore list 42 version"), .missingArgument)
+        XCTAssertEqual(reason("system restore list 42 version 16 17"), .unexpectedToken)
+        XCTAssertEqual(reason("system restore snapshot"), .missingArgument)
+        XCTAssertEqual(reason("system restore snapshot 2026-11-08-085959"), .badArgument, "the id is a quoted string")
+    }
+
+    /// Spec 9 §6 — both are edit groups: "logged with kind `edit` and its
+    /// inverse, undone and redone like any edit"; Spec 2 §3's table gives them
+    /// lock `passes` and undo `edit`. Spec 1 §4 — a list's number in a stored
+    /// command is a reference, rewritten when the list is renumbered.
+    func test_theRestoreCommandsAreEditsAndNameTheirListByNumber() {
+        for restore: Command in [.systemRestoreList(list: 42, version: 16), .systemRestoreSnapshot(id: "2026-11-08-085959")] {
+            XCTAssertEqual(restore.logKind, .edit, "\(restore)")
+            XCTAssertEqual(restore.undoClass, .edit, "\(restore)")
+            XCTAssertEqual(restore.lockClass, .passes, "\(restore)")
+        }
+        let renumbered = Command.systemRestoreList(list: 42, version: 16).mapReferences { type, number in
+            type == .list && number == 42 ? 57 : number
+        }
+        XCTAssertEqual(renumbered, .systemRestoreList(list: 57, version: 16))
     }
 
     // MARK: - Spec 2 §2, content expressions and riders
@@ -430,6 +474,9 @@ final class CommandTextTests: XCTestCase {
             .audioMute(audio: .all, state: .on),
             .macro(12), .undo, .redo, .historyJump(5), .historyJump(0),
             .systemClearAll, .systemPreflight, .systemSnapshot,
+            .systemRestoreList(list: 42, version: 16), .systemRestoreList(list: 1, version: 1),
+            .systemRestoreSnapshot(id: "2026-11-08-085959"), .systemRestoreSnapshot(id: "2026-11-08-085959-2"),
+            .systemRestoreSnapshot(id: "a \"quoted\" id"),
             .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             .edit(EditCommand(.numbered(.stack, 1), .set(path: "gammaBlend", value: .bool(true)))),
             .edit(EditCommand(.numbered(.channel, 2), .set(path: "decoderCap", value: .number(3)))),

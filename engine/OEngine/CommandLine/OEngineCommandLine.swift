@@ -54,7 +54,8 @@ public enum OEngineCommandLine {
     usage: oengine <command> [options]
       version
       run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio]
-           the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port
+           the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port;
+           the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure
       drive --to host:port --scenario <file> --library <root> [--seconds N]
@@ -79,7 +80,8 @@ public enum OEngineCommandLine {
         var options = EngineProcess.Options()
         options.oscPort = try args.int("--osc-port")
         options.audio = !args.flag("--no-audio")
-        let blackBoxFolder = args.optionalURL("--blackbox") ?? defaultBlackBoxFolder()
+        let blackBoxFolder = blackBoxFolder(named: args.optionalURL("--blackbox"), machineRoot: roots.machineRoot, soak: soak,
+                                            stamp: fileStamp(Date()), working: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         options.blackBoxFolder = blackBoxFolder
         let scenario = soak ? try SoakScenario.load(try args.url("--scenario")) : nil
         let seconds: Int? = soak ? (try args.int("--minutes") ?? 180) * 60 : try args.int("--seconds")
@@ -152,13 +154,22 @@ public enum OEngineCommandLine {
         }
     }
 
-    static func defaultBlackBoxFolder() -> URL {
+    /// Spec 9 §8 — "The black box in `machine/blackbox/` in the engine's
+    /// normal runs ...; the soak keeps `--blackbox`": the folder the command
+    /// line names, else `machine/blackbox/` for `run` and the soak's own
+    /// output folder, `tests/soak-output/<stamp>` under the working folder,
+    /// for `soak`.
+    static func blackBoxFolder(named: URL?, machineRoot: URL, soak: Bool, stamp: String, working: URL) -> URL {
+        if let named { return named }
+        if soak { return working.appendingPathComponent("tests/soak-output").appendingPathComponent(stamp) }
+        return machineRoot.appendingPathComponent("blackbox")
+    }
+
+    static func fileStamp(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("tests/soak-output")
-            .appendingPathComponent(formatter.string(from: Date()))
+        return formatter.string(from: date)
     }
 
     // MARK: - drive

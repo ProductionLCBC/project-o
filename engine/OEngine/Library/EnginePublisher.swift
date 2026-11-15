@@ -23,12 +23,55 @@ public final class EnginePublisher: @unchecked Sendable {
     /// answer's fields or the refusal out.
     public typealias Answerer = @Sendable ([String: JSONValue]) -> Result<[String: JSONValue], Rejection>
 
+    /// Spec 2 §9 as Spec 9 §9 corrected it — what carries out one request
+    /// that is neither a command nor a query (Spec 9 §2's `note`): the
+    /// request's fields, the source of the client that sent it and the
+    /// client's name in; the result's name (`ok`, `noop`) with its fields, or
+    /// the refusal, out.
+    public typealias Handler = @Sendable ([String: JSONValue], CommandSource, String) -> Result<(result: String, fields: [String: JSONValue]), Rejection>
+
     private let lock = NSLock()
     private var subscribers: [Int: Subscriber] = [:]
     private var answerers: [String: Answerer] = [:]
+    private var handlers: [String: Handler] = [:]
     private var nextID = 0
+    /// Spec 9 §5 and §7 — the topics "sent when a client subscribes": each
+    /// one's last event, by topic.
+    private var current: [String: JSONValue] = [:]
 
     public init() {}
+
+    /// Spec 2 §9 — an area's handler for the requests of this `type`.
+    public func handle(_ type: String, with handler: @escaping Handler) {
+        lock.lock()
+        handlers[type] = handler
+        lock.unlock()
+    }
+
+    /// Spec 9 §2 — a request such as `{ "id": 31, "type": "note", … }`,
+    /// answered with its `id`: `{ "id": 31, "type": "result", "result": "ok",
+    /// "seq": … }`, or the rejected result. `source` is the sender's (Spec 10
+    /// §2: the app names it on the local socket, and a LAN client's is `api`);
+    /// `client` names the connection.
+    public func request(_ request: JSONValue, source: CommandSource, client: String) -> JSONValue {
+        let members = request.objectValue ?? [:]
+        let id = members["id"] ?? .null
+        let type = members["type"]?.stringValue ?? ""
+        lock.lock()
+        let handler = handlers[type]
+        lock.unlock()
+        guard let handler else { return Self.rejected(id, Rejection(reason: .badValue, message: "there is no \(type) request")) }
+        switch handler(members, source, client) {
+        case .success(let outcome):
+            var fields = outcome.fields
+            fields["id"] = id
+            fields["type"] = .string("result")
+            fields["result"] = .string(outcome.result)
+            return .object(fields)
+        case .failure(let rejection):
+            return Self.rejected(id, rejection)
+        }
+    }
 
     /// Spec 2 §9 — an area's answer to the query of this `what`.
     public func answer(_ what: String, with answerer: @escaping Answerer) {
@@ -65,13 +108,30 @@ public final class EnginePublisher: @unchecked Sendable {
     }
 
     /// Spec 2 §9 — `subscribe` to one or more topics.
+    /// Spec 9 §5 and §7 — a topic that keeps a current value (`history`,
+    /// `saving`) sends it to the new subscriber at once, before any later event.
     @discardableResult
     public func subscribe(_ topics: Set<String>, _ deliver: @escaping @Sendable (JSONValue) -> Void) -> Subscription {
         lock.lock()
-        defer { lock.unlock() }
         nextID += 1
-        subscribers[nextID] = Subscriber(topics: topics, deliver: deliver)
-        return Subscription(id: nextID)
+        let id = nextID
+        subscribers[id] = Subscriber(topics: topics, deliver: deliver)
+        let held = topics.sorted().compactMap { current[$0] }
+        lock.unlock()
+        for event in held { deliver(event) }
+        return Subscription(id: id)
+    }
+
+    /// Spec 9 §5 — "the engine sends an event when a client subscribes and
+    /// whenever either stack changes": the event goes to its topic's
+    /// subscribers and is kept as the topic's current value, for the next
+    /// one to subscribe.
+    public func publish(current event: JSONValue) {
+        guard case .object(let members) = event, case .string(let topic)? = members["topic"] else { return }
+        lock.lock()
+        current[topic] = event
+        lock.unlock()
+        publish(event)
     }
 
     /// Spec 2 §9 — a subscriber stops receiving its topics.

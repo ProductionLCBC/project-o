@@ -134,6 +134,13 @@ public enum Command: Codable, Equatable, Sendable {
     case systemClearAll
     case systemPreflight
     case systemSnapshot
+    /// Spec 9 §6 — `system restore list N version V`: "Replaces list N with
+    /// one of its kept versions". N is the list's number, "as edits name
+    /// lists (Spec 5 §3)".
+    case systemRestoreList(list: Int, version: Int)
+    /// Spec 9 §6 — `system restore snapshot "ID"`: "Replaces the documents a
+    /// snapshot covers with its copies".
+    case systemRestoreSnapshot(id: String)
     /// Spec 5 §4 — the edit family, `edit.` plus the verb.
     case edit(EditCommand)
     /// Spec 8 §2 — the media family, `media.` plus the verb.
@@ -186,6 +193,8 @@ public enum Command: Codable, Equatable, Sendable {
         case .systemClearAll: return "system.clearAll"
         case .systemPreflight: return "system.preflight"
         case .systemSnapshot: return "system.snapshot"
+        case .systemRestoreList: return "system.restoreList"
+        case .systemRestoreSnapshot: return "system.restoreSnapshot"
         case .edit(let e): return e.cmd
         case .media(let m): return m.cmd
         case .unknown(let cmd, _): return cmd
@@ -204,6 +213,7 @@ public enum Command: Codable, Equatable, Sendable {
         "playlist.cue", "playlist.goto", "playlist.section", "list.goto", "playlist.load", "playlist.disarm", "timer.set", "timer.start",
         "timer.pause", "timer.reset", "popup.set", "popup.clear", "audio.mute", "macro.run", "history.undo",
         "history.redo", "history.jump", "system.clearAll", "system.preflight", "system.snapshot",
+        "system.restoreList", "system.restoreSnapshot",
         "next", "previous", "cue", "undo", "redo", "macro",
     ]).union(EditAction.commandNames).union(MediaCommand.commandNames)
 
@@ -355,6 +365,8 @@ public enum Command: Codable, Equatable, Sendable {
         case "system.clearAll": self = .systemClearAll
         case "system.preflight": self = .systemPreflight
         case "system.snapshot": self = .systemSnapshot
+        case "system.restoreList": self = .systemRestoreList(list: try int("list"), version: try int("version"))
+        case "system.restoreSnapshot": self = .systemRestoreSnapshot(id: try string("id"))
         case let edit where edit.hasPrefix("edit."):
             self = .edit(try EditCommand(cmd: edit, fields: try Command.parameters(from: decoder)))
         case let media where media.hasPrefix("media."):
@@ -455,6 +467,11 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(n, forKey: Key("macro"))
         case .historyJump(let position):
             try c.encode(position, forKey: Key("position"))
+        case .systemRestoreList(let list, let version):
+            try c.encode(list, forKey: Key("list"))
+            try c.encode(version, forKey: Key("version"))
+        case .systemRestoreSnapshot(let id):
+            try c.encode(id, forKey: Key("id"))
         case .edit(let e):
             for (key, value) in e.fields { try c.encode(value, forKey: Key(key)) }
         case .media(let m):
@@ -538,11 +555,14 @@ public enum Command: Codable, Equatable, Sendable {
         case .listCue(let list, let cue): return .listCue(list: transform(.list, list), cue: cue)
         case .audioMute(let audio, let state): return .audioMute(audio: target(.audioOutput, audio), state: state)
         case .macro(let n): return .macro(transform(.macro, n))
+        // Spec 9 §6 — "N is the list's number, as edits name lists": a reference like any other.
+        case .systemRestoreList(let list, let version):
+            return .systemRestoreList(list: transform(.list, list), version: version)
         case .edit(let e):
             return .edit(e.mapReferences(transform))
         case .next, .previous, .cue, .itemCue, .itemSection, .playlistLoad, .disarm, .timerSet, .timerStart, .timerPause, .timerReset,
              .popupSet, .popupClear, .undo, .redo, .historyJump, .systemClearAll, .systemPreflight, .systemSnapshot,
-             .media, .unknown, .invalid:
+             .systemRestoreSnapshot, .media, .unknown, .invalid:
             return self
         }
     }

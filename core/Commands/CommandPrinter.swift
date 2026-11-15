@@ -44,6 +44,8 @@ enum CommandPrinter {
         guard let row = Vocabulary.row(cmd: command.cmd),
               let object = (try? JSONCoding.encode(command))?.objectValue else { return nil }
         var words = head(row, object)
+        // Spec 9 §6 — `system restore list …`: the word that names the command, after the verb.
+        if let subverb = row.subverb { words.append(subverb) }
         for arg in row.args {
             words.append(contentsOf: argumentWords(arg, object))
         }
@@ -76,6 +78,8 @@ enum CommandPrinter {
         if case .body(let keys, _) = arg.kind {
             return bodyValue(keys, object).map { [JSONCanonical.line($0)] } ?? []
         }
+        // Spec 9 §6 — a word of the form itself (`version`).
+        if case .word(let word) = arg.kind { return [word] }
         guard let value = object[arg.key] else { return [] }
         switch arg.kind {
         case .int:
@@ -98,7 +102,7 @@ enum CommandPrinter {
         case .hash:
             // Spec 2 §4 — "Printing is canonical: ... full hashes".
             return [value.stringValue ?? ""]
-        case .write, .edit, .body:
+        case .write, .edit, .body, .word:
             return []
         }
     }

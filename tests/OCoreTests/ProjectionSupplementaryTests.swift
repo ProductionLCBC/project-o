@@ -248,6 +248,8 @@ final class ProjectionSupplementaryTests: XCTestCase {
 
     func test_passThroughAndUnknownCommands() {
         let passing: [Command] = [.timerStart(timer: 1), .undo, .redo, .historyJump(3), .systemPreflight, .systemSnapshot,
+                                  // Spec 5 §9 — "A restore changes the library and never ShowState."
+                                  .systemRestoreList(list: 42, version: 16), .systemRestoreSnapshot(id: "2026-11-08-085959"),
                                   .audioMute(audio: .all, state: .on),
                                   .edit(EditCommand(.numbered(.channel, 1), .set(path: "label", value: .string("x"))))]
         let (state, effects) = run(F.fresh(), passing)

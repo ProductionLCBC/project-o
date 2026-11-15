@@ -2,32 +2,48 @@
 
 import Foundation
 
-/// Spec 4 §13 — "a utility thread drains the ring into the black box (JSON
-/// lines, rotated daily) and into a live summary the API exposes under the
-/// `metrics` topic. The soak rig reads the same files." Privacy: "Metrics
-/// contain numbers and ids, never text content or file names beyond hashes".
-/// Logs "rotate daily and are capped by total size, oldest first."
+/// Spec 4 §13 as Spec 9 §9 corrected it — "a utility thread drains the ring
+/// into the black box (JSON lines in `machine/blackbox/`, a file an hour,
+/// with the minute records copied to the engine log, Spec 9 §2) and into a
+/// live summary the API exposes under the `metrics` topic. The soak rig reads
+/// the same files." Privacy: "Metrics contain numbers and ids, never text
+/// content or file names beyond hashes".
+///
+/// Spec 9 §2 — `blackbox-YYYY-MM-DD-HH.jsonl`, split "By UTC hour ... The
+/// black box writes about 100 MB an hour, so its size cap keeps only hours of
+/// it (§7). It has its own folder and a file an hour so the cap holds within
+/// a day". Spec 9 §8 — "with the same line repair and sync" as the logs: a
+/// file whose last byte isn't a newline is ended on opening, and the file is
+/// synced once a second, by the times its lines are given. Spec 9 §7 — "512
+/// MB in all, oldest first; only the current hour's file is spared".
 public final class BlackBox: @unchecked Sendable {
+    /// Spec 9 §7 — "The black box | 512 MB in all".
+    public static let defaultMaximumBytes = 512 * 1024 * 1024
+
     public let folder: URL
     public let maximumBytes: Int
+    /// Spec 9 §7 — what every writer knows of the disk: under 1 GB free
+    /// "the black box's tick and present lines pause", and on a full disk
+    /// "the black box stops". Set once, before the recorder starts.
+    public var status: DiskStatus?
     private let lock = NSLock()
-    private var currentDay = ""
-    private var handle: FileHandle?
-    private static let dayFormatter: DateFormatter = {
+    private let journal: JournalFile
+    /// The files of earlier hours, oldest first, with their sizes: listed
+    /// when an hour's file starts, so no line waits on a look at the folder.
+    private var earlier: [(name: String, bytes: Int64)] = []
+    private var lastSyncMs: Int64?
+    private static let hourFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
-        f.dateFormat = "yyyy-MM-dd"
+        f.dateFormat = "yyyy-MM-dd-HH"
         return f
     }()
 
-    public init(folder: URL, maximumBytes: Int = 512 * 1024 * 1024) {
+    public init(folder: URL, maximumBytes: Int = BlackBox.defaultMaximumBytes, disk: Disk = .live) {
         self.folder = folder
         self.maximumBytes = maximumBytes
-    }
-
-    deinit {
-        try? handle?.close()
+        journal = JournalFile(folder: folder, prefix: "blackbox-", disk: disk)
     }
 
     // MARK: - Lines
@@ -111,45 +127,76 @@ public final class BlackBox: @unchecked Sendable {
         try append(line: BlackBox.line(for: record), at: date)
     }
 
+    /// Spec 9 §7 — a minute record is written on a low disk too ("The
+    /// minute records go on"); on a full one nothing is.
     public func append(_ record: MinuteRecord, at date: Date = Date()) throws {
-        try append(line: BlackBox.line(for: record), at: date)
+        try write(line: BlackBox.line(for: record), at: date)
     }
 
-    /// Append one line to the day's file, rotating by UTC day and trimming
-    /// the oldest files past the cap.
+    /// Append one line (ending in its newline) to the file of `date`'s UTC
+    /// hour, trimming the oldest hours past the cap and syncing once a second.
+    /// Spec 9 §7 — a tick's or a present's line: not written while under
+    /// 1 GB is free.
     public func append(line: String, at date: Date) throws {
+        if status?.low == true { return }
+        try write(line: line, at: date)
+    }
+
+    private func write(line: String, at date: Date) throws {
+        // Spec 9 §7 — "the black box stops", quietly: its thread asks ten times a second.
+        if status?.full == true { return }
         lock.lock()
         defer { lock.unlock() }
-        let day = BlackBox.dayFormatter.string(from: date)
-        if day != currentDay || handle == nil {
-            try? handle?.close()
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let url = folder.appendingPathComponent("blackbox-\(day).jsonl")
-            if !FileManager.default.fileExists(atPath: url.path) {
-                FileManager.default.createFile(atPath: url.path, contents: nil)
-            }
-            handle = try FileHandle(forWritingTo: url)
-            try handle?.seekToEnd()
-            currentDay = day
+        let hour = BlackBox.hourFormatter.string(from: date)
+        do {
+            try journal.append(line, key: hour)
+        } catch {
+            let failure = Disk.Failure(error)
+            guard failure.isFull, let status else { throw error }
+            status.failed(failure)
+            journal.close()
+            return
         }
-        try handle?.write(contentsOf: Data(line.utf8))
-        try trim()
+        // Spec 9 §7 — the pass runs "when ... an hour's file starts": the earlier hours, with their sizes.
+        if !journal.takeStarted().isEmpty { earlier = earlierFiles(than: journal.url(for: hour).lastPathComponent) }
+        trim()
+        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        if let last = lastSyncMs {
+            if ms - last >= 1000 {
+                journal.sync()
+                lastSyncMs = ms
+            }
+        } else {
+            lastSyncMs = ms
+        }
     }
 
-    /// Spec 4 §13 — "capped by total size, oldest first": never the current day.
-    private func trim() throws {
-        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
-            .filter { $0.hasPrefix("blackbox-") && $0.hasSuffix(".jsonl") }
+    /// Everything appended reaches the disk: the recorder stops.
+    public func sync() {
+        lock.lock()
+        journal.sync()
+        lock.unlock()
+    }
+
+    /// The black box files in the folder other than `current`, oldest first.
+    private func earlierFiles(than current: String) -> [(name: String, bytes: Int64)] {
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+            .filter { $0.hasPrefix("blackbox-") && $0.hasSuffix(".jsonl") && $0 != current }
             .sorted()
-        var sizes: [(String, Int)] = names.map { name in
-            let size = (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size] as? Int) ?? 0
+        return names.map { name in
+            let size = (try? FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent(name).path)[.size] as? NSNumber)?.int64Value ?? 0
             return (name, size)
         }
-        var total = sizes.reduce(0) { $0 + $1.1 }
-        while total > maximumBytes, sizes.count > 1 {
-            let oldest = sizes.removeFirst()
-            try FileManager.default.removeItem(at: folder.appendingPathComponent(oldest.0))
-            total -= oldest.1
+    }
+
+    /// Spec 9 §7 — "512 MB in all, oldest first; only the current hour's
+    /// file is spared, so the cap holds within a day".
+    private func trim() {
+        var total = earlier.reduce(Int64(0)) { $0 + $1.bytes } + (journal.currentFile?.bytes ?? 0)
+        while total > Int64(maximumBytes), let oldest = earlier.first {
+            earlier.removeFirst()
+            try? journal.disk.remove(folder.appendingPathComponent(oldest.name))
+            total -= oldest.bytes
         }
     }
 }

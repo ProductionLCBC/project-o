@@ -165,6 +165,54 @@ public final class ControlLoop: @unchecked Sendable {
     private var remainingSent: [Int: (started: Int, second: Int)] = [:]
     /// The timers this build's commands changed, with their lines' `seq`.
     private var changedTimers: [(timer: Int, seq: Int)] = []
+    /// Spec 9 §4 — the writer of `state/last.json`, once the engine has
+    /// launched on roots on disk; nil for an engine that was only built.
+    var lastStateKeeper: LastStateKeeper?
+    /// Spec 3 §8 — the effects of a state replaced since the last build
+    /// (restore-last-state): what feedback mirrors after this build, as it
+    /// mirrors a command's effects. Reset every build.
+    public private(set) var lastReplaced: [Effect] = []
+    private var pendingReplacement: [Effect] = []
+    /// Spec 5 §8 — "One linear stack per run": the applied edit groups of
+    /// this run and the undone ones, which the runner changes as groups run.
+    public internal(set) var history = UndoHistory()
+    /// Spec 9 §5 — the `history` topic's event, when this build changed
+    /// either stack. Reset every build.
+    public internal(set) var lastHistoryEvent: JSONValue?
+    var historySent = UndoHistory()
+    /// Spec 9 §3 and §6 — the worker that writes snapshots and reads what a
+    /// restore needs, once the engine has launched on roots on disk.
+    public internal(set) var snapshots: SnapshotWorker?
+    /// The snapshots asked of the worker and not yet reported, by token.
+    var snapshotWaits: [Int: SnapshotWait] = [:]
+    /// Spec 9 §3 — the worker's answer for a group whose `system snapshot` is
+    /// written, when the group then had to wait behind a parked restore.
+    var snapshotAnswers: [GroupID: SnapshotAnswer] = [:]
+    var nextSnapshotToken = 1
+    /// Spec 9 §3 — whether the roots changed since a snapshot was last asked
+    /// for, so "the ten-minute timer writes one only when something has changed".
+    var changedSinceSnapshot = false
+    /// Spec 9 §3 — when the next timer snapshot is due, on engine time.
+    var nextTimerSnapshot: MonotonicTime?
+    /// Spec 9 §3 — "Every ten minutes (choice G-4)".
+    public var snapshotInterval: Int64 = 600_000_000_000
+    /// Spec 9 §6 (plan) — "No answer in thirty seconds is a failure (`conflict`)".
+    public var restoreParkTimeout: Int64 = 30_000_000_000
+    /// Spec 9 §3 — the id of the last snapshot written in this run.
+    public internal(set) var lastSnapshot: String?
+    /// Spec 9 §3 — this run's uuid, for a snapshot's manifest.
+    var runID = UUID()
+    /// Spec 9 §7 — what every writer of a launched engine knows of the disk.
+    var diskStatus: DiskStatus?
+    /// Spec 9 §7 — a write failed for want of space and none has succeeded
+    /// since: "`system snapshot` and the restore commands are refused with `diskFull`".
+    public var diskFull: Bool { diskStatus?.full ?? false }
+    /// Spec 9 §2 — the logs on disk, to know when a full disk moves them to memory and back.
+    var logWriter: LogWriter?
+    var logInMemory = false
+    /// Spec 9 §7 — the `saving` topic's event, when this build changed a value it carries. Reset every build.
+    public internal(set) var lastSavingEvent: JSONValue?
+    var savingSent = SavingStatus()
 
     public init(library: Library, machine: Machine, pacing: Pacing, media: MediaFolders, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -226,6 +274,7 @@ public final class ControlLoop: @unchecked Sendable {
     private let stateLock = NSLock()
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
+    private var namedSnapshot: Set<String> = []
     private var publishedMediaState: (files: [MediaLocation: MediaFileState], tiles: Set<String>)?
     private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
     private var timersSnapshot: [Int: TimerReading] = [:]
@@ -289,19 +338,40 @@ public final class ControlLoop: @unchecked Sendable {
         return publishedMediaState ?? (mediaFiles, mediaTiles)
     }
 
+    /// Spec 9 §7 — "A snapshot an undo or redo step names is kept until the
+    /// run ends": the ids the steps named when a plan was last built, for
+    /// the retention pass on the snapshot worker's thread.
+    public var publishedNamedSnapshots: Set<String> {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return namedSnapshot
+    }
+
     /// Spec 2 §8 — groups land on the next tick boundary.
     public func enqueue(_ group: CommandGroup) {
         queue.enqueue(group)
+    }
+
+    /// Spec 9 §2 — a note of the engine's own, "source `engine` (Spec 2 §5)":
+    /// its `event`, the event's fields, and a line of words. Stamped and
+    /// given the next `seq` like any line; "A note changes nothing and is
+    /// never undone." Returns its `seq`.
+    @discardableResult
+    public func note(_ event: String, _ fields: [String: JSONValue] = [:], text: String) -> Int {
+        var note = fields
+        note["event"] = .string(event)
+        return commandLog.note(note, text: text, source: CommandSource(kind: .engine), ts: variables.timestamp())
     }
 
     /// Spec 5 §2 — "The engine writes a changed document": the roots the
     /// library and machine were loaded from, with the snapshots they were
     /// loaded from, so the writer knows what the files hold. Called once,
     /// before the engine starts.
-    public func attachDocuments(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot) {
+    public func attachDocuments(libraryRoot: URL, machineRoot: URL, librarySnapshot: RootSnapshot, machineSnapshot: RootSnapshot,
+                                disk: Disk = .live) {
         let variables = self.variables
         let writer = DocumentWriter(libraryRoot: libraryRoot, machineRoot: machineRoot, librarySnapshot: librarySnapshot,
-                                    machineSnapshot: machineSnapshot, fileStamp: { variables.fileStamp() })
+                                    machineSnapshot: machineSnapshot, disk: disk, fileStamp: { variables.fileStamp() })
         let reload = ReloadState.loaded(library: library, machine: machine, librarySnapshot: librarySnapshot, machineSnapshot: machineSnapshot)
         documents = DocumentStore(writer: writer, library: library, machine: machine, kept: KeptVersions.reading(librarySnapshot.versions),
                                   reload: reload, log: log, wallMilliseconds: { variables.wallMilliseconds })
@@ -321,6 +391,13 @@ public final class ControlLoop: @unchecked Sendable {
         documents.writeDue(library: &library, machine: &machine, now: now, everything: true)
         documents.writer.waitUntilIdle()
         _ = documents.absorbReports(library: &library, machine: &machine, now: now)
+    }
+
+    /// Spec 9 §2 and §7 — the documents with edits that aren't on disk, each
+    /// by its root and its path in it: after `flushDocuments`, the ones the
+    /// engine "couldn't write". On the control side.
+    public var unsavedDocuments: [String] {
+        documents?.unsaved(library: library, machine: machine) ?? []
     }
 
     public var queuedGroups: Int { queue.count }
@@ -345,31 +422,61 @@ public final class ControlLoop: @unchecked Sendable {
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
+        lastReplaced = pendingReplacement
+        pendingReplacement = []
         lastRejected = []
         lastLibraryEvents = []
         lastMediaEvents = []
+        lastHistoryEvent = nil
+        lastSavingEvent = nil
         lastRootsChanged = false
         mediaFilesChanged = false
         posterFilesChanged = false
         changedTimers = []
         // Spec 5 §5 — a typing run "closes one second later": its one line.
         commandLog.closeRuns(now: now)
+        // Spec 9 §6 (plan) — while a restore is read, "An arriving file is looked at after the restore applies".
         if let documents {
-            let changes = documents.absorbReports(library: &library, machine: &machine, now: now)
+            let changes = documents.absorbReports(library: &library, machine: &machine, now: now, holdingScans: restoreIsParked)
+            // Spec 9 §2 — `conflict`: "When a file arriving on disk loses to unwritten edits (Spec 5 §10)".
+            for conflict in documents.takeKeptConflicts() {
+                note("conflict", ["document": .string(conflict.document), "kept": .string(conflict.kept)],
+                     text: "\(conflict.document) changed on disk while it had unwritten edits; the arriving file was kept as \(conflict.kept)")
+            }
             if !changes.isEmpty {
                 reloaded(changes)
                 // Spec 7 §4 — "after every applied edit group, reload or library restore".
                 kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
             }
+            // Spec 5 §8 — "A reload drops steps", with one `stepsDropped` note (Spec 9 §2).
+            dropSteps(history.drop(touching: documents.takeReloaded()), cause: "file")
         }
+        // Spec 9 §3 and §6 — what the snapshot worker wrote and read, before the queued groups.
+        absorbSnapshots(frame: frame, now: now)
         // Spec 8 §2 — what the media worker found, "through the one queue", before the queued groups.
         absorbMedia(frame: frame, now: now)
+        // Spec 8 §6 and Spec 9 §6 (plan) — a park neither worker has answered in time fails, whichever workers run here.
+        checkParkTimeout(frame: frame, now: now)
         for group in groups { run(group, frame: frame, now: now) }
         // Spec 5 §2 — the writes that are due, planned here and carried out on the writer's queue.
         if let documents, documents.writeDue(library: &library, machine: &machine, now: now) {
             lastRootsChanged = true
             kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
         }
+        // Spec 9 §3 — "Every ten minutes", when something changed.
+        timerSnapshot(now: now)
+        // Spec 9 §5 — the `history` topic follows "whenever either stack changes".
+        var named: Set<String>?
+        if history != historySent {
+            historySent = history
+            lastHistoryEvent = history.event(seq: commandLog.lastSeq)
+            named = history.snapshotIDs
+        }
+        // Spec 9 §7 — the `saving` topic, and the notes of a full disk.
+        updateSaving(now: now)
+        // Spec 9 §4 — the last state: "After a runtime group, within a second ... At least once a minute".
+        lastStateKeeper?.keep(state: model.state, pendingClears: pendingClears.keys.sorted(),
+                              changed: !lastExecuted.isEmpty || !lastReplaced.isEmpty, now: now)
         // Spec 8 §2 — missing state, worked out again when the indexes or what is known of the files changed.
         refreshMedia()
         updateLive(frame: frame)
@@ -383,6 +490,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
+        if let named { namedSnapshot = named }
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         publishedMediaState = (mediaFiles, mediaTiles)
         liveSnapshot = (lastLive, Int(frame))
@@ -525,9 +633,10 @@ public final class ControlLoop: @unchecked Sendable {
     /// a pointer effect is a fire, a load or a disarm.
     private func updateLive(frame: Int64) {
         lastLiveFeedback = nil
-        guard !lastExecuted.isEmpty || lastRootsChanged else { return }
+        guard !lastExecuted.isEmpty || lastRootsChanged || !lastReplaced.isEmpty else { return }
         let live = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: kept)
-        var moved = false
+        // Spec 3 §8 — a restore's `pointer` effect moves the live marker like a fire's.
+        var moved = lastReplaced.contains { if case .pointer = $0 { return true } else { return false } }
         var boundary: Bool?
         for line in lastExecuted {
             for effect in line.effects {
@@ -557,10 +666,27 @@ public final class ControlLoop: @unchecked Sendable {
             behindPark.append(.group(group))
             return
         }
-        // Spec 8 §6 — "A group that holds a `media delete` ... is validated whole; then every file it deletes moves".
-        if !group.source.kind.holdsEdits, group.commands.contains(where: { $0.command.movesFiles }) {
-            parkDirect(group, frame: frame, now: now)
+        // Spec 9 §3 — its snapshot is written, and whatever it waited behind has applied.
+        if let answer = snapshotAnswers.removeValue(forKey: group.id) {
+            runNow(group, frame: frame, now: now, moved: nil, snapshot: answer)
             return
+        }
+        let commands = group.commands.map(\.command)
+        // Spec 5 §5 — an undo reverses the step on top, which may be a run still open: "any other
+        // command ... closes the run early", so every open run writes its line first.
+        if commands.contains(where: { $0 == .undo || $0 == .redo }) { commandLog.flush() }
+        if !group.source.kind.holdsEdits {
+            // Spec 8 §6 — "A group that holds a `media delete` ... is validated whole; then every file it
+            // deletes moves"; Spec 9 §6 — a restore, or an undo or redo of one, waits for its file the same way.
+            if commands.contains(where: { $0.movesFiles }) || !gateWork(for: commands).isEmpty {
+                parkDirect(group, frame: frame, now: now)
+                return
+            }
+            // Spec 9 §3 — `system snapshot`: "its result arrives once the file is complete".
+            if snapshots != nil, commands.contains(.systemSnapshot) {
+                awaitSnapshot(for: group, frame: frame, now: now)
+                return
+            }
         }
         runNow(group, frame: frame, now: now, moved: nil)
     }
@@ -573,7 +699,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// Runs a group now. `moved` is what the worker did for its deletes and
     /// undeletes (Spec 8 §6); true when the group applied.
     @discardableResult
-    func runNow(_ group: CommandGroup, frame: Int64, now: MonotonicTime, moved: [String: Result<[MediaTrashedFile], Rejection>]?) -> Bool {
+    func runNow(_ group: CommandGroup, frame: Int64, now: MonotonicTime, moved: [String: Result<[MediaTrashedFile], Rejection>]?,
+                materials: [RestoreKey: Result<RestoreMaterial, Rejection>] = [:], snapshot: SnapshotAnswer? = nil) -> Bool {
         let context = projectionContext(frame: frame, source: group.source)
         // Spec 7 §5 — archive's dated title is "the day it runs in the machine's time zone".
         let editing = editingContext
@@ -583,7 +710,8 @@ public final class ControlLoop: @unchecked Sendable {
         switch CommandRunner.run(group, state: model.state, context: context, editing: editing,
                                  settle: { command, _, result in settler.settle(command, result: result) },
                                  media: { [unowned self] command, source in prepareMedia(command, source: source) },
-                                 moved: moved, parking: mediaPark != nil) {
+                                 moved: moved, parking: mediaPark != nil, history: history, restores: restoreInputs(materials),
+                                 snapshot: snapshot ?? (snapshots == nil ? .unavailable : .pending)) {
         case .failure(let rejection):
             reject(group, rejection)
             return false
@@ -614,6 +742,12 @@ public final class ControlLoop: @unchecked Sendable {
     func absorb(_ outcome: RunOutcome, client: String?, frame: Int64, now: MonotonicTime) {
         lastExecuted.append(contentsOf: outcome.executed)
         let logged = commandLog.record(outcome.executed, client: client, now: now, ts: variables.timestamp())
+        // Spec 5 §8 — the stacks as the run left them. Spec 5 §5 — a typing run is "one undo step, whose
+        // inverse is the value from before the run": a later edit of a run folds into the run's step.
+        history = outcome.history
+        if let only = logged.first, logged.count == 1, only.folded, let sent = outcome.executed.first?.group, only.executed.group != sent {
+            history.foldTop(intoRun: only.executed.group)
+        }
         // Spec 6 §8 — "after every timer command that changes the timer", with that line's `seq` (Spec 2 §9).
         for line in logged where line.executed.result == .ok {
             switch line.executed.command {
@@ -632,13 +766,14 @@ public final class ControlLoop: @unchecked Sendable {
             for edits in applied {
                 let seq = logged.filter { $0.executed.group == edits.group }.map(\.seq).max() ?? commandLog.lastSeq
                 if waiting.contains(edits.group) || heldEvents[edits.group] != nil {
-                    var stash = heldEvents[edits.group] ?? HeldEvent(source: edits.source, changed: [], seq: seq)
+                    var stash = heldEvents[edits.group] ?? HeldEvent(source: edits.source, changed: [], seq: seq, cause: edits.cause)
                     stash.changed += edits.changed
                     stash.seq = max(stash.seq, seq)
+                    if stash.cause == .edit { stash.cause = edits.cause }
                     heldEvents[edits.group] = stash
                 } else {
                     revision += 1
-                    lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .edit, group: edits.group, source: edits.source,
+                    lastLibraryEvents.append(LibraryEvent(rev: revision, cause: edits.cause, group: edits.group, source: edits.source,
                                                           changed: edits.changed, seq: seq))
                 }
             }
@@ -648,7 +783,7 @@ public final class ControlLoop: @unchecked Sendable {
             heldEvents[group] = nil
             guard !stash.changed.isEmpty else { continue }
             revision += 1
-            lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .edit, group: group, source: stash.source,
+            lastLibraryEvents.append(LibraryEvent(rev: revision, cause: stash.cause, group: group, source: stash.source,
                                                   changed: LibraryChange.merged(stash.changed), seq: stash.seq))
         }
         for executed in outcome.executed {
@@ -662,12 +797,20 @@ public final class ControlLoop: @unchecked Sendable {
             if case .media(let media) = executed.command, executed.result == .ok { startMediaWork(media, job: executed.job) }
             // Spec 5 §2 — a held edit that was refused "yields `blocked` with its reason"; Spec 8 §2 —
             // "any refusal of a media command is `blocked` with its reason and logged".
-            if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media."),
+            // Spec 9 §3 — "When a playlist is loaded (`playlist "TITLE"`, Spec 7 §3), the v1 stand-in for a service start".
+            if case .playlistLoad = executed.command, executed.result == .ok { takeSnapshot(.playlist, now: now) }
+            if executed.command.logKind == .edit || executed.command.cmd.hasPrefix("media.") || executed.command.isHistoryOrRestore
+                || executed.command == .systemSnapshot,
                executed.result == .blocked, let refusal = executed.refusal {
                 let text = CommandText.print(executed.command) ?? executed.command.cmd
                 log.warning("blocked \(executed.source.kind.rawValue) edit \(text): \(refusal.reason.rawValue): \(refusal.message)")
+            } else if case .historyJump = executed.command, executed.result == .blocked, let refusal = executed.refusal {
+                // Spec 5 §8 — `history jump N` held by a cue, macro or key: `notInV1`, and the rest of its group ran.
+                log.warning("blocked \(executed.source.kind.rawValue) history jump: \(refusal.reason.rawValue): \(refusal.message)")
             }
         }
+        // Spec 9 §3 — a `system snapshot` whose file isn't written yet: its line follows the file.
+        for wanted in outcome.snapshots { snapshotWaits[takeSnapshot(.command, now: now)] = .held(wanted) }
         // Spec 8 §6 — held edits behind a delete whose files must move first.
         if !outcome.parked.isEmpty {
             if mediaPark == nil {
@@ -687,6 +830,50 @@ public final class ControlLoop: @unchecked Sendable {
         lastLibraryEvents.append(LibraryEvent(rev: revision, cause: .file, changed: changes, seq: commandLog.lastSeq))
         // Spec 8 §2 — an index that reloaded may name files no walk has looked at.
         if changes.contains(where: { $0.object == "media" }) { mediaWorker?.requestWalk() }
+    }
+
+    /// Spec 9 §4 — "When the engine stops on request ... writes the file at
+    /// once with `clean: true`": the state and the pending clears as they
+    /// are, on disk when this returns. Nothing to do for an engine that
+    /// never launched on roots on disk. On the control side, the loop stopped.
+    func endLastState(now: MonotonicTime) {
+        lastStateKeeper?.end(state: model.state, pendingClears: pendingClears.keys.sorted(), now: now)
+    }
+
+    // MARK: - Restores (Spec 3 §8)
+
+    /// Spec 3 §8 — "Restores replace ShowState wholesale: in v1
+    /// restore-last-state does, from `state/last.json` (Spec 9 §4), and in
+    /// v1.5 runtime undo does ... the engine diffs old and new state and
+    /// synthesizes `transition` effects as cuts, `attribute` effects for
+    /// every changed attribute, and a `pointer` effect". Spec 9 §4 — "Every
+    /// change is a cut ... and outgoing instances are dropped."
+    ///
+    /// `new` is the state to hold from `frame` on, already made for this
+    /// library and machine (`LastState.restored`). Each channel whose
+    /// content differs gets a new runtime from its in-point, the old one
+    /// released; each output lands on its stack with no switch or blackout
+    /// running; pending popup clears go, since the state that set them is
+    /// gone; and the kept copies are taken for the pointer (Spec 7 §4: "at a
+    /// launch or a state restore"). Timers aren't in ShowState and are left
+    /// as they are. On the control side, between builds.
+    public func replaceState(_ new: ShowState, frame: Int64) {
+        let effects = StateReplacement.effects(from: model.state, to: new)
+        model.state = new
+        for effect in effects { apply(effect, frame: frame) }
+        for output in machine.outputs {
+            var runtime = model.outputs[output.number] ?? OutputRuntime()
+            runtime.switchRun = nil
+            runtime.blackout = nil
+            let stack = new.outputs[output.number] ?? output.defaultStack
+            runtime.blackoutMix = new.stacks[stack]?.blackout == true ? 1 : 0
+            model.outputs[output.number] = runtime
+        }
+        // A box has no earlier text to dissolve from: what it shows next is a cut too.
+        model.boxRuns.removeAll()
+        pendingClears = [:]
+        kept = KeptCopies().refreshed(for: new.pointer, library: library, machine: machine)
+        pendingReplacement.append(contentsOf: effects)
     }
 
     // MARK: - Effects to runtimes (Spec 3 §6, "Who acts": the engine)
@@ -945,7 +1132,8 @@ public final class ControlLoop: @unchecked Sendable {
                 ref: m.ref, handle: InstanceHandle(rawValue: -1), source: nil,
                 poster: posterKey.map(posters.poster) ?? .none, entry: entry,
                 layout: .nv12, size: PixelSize(width: entry?.width ?? 0, height: entry?.height ?? 0), matrix: .bt709, range: .limited,
-                inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: true),
+                // Spec 9 §4 — a restored instance's "transport is as it was": one that was paused or stopped doesn't play.
+                inMs: inMs, outMs: outMs, clock: MediaClock(anchorFrame: frame, anchorMs: inMs, playing: m.transport == .playing),
                 ready: false, missing: m.missing || url == nil, clearIssued: false,
                 transport: m.transport, endBehavior: m.endBehavior, posterKey: posterKey)
             guard !runtime.missing, let entry, let url else { return .media(runtime) }

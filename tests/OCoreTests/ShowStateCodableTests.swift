@@ -142,6 +142,7 @@ final class ShowStateCodableTests: XCTestCase {
             .audioMute(audio: .all, state: .on),
             .macro(12), .undo, .redo, .historyJump(5),
             .systemClearAll, .systemPreflight, .systemSnapshot,
+            .systemRestoreList(list: 42, version: 16), .systemRestoreSnapshot(id: "2026-11-08-085959"),
             .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Lyrics")))),
             .unknown(cmd: "channel.teleport"),
         ]

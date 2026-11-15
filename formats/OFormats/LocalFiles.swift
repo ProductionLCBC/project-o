@@ -21,22 +21,32 @@ public struct SimulatedCrash: Error, Sendable {
     public init() {}
 }
 
-/// A file operation that failed, with the system's reason.
+/// A file operation that failed, with the system's reason and its error
+/// number, so "a write fails for want of space" (Spec 9 §7) is told from
+/// every other failure without reading the words.
 public struct FileError: Error, Equatable, Sendable, CustomStringConvertible {
     public var operation: String
     public var path: String
     public var reason: String
+    /// The system's `errno` for the failure; 0 when it had none.
+    public var code: Int32
 
-    public init(operation: String, path: String, reason: String) {
+    public init(operation: String, path: String, reason: String, code: Int32 = 0) {
         self.operation = operation
         self.path = path
         self.reason = reason
+        self.code = code
     }
 
     public var description: String { "\(operation) \(path): \(reason)" }
 
+    /// Spec 9 §7 — "When a write fails for want of space": the volume is
+    /// full, or the user's quota is.
+    public var isOutOfSpace: Bool { code == ENOSPC || code == EDQUOT }
+
     static func last(_ operation: String, _ path: String) -> FileError {
-        FileError(operation: operation, path: path, reason: String(cString: strerror(errno)))
+        let code = errno
+        return FileError(operation: operation, path: path, reason: String(cString: strerror(code)), code: code)
     }
 }
 
@@ -125,6 +135,8 @@ public enum LocalFiles {
                 try remove(root.appendingPathComponent(path))
             case .copy(let from, let to):
                 try copy(root.appendingPathComponent(from), to: root.appendingPathComponent(to))
+            case .create(let path, let data):
+                try create(data, at: root.appendingPathComponent(path))
             case .makeFolder(let path):
                 try makeFolder(root.appendingPathComponent(path))
             case .renameFolder(let from, let to):
@@ -227,7 +239,22 @@ public enum LocalFiles {
             let failure = errno
             unlink(temporary.path)
             if failure == EEXIST { return }
-            throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)))
+            throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)), code: failure)
+        }
+        syncFolder(folder)
+    }
+
+    /// Spec 9 §6 — a new file written whole and synced before it takes its
+    /// name, its folders made; refused, with nothing changed, when the name
+    /// is taken: "No save writes over a kept version".
+    static func create(_ data: Data, at url: URL) throws {
+        let folder = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = try writeTemporary(data, beside: url)
+        if renameNoReplace(temporary.path, url.path) != 0 {
+            let failure = errno
+            unlink(temporary.path)
+            throw FileError(operation: "create", path: url.path, reason: String(cString: strerror(failure)), code: failure)
         }
         syncFolder(folder)
     }

@@ -71,6 +71,9 @@ public final class EngineProcess: @unchecked Sendable {
         public var oscPort: Int?
         public var blackBoxFolder: URL?
         public var audio = true
+        /// Spec 10 §2 — whether this launch is a relaunch; Area 19 sets it
+        /// from `--relaunch` and from how the last run ended in this boot.
+        public var relaunch = false
 
         public init() {}
     }
@@ -206,6 +209,8 @@ public final class EngineProcess: @unchecked Sendable {
                                log: log) { group in engine.enqueue(group) }
         osc = server
         blackBox = options.blackBoxFolder.map { BlackBox(folder: $0) }
+        // Spec 9 §7 — the black box pauses its tick and present lines on a low disk and stops on a full one.
+        blackBox?.status = engine.diskStatus
 
         server.queryHandler = { [weak self] address in self?.answer(query: address) }
         // Spec 5 §2 — feedback reads the roots as the edits left them.
@@ -235,6 +240,9 @@ public final class EngineProcess: @unchecked Sendable {
     // MARK: - Lifecycle
 
     public func start() {
+        // Spec 9 §4 — the launch order, on the roots this process loaded: the logs open and the run's `start`
+        // note is written before anything can send a command ("The engine takes commands from step 5 on").
+        engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch))
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
         }

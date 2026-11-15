@@ -41,6 +41,40 @@ final class DocumentStore {
     private var removing: Set<DocumentRef> = []
     /// Spec 7 §2 — spare files and the three-second window.
     private(set) var reload: ReloadState
+    /// Spec 9 §2 — the arriving files kept since the control loop last asked,
+    /// for its `conflict` notes: the document that lost and where the
+    /// arriving file was kept, each by its root and path.
+    private var keptConflicts: [(document: String, kept: String)] = []
+
+    /// The conflicts kept since this was last asked.
+    func takeKeptConflicts() -> [(document: String, kept: String)] {
+        defer { keptConflicts.removeAll() }
+        return keptConflicts
+    }
+
+    /// Spec 5 §8 — "When a document is reloaded from disk (§10), every undo
+    /// and redo step that touches it is dropped": the documents a reload
+    /// changed or took away since this was last asked.
+    private var reloaded: Set<DocumentRef> = []
+    /// Spec 9 §7 — what every writer knows of the disk. Set once, at launch.
+    var status: DiskStatus?
+    /// When the waiting documents were last tried on a full disk.
+    private var lastFullTry: MonotonicTime?
+
+    /// Spec 9 §7 — the `saving` topic's `unsaved`: "the documents waiting to
+    /// be written past their second", with those whose write failed.
+    func unsavedCount(now: MonotonicTime) -> Int {
+        var refs = failing
+        for (ref, since) in dirty where now - since > Self.interval { refs.insert(ref) }
+        return refs.count
+    }
+    /// Spec 9 §6 (plan) — what scans found while a restore was read, in order.
+    private var heldScans: [DiskDelta] = []
+
+    func takeReloaded() -> Set<DocumentRef> {
+        defer { reloaded.removeAll() }
+        return reloaded
+    }
 
     /// What a planned save changed in memory, put back if it fails.
     private struct Revert {
@@ -57,7 +91,9 @@ final class DocumentStore {
         self.reload = reload
         self.log = log
         self.wallMilliseconds = wallMilliseconds
-        var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal]
+        var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions,
+                                        .audioTransitions]
+        for preset in library.presets where library.documentPaths["preset/\(preset.number)"] != nil { onDisk.insert(.preset(preset.number)) }
         for list in library.lists where library.documentPaths[FileLayout.documentKey(list: list.uuid)] != nil { onDisk.insert(.list(list.uuid)) }
         for macro in library.macros where library.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.libraryMacro(macro.number)) }
         for macro in machine.macros where machine.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.machineMacro(macro.number)) }
@@ -74,6 +110,75 @@ final class DocumentStore {
 
     static func localKey(_ uuid: UUID) -> String {
         "local/" + uuid.uuidString.lowercased()
+    }
+
+    // MARK: - What is waiting (Spec 9 §7)
+
+    /// Spec 9 §7 — the documents with edits that aren't on disk: changed and
+    /// not yet handed to the queue, handed and not yet reported, or failed.
+    var waiting: Set<DocumentRef> {
+        Set(dirty.keys).union(inFlight).union(failing)
+    }
+
+    /// Spec 9 §2 and §7 — the documents the engine "couldn't write", for the
+    /// `stop` note's `unsaved` and the answer to the request that stopped it:
+    /// each by its root and its path in it, as a snapshot names documents
+    /// (Spec 9 §3), sorted.
+    func unsaved(library: Library, machine: Machine) -> [String] {
+        waiting.map { path(of: $0, library: library, machine: machine) }.sorted()
+    }
+
+    /// A document's file, by its root and its path in it.
+    func path(of ref: DocumentRef, library: Library, machine: Machine) -> String {
+        switch ref {
+        case .list(let uuid):
+            let path = library.documentPaths[FileLayout.documentKey(list: uuid)] ?? library.list(uuid: uuid).map { FileLayout.path(for: .list($0)) }
+            return "library/" + (path ?? "lists/" + uuid.uuidString.lowercased())
+        case .libraryMacro(let number):
+            return "library/" + (library.documentPaths["macro/\(number)"] ?? library.macro(number).map { FileLayout.path(for: .macro($0)) } ?? "macros/\(number)")
+        case .playlist(let uuid):
+            let path = playlistFiles[uuid] ?? machine.documentPaths[FileLayout.documentKey(playlist: uuid)]
+            return "machine/" + (path ?? "playlists/" + uuid.uuidString.lowercased())
+        case .localList(let uuid):
+            return "machine/" + (machine.documentPaths[Self.localKey(uuid)] ?? "lists-local/" + uuid.uuidString.lowercased())
+        case .machineMacro(let number):
+            return "machine/" + (machine.documentPaths["macro/\(number)"] ?? machine.macro(number).map { FileLayout.path(for: .macro($0)) } ?? "macros/\(number)")
+        case .keys:
+            return "machine/" + FileLayout.path(for: .keys(machine.keys))
+        case .mediaIndex:
+            return "library/" + FileLayout.path(for: .mediaIndex(library.mediaIndex))
+        case .mediaLocal:
+            return "machine/" + FileLayout.path(for: .mediaLocal(machine.mediaLocal))
+        case .libraryInfo: return "library/" + FileLayout.path(for: .library(library.info))
+        case .channels: return "library/" + FileLayout.path(for: .channels(library.channels))
+        case .textStyles: return "library/" + FileLayout.path(for: .textStyles(library.textStyles))
+        case .grades: return "library/" + FileLayout.path(for: .grades(library.grades))
+        case .transitions: return "library/" + FileLayout.path(for: .transitions(library.transitions))
+        case .audioTransitions: return "library/" + FileLayout.path(for: .audioTransitions(library.audioTransitions))
+        case .preset(let number):
+            return "library/" + (library.documentPaths["preset/\(number)"] ?? library.preset(number).map { FileLayout.path(for: .preset($0)) }
+                ?? "presets/\(number)")
+        }
+    }
+
+    // MARK: - Kept versions (Spec 9 §6)
+
+    /// Spec 9 §6 — the lists with edits that aren't on disk, so a restore
+    /// keeps the document in memory under a number of its own and not under
+    /// the number of the file it differs from.
+    var unwrittenLists: Set<UUID> {
+        var lists: Set<UUID> = []
+        for ref in waiting {
+            if case .list(let uuid) = ref { lists.insert(uuid) }
+        }
+        return lists
+    }
+
+    /// Spec 9 §6 — versions the worker found in a list's folder that the
+    /// engine didn't know, as a sync brings them after launch: "no save
+    /// writes over a kept version", so they count from now.
+    func noteKept(list uuid: UUID, versions: Set<Int>) {
+        for version in versions where kept.lists[uuid]?[version] == nil { kept.lists[uuid, default: [:]][version] = 0 }
     }
 
     // MARK: - After an applied group
@@ -125,6 +230,19 @@ final class DocumentStore {
             removing.insert(.playlist(uuid))
             submit(change, .machine, [.remove(path: file)])
             return .playlist(uuid)
+        case .keepVersion(let uuid, let version, let data):
+            // Spec 9 §6 — "in the same write as the restored list and ahead of it": kept now, and the
+            // list's own save is due in this build, whatever its last write's second says.
+            kept.lists[uuid, default: [:]][version] = wallMilliseconds()
+            lastIssued.removeValue(forKey: .list(uuid))
+            submit(change, .library, [.create(path: FileLayout.versionPath(list: uuid, version: version), data: data)])
+        case .removeDocument(let ref, let path):
+            dirty.removeValue(forKey: ref)
+            if case .localList(let uuid) = ref { reload.pending.removeValue(forKey: uuid) }
+            guard onDisk.remove(ref) != nil else { return nil }
+            removing.insert(ref)
+            submit(change, ref.inLibrary ? .library : .machine, [.remove(path: path)])
+            return ref
         }
         return nil
     }
@@ -142,10 +260,27 @@ final class DocumentStore {
     /// whether it moved (Spec 7 §2). Returns whether the roots changed: a
     /// list's version, a file's name.
     @discardableResult
+    ///
+    /// Spec 9 §7 — "Edits keep applying, and the documents they change wait
+    /// to be written (choice G-10). Every 30 seconds the engine tries the
+    /// waiting writes again": while the disk is full, every waiting document
+    /// is tried together, thirty seconds after the last try.
     func writeDue(library: inout Library, machine: inout Machine, now: MonotonicTime, everything: Bool = false) -> Bool {
+        var retry = false
+        if status?.full == true, !everything {
+            guard let last = lastFullTry else {
+                lastFullTry = now
+                return false
+            }
+            guard now - last >= DiskStatus.retryInterval else { return false }
+            lastFullTry = now
+            retry = true
+        } else {
+            lastFullTry = nil
+        }
         let due = dirty.filter { ref, _ in
             if case .list(let uuid) = ref, reload.pending[uuid] != nil, !everything { return false }
-            return everything || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
+            return everything || retry || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
         }
         guard !due.isEmpty else { return false }
         var changed = false
@@ -223,7 +358,27 @@ final class DocumentStore {
         case .mediaLocal:
             let plan = Writer.save(.mediaLocal(machine.mediaLocal), extras: machine.documentExtras[.mediaLocal] ?? [:])
             issue(ref, .machine, plan.operations, path: FileLayout.path(for: .mediaLocal(machine.mediaLocal)), recorded: nil, wasOnDisk: true)
+        case .libraryInfo: issueCatalog(ref, .library(library.info), library)
+        case .channels: issueCatalog(ref, .channels(library.channels), library)
+        case .textStyles: issueCatalog(ref, .textStyles(library.textStyles), library)
+        case .grades: issueCatalog(ref, .grades(library.grades), library)
+        case .transitions: issueCatalog(ref, .transitions(library.transitions), library)
+        case .audioTransitions: issueCatalog(ref, .audioTransitions(library.audioTransitions), library)
+        case .preset(let number):
+            guard let preset = library.preset(number) else { return }
+            let recorded = library.documentPaths["preset/\(number)"]
+            let plan = Writer.save(.preset(preset), currentPath: onDisk.contains(ref) ? recorded : nil)
+            let path = FileLayout.path(for: .preset(preset))
+            library.documentPaths["preset/\(number)"] = path
+            issue(ref, .library, plan.operations, path: path, recorded: recorded, wasOnDisk: onDisk.contains(ref))
         }
+    }
+
+    /// Spec 9 §6 — one of the library's single documents (`library.json`, a
+    /// catalog), which a snapshot restore replaces, at its fixed name.
+    private func issueCatalog(_ ref: DocumentRef, _ document: Document, _ library: Library) {
+        let plan = Writer.save(document, extras: library.documentExtras[document.kind] ?? [:])
+        issue(ref, .library, plan.operations, path: FileLayout.path(for: document), recorded: nil, wasOnDisk: true)
     }
 
     private func issue(_ ref: DocumentRef, _ root: DocumentWriter.Root, _ operations: [FileOperation], path: String,
@@ -261,8 +416,22 @@ final class DocumentStore {
     /// found is reloaded (Spec 5 §10), and the lists whose files have been
     /// gone three seconds are deleted. Returns what changed, for one
     /// `library` event with cause `file`.
-    func absorbReports(library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
+    ///
+    /// Spec 9 §6 (plan) — with `holdingScans`, while a restore is read, what
+    /// a scan found waits ("An arriving file is looked at after the restore
+    /// applies"); the queue's reports of its own writes are still taken in,
+    /// so a document that was written isn't counted unwritten.
+    func absorbReports(library: inout Library, machine: inout Machine, now: MonotonicTime, holdingScans: Bool = false) -> [LibraryChange] {
         var changes: [LibraryChange] = []
+        if !holdingScans, !heldScans.isEmpty {
+            let held = heldScans
+            heldScans = []
+            for delta in held {
+                let outcome = DiskReload.apply(delta, library: library, machine: machine, state: reload,
+                                               unwritten: Set(dirty.keys).union(inFlight), deleting: removing, now: now.nanoseconds)
+                changes += adopt(outcome, library: &library, machine: &machine, now: now)
+            }
+        }
         for report in writer.takeReports() {
             switch report {
             case .saved(let seq, let ref, _, let skipped):
@@ -279,7 +448,9 @@ final class DocumentStore {
                 if failing.remove(ref) != nil { log.info("wrote \(ref) again") }
             case .saveFailed(let seq, let ref, let reason):
                 inFlight.remove(ref)
-                if failing.insert(ref).inserted { log.error("could not write \(ref): \(reason); trying again every second") }
+                if failing.insert(ref).inserted {
+                    log.error("could not write \(ref): \(reason); trying again every \(status?.full == true ? "thirty seconds" : "second")")
+                }
                 if let revert = reverts.removeValue(forKey: seq) { putBack(revert, library: &library, machine: &machine) }
                 if dirty[ref] == nil, DocumentChanges.exists(ref, library: library, machine: machine) { dirty[ref] = now }
             case .structured(_, let change):
@@ -287,22 +458,29 @@ final class DocumentStore {
             case .structureFailed(_, let change, let reason):
                 removing.subtract(Self.removed(by: change))
                 log.error("\(DocumentWriter.describe(change)) failed on disk: \(reason)")
+                // Spec 9 §6 — a version that wasn't kept isn't one a later restore can name.
+                if case .keepVersion(let uuid, let version, _) = change { kept.lists[uuid]?[version] = nil }
                 if case .moveList(let uuid, let from, _) = change, let list = library.list(uuid: uuid) {
                     library.documentPaths[FileLayout.documentKey(list: uuid)] = from
                     changes.append(LibraryChange(object: "list", address: ["list": .number(Double(list.number)),
                                                                            "listUuid": .string(uuid.uuidString.lowercased())]))
                 }
-            case .kept(let path, let about):
+            case .kept(let path, let about, let document):
                 log.warning("\(about) changed on disk while the engine held unwritten edits: the arriving file is kept as \(path), and the engine's document is written")
+                keptConflicts.append((document: document, kept: "machine/" + path))
             case .keepFailed(let about, let reason):
                 log.error("\(about) changed on disk while the engine held unwritten edits, and the arriving file could not be kept: \(reason)")
             case .scanned(let delta):
+                if holdingScans {
+                    heldScans.append(delta)
+                    continue
+                }
                 let outcome = DiskReload.apply(delta, library: library, machine: machine, state: reload,
                                                unwritten: Set(dirty.keys).union(inFlight), deleting: removing, now: now.nanoseconds)
                 changes += adopt(outcome, library: &library, machine: &machine, now: now)
             }
         }
-        if !reload.pending.isEmpty {
+        if !reload.pending.isEmpty, !holdingScans {
             let outcome = DiskReload.expire(library: library, machine: machine, state: reload,
                                             unwritten: Set(dirty.keys).union(inFlight), now: now.nanoseconds)
             changes += adopt(outcome, library: &library, machine: &machine, now: now)
@@ -314,6 +492,7 @@ final class DocumentStore {
         switch change {
         case .removeList(let uuid, _): return [.list(uuid)]
         case .removePlaylist(let uuid, _): return [.playlist(uuid)]
+        case .removeDocument(let ref, _): return [ref]
         default: return []
         }
     }
@@ -322,6 +501,8 @@ final class DocumentStore {
     /// kept in `conflicts/`, the documents the engine's edits win for written
     /// again, and both logged.
     private func adopt(_ outcome: ReloadOutcome, library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
+        reloaded.formUnion(DocumentChanges.between((library, machine), (outcome.library, outcome.machine)))
+        reloaded.formUnion(outcome.gone)
         library = outcome.library
         machine = outcome.machine
         reload = outcome.state
@@ -334,7 +515,7 @@ final class DocumentStore {
             if case .playlist(let uuid) = ref { playlistFiles[uuid] = path }
         }
         for conflict in outcome.conflicts {
-            writer.submit(.keep(conflict.data, name: conflict.name, about: conflict.about))
+            writer.submit(.keep(conflict.data, name: conflict.name, about: conflict.about, document: conflict.document))
         }
         for ref in outcome.rewrite where dirty[ref] == nil { dirty[ref] = now }
         for note in outcome.notes { log.info(note) }
@@ -355,7 +536,9 @@ final class DocumentStore {
             if let recorded = revert.recorded, library.documentPaths["macro/\(number)"] == revert.planned { library.documentPaths["macro/\(number)"] = recorded }
         case .machineMacro(let number):
             if let recorded = revert.recorded, machine.documentPaths["macro/\(number)"] == revert.planned { machine.documentPaths["macro/\(number)"] = recorded }
-        case .localList, .keys, .mediaIndex, .mediaLocal:
+        case .preset(let number):
+            if let recorded = revert.recorded, library.documentPaths["preset/\(number)"] == revert.planned { library.documentPaths["preset/\(number)"] = recorded }
+        case .localList, .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions:
             break
         }
     }

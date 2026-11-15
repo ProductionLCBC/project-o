@@ -19,6 +19,10 @@ public enum FileOperation: Equatable, Sendable {
     /// Spec 9 §6 — keep a file's bytes at another path, never writing over
     /// one there ("No save writes over a kept version"); its folders are made.
     case copy(from: String, to: String)
+    /// Spec 9 §6 — a new file with these bytes, its folders made, refused
+    /// when the path is taken ("No save writes over a kept version"): the
+    /// document a list restore keeps before it replaces it.
+    case create(path: String, data: Data)
     /// Spec 7 §2 — a folder edit's directory work: create (its parent must
     /// exist), rename or move (refused when the new path exists, unless only
     /// the case changes) and remove (only when it holds nothing visible;

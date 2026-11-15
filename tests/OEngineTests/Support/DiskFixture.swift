@@ -24,11 +24,20 @@ final class MovableWallClock: @unchecked Sendable {
 /// edits there (Spec 5 §2). The machine takes the spike's display outputs in
 /// memory (the fixture's own pair a 60p display with a 29.97 SDI output) and
 /// is `writable` unless the test says otherwise; neither is ever written.
+///
+/// Spec 9 §4 — with `launch`, the engine goes through its launch order on
+/// the copy, as the engine process does: the logs open and the run's `start`
+/// note is written. `continuing` is the next run on the roots a fixture
+/// leaves behind, for what a launch finds after a stop or a kill.
 final class DiskFixture {
     let folder: URL
     let engine: HeadlessEngine
     let clock: MovableWallClock
     let events = EventRecorder()
+    /// Spec 9 §8 — the disk seam every writer of this engine is built with.
+    let disk: TestDisk
+    /// Whether the folder outlives this fixture, for the run that continues on it.
+    private var handedOn = false
 
     var libraryRoot: URL { folder.appendingPathComponent("library") }
     var machineRoot: URL { folder.appendingPathComponent("machine") }
@@ -36,29 +45,137 @@ final class DiskFixture {
     var log: EngineLog { engine.log }
 
     /// `prepare` changes the copy before it loads.
-    init(wallClock: Date = HeadlessEngine.fixedWallClock(), prepare: (URL) throws -> Void = { _ in },
-         configure: (inout Machine) -> Void = { _ in }) throws {
-        folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-disk-\(UUID().uuidString)")
+    convenience init(wallClock: Date = HeadlessEngine.fixedWallClock(), prepare: (URL) throws -> Void = { _ in },
+                     configure: (inout Machine) -> Void = { _ in }, launch: Bool = false, relaunch: Bool = false) throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-disk-\(UUID().uuidString)")
         try FileManager.default.copyItem(at: EngineFixtures.fixtureRoot, to: folder)
         try prepare(folder)
+        try self.init(folder: folder, clock: MovableWallClock(wallClock), disk: TestDisk(), configure: configure, launch: launch,
+                      relaunch: relaunch)
+    }
+
+    /// The next run on `previous`'s roots, as they are on disk now, with its
+    /// clock and its disk: a launch after `previous` stopped, or was killed
+    /// (dropped without stopping).
+    convenience init(continuing previous: DiskFixture, configure: (inout Machine) -> Void = { _ in }, launch: Bool = true,
+                     relaunch: Bool = false) throws {
+        previous.engine.waitForWrites()
+        previous.engine.settleLogs()
+        previous.engine.settleState()
+        previous.handedOn = true
+        try self.init(folder: previous.folder, clock: previous.clock, disk: previous.disk, configure: configure, launch: launch,
+                      relaunch: relaunch)
+    }
+
+    private init(folder: URL, clock: MovableWallClock, disk: TestDisk, configure: (inout Machine) -> Void, launch: Bool,
+                 relaunch: Bool) throws {
+        self.folder = folder
+        self.clock = clock
+        self.disk = disk
         let roots = try LoadedRoots.load(libraryRoot: folder.appendingPathComponent("library"),
                                          machineRoot: folder.appendingPathComponent("machine"))
         var machine = roots.machine
         machine.outputs = try EngineFixtures.spikeMachine().outputs
         machine.settings.libraryMode = .writable
+        // Spec 9 §4, step 5 — the fixture names a startup macro (its preshow); a test that launches runs it only
+        // when it says so, so the others start from an empty stage.
+        machine.settings.startupMacro = nil
         configure(&machine)
-        let clock = MovableWallClock(wallClock)
-        self.clock = clock
         // Spec 8 §9 — "every test that launches the engine on a fixture runs on a temporary copy", its media included.
         engine = try HeadlessEngine(library: roots.library, machine: machine, media: roots.media,
                                     wallClock: { clock.now })
-        engine.attachDocuments(roots)
+        engine.attachDocuments(roots, disk: disk.disk)
         let events = self.events
         engine.engine.publisher.subscribe(["library"]) { events.record($0) }
+        if launch { self.launch(relaunch: relaunch) }
     }
 
     deinit {
-        try? FileManager.default.removeItem(at: folder)
+        if !handedOn { try? FileManager.default.removeItem(at: folder) }
+    }
+
+    /// Spec 9 §4 — the launch order, on this copy.
+    /// The launch snapshot's zip is written before this returns, so the
+    /// first tick finds the worker's report and a test's log lines fall in
+    /// the same order every run (Spec 9 §3: the engine itself never waits).
+    @discardableResult
+    func launch(relaunch: Bool = false, logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
+        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk, logMemory: logMemory)
+        engine.waitForSnapshots()
+        return report
+    }
+
+    // MARK: - Snapshots (Spec 9 §3)
+
+    var snapshotsFolder: URL { machineRoot.appendingPathComponent("snapshots") }
+
+    /// The ids of the snapshots in `machine/snapshots/`, oldest first; hidden files aren't snapshots.
+    var snapshotIDs: [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: snapshotsFolder.path)) ?? []
+        return SnapshotID.sorted(names.filter { $0.hasSuffix(".zip") && !$0.hasPrefix(".") }.map { String($0.dropLast(4)) })
+    }
+
+    /// A snapshot as its zip holds it.
+    func snapshot(_ id: String) throws -> Snapshot {
+        let data = try Data(contentsOf: snapshotsFolder.appendingPathComponent(id + ".zip"))
+        return try Snapshot(files: Zip.entries(of: data).map { ($0.path, $0.data) })
+    }
+
+    /// The notes of the command log with this `event`, in order.
+    func notes(_ event: String) -> [LogNote] {
+        commandLog().compactMap { line in
+            if case .note(let note) = line, note.event == event { return note }
+            return nil
+        }
+    }
+
+    /// A tick, the snapshot worker and the writer each done, and a tick that reads what they reported.
+    func settleSaving() {
+        engine.settleSaving()
+    }
+
+    // MARK: - A full disk (Spec 9 §7)
+
+    /// The disk as a write that failed for want of space leaves it: every
+    /// write is refused, and the engine's writers know the disk is full.
+    func fillDisk() {
+        disk.full = true
+        engine.engine.diskStatus?.failed(.full("the test's disk is full"))
+    }
+
+    /// Space again: writes go through, and the engine finds out at its next try.
+    func freeDisk() {
+        disk.full = false
+    }
+
+    // MARK: - The logs (Spec 9 §2)
+
+    /// The machine's local day now, as the log files are named: `2026-11-08`.
+    var day: String { engine.variables.today() }
+
+    /// The text of a day's command log, once everything handed to the log
+    /// thread is written; empty when there is no such file.
+    func commandLogText(day: String? = nil) -> String {
+        engine.settleLogs()
+        return data(.machine, "logs/commands-\(day ?? self.day).jsonl").map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+
+    /// A day's command log as a reader takes it, skipping what doesn't parse.
+    func commandLog(day: String? = nil) -> [LogLine] {
+        LogLine.reading(commandLogText(day: day))
+    }
+
+    /// A day's engine log, one object per line that parses.
+    func engineLog(day: String? = nil) -> [[String: JSONValue]] {
+        engine.settleLogs()
+        let text = data(.machine, "logs/engine-\(day ?? self.day).jsonl").map { String(decoding: $0, as: UTF8.self) } ?? ""
+        return text.split(separator: "\n").compactMap { (try? JSONValue.parse(String($0)))?.objectValue }
+    }
+
+    /// The names of the files in `machine/logs/`, sorted.
+    var logFiles: [String] {
+        engine.settleLogs()
+        return ((try? FileManager.default.contentsOfDirectory(atPath: machineRoot.appendingPathComponent("logs").path)) ?? []).sorted()
     }
 
     // MARK: - Driving

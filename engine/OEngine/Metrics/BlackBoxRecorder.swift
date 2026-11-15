@@ -80,12 +80,18 @@ public final class BlackBoxRecorder: @unchecked Sendable {
     private var lastMinute: MinuteRecord?
     private var totalUnderruns = 0
 
-    public init(box: BlackBox, ticks: MetricsRing, presents: [PresentRing], tickNanoseconds: Int64, sources: MinuteSources, log: EngineLog) {
+    /// Spec 9 §2 — "a copy of each minute record (Spec 4 §13)" goes to the
+    /// engine log: `onMinute` takes each record as it is written.
+    private let onMinute: (@Sendable (MinuteRecord, Date) -> Void)?
+
+    public init(box: BlackBox, ticks: MetricsRing, presents: [PresentRing], tickNanoseconds: Int64, sources: MinuteSources, log: EngineLog,
+                onMinute: (@Sendable (MinuteRecord, Date) -> Void)? = nil) {
         self.box = box
         self.ticks = ticks
         self.presents = presents
         self.sources = sources
         self.log = log
+        self.onMinute = onMinute
         summary = MetricsSummary(tickNanoseconds: tickNanoseconds)
     }
 
@@ -159,6 +165,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
         totalUnderruns = underruns
         lock.unlock()
         do { try box.append(record, at: now) } catch { log.error("black box: \(error)") }
+        // Spec 9 §2 — the engine log keeps "the minute records ... for a Monday postmortem".
+        onMinute?(record, now)
     }
 
     /// Spec 4 §13 — "a live summary the API exposes under the `metrics`
@@ -208,6 +216,8 @@ public final class BlackBoxRecorder: @unchecked Sendable {
                 Thread.sleep(forTimeInterval: 0.1)
             }
             autoreleasepool { drain() }
+            // Spec 9 §8 — "with the same ... sync": what the last drain wrote reaches the disk.
+            box.sync()
         }
         thread.name = "o.engine.blackbox"
         thread.qualityOfService = .utility

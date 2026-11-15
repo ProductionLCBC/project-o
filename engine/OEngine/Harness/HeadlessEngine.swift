@@ -158,10 +158,60 @@ public final class HeadlessEngine: @unchecked Sendable {
     }
 
     /// Spec 5 §2 — write edits to the roots on disk the library and machine
-    /// were loaded from (`LoadedRoots`), as the engine process does.
-    public func attachDocuments(_ roots: LoadedRoots) {
+    /// were loaded from (`LoadedRoots`), as the engine process does. Spec 9
+    /// §8 — through `disk`, the seam a test fills or fails.
+    public func attachDocuments(_ roots: LoadedRoots, disk: Disk = .live) {
         control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
-                                librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+                                librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot, disk: disk)
+    }
+
+    /// Spec 9 §4 — the launch order on roots on disk, as the engine process
+    /// goes through it; the harness of a test that doesn't launch skips it.
+    @discardableResult
+    public func launch(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live,
+                       logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
+        var options = LaunchOptions(machineRoot: machineRoot, relaunch: relaunch, disk: disk)
+        if let logMemory { options.logMemory = logMemory }
+        return engine.launch(options)
+    }
+
+    /// Spec 9 §4 — the engine stops on request: what is unwritten is
+    /// written, the `stop` note ends the run's log, the logs are synced.
+    @discardableResult
+    public func stop() -> Engine.StopReport {
+        engine.stop()
+    }
+
+    /// The log thread has written everything handed to it so far.
+    public func settleLogs() {
+        engine.logs?.waitUntilIdle()
+    }
+
+    /// Spec 9 §4 — every write of `state/last.json` handed over so far is on disk.
+    public func settleState() {
+        control.lastStateKeeper?.waitUntilIdle()
+    }
+
+    /// Spec 9 §3 and §6 — the snapshot worker has done everything asked of
+    /// it; the next tick takes in what it reported.
+    public func waitForSnapshots() {
+        control.snapshots?.waitUntilIdle()
+    }
+
+    /// A tick runs what is queued (a `system snapshot`, a restore); the
+    /// snapshot worker and the writer do what was asked; the next tick takes
+    /// in what they reported, which can ask for more (an undo behind a
+    /// restore, a restored list's save); until neither has anything left.
+    public func settleSaving() {
+        var rounds = 0
+        repeat {
+            tick()
+            waitForSnapshots()
+            waitForWrites()
+            rounds += 1
+        } while (control.snapshots?.hasReports == true || control.mediaPark != nil) && rounds < 12
+        tick()
+        waitForWrites()
     }
 
     /// The writer's queue has done everything queued so far; the next tick

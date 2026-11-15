@@ -90,8 +90,12 @@ final class MediaFixture {
     /// Where media may live, when the test says (Spec 8 §2, M-8).
     let places: MediaPlaces?
 
+    /// Spec 9 §4 — whether the engine goes through its launch order on the
+    /// copy, so its logs are written there.
+    let launching: Bool
+
     /// `prepare` changes the copy before it loads; `configure` the machine.
-    init(writable: Bool = true, places: MediaPlaces? = nil, beforeCopy: (@Sendable (URL) -> Void)? = nil,
+    init(writable: Bool = true, places: MediaPlaces? = nil, beforeCopy: (@Sendable (URL) -> Void)? = nil, launching: Bool = false,
          prepare: (MediaFixture) throws -> Void = { _ in }, configure: (inout Machine) -> Void = { _ in }) throws {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-media-\(UUID().uuidString)")
         staging = folder.appendingPathComponent("Staging")
@@ -99,6 +103,7 @@ final class MediaFixture {
         free = FreeSpace()
         self.places = places
         self.beforeCopy = beforeCopy
+        self.launching = launching
         try FileManager.default.copyItem(at: EngineFixtures.fixtureRoot, to: folder)
         trash = FakeTrash(folder: folder.appendingPathComponent("Trash"))
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -117,6 +122,8 @@ final class MediaFixture {
         var machine = roots.machine
         machine.outputs = try EngineFixtures.spikeMachine().outputs
         machine.settings.libraryMode = writable ? .writable : .readOnlyMasters
+        // Spec 9 §4, step 5 — the fixture's startup macro runs only for a test that asks for it.
+        machine.settings.startupMacro = nil
         configure(&machine)
         engine = try HeadlessEngine(library: roots.library, machine: machine, media: roots.media,
                                     mediaCache: LocalFiles.mediaCache(machineRoot: machineRoot))
@@ -131,6 +138,12 @@ final class MediaFixture {
                                               seams: MediaWorker.Seams(now: { clock.now() }, probe: FakeMediaProbe(),
                                                                        freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy,
                                                                        frames: frames, trash: trash))
+        // Spec 9 §4 — "1. The roots load (Spec 1 §8) and the media walk starts (Spec 8 §4). 2. The `start` note".
+        if launching {
+            engine.launch(machineRoot: machineRoot)
+            // Spec 9 §3 — the launch snapshot is on disk before the first tick, so the log's order is the same every run.
+            engine.waitForSnapshots()
+        }
         settle()
     }
 

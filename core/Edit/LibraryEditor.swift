@@ -94,6 +94,15 @@ public enum StructureChange: Equatable, Sendable {
     case moveList(UUID, from: String, to: String)
     case removeList(UUID, path: String)
     case removePlaylist(UUID, path: String)
+    /// Spec 9 §6 — "The current document is kept as a version first,
+    /// whatever E-3's ten minutes say (Spec 1 §4), in the same write as the
+    /// restored list and ahead of it": the list as it was, under `version`,
+    /// at `versions/<list uuid>/vNNNN.json`, never over a file already there.
+    case keepVersion(list: UUID, version: Int, data: Data)
+    /// Spec 9 §6 — "a document of a replaced kind that the snapshot doesn't
+    /// hold ... is deleted": a preset's, a macro's or a local copy's file,
+    /// at its path in its root.
+    case removeDocument(DocumentRef, path: String)
 }
 
 /// Spec 5 §4 and §6 — one applied edit: the roots after it, the command as

@@ -145,6 +145,49 @@ final class LogEntryTests: XCTestCase {
         XCTAssertEqual(write.logKind, .runtime)
     }
 
+    /// Spec 5 §8 — an undo's group "is logged with source `restore` and an
+    /// `undoes` field naming the group it reverses"; a redo's "with source
+    /// `restore` and a `redoes` field". Spec 9 §8 — "`LogEntry` gains note
+    /// lines and the `undoes` and `redoes` fields". Absent, neither is written.
+    func test_undoesAndRedoesNameTheGroupAndAreOmittedWhenAbsent() throws {
+        var undone = example
+        undone.source = CommandSource(kind: .restore)
+        undone.command = .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Words"))))
+        undone.text = "edit channel 2 label \"Words\""
+        undone.kind = .edit
+        undone.undo = .edit
+        undone.undoes = GroupID("g-7f1a2b3c")
+        XCTAssertTrue(undone.line.contains("\"undoes\": \"g-7f1a2b3c\""), undone.line)
+        XCTAssertFalse(undone.line.contains("redoes"), undone.line)
+        XCTAssertEqual(try LogEntry(line: undone.line), undone)
+
+        var redone = undone
+        redone.undoes = nil
+        redone.redoes = GroupID("g-00aa11bb")
+        XCTAssertTrue(redone.line.contains("\"redoes\": \"g-00aa11bb\""), redone.line)
+        XCTAssertFalse(redone.line.contains("undoes"), redone.line)
+        XCTAssertEqual(try LogEntry(line: redone.line), redone)
+
+        XCTAssertFalse(example.line.contains("undoes") || example.line.contains("redoes"))
+        XCTAssertNil(try LogEntry(line: exampleLine).undoes)
+        XCTAssertNil(try LogEntry(line: exampleLine).redoes)
+    }
+
+    /// Spec 5 §8 — the runner stamps an undo's and a redo's lines; the entry
+    /// takes the field from the executed command.
+    func test_anExecutedCommandsUndoesAndRedoesReachItsEntry() {
+        var executed = ExecutedCommand(group: GroupID("g-2"), source: CommandSource(kind: .restore),
+                                       command: .edit(EditCommand(.numbered(.channel, 2), .set(path: "label", value: .string("Words")))),
+                                       result: .ok, effects: [])
+        executed.undoes = GroupID("g-1")
+        XCTAssertEqual(LogEntry(executed, seq: 7, ts: "2026-11-01T09:14:03.117-05:00").undoes, GroupID("g-1"))
+        executed.undoes = nil
+        executed.redoes = GroupID("g-1")
+        let entry = LogEntry(executed, seq: 8, ts: "2026-11-01T09:14:03.117-05:00")
+        XCTAssertEqual(entry.redoes, GroupID("g-1"))
+        XCTAssertNil(entry.undoes)
+    }
+
     /// Spec 1 §9 — UUIDs are written lowercase; absent fields are omitted.
     func test_sourceEncodesLowercaseUuidsAndOmitsAbsentFields() throws {
         let source = CommandSource(kind: .cue, list: Self.listUuid, cue: Self.cueUuid, playlist: Self.playlistUuid)
