@@ -11,11 +11,17 @@ public struct LaunchOptions: Sendable {
     public var machineRoot: URL
     public var relaunch: Bool
     public var disk: Disk
+    /// Spec 9 §7 — how much of each log is kept in memory on a full disk:
+    /// "the command log up to 64 MB of lines and the engine log up to 16
+    /// MB", unless a test gives less.
+    public var logMemory: (commands: Int, engine: Int)
 
-    public init(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live) {
+    public init(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live,
+                logMemory: (commands: Int, engine: Int) = (LogWriter.commandMemoryBytes, LogWriter.engineMemoryBytes)) {
         self.machineRoot = machineRoot
         self.relaunch = relaunch
         self.disk = disk
+        self.logMemory = logMemory
     }
 }
 
@@ -65,10 +71,21 @@ extension Engine {
         let machineUuid = machine.settings.uuid.uuidString.lowercased()
         let runUuid = run.uuidString.lowercased()
 
+        // Spec 9 §7 — one reading of the disk for every writer: a write that fails for want of space, from
+        // any of them, starts the full state for all. Free space is measured now, then once a second.
+        let status = DiskStatus(disk: options.disk, root: options.machineRoot)
+        status.measure()
+        diskStatus = status
+        control.diskStatus = status
+        control.documents?.status = status
+        control.documents?.writer.status = status
+
         // Step 2 — the logs open (Spec 9 §2), and the run's part of each begins with its start.
-        let writer = LogWriter(folder: options.machineRoot.appendingPathComponent("logs"), run: run, disk: options.disk,
+        let writer = LogWriter(folder: options.machineRoot.appendingPathComponent("logs"), run: run, disk: options.disk, status: status,
+                               commandMemoryBytes: options.logMemory.commands, engineMemoryBytes: options.logMemory.engine,
                                stamp: { variables.timestamp(at: $0) })
         logs = writer
+        control.logWriter = writer
         // "`start` (opening each run's part of the file, with the app version and the machine)".
         writer.engine(LogWriter.EngineRecord(at: variables.now(), kind: "start",
                                              fields: ["app": .string(OCore.appVersion), "machine": .string(machineUuid)]))
@@ -98,7 +115,10 @@ extension Engine {
         // The roots are copied here, so the macro's edits aren't in it; the zip is written on the worker.
         if let documents = control.documents {
             let worker = SnapshotWorker(folder: options.machineRoot.appendingPathComponent("snapshots"),
-                                        libraryRoot: documents.writer.libraryRoot, disk: options.disk, timeZone: variables.timeZone)
+                                        libraryRoot: documents.writer.libraryRoot, disk: options.disk, status: status,
+                                        timeZone: variables.timeZone)
+            let control = self.control
+            worker.retention = (today: { variables.today() }, named: { control.publishedNamedSnapshots })
             control.attachSnapshots(worker, run: run, now: clock.now())
             answerSavingQueries(worker)
             control.takeLaunchSnapshot(now: clock.now())
@@ -113,6 +133,9 @@ extension Engine {
             control.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .startup), commands: [Command.macro(macro)]))
             report.startupMacro = macro
         }
+        // Step 6 — "The retention pass (§7)": the snapshots, on their worker, after the launch's own. The
+        // logs' pass ran when this run's day began in each (step 2), and the black box's runs with its first line.
+        control.snapshots?.retain()
         return report
     }
 
@@ -127,7 +150,7 @@ extension Engine {
     private func restoreLastState(_ options: LaunchOptions) -> LaunchReport.LastStateOutcome {
         let variables = control.variables
         let keeper = LastStateKeeper(url: options.machineRoot.appendingPathComponent("state/last.json"), run: run, disk: options.disk,
-                                     stamp: { variables.timestamp() })
+                                     status: diskStatus, stamp: { variables.timestamp() })
         control.lastStateKeeper = keeper
         let now = clock.now()
         let last = machine.last

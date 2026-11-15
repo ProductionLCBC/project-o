@@ -37,8 +37,12 @@ final class LastStateKeeper: @unchecked Sendable {
     let url: URL
     let run: UUID
     private let disk: Disk
+    /// Spec 9 §7 — what every writer knows of the disk.
+    private let status: DiskStatus?
     private let stamp: @Sendable () -> String
     private let queue = DispatchQueue(label: "o.engine.state", qos: .utility)
+    /// Spec 9 §7 — the file was removed for a full disk, and isn't written until the full state ends.
+    private var removed = false
 
     // The control side's own.
     private var written: (state: ShowState, clears: [Int], restored: Bool)?
@@ -51,10 +55,11 @@ final class LastStateKeeper: @unchecked Sendable {
 
     /// `url` is `machine/state/last.json`; `stamp` is the wall clock as a
     /// `writtenAt`, in the machine's time zone.
-    init(url: URL, run: UUID, disk: Disk, stamp: @escaping @Sendable () -> String) {
+    init(url: URL, run: UUID, disk: Disk, status: DiskStatus? = nil, stamp: @escaping @Sendable () -> String) {
         self.url = url
         self.run = run
         self.disk = disk
+        self.status = status
         self.stamp = stamp
     }
 
@@ -74,10 +79,27 @@ final class LastStateKeeper: @unchecked Sendable {
     /// comparing. Written when it differs from what the file holds and a
     /// second has passed since the last write; when a minute has; and when
     /// the minute after a restore ends.
+    ///
+    /// Spec 9 §7 — "A full disk ... The engine removes `state/last.json`,
+    /// which frees space and needs none, so a stale last state can't come
+    /// back later. It isn't written again until the full state ends", and
+    /// then it is written at once.
     func keep(state: ShowState, pendingClears: [Int], changed: Bool, now: MonotonicTime) {
         guard let written, let lastWriteAt else { return }
         if changed, !dirty { dirty = state != written.state || pendingClears != written.clears }
         let restored = restoredUntil.map { now < $0 } ?? false
+        if status?.full == true {
+            if !removed {
+                removed = true
+                queue.async { [self] in try? disk.remove(url) }
+            }
+            return
+        }
+        if removed {
+            removed = false
+            write(state: state, clears: pendingClears, clean: false, restored: restored, now: now, wait: false)
+            return
+        }
         let since = now - lastWriteAt
         guard (dirty && since >= Self.changeInterval) || since >= Self.refreshInterval || restored != written.restored else { return }
         write(state: state, clears: pendingClears, clean: false, restored: restored, now: now, wait: false)
@@ -85,8 +107,15 @@ final class LastStateKeeper: @unchecked Sendable {
 
     /// Spec 9 §4 — the stop on request: "writes the file at once with
     /// `clean: true`". On disk when this returns.
+    ///
+    /// Spec 9 §7 — on a disk still full the file stays removed: the next
+    /// launch finds none, and starts empty.
     func end(state: ShowState, pendingClears: [Int], now: MonotonicTime) {
         let restored = restoredUntil.map { now < $0 } ?? false
+        if status?.full == true {
+            queue.sync { [self] in try? disk.remove(url) }
+            return
+        }
         write(state: state, clears: pendingClears, clean: true, restored: restored, now: now, wait: true)
     }
 
@@ -99,8 +128,12 @@ final class LastStateKeeper: @unchecked Sendable {
             do {
                 try disk.replace(last.data, at: url)
             } catch {
+                let failure = Disk.Failure(error)
+                // Spec 9 §7 — "When a write fails for want of space": the full state starts, and the file goes.
+                status?.failed(failure)
+                if failure.isFull { try? disk.remove(url) }
                 lock.lock()
-                failed.append(Disk.Failure(error))
+                failed.append(failure)
                 lock.unlock()
             }
         }

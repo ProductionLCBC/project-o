@@ -168,8 +168,11 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// Spec 9 §4 — the launch order on roots on disk, as the engine process
     /// goes through it; the harness of a test that doesn't launch skips it.
     @discardableResult
-    public func launch(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live) -> LaunchReport {
-        engine.launch(LaunchOptions(machineRoot: machineRoot, relaunch: relaunch, disk: disk))
+    public func launch(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live,
+                       logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
+        var options = LaunchOptions(machineRoot: machineRoot, relaunch: relaunch, disk: disk)
+        if let logMemory { options.logMemory = logMemory }
+        return engine.launch(options)
     }
 
     /// Spec 9 §4 — the engine stops on request: what is unwritten is

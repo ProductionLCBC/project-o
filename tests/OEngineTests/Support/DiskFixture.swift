@@ -99,8 +99,8 @@ final class DiskFixture {
     /// first tick finds the worker's report and a test's log lines fall in
     /// the same order every run (Spec 9 §3: the engine itself never waits).
     @discardableResult
-    func launch(relaunch: Bool = false) -> LaunchReport {
-        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk)
+    func launch(relaunch: Bool = false, logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
+        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk, logMemory: logMemory)
         engine.waitForSnapshots()
         return report
     }
@@ -132,6 +132,20 @@ final class DiskFixture {
     /// A tick, the snapshot worker and the writer each done, and a tick that reads what they reported.
     func settleSaving() {
         engine.settleSaving()
+    }
+
+    // MARK: - A full disk (Spec 9 §7)
+
+    /// The disk as a write that failed for want of space leaves it: every
+    /// write is refused, and the engine's writers know the disk is full.
+    func fillDisk() {
+        disk.full = true
+        engine.engine.diskStatus?.failed(.full("the test's disk is full"))
+    }
+
+    /// Space again: writes go through, and the engine finds out at its next try.
+    func freeDisk() {
+        disk.full = false
     }
 
     // MARK: - The logs (Spec 9 §2)

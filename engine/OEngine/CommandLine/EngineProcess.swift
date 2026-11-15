@@ -209,6 +209,8 @@ public final class EngineProcess: @unchecked Sendable {
                                log: log) { group in engine.enqueue(group) }
         osc = server
         blackBox = options.blackBoxFolder.map { BlackBox(folder: $0) }
+        // Spec 9 §7 — the black box pauses its tick and present lines on a low disk and stops on a full one.
+        blackBox?.status = engine.diskStatus
 
         server.queryHandler = { [weak self] address in self?.answer(query: address) }
         // Spec 5 §2 — feedback reads the roots as the edits left them.

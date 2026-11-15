@@ -22,6 +22,10 @@ public final class BlackBox: @unchecked Sendable {
 
     public let folder: URL
     public let maximumBytes: Int
+    /// Spec 9 §7 — what every writer knows of the disk: under 1 GB free
+    /// "the black box's tick and present lines pause", and on a full disk
+    /// "the black box stops". Set once, before the recorder starts.
+    public var status: DiskStatus?
     private let lock = NSLock()
     private let journal: JournalFile
     /// The files of earlier hours, oldest first, with their sizes: listed
@@ -123,17 +127,36 @@ public final class BlackBox: @unchecked Sendable {
         try append(line: BlackBox.line(for: record), at: date)
     }
 
+    /// Spec 9 §7 — a minute record is written on a low disk too ("The
+    /// minute records go on"); on a full one nothing is.
     public func append(_ record: MinuteRecord, at date: Date = Date()) throws {
-        try append(line: BlackBox.line(for: record), at: date)
+        try write(line: BlackBox.line(for: record), at: date)
     }
 
     /// Append one line (ending in its newline) to the file of `date`'s UTC
     /// hour, trimming the oldest hours past the cap and syncing once a second.
+    /// Spec 9 §7 — a tick's or a present's line: not written while under
+    /// 1 GB is free.
     public func append(line: String, at date: Date) throws {
+        if status?.low == true { return }
+        try write(line: line, at: date)
+    }
+
+    private func write(line: String, at date: Date) throws {
+        // Spec 9 §7 — "the black box stops", quietly: its thread asks ten times a second.
+        if status?.full == true { return }
         lock.lock()
         defer { lock.unlock() }
         let hour = BlackBox.hourFormatter.string(from: date)
-        try journal.append(line, key: hour)
+        do {
+            try journal.append(line, key: hour)
+        } catch {
+            let failure = Disk.Failure(error)
+            guard failure.isFull, let status else { throw error }
+            status.failed(failure)
+            journal.close()
+            return
+        }
         // Spec 9 §7 — the pass runs "when ... an hour's file starts": the earlier hours, with their sizes.
         if !journal.takeStarted().isEmpty { earlier = earlierFiles(than: journal.url(for: hour).lastPathComponent) }
         trim()

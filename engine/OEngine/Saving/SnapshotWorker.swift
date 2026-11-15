@@ -48,10 +48,17 @@ public final class SnapshotWorker: @unchecked Sendable {
     public let folder: URL
     public let libraryRoot: URL
     public let disk: Disk
+    /// Spec 9 §7 — what every writer knows of the disk.
+    public let status: DiskStatus?
     private let timeZone: TimeZone
+    /// Spec 9 §7 — what the retention pass needs from outside the folder:
+    /// today's date in the machine's time zone, and the snapshots an undo or
+    /// redo step names. Set once, before the first snapshot.
+    public var retention: (today: @Sendable () -> String, named: @Sendable () -> Set<String>)?
     private let queue = DispatchQueue(label: "o.engine.snapshots", qos: .background)
     private let lock = NSLock()
     private var reports: [Report] = []
+    private var removed: [String] = []
     /// The queue's own: the newest snapshot it wrote or read, so the
     /// ten-minute check doesn't read a zip each time.
     private var newest: Snapshot?
@@ -63,11 +70,42 @@ public final class SnapshotWorker: @unchecked Sendable {
     public var beforeRead: (@Sendable () -> Void)?
 
     /// `folder` is `machine/snapshots/`; `libraryRoot` holds `versions/`.
-    public init(folder: URL, libraryRoot: URL, disk: Disk = .live, timeZone: TimeZone) {
+    public init(folder: URL, libraryRoot: URL, disk: Disk = .live, status: DiskStatus? = nil, timeZone: TimeZone) {
         self.folder = folder
         self.libraryRoot = libraryRoot
         self.disk = disk
+        self.status = status
         self.timeZone = timeZone
+    }
+
+    /// Spec 9 §7 — "The retention pass runs at launch, after each snapshot":
+    /// every snapshot §7's rule no longer keeps is removed, oldest first,
+    /// but one "an undo or redo step names", which "is kept until the run
+    /// ends". After everything asked so far.
+    public func retain() {
+        queue.async { [self] in removeExpired() }
+    }
+
+    /// The ids the pass removed since this was last asked, for the engine log.
+    public func takeRemoved() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        let out = removed
+        removed.removeAll()
+        return out
+    }
+
+    private func removeExpired() {
+        guard let retention else { return }
+        let expired = Retention.snapshotsToRemove(ids(), today: retention.today(), named: retention.named())
+        guard !expired.isEmpty else { return }
+        for id in expired {
+            try? disk.remove(url(id))
+            if newest?.manifest.id == id { newest = nil }
+        }
+        lock.lock()
+        removed += expired
+        lock.unlock()
     }
 
     // MARK: - The control thread's side
@@ -137,7 +175,8 @@ public final class SnapshotWorker: @unchecked Sendable {
     private func write(_ request: Take) -> Report {
         let reason = request.reason
         if reason.isAutomatic {
-            // Spec 9 §7 — "automatic snapshots ... pause" on a low disk.
+            // Spec 9 §7 — "automatic snapshots ... pause" on a low disk; on a full one "Snapshots aren't written".
+            if status?.full == true { return .paused(token: request.token, reason: reason) }
             if let free = disk.freeBytes(at: folder.deletingLastPathComponent()), free < Self.lowDiskBytes {
                 return .paused(token: request.token, reason: reason)
             }
@@ -154,10 +193,14 @@ public final class SnapshotWorker: @unchecked Sendable {
             // Spec 1 §5 — a temporary file with a hidden name in the same folder, synced, then renamed.
             try disk.replace(data, at: url(id))
             newest = snapshot
+            // Spec 9 §7 — "The retention pass runs ... after each snapshot".
+            removeExpired()
             afterSnapshot?()
             return .taken(token: request.token, reason: reason, id: id, bytes: data.count)
         } catch {
-            return .failed(token: request.token, reason: reason, failure: Disk.Failure(error))
+            let failure = Disk.Failure(error)
+            status?.failed(failure)
+            return .failed(token: request.token, reason: reason, failure: failure)
         }
     }
 

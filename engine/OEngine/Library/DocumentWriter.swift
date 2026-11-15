@@ -87,6 +87,8 @@ public final class DocumentWriter: @unchecked Sendable {
     private let fileStamp: @Sendable () -> String
     /// Spec 9 §8 — the seam every write goes through.
     public let disk: Disk
+    /// Spec 9 §7 — what every writer knows of the disk. Set once, at launch.
+    public var status: DiskStatus?
     private let queue = DispatchQueue(label: "o.engine.writer", qos: .utility)
     private let lock = NSLock()
     private var nextSeq = 0
@@ -293,6 +295,7 @@ public final class DocumentWriter: @unchecked Sendable {
     private func save(_ ref: DocumentRef, root: Root, operations: [FileOperation], path: String, seq: Int) {
         let changed = keepArrivals(in: operations, root: root, about: ref.description)
         var skipped: [String] = []
+        var renamed: [(from: String, to: String)] = []
         do {
             for operation in operations {
                 switch operation {
@@ -308,9 +311,19 @@ public final class DocumentWriter: @unchecked Sendable {
                 }
                 try disk.execute(WritePlan(operations: [operation]), in: url(root))
                 note(operation, root: root)
+                if case .move(let from, let to) = operation { renamed.append((from, to)) }
             }
+            // Spec 9 §7 — "When one succeeds, the full state ends".
+            if status?.full == true { status?.wrote() }
             report(.saved(seq: seq, ref: ref, path: path, skippedCopies: skipped))
         } catch {
+            // The document's file keeps the name it had: a rename this save made before it failed is undone, so
+            // the document is named where its file still is (Spec 9 §7, what a stop couldn't write).
+            for rename in renamed.reversed() {
+                let back = FileOperation.move(from: rename.to, to: rename.from)
+                if (try? disk.execute(WritePlan(operations: [back]), in: url(root))) != nil { note(back, root: root) }
+            }
+            status?.failed(Disk.Failure(error))
             report(.saveFailed(seq: seq, ref: ref, reason: "\(error)"))
         }
     }

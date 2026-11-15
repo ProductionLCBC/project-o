@@ -56,6 +56,18 @@ final class DocumentStore {
     /// and redo step that touches it is dropped": the documents a reload
     /// changed or took away since this was last asked.
     private var reloaded: Set<DocumentRef> = []
+    /// Spec 9 §7 — what every writer knows of the disk. Set once, at launch.
+    var status: DiskStatus?
+    /// When the waiting documents were last tried on a full disk.
+    private var lastFullTry: MonotonicTime?
+
+    /// Spec 9 §7 — the `saving` topic's `unsaved`: "the documents waiting to
+    /// be written past their second", with those whose write failed.
+    func unsavedCount(now: MonotonicTime) -> Int {
+        var refs = failing
+        for (ref, since) in dirty where now - since > Self.interval { refs.insert(ref) }
+        return refs.count
+    }
     /// Spec 9 §6 (plan) — what scans found while a restore was read, in order.
     private var heldScans: [DiskDelta] = []
 
@@ -248,10 +260,27 @@ final class DocumentStore {
     /// whether it moved (Spec 7 §2). Returns whether the roots changed: a
     /// list's version, a file's name.
     @discardableResult
+    ///
+    /// Spec 9 §7 — "Edits keep applying, and the documents they change wait
+    /// to be written (choice G-10). Every 30 seconds the engine tries the
+    /// waiting writes again": while the disk is full, every waiting document
+    /// is tried together, thirty seconds after the last try.
     func writeDue(library: inout Library, machine: inout Machine, now: MonotonicTime, everything: Bool = false) -> Bool {
+        var retry = false
+        if status?.full == true, !everything {
+            guard let last = lastFullTry else {
+                lastFullTry = now
+                return false
+            }
+            guard now - last >= DiskStatus.retryInterval else { return false }
+            lastFullTry = now
+            retry = true
+        } else {
+            lastFullTry = nil
+        }
         let due = dirty.filter { ref, _ in
             if case .list(let uuid) = ref, reload.pending[uuid] != nil, !everything { return false }
-            return everything || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
+            return everything || retry || lastIssued[ref].map { now - $0 >= Self.interval } ?? true
         }
         guard !due.isEmpty else { return false }
         var changed = false
@@ -419,7 +448,9 @@ final class DocumentStore {
                 if failing.remove(ref) != nil { log.info("wrote \(ref) again") }
             case .saveFailed(let seq, let ref, let reason):
                 inFlight.remove(ref)
-                if failing.insert(ref).inserted { log.error("could not write \(ref): \(reason); trying again every second") }
+                if failing.insert(ref).inserted {
+                    log.error("could not write \(ref): \(reason); trying again every \(status?.full == true ? "thirty seconds" : "second")")
+                }
                 if let revert = reverts.removeValue(forKey: seq) { putBack(revert, library: &library, machine: &machine) }
                 if dirty[ref] == nil, DocumentChanges.exists(ref, library: library, machine: machine) { dirty[ref] = now }
             case .structured(_, let change):

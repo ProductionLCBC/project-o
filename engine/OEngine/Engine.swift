@@ -52,6 +52,8 @@ public final class Engine: @unchecked Sendable {
     /// engine has gone through its launch (`launch(_:)`); nil for an engine
     /// built in memory, whose lines stay in `control.commandLog` and `log`.
     public internal(set) var logs: LogWriter?
+    /// Spec 9 §7 — what this engine's writers know of the disk, once it has launched.
+    public internal(set) var diskStatus: DiskStatus?
     /// Spec 9 §2 — "each file is synced once a second": the threaded engine's pulse.
     private var logTimer: DispatchSourceTimer?
 
@@ -117,6 +119,8 @@ public final class Engine: @unchecked Sendable {
         takeNotes()
         // Spec 9 §5 — "the engine sends an event when a client subscribes": both stacks start empty.
         publisher.publish(current: UndoHistory().event(seq: 0))
+        // Spec 9 §7 — and the `saving` topic, "sent when a client subscribes and whenever a value changes".
+        publisher.publish(current: SavingStatus().event(seq: 0))
     }
 
     /// Spec 9 §6, "Picking one" — the `versions` and `snapshots` queries,
@@ -228,6 +232,8 @@ public final class Engine: @unchecked Sendable {
         for event in control.lastMediaEvents { publisher.publish(event) }
         // Spec 9 §5 — the `history` topic: "whenever either stack changes".
         if let history = control.lastHistoryEvent { publisher.publish(current: history) }
+        // Spec 9 §7 — the `saving` topic: "whenever a value changes".
+        if let saving = control.lastSavingEvent { publisher.publish(current: saving) }
         // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.

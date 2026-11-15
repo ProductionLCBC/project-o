@@ -245,9 +245,9 @@ final class ListRestoreEngineTests: XCTestCase {
     }
 
     func test_aFullDiskIsDiskFullAndOperatorLockRefusesIt() throws {
-        disk.control.diskFull = true
+        disk.fillDisk()
         XCTAssertEqual(run("system restore list 42 version 16"), .diskFull)
-        disk.control.diskFull = false
+        disk.freeDisk()
 
         disk = try DiskFixture(configure: { $0.settings.operatorLock.enabled = true }, launch: true)
         disk.settleSaving()

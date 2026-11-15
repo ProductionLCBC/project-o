@@ -4,6 +4,31 @@
 import Foundation
 import OCore
 
+/// Spec 9 §7 — "The `saving` topic. What the app's badge reads, sent when a
+/// client subscribes and whenever a value changes":
+///
+/// ```json
+/// { "type": "event", "topic": "saving", "unsaved": 0, "disk": "ok", "log": "file",
+///   "lastSnapshot": "2026-11-08-085959", "seq": 5231 }
+/// ```
+///
+/// "`unsaved` counts the documents waiting to be written past their second;
+/// `disk` is `ok`, `low` or `full`; `log` is `file` or `memory`."
+public struct SavingStatus: Equatable, Sendable {
+    public var unsaved = 0
+    public var disk = "ok"
+    public var log = "file"
+    /// The newest snapshot there is, as far as this run knows; null before it knows of one.
+    public var lastSnapshot: String?
+
+    public init() {}
+
+    public func event(seq: Int) -> JSONValue {
+        .object(["type": .string("event"), "topic": .string("saving"), "unsaved": .number(Double(unsaved)), "disk": .string(disk),
+                 "log": .string(log), "lastSnapshot": lastSnapshot.map(JSONValue.string) ?? .null, "seq": .number(Double(seq))])
+    }
+}
+
 /// What a snapshot asked of the worker is for.
 enum SnapshotWait {
     /// Spec 9 §3 — a `launch`, `playlist` or `timer` snapshot: noted when written.
@@ -127,6 +152,9 @@ extension ControlLoop {
     /// a parked restore.
     func absorbSnapshots(frame: Int64, now: MonotonicTime) {
         guard let worker = snapshots else { return }
+        // Spec 9 §7 — what the retention pass removed, in the engine's log.
+        let expired = worker.takeRemoved()
+        if !expired.isEmpty { log.info("retention: removed \(expired.count) snapshot(s), from \(expired[0]) to \(expired[expired.count - 1])") }
         for report in worker.takeReports() {
             switch report {
             case .taken(let token, let reason, let id, _):
@@ -136,8 +164,10 @@ extension ControlLoop {
                     note("snapshot", ["id": .string(id), "reason": .string(reason.rawValue)], text: "Snapshot \(id) taken (\(reason.rawValue))")
                 }
                 settle(snapshotWaits.removeValue(forKey: token), .taken(id), frame: frame, now: now)
-            case .unchanged(let token, _, _):
+            case .unchanged(let token, _, let newest):
+                // Not written: the newest snapshot there is already holds these documents.
                 snapshotWaits.removeValue(forKey: token)
+                lastSnapshot = newest
             case .paused(let token, let reason):
                 snapshotWaits.removeValue(forKey: token)
                 changedSinceSnapshot = true
@@ -179,6 +209,36 @@ extension ControlLoop {
                    client: nil, frame: frame, now: now)
         case .automatic?, nil:
             break
+        }
+    }
+
+    // MARK: - The saving topic and a full disk (Spec 9 §7)
+
+    /// Spec 9 §2 — `logToMemory`, `logToFile`: "When a full disk moves the
+    /// logs to memory and back (§7)", each with `lost`, the "lines that
+    /// couldn't be kept". Spec 9 §7 — the `saving` topic's event "whenever a
+    /// value changes": the documents waiting past their second, the disk,
+    /// where the logs are, and the newest snapshot.
+    func updateSaving(now: MonotonicTime) {
+        let memory = logWriter?.inMemory ?? false
+        if memory != logInMemory {
+            logInMemory = memory
+            let lost = logWriter?.takeLost() ?? 0
+            if memory {
+                note("logToMemory", ["lost": .number(Double(lost))], text: "The disk is full: the logs are kept in memory")
+            } else {
+                note("logToFile", ["lost": .number(Double(lost))],
+                     text: lost == 0 ? "The logs are on disk again" : "The logs are on disk again; \(lost) line(s) couldn't be kept")
+            }
+        }
+        var status = SavingStatus()
+        status.unsaved = documents?.unsavedCount(now: now) ?? 0
+        status.disk = diskStatus?.word ?? "ok"
+        status.log = memory ? "memory" : "file"
+        status.lastSnapshot = lastSnapshot
+        if status != savingSent {
+            savingSent = status
+            lastSavingEvent = status.event(seq: commandLog.lastSeq)
         }
     }
 

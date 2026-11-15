@@ -202,8 +202,17 @@ public final class ControlLoop: @unchecked Sendable {
     public internal(set) var lastSnapshot: String?
     /// Spec 9 §3 — this run's uuid, for a snapshot's manifest.
     var runID = UUID()
-    /// Spec 9 §7 — a write failed for want of space: snapshots and restores are refused with `diskFull`.
-    public internal(set) var diskFull = false
+    /// Spec 9 §7 — what every writer of a launched engine knows of the disk.
+    var diskStatus: DiskStatus?
+    /// Spec 9 §7 — a write failed for want of space and none has succeeded
+    /// since: "`system snapshot` and the restore commands are refused with `diskFull`".
+    public var diskFull: Bool { diskStatus?.full ?? false }
+    /// Spec 9 §2 — the logs on disk, to know when a full disk moves them to memory and back.
+    var logWriter: LogWriter?
+    var logInMemory = false
+    /// Spec 9 §7 — the `saving` topic's event, when this build changed a value it carries. Reset every build.
+    public internal(set) var lastSavingEvent: JSONValue?
+    var savingSent = SavingStatus()
 
     public init(library: Library, machine: Machine, pacing: Pacing, media: MediaFolders, backend: any RenderBackend,
                 sources: SourceTable, sourceFactory: any SourceFactory, posters: any PosterProvider, text: any TextProvider,
@@ -265,6 +274,7 @@ public final class ControlLoop: @unchecked Sendable {
     private let stateLock = NSLock()
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
+    private var namedSnapshot: Set<String> = []
     private var publishedMediaState: (files: [MediaLocation: MediaFileState], tiles: Set<String>)?
     private var liveSnapshot: (live: LiveSnapshot, frame: Int)?
     private var timersSnapshot: [Int: TimerReading] = [:]
@@ -326,6 +336,15 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return publishedMediaState ?? (mediaFiles, mediaTiles)
+    }
+
+    /// Spec 9 §7 — "A snapshot an undo or redo step names is kept until the
+    /// run ends": the ids the steps named when a plan was last built, for
+    /// the retention pass on the snapshot worker's thread.
+    public var publishedNamedSnapshots: Set<String> {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return namedSnapshot
     }
 
     /// Spec 2 §8 — groups land on the next tick boundary.
@@ -409,6 +428,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastLibraryEvents = []
         lastMediaEvents = []
         lastHistoryEvent = nil
+        lastSavingEvent = nil
         lastRootsChanged = false
         mediaFilesChanged = false
         posterFilesChanged = false
@@ -446,10 +466,14 @@ public final class ControlLoop: @unchecked Sendable {
         // Spec 9 §3 — "Every ten minutes", when something changed.
         timerSnapshot(now: now)
         // Spec 9 §5 — the `history` topic follows "whenever either stack changes".
+        var named: Set<String>?
         if history != historySent {
             historySent = history
             lastHistoryEvent = history.event(seq: commandLog.lastSeq)
+            named = history.snapshotIDs
         }
+        // Spec 9 §7 — the `saving` topic, and the notes of a full disk.
+        updateSaving(now: now)
         // Spec 9 §4 — the last state: "After a runtime group, within a second ... At least once a minute".
         lastStateKeeper?.keep(state: model.state, pendingClears: pendingClears.keys.sorted(),
                               changed: !lastExecuted.isEmpty || !lastReplaced.isEmpty, now: now)
@@ -466,6 +490,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
+        if let named { namedSnapshot = named }
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         publishedMediaState = (mediaFiles, mediaTiles)
         liveSnapshot = (lastLive, Int(frame))

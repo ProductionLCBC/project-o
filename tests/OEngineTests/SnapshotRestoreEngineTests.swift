@@ -556,9 +556,9 @@ final class SnapshotRestoreEngineTests: XCTestCase {
 
     /// "Both are refused with `diskFull` while the disk is full (§7)", and operator lock refuses it (Spec 5 §7).
     func test_aFullDiskAndOperatorLockRefuseIt() throws {
-        disk.control.diskFull = true
+        disk.fillDisk()
         XCTAssertEqual(run("system restore snapshot \"\(Self.launch)\"")?.reason, .diskFull)
-        disk.control.diskFull = false
+        disk.freeDisk()
 
         disk = try DiskFixture(wallClock: Self.start, configure: { $0.settings.operatorLock.enabled = true }, launch: true)
         disk.settleSaving()

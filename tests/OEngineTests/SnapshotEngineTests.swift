@@ -222,7 +222,10 @@ final class SnapshotEngineTests: XCTestCase {
         XCTAssertTrue(entries(disk).filter { $0.command == .systemSnapshot }.isEmpty, "a rejected command isn't logged")
 
         // Its writes go through the atomic writer: every snapshot that was written arrived whole, under its name.
+        // The failed write began the full state (Spec 9 §7); with space again, the next try, thirty seconds on, ends it.
         disk.disk.full = false
+        disk.engine.tick(count: 32 * 60)
+        disk.settleSaving()
         disk.send("system snapshot")
         disk.settleSaving()
         XCTAssertEqual(disk.disk.writes.filter { $0.name.hasSuffix(".zip") }.map(\.name), ["2026-10-30-100000.zip", "2026-10-30-100200.zip"])
