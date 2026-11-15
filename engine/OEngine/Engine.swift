@@ -17,8 +17,10 @@ public final class Engine: @unchecked Sendable {
     /// side; other threads read `control.publishedRoots`.
     public var library: Library { control.library }
     public var machine: Machine { control.machine }
-    /// Spec 2 §9 — the engine's own publisher, until the API exists (Area 19).
+    /// Spec 2 §9 — the engine's own publisher: every area publishes its events and answers its queries here.
     public let publisher = EnginePublisher()
+    /// Spec 10 §3 — the API's hub, which puts the publisher on the wire for every connection, in one order.
+    public let api: ApiHub
     public let pacing: Pacing
     public let backend: any RenderBackend
     public let clock: any MasterClock
@@ -87,6 +89,7 @@ public final class Engine: @unchecked Sendable {
                 log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
         self.pacing = try Pacing(machine: machine)
+        api = ApiHub(publisher: publisher, log: log)
         self.backend = backend
         self.clock = clock
         self.fallbackClocks = fallbackClocks
@@ -124,6 +127,7 @@ public final class Engine: @unchecked Sendable {
         publisher.publish(current: UndoHistory().event(seq: 0))
         // Spec 9 §7 — and the `saving` topic, "sent when a client subscribes and whenever a value changes".
         publisher.publish(current: SavingStatus().event(seq: 0))
+        api.engine = self
     }
 
     /// Spec 9 §6, "Picking one" — the `versions` and `snapshots` queries,
@@ -216,6 +220,7 @@ public final class Engine: @unchecked Sendable {
     public func runTick(_ time: TickTime, buildPlan: Bool = true) {
         if buildPlan {
             recoverIfNeeded()
+            api.buildWillStart()
             planRing.publish(control.build(for: time.tick, now: time.reference))
             finishBuild()
         }
@@ -229,6 +234,9 @@ public final class Engine: @unchecked Sendable {
     /// job given the edited library, the deferred releases, and the warm of a
     /// newly live list.
     func finishBuild() {
+        // Spec 10 §3 — one order per connection: the results of the groups that ran, then the build's events, then
+        // the answers to the requests this build took (at the end, below).
+        api.deliverResults(control)
         afterBuild?(control)
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
@@ -247,6 +255,7 @@ public final class Engine: @unchecked Sendable {
         sweepReleases()
         warmThumbnailsIfTheListChanged()
         power?.update(outputStandings())
+        api.takeRequests(self)
     }
 
     /// Spec 10 §3, the `outputs` topic — each output's state, by number:
@@ -316,6 +325,7 @@ public final class Engine: @unchecked Sendable {
         audio?.start()
         // The first plan, so the first tick has something to render; what it
         // ran gets its feedback and its errors like any other build.
+        api.buildWillStart()
         planRing.publish(control.build(for: 0, now: clock.now()))
         finishBuild()
         nextFrameToBuild.store(1, ordering: .releasing)
@@ -329,6 +339,7 @@ public final class Engine: @unchecked Sendable {
                 autoreleasepool {
                     recoverIfNeeded()
                     let started = MonotonicClock.now()
+                    api.buildWillStart()
                     planRing.publish(control.build(for: frame, now: clock.now()))
                     finishBuild()
                     let took = MonotonicClock.now() - started
@@ -437,6 +448,7 @@ public final class Engine: @unchecked Sendable {
             // source `shutdown`), with whatever was still queued behind it.
             if let macro = control.machine.settings.shutdownMacro {
                 control.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .shutdown), commands: [Command.macro(macro)]))
+                api.buildWillStart()
                 planRing.publish(control.build(for: control.model.frame + 1, now: clock.now()))
                 finishBuild()
             }

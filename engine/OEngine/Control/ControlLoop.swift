@@ -12,6 +12,20 @@ public struct LiveFeedback: Sendable {
     public var event: JSONValue
 }
 
+/// Spec 2 §9 — a group that ran, for the answer to the request that sent it:
+/// the id it was sent under and every line it logged, in order. The lines of
+/// its own commands carry that id, or the id of the typing run they folded
+/// into; a cue it fired logs under a group of its own (Spec 2 §9).
+public struct GroupResult: Sendable {
+    public var id: GroupID
+    public var lines: [CommandLog.Logged]
+
+    public init(id: GroupID, lines: [CommandLog.Logged]) {
+        self.id = id
+        self.lines = lines
+    }
+}
+
 /// Spec 2 §8 — a group the runner rejected before anything ran: its id, its
 /// source and "the rejection [that] names the command and the reason".
 public struct RejectedGroup: Equatable, Sendable {
@@ -138,6 +152,12 @@ public final class ControlLoop: @unchecked Sendable {
     /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
     /// back to the sender"). Reset every build, like `lastExecuted`.
     public private(set) var lastRejected: [RejectedGroup] = []
+    /// Spec 2 §9 — "A client sends a request and receives a response with
+    /// the same `id`": the groups that ran in this build, each by the id it
+    /// was sent under, with its lines as the log took them (their `seq`, and
+    /// the group a typing run folded them into). A group the engine parked
+    /// is here in the build it finishes in. Reset every build.
+    public private(set) var lastResults: [GroupResult] = []
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
@@ -425,6 +445,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastReplaced = pendingReplacement
         pendingReplacement = []
         lastRejected = []
+        lastResults = []
         lastLibraryEvents = []
         lastMediaEvents = []
         lastHistoryEvent = nil
@@ -742,6 +763,8 @@ public final class ControlLoop: @unchecked Sendable {
     func absorb(_ outcome: RunOutcome, client: String?, frame: Int64, now: MonotonicTime) {
         lastExecuted.append(contentsOf: outcome.executed)
         let logged = commandLog.record(outcome.executed, client: client, now: now, ts: variables.timestamp())
+        // Spec 2 §9 — the result of the group as it was sent: its first line is the first command's, under the id it came with.
+        if let sent = outcome.executed.first?.group { lastResults.append(GroupResult(id: sent, lines: logged)) }
         // Spec 5 §8 — the stacks as the run left them. Spec 5 §5 — a typing run is "one undo step, whose
         // inverse is the value from before the run": a later edit of a run folds into the run's step.
         history = outcome.history
@@ -1519,6 +1542,22 @@ public final class ControlLoop: @unchecked Sendable {
         }
         remainingSent = remainingSent.filter { remaining[$0.key] != nil }
         return remaining
+    }
+
+    /// Spec 10 §3, the `channels` topic — "for timed media its duration,
+    /// position, loop and end behaviour"; "Timed media's duration and
+    /// position count within its in and out points". By channel, for media
+    /// that has a length: not a still, and with an out point or a known
+    /// duration. Paused or held media reads where it stands. Control side.
+    func mediaTimings(at frame: Int64) -> [Int: MediaTiming] {
+        var timings: [Int: MediaTiming] = [:]
+        for (channel, runtime) in model.channels {
+            guard case .media(let m) = runtime.live, !m.missing, !m.isStill, m.outMs.isFinite else { continue }
+            let duration = max(0, Int((m.outMs - m.inMs).rounded()))
+            let position = min(duration, max(0, Int((mediaTime(m, at: frame) - m.inMs).rounded())))
+            timings[channel] = MediaTiming(durationMs: duration, positionMs: position, playing: m.ready && m.transport == .playing)
+        }
+        return timings
     }
 
     /// Spec 6 §5 — a text box's variables resolved in the state being drawn,

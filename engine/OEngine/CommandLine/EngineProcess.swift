@@ -99,6 +99,8 @@ public final class EngineProcess: @unchecked Sendable {
     public let displayOutputs: DisplayOutputs
     /// Spec 10 §2 — the activity and the sleep assertion.
     public let power = SystemPower()
+    /// Spec 10 §2 — the local socket, once the engine takes commands.
+    public private(set) var socket: LocalSocket?
     /// Spec 1 §8 — documents that change on disk under the engine are reloaded.
     public let watcher: DiskWatcher
     private let startedAt = MonotonicClock.now()
@@ -250,6 +252,9 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 9 §4 — the launch order, on the roots this process loaded: the logs open and the run's `start`
         // note is written before anything can send a command ("The engine takes commands from step 5 on").
         engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch))
+        // Spec 10 §2 — "opens its local socket ... at that list's step 5, when it takes commands, so `hello` means it
+        // is ready."
+        openSocket()
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
         }
@@ -283,6 +288,32 @@ public final class EngineProcess: @unchecked Sendable {
         engine.start(blackBox: blackBox, minuteSources: sources)
     }
 
+    /// Spec 10 §2 — the local socket: each connection that passes the peer check joins the API's hub, which greets
+    /// it with `hello`. Spec 10 §3 — the requests that reach past the engine: `stop` and `releaseScreen`.
+    private func openSocket() {
+        let hub = engine.api
+        hub.identify(ApiHub.Identity(machine: roots.machine.settings.uuid, run: engine.run, mach: MachServiceName.engine(run: engine.run)))
+        hub.stopEngine = { [weak self] in self?.stop() ?? Engine.StopReport() }
+        let outputs = displayOutputs
+        hub.releaseScreen = { uuid, done in
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(outputs.release(screen: uuid)) } }
+        }
+        let socket = LocalSocket(url: LocalSocket.url(machineRoot: roots.machineRoot), log: log) { transport in
+            let connection = hub.accept(transport, origin: .local)
+            transport.read(onLine: { [weak connection] line in
+                if let connection { hub.receive(line, from: connection) }
+            }, onClose: { [weak connection] in
+                connection?.close()
+            })
+        }
+        do {
+            try socket.start()
+            self.socket = socket
+        } catch {
+            log.error("the local socket did not open: \(error)")
+        }
+    }
+
     /// Spec 4 §13 — the live summary, now; empty before the black box starts.
     public func metricsSnapshot() -> MetricsSnapshot {
         let uptime = Int((MonotonicClock.now().nanoseconds - startedAt.nanoseconds) / 1_000_000_000)
@@ -300,6 +331,8 @@ public final class EngineProcess: @unchecked Sendable {
         } else {
             DispatchQueue.main.sync { MainActor.assumeIsolated { outputs.stopWatching() } }
         }
+        // No new connection once the stop has begun; the ones open stay, for the answer to the request that stopped it.
+        socket?.stop()
         let report = engine.stop()
         osc?.stop()
         return report

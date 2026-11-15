@@ -15,7 +15,8 @@ public final class EnginePublisher: @unchecked Sendable {
     }
 
     private struct Subscriber {
-        var topics: Set<String>
+        /// The topics it takes; nil takes every topic.
+        var topics: Set<String>?
         var deliver: @Sendable (JSONValue) -> Void
     }
 
@@ -122,6 +123,28 @@ public final class EnginePublisher: @unchecked Sendable {
         return Subscription(id: id)
     }
 
+    /// Spec 10 §3 — every event of every topic, in the order published: how
+    /// the API's hub takes them, to hand each on to the connections that
+    /// subscribed to its topic. Nothing is sent at once; the hub asks for a
+    /// topic's current value (`current(_:)`) when a connection subscribes.
+    @discardableResult
+    public func subscribeToEverything(_ deliver: @escaping @Sendable (JSONValue) -> Void) -> Subscription {
+        lock.lock()
+        nextID += 1
+        let id = nextID
+        subscribers[id] = Subscriber(topics: nil, deliver: deliver)
+        lock.unlock()
+        return Subscription(id: id)
+    }
+
+    /// Spec 9 §5 and §7, Spec 10 §3 — the event a topic "sent when a client
+    /// subscribes" would send now, or nil for a topic that keeps none.
+    public func current(_ topic: String) -> JSONValue? {
+        lock.lock()
+        defer { lock.unlock() }
+        return current[topic]
+    }
+
     /// Spec 9 §5 — "the engine sends an event when a client subscribes and
     /// whenever either stack changes": the event goes to its topic's
     /// subscribers and is kept as the topic's current value, for the next
@@ -145,7 +168,7 @@ public final class EnginePublisher: @unchecked Sendable {
     public func publish(_ event: JSONValue) {
         guard case .object(let members) = event, case .string(let topic)? = members["topic"] else { return }
         lock.lock()
-        let targets = subscribers.sorted { $0.key < $1.key }.filter { $0.value.topics.contains(topic) }.map(\.value.deliver)
+        let targets = subscribers.sorted { $0.key < $1.key }.filter { $0.value.topics?.contains(topic) ?? true }.map(\.value.deliver)
         lock.unlock()
         for deliver in targets { deliver(event) }
     }

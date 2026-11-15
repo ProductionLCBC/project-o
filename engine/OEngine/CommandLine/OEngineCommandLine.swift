@@ -104,6 +104,12 @@ public enum OEngineCommandLine {
         }
         // Spec 10 §2 — "the engine trims the file in place to its last 10 MB at launch".
         ConsoleLog.trim(ConsoleLog.url(machineRoot: machineRoot))
+        // Spec 10 §2 — "The socket's path must fit macOS's limit of 103 bytes": an engine the app can't reach doesn't start.
+        if let failure = LocalSocket.check(path: LocalSocket.url(machineRoot: machineRoot).path) {
+            fail("\(failure)")
+            releaseLock()
+            return 1
+        }
         do {
             return try runLocked(args, soak: soak, libraryRoot: libraryRoot, machineRoot: machineRoot)
         } catch {
@@ -176,10 +182,13 @@ public enum OEngineCommandLine {
                         code = 1
                     }
                 }
+                releaseLock()
                 exit(code)
             }
         }
         installSignalHandlers { finish(0) }
+        // Spec 10 §3 — `stop` is answered "before it exits": the hub stops the engine, sends the answer, then comes here.
+        process.engine.api.afterStop = { finish(0) }
         // Spec 10 §2 — "When macOS asks it to quit (logout, restart, shutdown) or sends it a terminate signal, it stops on
         // request as Spec 9 §4 says."
         MainActor.assumeIsolated {

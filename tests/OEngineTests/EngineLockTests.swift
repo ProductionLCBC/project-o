@@ -81,7 +81,10 @@ final class EngineLockTests: XCTestCase {
     /// it doesn't count as an end; roots that don't load are an end, with a
     /// status of their own, and they let the root go.
     func test_rootsThatDoNotLoadExitWithStatusFourAndLetTheRootGo() throws {
-        let library = root.appendingPathComponent("library"), machine = root.appendingPathComponent("machine")
+        // A short folder: the machine root's socket path has to fit (Spec 10 §2), and the temporary folder's doesn't.
+        let short = try ShortFolder.make()
+        defer { try? FileManager.default.removeItem(at: short) }
+        let library = short.appendingPathComponent("library"), machine = short.appendingPathComponent("machine")
         try FileManager.default.copyItem(at: EngineFixtures.libraryRoot, to: library)
         try FileManager.default.copyItem(at: EngineFixtures.machineRoot, to: machine)
         try Data("{ not json".utf8).write(to: library.appendingPathComponent("library.json"))
