@@ -57,31 +57,42 @@ public struct AppliedEdits: Equatable, Sendable {
     public var group: GroupID
     public var source: CommandSource
     public var changed: [LibraryChange]
+    /// Spec 5 §2 — the event's `cause`: `undo` for an undo's group, `redo`
+    /// for a redo's (Spec 5 §8), `restore` for a group that holds a restore
+    /// command (Spec 9 §6), else `edit`.
+    public var cause: LibraryEvent.Cause
 
-    public init(group: GroupID, source: CommandSource, changed: [LibraryChange]) {
+    public init(group: GroupID, source: CommandSource, changed: [LibraryChange], cause: LibraryEvent.Cause = .edit) {
         self.group = group
         self.source = source
         self.changed = changed
+        self.cause = cause
     }
 
     /// The applied edits of `executed` (result `ok`; a `noop` or a `blocked`
     /// edit applied nothing), one entry per log group. Spec 8 §2 — `media
-    /// replace`, `media delete` and their inverses "are ordinary edits".
+    /// replace`, `media delete` and their inverses "are ordinary edits";
+    /// Spec 9 §6 — each restore command "is an edit group".
     public static func groups(in executed: [ExecutedCommand]) -> [AppliedEdits] {
         var out: [AppliedEdits] = []
         for line in executed where line.result == .ok {
+            var cause = LibraryEvent.Cause.edit
             switch line.command {
             case .edit: break
             case .media(let media) where media.isEdit: break
+            case .systemRestoreList, .systemRestoreSnapshot: cause = .restore
             default: continue
             }
+            if line.undoes != nil { cause = .undo }
+            if line.redoes != nil { cause = .redo }
             if let index = out.firstIndex(where: { $0.group == line.group }) {
                 out[index].changed += line.changes
+                if out[index].cause == .edit { out[index].cause = cause }
             } else {
-                out.append(AppliedEdits(group: line.group, source: line.source, changed: line.changes))
+                out.append(AppliedEdits(group: line.group, source: line.source, changed: line.changes, cause: cause))
             }
         }
-        return out.map { AppliedEdits(group: $0.group, source: $0.source, changed: LibraryChange.merged($0.changed)) }
+        return out.map { AppliedEdits(group: $0.group, source: $0.source, changed: LibraryChange.merged($0.changed), cause: $0.cause) }
     }
 }
 

@@ -32,11 +32,14 @@ public struct ExecutedCommand: Equatable, Sendable {
     public var undoes: GroupID?
     /// Spec 5 §8 — on a line of a redo's group, the undone group it runs again.
     public var redoes: GroupID?
+    /// Spec 9 §3 — `system snapshot`'s "result arrives once the file is
+    /// complete and names it": the snapshot's id.
+    public var snapshot: String?
 
     public init(group: GroupID, source: CommandSource, command: Command, result: CommandResult,
                 effects: [Effect], fire: FireRecord? = nil, refusal: Rejection? = nil, inverse: Command? = nil,
                 changes: [LibraryChange] = [], structure: [StructureChange] = [], warnings: [String] = [], job: String? = nil,
-                undoes: GroupID? = nil, redoes: GroupID? = nil) {
+                undoes: GroupID? = nil, redoes: GroupID? = nil, snapshot: String? = nil) {
         self.group = group
         self.source = source
         self.command = command
@@ -51,6 +54,7 @@ public struct ExecutedCommand: Equatable, Sendable {
         self.job = job
         self.undoes = undoes
         self.redoes = redoes
+        self.snapshot = snapshot
     }
 }
 
@@ -70,16 +74,38 @@ public struct RunOutcome: Equatable, Sendable {
     /// whose files must move first, or every held edit while a delete is
     /// parked. The engine runs them once the files have moved.
     public var parked: [HeldEdit]
+    /// Spec 5 §8 — the undo and redo stacks as the run left them: its
+    /// applied edit groups pushed, its undos and redos moved.
+    public var history: UndoHistory
+    /// Spec 9 §3 — each `system snapshot` the run reached whose file isn't
+    /// written yet. Its line is logged "once the file is complete".
+    public var snapshots: [HeldEdit]
 
     public init(state: ShowState, executed: [ExecutedCommand], library: Library, machine: Machine, kept: KeptCopies = KeptCopies(),
-                parked: [HeldEdit] = []) {
+                parked: [HeldEdit] = [], history: UndoHistory = UndoHistory(), snapshots: [HeldEdit] = []) {
         self.state = state
         self.executed = executed
         self.library = library
         self.machine = machine
         self.kept = kept
         self.parked = parked
+        self.history = history
+        self.snapshots = snapshots
     }
+}
+
+/// Spec 9 §3 — what the engine says of the snapshot a `system snapshot` asks
+/// for: "`system snapshot` always writes one; its result arrives once the
+/// file is complete and names it".
+public enum SnapshotAnswer: Equatable, Sendable {
+    /// No snapshots are written here: an engine over roots built in memory.
+    case unavailable
+    /// Not written yet: the command waits for its file (`RunOutcome.snapshots`).
+    case pending
+    /// The file is complete, under this id.
+    case taken(String)
+    /// It couldn't be written.
+    case failed(Rejection)
 }
 
 /// Spec 5 §2 and Spec 8 §2 — an edit a cue, macro, key binding or scheduler
@@ -152,6 +178,8 @@ public enum CommandRunner {
                            settle: ((Command, CommandSource, CommandResult) -> CommandResult)? = nil,
                            media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)? = nil,
                            moved: [String: Result<[MediaTrashedFile], Rejection>]? = nil, parking: Bool = false,
+                           history: UndoHistory = UndoHistory(), restores: RestoreInputs = RestoreInputs(),
+                           snapshot: SnapshotAnswer = .unavailable,
                            makeGroupID: () -> GroupID = { GroupID.random() },
                            makeUUID: () -> UUID = { UUID() }) -> Result<RunOutcome, Rejection> {
         var runner = Runner(state: state, context: context, editing: editing)
@@ -159,6 +187,9 @@ public enum CommandRunner {
         runner.media = media
         runner.moved = moved
         runner.parking = parking
+        runner.history = history
+        runner.restores = restores
+        runner.snapshot = snapshot
         var fire = group.fire
         for (index, entry) in group.commands.enumerated() {
             if validate {
@@ -178,7 +209,7 @@ public enum CommandRunner {
         runner.refreshKept()
         return .success(RunOutcome(state: runner.state, executed: runner.executed,
                                    library: runner.context.library, machine: runner.context.machine, kept: runner.context.kept,
-                                   parked: runner.parked))
+                                   parked: runner.parked, history: runner.history, snapshots: runner.snapshots))
     }
 
     /// Spec 8 §6 and Adam's answer of 2026-11-11 (7) — held edits that waited
@@ -188,13 +219,17 @@ public enum CommandRunner {
     /// and a delete still to move parks the rest again.
     public static func runHeld(_ held: [HeldEdit], state: ShowState, context: ProjectionContext, editing: EditContext = EditContext(),
                                media: ((MediaCommand, CommandSource) -> Result<String?, Rejection>)? = nil,
-                               moved: [String: Result<[MediaTrashedFile], Rejection>], makeUUID: () -> UUID = { UUID() }) -> RunOutcome {
+                               moved: [String: Result<[MediaTrashedFile], Rejection>], history: UndoHistory = UndoHistory(),
+                               restores: RestoreInputs = RestoreInputs(), makeGroupID: () -> GroupID = { GroupID.random() },
+                               makeUUID: () -> UUID = { UUID() }) -> RunOutcome {
         var runner = Runner(state: state, context: context, editing: editing)
         runner.media = media
         runner.moved = moved
-        for entry in held { runner.runDeferred(entry, makeUUID: makeUUID) }
+        runner.history = history
+        runner.restores = restores
+        for entry in held { runner.runDeferred(entry, makeGroupID: makeGroupID, makeUUID: makeUUID) }
         return RunOutcome(state: runner.state, executed: runner.executed, library: runner.context.library, machine: runner.context.machine,
-                          kept: runner.context.kept, parked: runner.parked)
+                          kept: runner.context.kept, parked: runner.parked, history: runner.history, snapshots: runner.snapshots)
     }
 
     /// Spec 2 §8 — the result a command's effects add up to: `steppedOn` when
@@ -241,16 +276,40 @@ struct Runner {
     /// held edits wait behind it, in `parked`.
     var parking = false
     var parked: [HeldEdit] = []
+    /// Spec 5 §8 — the undo and redo stacks, which the run's applied edits,
+    /// undos and redos change.
+    var history = UndoHistory()
+    /// Spec 9 §6 — what the engine brings to a restore: what its worker
+    /// read, the versions kept, and whether the disk is full.
+    var restores = RestoreInputs()
+    /// Spec 9 §3 — the engine's answer to this group's `system snapshot`.
+    var snapshot: SnapshotAnswer = .unavailable
+    var snapshots: [HeldEdit] = []
+    /// Spec 5 §8 — an undo or a redo is running its step: what it applies
+    /// moves a step between the stacks and never starts one.
+    var replaying = false
 
     typealias DeferredEdit = HeldEdit
 
     /// Runs a held edit once the fire that reached it is done.
-    mutating func runDeferred(_ entry: DeferredEdit, makeUUID: () -> UUID) {
+    mutating func runDeferred(_ entry: DeferredEdit, makeGroupID: () -> GroupID = { GroupID.random() }, makeUUID: () -> UUID) {
         switch entry.command {
         case .edit(let edit): runEdit(edit, group: entry.group, source: entry.source, fire: entry.fire, makeUUID: makeUUID)
         case .media(let media): runMedia(media, group: entry.group, source: entry.source, fire: entry.fire)
+        case .undo, .redo:
+            runHistory(entry.command, group: entry.group, source: entry.source, fire: entry.fire, makeGroupID: makeGroupID, makeUUID: makeUUID)
+        case .systemRestoreList, .systemRestoreSnapshot:
+            runRestore(entry.command, group: entry.group, source: entry.source, fire: entry.fire)
         default: break
         }
+    }
+
+    /// Spec 5 §2 and §8 — what an applied edit leaves on the undo stack:
+    /// its line, its inverse and the documents it changed.
+    mutating func remember(_ line: ExecutedCommand, before: (library: Library, machine: Machine)) {
+        guard !replaying, line.result == .ok, let inverse = line.inverse else { return }
+        history.record(group: line.group, source: line.source, command: line.command, inverse: inverse,
+                       documents: DocumentChanges.touched(before, (context.library, context.machine), structure: line.structure))
     }
 
     init(state: ShowState, context: ProjectionContext, editing: EditContext) {
@@ -297,6 +356,28 @@ struct Runner {
             }
             return
         }
+        switch command {
+        case .undo, .redo:
+            // Spec 5 §2 — like an edit a fired cue holds, it waits for the fire to finish.
+            if deferring {
+                deferred.append(DeferredEdit(command: command, group: group, source: source, fire: fire))
+            } else {
+                runHistory(command, group: group, source: source, fire: fire, makeGroupID: makeGroupID, makeUUID: makeUUID)
+            }
+            return
+        case .systemRestoreList, .systemRestoreSnapshot:
+            if deferring {
+                deferred.append(DeferredEdit(command: command, group: group, source: source, fire: fire))
+            } else {
+                runRestore(command, group: group, source: source, fire: fire)
+            }
+            return
+        case .systemSnapshot:
+            runSnapshot(command, group: group, source: source, fire: fire)
+            return
+        default:
+            break
+        }
         if case .historyJump = command {
             // Spec 5 §8 — "`history jump N` is rejected with `notInV1`": the history view is v1.5.
             refuse(command, Rejection(reason: .notInV1, message: "history jump comes with the history view, after v1"),
@@ -340,6 +421,11 @@ struct Runner {
                     deferred.append(DeferredEdit(command: entry.command, group: cueGroup, source: cueSource, fire: nil))
                     continue
                 }
+                // Spec 5 §2 — "Every input path can send an edit, an undo, a redo or a restore": a cue's wait like its edits.
+                if entry.command.isHistoryOrRestore {
+                    deferred.append(DeferredEdit(command: entry.command, group: cueGroup, source: cueSource, fire: nil))
+                    continue
+                }
                 run(entry.command, group: cueGroup, source: cueSource, fire: cueFire, nesting: cueNesting,
                     makeGroupID: makeGroupID, makeUUID: makeUUID)
                 cueFire = nil
@@ -355,7 +441,7 @@ struct Runner {
                 deferring = false
                 let waiting = deferred
                 deferred = []
-                for entry in waiting { runDeferred(entry, makeUUID: makeUUID) }
+                for entry in waiting { runDeferred(entry, makeGroupID: makeGroupID, makeUUID: makeUUID) }
             }
             return
         }
@@ -400,12 +486,15 @@ struct Runner {
         case .success(let outcomes):
             var fire = fire
             for outcome in outcomes {
+                let before = (library: context.library, machine: context.machine)
                 context.library = outcome.library
                 context.machine = outcome.machine
-                executed.append(ExecutedCommand(group: group, source: source, command: .edit(outcome.logged),
-                                                result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
-                                                inverse: outcome.inverse.map(Command.edit), changes: outcome.changes,
-                                                structure: outcome.structure, warnings: outcome.warnings))
+                let line = ExecutedCommand(group: group, source: source, command: .edit(outcome.logged),
+                                           result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
+                                           inverse: outcome.inverse.map(Command.edit), changes: outcome.changes,
+                                           structure: outcome.structure, warnings: outcome.warnings)
+                executed.append(line)
+                remember(line, before: before)
                 fire = nil
             }
         case .failure(let rejection):
@@ -442,11 +531,14 @@ struct Runner {
             switch applyMediaEdit(media) {
             case .success(let applied):
                 // Spec 8 §2 — "ordinary edits": the roots the group's later commands read, a line with its inverse.
+                let before = (library: context.library, machine: context.machine)
                 context.library = applied.library
                 context.machine = applied.machine
-                executed.append(ExecutedCommand(group: group, source: source, command: .media(applied.logged),
-                                                result: applied.isNoop ? .noop : .ok, effects: [], fire: fire,
-                                                inverse: applied.inverse.map(Command.media), changes: applied.changes))
+                let line = ExecutedCommand(group: group, source: source, command: .media(applied.logged),
+                                           result: applied.isNoop ? .noop : .ok, effects: [], fire: fire,
+                                           inverse: applied.inverse.map(Command.media), changes: applied.changes)
+                executed.append(line)
+                remember(line, before: before)
                 return
             case .failure(let rejection):
                 outcome = .failure(rejection)
@@ -515,11 +607,14 @@ struct Runner {
         case .failure(let rejection):
             return rejection
         case .success(let outcome):
+            let before = (library: context.library, machine: context.machine)
             context.library = outcome.library
             context.machine = outcome.machine
-            executed.append(ExecutedCommand(group: group, source: source, command: .media(outcome.logged),
-                                            result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
-                                            inverse: outcome.inverse.map(Command.media), changes: outcome.changes))
+            let line = ExecutedCommand(group: group, source: source, command: .media(outcome.logged),
+                                       result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
+                                       inverse: outcome.inverse.map(Command.media), changes: outcome.changes)
+            executed.append(line)
+            remember(line, before: before)
             return nil
         }
     }
