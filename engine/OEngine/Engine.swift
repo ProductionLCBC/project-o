@@ -115,6 +115,27 @@ public final class Engine: @unchecked Sendable {
         log.setClock { variables.now() }
         answerMediaQueries()
         takeNotes()
+        // Spec 9 §5 — "the engine sends an event when a client subscribes": both stacks start empty.
+        publisher.publish(current: UndoHistory().event(seq: 0))
+    }
+
+    /// Spec 9 §6, "Picking one" — the `versions` and `snapshots` queries,
+    /// through the engine's own publisher until the API carries them (Area
+    /// 19). They read files, on the asking thread, never the control thread.
+    func answerSavingQueries(_ worker: SnapshotWorker) {
+        let control = self.control
+        publisher.answer("versions") { request in
+            guard let number = request["list"]?.intValue else {
+                return .failure(Rejection(reason: .badValue, message: "versions names its list as \"list\", by number"))
+            }
+            guard let list = control.publishedRoots.library.list(number: number) else {
+                return .failure(Rejection(reason: .unknownObject, message: "list \(number) does not exist"))
+            }
+            return .success(["versions": .array(worker.versionListing(of: list.uuid, stamp: { control.variables.timestamp(at: $0) }))])
+        }
+        publisher.answer("snapshots") { _ in
+            .success(["snapshots": .array(worker.snapshotListing())])
+        }
     }
 
     /// Spec 9 §2 — the `note` request: "A client sends `{ "id": 31, "type":
@@ -205,6 +226,8 @@ public final class Engine: @unchecked Sendable {
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
         for event in control.lastMediaEvents { publisher.publish(event) }
+        // Spec 9 §5 — the `history` topic: "whenever either stack changes".
+        if let history = control.lastHistoryEvent { publisher.publish(current: history) }
         // Spec 7 §6 — "The `live` event is sent at the same moments" as the live feedback.
         if let live = control.lastLiveFeedback { publisher.publish(live.event) }
         // Spec 6 §8 — "The `timers` topic sends one event per timer on the same cadence" as `/o/timer/N`.
@@ -398,6 +421,8 @@ public final class Engine: @unchecked Sendable {
                 finishBuild()
             }
             control.flushDocuments(now: clock.now())
+            // Spec 9 §3 — a snapshot the worker has in hand is written whole before the engine goes.
+            control.snapshots?.waitUntilIdle()
             // Spec 5 §5 — an open typing run writes its line before the engine stops.
             control.commandLog.flush()
             report.unsaved = control.unsavedDocuments

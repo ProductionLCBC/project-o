@@ -81,7 +81,12 @@ public final class VariableProvider: @unchecked Sendable {
     /// name": the machine's local time, `2026-11-08-085959`, as Spec 9 names
     /// its snapshots.
     public func fileStamp() -> String {
-        let now = wallClock()
+        fileStamp(at: wallClock())
+    }
+
+    /// Spec 9 §3 — a snapshot's id for a moment: "the local date and time to
+    /// the second, `2026-11-08-085959`".
+    public func fileStamp(at now: Date) -> String {
         lock.lock()
         defer { lock.unlock() }
         let format = stampFormatter.dateFormat

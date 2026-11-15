@@ -149,8 +149,10 @@ final class CommandLogFileTests: XCTestCase {
         disk.engine.tick()
         disk.engine.stop()
 
+        // The start note, the launch snapshot's note (Spec 9 §4, step 4), the command, the stop note.
         let first = disk.commandLog()
-        XCTAssertEqual(first.map(\.seq), [1, 2, 3])
+        XCTAssertEqual(first.map(\.seq), [1, 2, 3, 4])
+        XCTAssertEqual(first[1].note?.event, "snapshot")
         let start = try XCTUnwrap(first.first?.note)
         XCTAssertEqual(start.event, "start")
         XCTAssertEqual(start.source, CommandSource(kind: .engine))
@@ -169,11 +171,12 @@ final class CommandLogFileTests: XCTestCase {
         let next = try DiskFixture(continuing: disk)
         next.send("channel 2 clear", source: .osc)
         next.engine.tick()
+        // Nothing changed since the first run's snapshot, so this launch writes none (Spec 9 §3) and notes none.
         let lines = next.commandLog()
-        XCTAssertEqual(lines.map(\.seq), [1, 2, 3, 1, 2])
-        XCTAssertEqual(lines[3].note?.event, "start")
+        XCTAssertEqual(lines.map(\.seq), [1, 2, 3, 4, 1, 2])
+        XCTAssertEqual(lines[4].note?.event, "start")
         XCTAssertNotEqual(next.engine.engine.run, firstRun)
-        XCTAssertEqual(lines[3].note?.note["run"], .string(next.engine.engine.run.uuidString.lowercased()))
+        XCTAssertEqual(lines[4].note?.note["run"], .string(next.engine.engine.run.uuidString.lowercased()))
     }
 
     // MARK: - Days
@@ -193,10 +196,10 @@ final class CommandLogFileTests: XCTestCase {
         XCTAssertEqual(disk.logFiles.filter { $0.hasPrefix("commands-") }, ["commands-2026-11-08.jsonl", "commands-2026-11-09.jsonl"])
         let sunday = disk.commandLog(day: "2026-11-08")
         let monday = disk.commandLog(day: "2026-11-09")
-        XCTAssertEqual(sunday.map(\.seq), [1, 2])
+        XCTAssertEqual(sunday.map(\.seq), [1, 2, 3], "the start note, the launch snapshot's note, the command")
         XCTAssertEqual(sunday.last?.entry?.text, "channel 2 clear")
         XCTAssertEqual(sunday.last?.ts, "2026-11-08T23:59:59.900-05:00", "already the 9th in UTC")
-        XCTAssertEqual(monday.map(\.seq), [3], "seq runs on across the day")
+        XCTAssertEqual(monday.map(\.seq), [4], "seq runs on across the day")
         XCTAssertEqual(monday.first?.entry?.text, "channel 1 clear")
         XCTAssertEqual(monday.first?.ts, "2026-11-09T00:00:00.100-05:00")
     }
@@ -220,9 +223,10 @@ final class CommandLogFileTests: XCTestCase {
         let text = disk.commandLogText()
         XCTAssertTrue(text.hasPrefix(whole + "\n" + fragment + "\n"), "the fragment is ended, nothing before it is touched")
         let lines = disk.commandLog()
-        XCTAssertEqual(lines.map(\.seq), [9, 1, 2], "the fragment is skipped")
+        XCTAssertEqual(lines.map(\.seq), [9, 1, 2, 3], "the fragment is skipped")
         XCTAssertEqual(lines[1].note?.event, "start")
-        XCTAssertEqual(lines[2].entry?.text, "channel 2 clear")
+        XCTAssertEqual(lines[2].note?.event, "snapshot")
+        XCTAssertEqual(lines[3].entry?.text, "channel 2 clear")
     }
 
     /// A file that ends cleanly gets no stray newline.
@@ -278,7 +282,8 @@ final class CommandLogFileTests: XCTestCase {
         XCTAssertGreaterThan(sets, CommandLog.defaultCapacity)
         XCTAssertEqual(entries.first?.text, "popup 1 set \"caption 0\"")
         XCTAssertEqual(entries.last?.text, "popup 1 set \"caption \(sets - 1)\"")
-        XCTAssertEqual(entries.map(\.seq), Array(2...(sets + 1)), "in order, none missing")
+        // After the start note and the launch snapshot's note.
+        XCTAssertEqual(entries.map(\.seq), Array(3...(sets + 2)), "in order, none missing")
         XCTAssertTrue(entries.allSatisfy { $0.result == .ok })
     }
 }

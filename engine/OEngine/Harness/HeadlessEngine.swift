@@ -189,6 +189,28 @@ public final class HeadlessEngine: @unchecked Sendable {
         control.lastStateKeeper?.waitUntilIdle()
     }
 
+    /// Spec 9 §3 and §6 — the snapshot worker has done everything asked of
+    /// it; the next tick takes in what it reported.
+    public func waitForSnapshots() {
+        control.snapshots?.waitUntilIdle()
+    }
+
+    /// A tick runs what is queued (a `system snapshot`, a restore); the
+    /// snapshot worker and the writer do what was asked; the next tick takes
+    /// in what they reported, which can ask for more (an undo behind a
+    /// restore, a restored list's save); until neither has anything left.
+    public func settleSaving() {
+        var rounds = 0
+        repeat {
+            tick()
+            waitForSnapshots()
+            waitForWrites()
+            rounds += 1
+        } while (control.snapshots?.hasReports == true || control.mediaPark != nil) && rounds < 12
+        tick()
+        waitForWrites()
+    }
+
     /// The writer's queue has done everything queued so far; the next tick
     /// reads what it reported.
     public func waitForWrites() {

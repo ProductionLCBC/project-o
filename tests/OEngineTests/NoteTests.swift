@@ -33,11 +33,12 @@ final class NoteTests: XCTestCase {
         let state = disk.engine.state
         let revision = disk.control.revision
 
+        // After the start note, the launch snapshot's note and the command.
         let answer = request(31)
-        XCTAssertEqual(answer, ["id": .number(31), "type": .string("result"), "result": .string("ok"), "seq": .number(3)])
+        XCTAssertEqual(answer, ["id": .number(31), "type": .string("result"), "result": .string("ok"), "seq": .number(4)])
 
         let line = try XCTUnwrap(disk.commandLog().last?.note)
-        XCTAssertEqual(line.seq, 3)
+        XCTAssertEqual(line.seq, 4)
         XCTAssertEqual(line.ts, "2026-10-30T10:00:00.000-04:00", "the engine's stamp, in the machine's zone")
         XCTAssertEqual(line.source, CommandSource(kind: .ui))
         XCTAssertEqual(line.note, ["event": .string("browse"), "list": .number(42)])
@@ -51,7 +52,7 @@ final class NoteTests: XCTestCase {
         XCTAssertEqual(disk.engine.state, state)
         XCTAssertEqual(disk.control.revision, revision)
         XCTAssertTrue(disk.events.all.isEmpty)
-        XCTAssertEqual(disk.control.commandLog.lastSeq, 3)
+        XCTAssertEqual(disk.control.commandLog.lastSeq, 4)
     }
 
     /// The source is the client's: a LAN client's notes are `api` (Spec 10 §2).

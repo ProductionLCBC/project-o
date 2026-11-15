@@ -35,6 +35,9 @@ public final class EnginePublisher: @unchecked Sendable {
     private var answerers: [String: Answerer] = [:]
     private var handlers: [String: Handler] = [:]
     private var nextID = 0
+    /// Spec 9 §5 and §7 — the topics "sent when a client subscribes": each
+    /// one's last event, by topic.
+    private var current: [String: JSONValue] = [:]
 
     public init() {}
 
@@ -105,13 +108,30 @@ public final class EnginePublisher: @unchecked Sendable {
     }
 
     /// Spec 2 §9 — `subscribe` to one or more topics.
+    /// Spec 9 §5 and §7 — a topic that keeps a current value (`history`,
+    /// `saving`) sends it to the new subscriber at once, before any later event.
     @discardableResult
     public func subscribe(_ topics: Set<String>, _ deliver: @escaping @Sendable (JSONValue) -> Void) -> Subscription {
         lock.lock()
-        defer { lock.unlock() }
         nextID += 1
-        subscribers[nextID] = Subscriber(topics: topics, deliver: deliver)
-        return Subscription(id: nextID)
+        let id = nextID
+        subscribers[id] = Subscriber(topics: topics, deliver: deliver)
+        let held = topics.sorted().compactMap { current[$0] }
+        lock.unlock()
+        for event in held { deliver(event) }
+        return Subscription(id: id)
+    }
+
+    /// Spec 9 §5 — "the engine sends an event when a client subscribes and
+    /// whenever either stack changes": the event goes to its topic's
+    /// subscribers and is kept as the topic's current value, for the next
+    /// one to subscribe.
+    public func publish(current event: JSONValue) {
+        guard case .object(let members) = event, case .string(let topic)? = members["topic"] else { return }
+        lock.lock()
+        current[topic] = event
+        lock.unlock()
+        publish(event)
     }
 
     /// Spec 2 §9 — a subscriber stops receiving its topics.

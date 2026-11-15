@@ -226,6 +226,8 @@ extension ControlLoop {
                                               seq: commandLog.lastSeq))
         // Spec 9 §2 — the engine log's `media` line: "an index change, with its operation and ids".
         for change in changes { log.info(change.logText, record: "media", change.record) }
+        // Spec 5 §8 — "The media walk drops the steps that name an entry it maps to another file or brings back (Spec 8 §4)."
+        dropSteps(history.drop(naming: Set(changes.compactMap(\.remapped))), cause: "media")
     }
 
     // MARK: - The media topic (Spec 8 §7)

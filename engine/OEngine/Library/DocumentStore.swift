@@ -52,6 +52,16 @@ final class DocumentStore {
         return keptConflicts
     }
 
+    /// Spec 5 §8 — "When a document is reloaded from disk (§10), every undo
+    /// and redo step that touches it is dropped": the documents a reload
+    /// changed or took away since this was last asked.
+    private var reloaded: Set<DocumentRef> = []
+
+    func takeReloaded() -> Set<DocumentRef> {
+        defer { reloaded.removeAll() }
+        return reloaded
+    }
+
     /// What a planned save changed in memory, put back if it fails.
     private struct Revert {
         var ref: DocumentRef
@@ -440,6 +450,8 @@ final class DocumentStore {
     /// kept in `conflicts/`, the documents the engine's edits win for written
     /// again, and both logged.
     private func adopt(_ outcome: ReloadOutcome, library: inout Library, machine: inout Machine, now: MonotonicTime) -> [LibraryChange] {
+        reloaded.formUnion(DocumentChanges.between((library, machine), (outcome.library, outcome.machine)))
+        reloaded.formUnion(outcome.gone)
         library = outcome.library
         machine = outcome.machine
         reload = outcome.state

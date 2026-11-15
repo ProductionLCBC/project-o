@@ -139,7 +139,11 @@ final class MediaFixture {
                                                                        freeBytes: { _ in free.bytes }, beforeCopy: beforeCopy,
                                                                        frames: frames, trash: trash))
         // Spec 9 §4 — "1. The roots load (Spec 1 §8) and the media walk starts (Spec 8 §4). 2. The `start` note".
-        if launching { engine.launch(machineRoot: machineRoot) }
+        if launching {
+            engine.launch(machineRoot: machineRoot)
+            // Spec 9 §3 — the launch snapshot is on disk before the first tick, so the log's order is the same every run.
+            engine.waitForSnapshots()
+        }
         settle()
     }
 

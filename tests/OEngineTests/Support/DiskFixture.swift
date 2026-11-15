@@ -95,9 +95,43 @@ final class DiskFixture {
     }
 
     /// Spec 9 §4 — the launch order, on this copy.
+    /// The launch snapshot's zip is written before this returns, so the
+    /// first tick finds the worker's report and a test's log lines fall in
+    /// the same order every run (Spec 9 §3: the engine itself never waits).
     @discardableResult
     func launch(relaunch: Bool = false) -> LaunchReport {
-        engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk)
+        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk)
+        engine.waitForSnapshots()
+        return report
+    }
+
+    // MARK: - Snapshots (Spec 9 §3)
+
+    var snapshotsFolder: URL { machineRoot.appendingPathComponent("snapshots") }
+
+    /// The ids of the snapshots in `machine/snapshots/`, oldest first; hidden files aren't snapshots.
+    var snapshotIDs: [String] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: snapshotsFolder.path)) ?? []
+        return SnapshotID.sorted(names.filter { $0.hasSuffix(".zip") && !$0.hasPrefix(".") }.map { String($0.dropLast(4)) })
+    }
+
+    /// A snapshot as its zip holds it.
+    func snapshot(_ id: String) throws -> Snapshot {
+        let data = try Data(contentsOf: snapshotsFolder.appendingPathComponent(id + ".zip"))
+        return try Snapshot(files: Zip.entries(of: data).map { ($0.path, $0.data) })
+    }
+
+    /// The notes of the command log with this `event`, in order.
+    func notes(_ event: String) -> [LogNote] {
+        commandLog().compactMap { line in
+            if case .note(let note) = line, note.event == event { return note }
+            return nil
+        }
+    }
+
+    /// A tick, the snapshot worker and the writer each done, and a tick that reads what they reported.
+    func settleSaving() {
+        engine.settleSaving()
     }
 
     // MARK: - The logs (Spec 9 §2)

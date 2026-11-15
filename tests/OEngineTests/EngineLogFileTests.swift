@@ -112,10 +112,10 @@ final class EngineLogFileTests: XCTestCase {
         // The engine's memory still says it in words.
         XCTAssertTrue(media.engine.log.contains("media: added \(id)"))
 
-        // The command log: the start note and nothing of the walk's.
+        // The command log: the start note, the launch snapshot's note, and nothing of the walk's.
         let commands = try String(contentsOf: media.machineRoot.appendingPathComponent("logs/commands-\(day).jsonl"), encoding: .utf8)
         XCTAssertFalse(commands.contains(id))
-        XCTAssertEqual(LogLine.reading(commands).compactMap(\.note).map(\.event), ["start"])
+        XCTAssertEqual(LogLine.reading(commands).compactMap(\.note).map(\.event), ["start", "snapshot"])
         XCTAssertTrue(LogLine.reading(commands).compactMap(\.entry).isEmpty)
         // And the engine log has no command.
         XCTAssertFalse(lines.contains { $0["command"] != nil })

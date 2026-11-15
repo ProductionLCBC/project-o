@@ -94,6 +94,16 @@ extension Engine {
         // Step 3 — "`last.json` written for this run, then the last state put back or not."
         report.lastState = restoreLastState(options)
 
+        // Step 4 — "The launch snapshot (§3)": "At launch, after the last state and before the startup macro".
+        // The roots are copied here, so the macro's edits aren't in it; the zip is written on the worker.
+        if let documents = control.documents {
+            let worker = SnapshotWorker(folder: options.machineRoot.appendingPathComponent("snapshots"),
+                                        libraryRoot: documents.writer.libraryRoot, disk: options.disk, timeZone: variables.timeZone)
+            control.attachSnapshots(worker, run: run, now: clock.now())
+            answerSavingQueries(worker)
+            control.takeLaunchSnapshot(now: clock.now())
+        }
+
         // Step 5 — "The startup macro, unless the last state was restored (choice G-2) or the launch is a relaunch
         // (Spec 10 §2)." Queued here, so it is the first group the first build runs: "The engine takes commands
         // from step 5 on." Spec 2 §5 — its own line has source `startup`.

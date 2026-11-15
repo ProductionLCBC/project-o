@@ -165,6 +165,16 @@ public enum Zip {
     /// Folder entries are left out. Throws for anything that isn't a whole
     /// zip of stored and deflated files whose checksums hold.
     public static func entries(of archive: Data) throws -> [Entry] {
+        try read(archive, only: nil)
+    }
+
+    /// One file of an archive by its path, without inflating the others;
+    /// nil when the archive doesn't hold it.
+    public static func entry(_ path: String, of archive: Data) throws -> Data? {
+        try read(archive, only: path).first?.data
+    }
+
+    private static func read(_ archive: Data, only wanted: String?) throws -> [Entry] {
         let bytes = [UInt8](archive)
         let end = try endRecord(in: bytes)
         let count = try Int(u16(bytes, end + 10))
@@ -188,6 +198,7 @@ public enum Zip {
             let path = String(decoding: bytes[(at + 46)..<(at + 46 + nameLength)], as: UTF8.self)
             at += 46 + nameLength + extraLength + commentLength
             if path.hasSuffix("/") { continue }
+            if let wanted, path != wanted { continue }
             guard flags & 0x0001 == 0 else { throw Failure("\(path) is encrypted") }
             guard fullSize <= largestEntry else { throw Failure("\(path) is larger than a document can be") }
 
