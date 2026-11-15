@@ -135,6 +135,8 @@ public enum LocalFiles {
                 try remove(root.appendingPathComponent(path))
             case .copy(let from, let to):
                 try copy(root.appendingPathComponent(from), to: root.appendingPathComponent(to))
+            case .create(let path, let data):
+                try create(data, at: root.appendingPathComponent(path))
             case .makeFolder(let path):
                 try makeFolder(root.appendingPathComponent(path))
             case .renameFolder(let from, let to):
@@ -238,6 +240,21 @@ public enum LocalFiles {
             unlink(temporary.path)
             if failure == EEXIST { return }
             throw FileError(operation: "copy", path: to.path, reason: String(cString: strerror(failure)), code: failure)
+        }
+        syncFolder(folder)
+    }
+
+    /// Spec 9 §6 — a new file written whole and synced before it takes its
+    /// name, its folders made; refused, with nothing changed, when the name
+    /// is taken: "No save writes over a kept version".
+    static func create(_ data: Data, at url: URL) throws {
+        let folder = url.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let temporary = try writeTemporary(data, beside: url)
+        if renameNoReplace(temporary.path, url.path) != 0 {
+            let failure = errno
+            unlink(temporary.path)
+            throw FileError(operation: "create", path: url.path, reason: String(cString: strerror(failure)), code: failure)
         }
         syncFolder(folder)
     }

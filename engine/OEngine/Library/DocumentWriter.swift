@@ -337,6 +337,8 @@ public final class DocumentWriter: @unchecked Sendable {
         case .moveList(let uuid, let from, let to): return "list \(uuid.uuidString.lowercased()) move \(from) to \(to)"
         case .removeList(let uuid, let path): return "list \(uuid.uuidString.lowercased()) delete \(path)"
         case .removePlaylist(let uuid, let path): return "playlist \(uuid.uuidString.lowercased()) delete \(path)"
+        case .keepVersion(let uuid, let version, _): return "list \(uuid.uuidString.lowercased()) keep version \(version)"
+        case .removeDocument(let ref, let path): return "\(ref) delete \(path)"
         }
     }
 
@@ -353,7 +355,7 @@ public final class DocumentWriter: @unchecked Sendable {
             switch operation {
             case .replace(let path, _), .remove(let path): paths.append(path)
             case .move(let from, _), .copy(let from, _): paths.append(from)
-            case .makeFolder, .renameFolder, .removeFolder: break
+            case .makeFolder, .renameFolder, .removeFolder, .create: break
             }
         }
         var changed: Set<String> = []
@@ -412,7 +414,7 @@ public final class DocumentWriter: @unchecked Sendable {
             }
         case .remove(let path):
             files.removeValue(forKey: FileKey(root: root, path: path))
-        case .copy:
+        case .copy, .create:
             break
         case .makeFolder(let path):
             if root == .library, path.hasPrefix("lists/") { folders.insert(path) }

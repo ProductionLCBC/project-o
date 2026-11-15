@@ -21,9 +21,25 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
     case mediaIndex
     /// `machine/media-local.json` (Spec 1 §7).
     case mediaLocal
+    /// Spec 9 §6 — the documents a snapshot restore replaces that no edit
+    /// changes yet: `library.json`, the five catalogs and the presets.
+    case libraryInfo
+    case channels
+    case textStyles
+    case grades
+    case transitions
+    case audioTransitions
+    case preset(Int)
 
     public var description: String {
         switch self {
+        case .libraryInfo: return "the library's name"
+        case .channels: return "the channels"
+        case .textStyles: return "the text styles"
+        case .grades: return "the grades"
+        case .transitions: return "the transitions"
+        case .audioTransitions: return "the audio transitions"
+        case .preset(let number): return "preset \(number)"
         case .list(let uuid): return "list " + uuid.uuidString.lowercased()
         case .libraryMacro(let number): return "macro \(number)"
         case .playlist(let uuid): return "playlist " + uuid.uuidString.lowercased()
@@ -38,7 +54,8 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
     /// The document lives in the library root (else the machine root).
     public var inLibrary: Bool {
         switch self {
-        case .list, .libraryMacro, .mediaIndex: return true
+        case .list, .libraryMacro, .mediaIndex, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions, .preset:
+            return true
         case .playlist, .localList, .machineMacro, .keys, .mediaLocal: return false
         }
     }
@@ -68,6 +85,27 @@ public enum DocumentChanges {
         if old.machine.keys != new.machine.keys { out.append(.keys) }
         if old.library.mediaIndex != new.library.mediaIndex { out.append(.mediaIndex) }
         if old.machine.mediaLocal != new.machine.mediaLocal { out.append(.mediaLocal) }
+        // Spec 9 §6 — what only a snapshot restore changes until the areas that edit them (Spec 7 §7).
+        if old.library.info != new.library.info { out.append(.libraryInfo) }
+        if old.library.channels != new.library.channels || old.library.documentExtras[.channels] != new.library.documentExtras[.channels] {
+            out.append(.channels)
+        }
+        if old.library.textStyles != new.library.textStyles || old.library.documentExtras[.textStyles] != new.library.documentExtras[.textStyles] {
+            out.append(.textStyles)
+        }
+        if old.library.grades != new.library.grades || old.library.documentExtras[.grades] != new.library.documentExtras[.grades] {
+            out.append(.grades)
+        }
+        if old.library.transitions != new.library.transitions
+            || old.library.documentExtras[.transitions] != new.library.documentExtras[.transitions] {
+            out.append(.transitions)
+        }
+        if old.library.audioTransitions != new.library.audioTransitions
+            || old.library.documentExtras[.audioTransitions] != new.library.documentExtras[.audioTransitions] {
+            out.append(.audioTransitions)
+        }
+        let presets = Dictionary(old.library.presets.map { ($0.number, $0) }, uniquingKeysWith: { first, _ in first })
+        for preset in new.library.presets where presets[preset.number] != preset { out.append(.preset(preset.number)) }
         return out
     }
 
@@ -80,7 +118,8 @@ public enum DocumentChanges {
         case .playlist(let uuid): return machine.playlist(uuid: uuid) != nil
         case .localList(let uuid): return machine.localList(uuid: uuid) != nil
         case .machineMacro(let number): return machine.macro(number) != nil
-        case .keys, .mediaIndex, .mediaLocal: return true
+        case .preset(let number): return library.preset(number) != nil
+        case .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions: return true
         }
     }
 }

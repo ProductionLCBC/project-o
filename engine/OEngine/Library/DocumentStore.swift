@@ -67,7 +67,9 @@ final class DocumentStore {
         self.reload = reload
         self.log = log
         self.wallMilliseconds = wallMilliseconds
-        var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal]
+        var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions,
+                                        .audioTransitions]
+        for preset in library.presets where library.documentPaths["preset/\(preset.number)"] != nil { onDisk.insert(.preset(preset.number)) }
         for list in library.lists where library.documentPaths[FileLayout.documentKey(list: list.uuid)] != nil { onDisk.insert(.list(list.uuid)) }
         for macro in library.macros where library.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.libraryMacro(macro.number)) }
         for macro in machine.macros where machine.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.machineMacro(macro.number)) }
@@ -123,7 +125,36 @@ final class DocumentStore {
             return "library/" + FileLayout.path(for: .mediaIndex(library.mediaIndex))
         case .mediaLocal:
             return "machine/" + FileLayout.path(for: .mediaLocal(machine.mediaLocal))
+        case .libraryInfo: return "library/" + FileLayout.path(for: .library(library.info))
+        case .channels: return "library/" + FileLayout.path(for: .channels(library.channels))
+        case .textStyles: return "library/" + FileLayout.path(for: .textStyles(library.textStyles))
+        case .grades: return "library/" + FileLayout.path(for: .grades(library.grades))
+        case .transitions: return "library/" + FileLayout.path(for: .transitions(library.transitions))
+        case .audioTransitions: return "library/" + FileLayout.path(for: .audioTransitions(library.audioTransitions))
+        case .preset(let number):
+            return "library/" + (library.documentPaths["preset/\(number)"] ?? library.preset(number).map { FileLayout.path(for: .preset($0)) }
+                ?? "presets/\(number)")
         }
+    }
+
+    // MARK: - Kept versions (Spec 9 §6)
+
+    /// Spec 9 §6 — the lists with edits that aren't on disk, so a restore
+    /// keeps the document in memory under a number of its own and not under
+    /// the number of the file it differs from.
+    var unwrittenLists: Set<UUID> {
+        var lists: Set<UUID> = []
+        for ref in waiting {
+            if case .list(let uuid) = ref { lists.insert(uuid) }
+        }
+        return lists
+    }
+
+    /// Spec 9 §6 — versions the worker found in a list's folder that the
+    /// engine didn't know, as a sync brings them after launch: "no save
+    /// writes over a kept version", so they count from now.
+    func noteKept(list uuid: UUID, versions: Set<Int>) {
+        for version in versions where kept.lists[uuid]?[version] == nil { kept.lists[uuid, default: [:]][version] = 0 }
     }
 
     // MARK: - After an applied group
@@ -175,6 +206,19 @@ final class DocumentStore {
             removing.insert(.playlist(uuid))
             submit(change, .machine, [.remove(path: file)])
             return .playlist(uuid)
+        case .keepVersion(let uuid, let version, let data):
+            // Spec 9 §6 — "in the same write as the restored list and ahead of it": kept now, and the
+            // list's own save is due in this build, whatever its last write's second says.
+            kept.lists[uuid, default: [:]][version] = wallMilliseconds()
+            lastIssued.removeValue(forKey: .list(uuid))
+            submit(change, .library, [.create(path: FileLayout.versionPath(list: uuid, version: version), data: data)])
+        case .removeDocument(let ref, let path):
+            dirty.removeValue(forKey: ref)
+            if case .localList(let uuid) = ref { reload.pending.removeValue(forKey: uuid) }
+            guard onDisk.remove(ref) != nil else { return nil }
+            removing.insert(ref)
+            submit(change, ref.inLibrary ? .library : .machine, [.remove(path: path)])
+            return ref
         }
         return nil
     }
@@ -273,7 +317,27 @@ final class DocumentStore {
         case .mediaLocal:
             let plan = Writer.save(.mediaLocal(machine.mediaLocal), extras: machine.documentExtras[.mediaLocal] ?? [:])
             issue(ref, .machine, plan.operations, path: FileLayout.path(for: .mediaLocal(machine.mediaLocal)), recorded: nil, wasOnDisk: true)
+        case .libraryInfo: issueCatalog(ref, .library(library.info), library)
+        case .channels: issueCatalog(ref, .channels(library.channels), library)
+        case .textStyles: issueCatalog(ref, .textStyles(library.textStyles), library)
+        case .grades: issueCatalog(ref, .grades(library.grades), library)
+        case .transitions: issueCatalog(ref, .transitions(library.transitions), library)
+        case .audioTransitions: issueCatalog(ref, .audioTransitions(library.audioTransitions), library)
+        case .preset(let number):
+            guard let preset = library.preset(number) else { return }
+            let recorded = library.documentPaths["preset/\(number)"]
+            let plan = Writer.save(.preset(preset), currentPath: onDisk.contains(ref) ? recorded : nil)
+            let path = FileLayout.path(for: .preset(preset))
+            library.documentPaths["preset/\(number)"] = path
+            issue(ref, .library, plan.operations, path: path, recorded: recorded, wasOnDisk: onDisk.contains(ref))
         }
+    }
+
+    /// Spec 9 §6 — one of the library's single documents (`library.json`, a
+    /// catalog), which a snapshot restore replaces, at its fixed name.
+    private func issueCatalog(_ ref: DocumentRef, _ document: Document, _ library: Library) {
+        let plan = Writer.save(document, extras: library.documentExtras[document.kind] ?? [:])
+        issue(ref, .library, plan.operations, path: FileLayout.path(for: document), recorded: nil, wasOnDisk: true)
     }
 
     private func issue(_ ref: DocumentRef, _ root: DocumentWriter.Root, _ operations: [FileOperation], path: String,
@@ -337,6 +401,8 @@ final class DocumentStore {
             case .structureFailed(_, let change, let reason):
                 removing.subtract(Self.removed(by: change))
                 log.error("\(DocumentWriter.describe(change)) failed on disk: \(reason)")
+                // Spec 9 §6 — a version that wasn't kept isn't one a later restore can name.
+                if case .keepVersion(let uuid, let version, _) = change { kept.lists[uuid]?[version] = nil }
                 if case .moveList(let uuid, let from, _) = change, let list = library.list(uuid: uuid) {
                     library.documentPaths[FileLayout.documentKey(list: uuid)] = from
                     changes.append(LibraryChange(object: "list", address: ["list": .number(Double(list.number)),
@@ -365,6 +431,7 @@ final class DocumentStore {
         switch change {
         case .removeList(let uuid, _): return [.list(uuid)]
         case .removePlaylist(let uuid, _): return [.playlist(uuid)]
+        case .removeDocument(let ref, _): return [ref]
         default: return []
         }
     }
@@ -406,7 +473,9 @@ final class DocumentStore {
             if let recorded = revert.recorded, library.documentPaths["macro/\(number)"] == revert.planned { library.documentPaths["macro/\(number)"] = recorded }
         case .machineMacro(let number):
             if let recorded = revert.recorded, machine.documentPaths["macro/\(number)"] == revert.planned { machine.documentPaths["macro/\(number)"] = recorded }
-        case .localList, .keys, .mediaIndex, .mediaLocal:
+        case .preset(let number):
+            if let recorded = revert.recorded, library.documentPaths["preset/\(number)"] == revert.planned { library.documentPaths["preset/\(number)"] = recorded }
+        case .localList, .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions:
             break
         }
     }

@@ -91,7 +91,7 @@ public final class Disk: Sendable {
         for operation in plan.operations {
             var written: (URL, Data)?
             switch operation {
-            case .replace(let path, let data):
+            case .replace(let path, let data), .create(let path, let data):
                 written = (root.appendingPathComponent(path), data)
             case .copy(_, let to):
                 if let refusal = seams.refuse?(root.appendingPathComponent(to)) { throw refusal }
