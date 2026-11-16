@@ -1389,6 +1389,8 @@ public final class ControlLoop: @unchecked Sendable {
         if previewTick, picturesWanted.load(ordering: .relaxed) {
             for channel in library.channels.map(\.number).sorted() {
                 guard let targets = pictureSurfaces[channel], targets.count == FrameRing.depth, let texture = channelTextures[channel] else { continue }
+                // Spec 10 §18 — "text and audio alone get none": sound with no picture has nothing to show, missing or not.
+                if let kind = model.channels[channel]?.live.media?.entry?.kind, kind == .audio || kind == .audioSet { continue }
                 let missing = model.state.channels[channel]?.content.media?.missing == true
                 var drawn = false
                 if !missing {

@@ -156,6 +156,8 @@ final class FirstRunDocumentTests: XCTestCase {
         XCTAssertEqual(keys.map(\.key), ["space", "right", "left", "shift+escape"])
         XCTAssertEqual(keys.map(\.command), [.next, .next, .previous, .systemClearAll], "Space and → send next, ← previous, ⇧⎋ clear all")
         XCTAssertFalse(keys.contains { $0.key == "escape" }, "plain Escape is never bound")
+        // The fixture's keyboard bindings are these defaults (its clear-all moved to ⇧⎋ with this area).
+        XCTAssertEqual(F.load().machine.keys.filter { $0.device == "keyboard" }, keys)
     }
 
     // MARK: - The machine: which screens become outputs (S3)

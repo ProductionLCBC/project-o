@@ -127,6 +127,28 @@ final class MachChannelEngineTests: XCTestCase {
         XCTAssertTrue(plan.channelPasses.contains { $0.channel == 1 && !$0.auxOnly }, "stack 1 samples channel 1: its pass is live work, and the picture adds none")
     }
 
+    /// Spec 10 §18 — "text and audio alone get none": a channel whose content
+    /// is sound with no picture gets no picture, and no channel pass is run
+    /// for one, whether a stack holds the channel or not.
+    func test_soundAloneGetsNoPicture() throws {
+        var library = try EngineFixtures.library()
+        let bed = "sha256:" + String(repeating: "a0d1", count: 16)
+        library.mediaIndex.entries.append(MediaEntry(id: bed, path: "audio/bed.wav", kind: .audio, size: 1024, durationMs: 5000, hasAudio: true))
+        var machine = try EngineFixtures.spikeMachine()
+        machine.stacks[0].slots = [StackSlot(channel: 2)]   // no stack holds channel 1
+        machine.stacks[1].slots = [StackSlot(channel: 2), StackSlot(channel: 3)]
+        try open(library: library, machine: machine)
+        XCTAssertNil(engine.send("channel 1 write media \(bed)"), "the bed is written")
+        XCTAssertNil(engine.send("channel 3 write media \(EngineFixtures.dawn)"))
+        tick(30)
+        XCTAssertEqual(engine.state.channels[1]?.content.media?.ref, bed)
+        XCTAssertEqual(Set(client.state.pictureFrames.map(\.channel)), [3], "the clip's channel, and not the one that only sounds")
+        tick(2)
+        let plans = [try XCTUnwrap(engine.lastPlan)]
+        XCTAssertFalse(plans.contains { $0.auxPasses.contains { $0.kind == .picture && $0.channel == 1 } })
+        XCTAssertFalse(plans.contains { $0.channelPasses.contains { $0.channel == 1 } }, "and nothing is drawn for it")
+    }
+
     /// "a channel with pixel content that no stack pass has sampled since the
     /// last one runs its channel pass as aux work" — while a client holds the
     /// channel, and only then.
