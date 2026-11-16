@@ -78,8 +78,22 @@ public final class EngineProcess: @unchecked Sendable {
         /// app] has released while it runs": screens whose outputs stay
         /// closed from the start of this run.
         public var released: [String] = []
+        /// Spec 10 §2 — the LAN API's wire and the Keychain it reads its token from; nil opens no listener and
+        /// touches no Keychain, which is what a test or a run with `--no-lan` wants.
+        public var lan: LanOptions?
 
         public init() {}
+    }
+
+    /// Spec 10 §2, "The LAN API" — what the listener runs on: both are seams (Spec 4 §14).
+    public struct LanOptions: Sendable {
+        public var server: any LanServer
+        public var secrets: any SecretStore
+
+        public init(server: any LanServer, secrets: any SecretStore) {
+            self.server = server
+            self.secrets = secrets
+        }
     }
 
     public let roots: LoadedRoots
@@ -101,6 +115,8 @@ public final class EngineProcess: @unchecked Sendable {
     public let power = SystemPower()
     /// Spec 10 §2 — the local socket, once the engine takes commands.
     public private(set) var socket: LocalSocket?
+    /// Spec 10 §2 — the LAN API's listener, when this run has one.
+    public private(set) var lan: LanListener?
     /// Spec 1 §8 — documents that change on disk under the engine are reloaded.
     public let watcher: DiskWatcher
     private let startedAt = MonotonicClock.now()
@@ -267,8 +283,11 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 10 §2 — "opens its local socket ... at that list's step 5, when it takes commands, so `hello` means it
         // is ready."
         openSocket()
+        openLan()
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
+            // Spec 10 §2 — a refused OSC send shows on the `engine` topic as the LAN waiting.
+            engine.oscRefused = { osc.sendsRefused }
         }
         // Spec 1 §8 — the watcher, and one scan for anything that changed between the load and the watch.
         if !watcher.start() { log.error("the folder watcher did not start: changes on disk are read at the next launch") }
@@ -326,6 +345,21 @@ public final class EngineProcess: @unchecked Sendable {
         }
     }
 
+    /// Spec 10 §2 — "opens its local socket and its LAN listener at that list's step 5": the listener starts here
+    /// and opens once the token has been read, on a thread of its own, so a Keychain prompt "never holds back the
+    /// outputs".
+    private func openLan() {
+        guard let wire = options.lan else {
+            log.info("the LAN API is off for this run")
+            return
+        }
+        let settings = roots.machine.settings
+        let listener = LanListener(hub: engine.api, server: wire.server, secrets: wire.secrets, machine: settings.uuid,
+                                   port: settings.network.apiPort, campus: settings.campusName, log: log)
+        listener.start()
+        lan = listener
+    }
+
     /// Spec 4 §13 — the live summary, now; empty before the black box starts.
     public func metricsSnapshot() -> MetricsSnapshot {
         let uptime = Int((MonotonicClock.now().nanoseconds - startedAt.nanoseconds) / 1_000_000_000)
@@ -345,6 +379,7 @@ public final class EngineProcess: @unchecked Sendable {
         }
         // No new connection once the stop has begun; the ones open stay, for the answer to the request that stopped it.
         socket?.stop()
+        lan?.stop()
         let report = engine.stop()
         osc?.stop()
         return report

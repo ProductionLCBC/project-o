@@ -53,7 +53,7 @@ final class ApiRequestTests: XCTestCase {
 
     func test_noAuthClosesALanSocket() throws {
         let api = try ApiFixture()
-        api.hub.token = ApiFixture.token
+        api.hub.setToken(ApiFixture.token)
 
         let silent = ApiTestClient(hub: api.hub, origin: .lan)
         silent.send("ping")
@@ -76,7 +76,7 @@ final class ApiRequestTests: XCTestCase {
         XCTAssertFalse(right.connection.isClosed)
 
         // Until the token is read there is nothing to compare with: nobody gets in.
-        api.hub.token = nil
+        api.hub.setToken(nil)
         let early = ApiTestClient(hub: api.hub, origin: .lan)
         early.send("auth", ["token": .string(ApiFixture.token)])
         api.tick()
@@ -85,7 +85,7 @@ final class ApiRequestTests: XCTestCase {
 
     func test_aCommandBeforeAuthClosesTheSocketAndNeverRuns() throws {
         let api = try ApiFixture()
-        api.hub.token = ApiFixture.token
+        api.hub.setToken(ApiFixture.token)
         let client = ApiTestClient(hub: api.hub, origin: .lan)
         let before = api.entries.count
         client.send("command", ["command": try api.command("stack 1 blackout on")])

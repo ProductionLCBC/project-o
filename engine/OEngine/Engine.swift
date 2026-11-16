@@ -279,9 +279,28 @@ public final class Engine: @unchecked Sendable {
         // the answers to the requests this build took are made from the same.
         let snapshot = ApiSnapshot(engine: self)
         topics.publish(snapshot, control: control, to: publisher)
-        status.publish(engine: self, snapshot: snapshot, now: clock.now())
+        let now = clock.now()
+        status.publish(engine: self, snapshot: snapshot, now: now)
+        // Spec 10 §3 — the `preview` topic: "a JPEG of each stack the client names ..., twice a second".
+        preview.publish(engine: self, snapshot: snapshot, now: now)
         power?.update(snapshot.standings)
         api.takeRequests(self, snapshot: snapshot)
+    }
+
+    /// Spec 10 §3 — the `preview` topic's own state: when it last sent.
+    let preview = ApiPreview()
+
+    /// Spec 10 §2 — whether the system is holding OSC sends back now, which the `engine` topic shows as the LAN
+    /// waiting; the process sets it to its OSC server's.
+    public var oscRefused: (@Sendable () -> Bool)?
+
+    /// A test's own surfaces for the preview and picture textures; nil for the Metal backend's.
+    public var surfaceSource: (@Sendable (TextureHandle) -> IOSurfaceRef?)?
+
+    /// Spec 4 §10 — "backed by IOSurfaces": the surface behind a preview or picture texture.
+    func surface(of handle: TextureHandle) -> IOSurfaceRef? {
+        if let surfaceSource { return surfaceSource(handle) }
+        return (backend as? MetalBackend)?.surface(of: handle)
     }
 
     /// Spec 10 §2 — the Mach channel, once it is open: the preview surfaces, the channel pictures and the meters.
@@ -296,7 +315,8 @@ public final class Engine: @unchecked Sendable {
                                 allows: @escaping @Sendable (uid_t) -> Bool = { $0 == geteuid() }) throws -> MachChannel {
         if let mach { return mach }
         let backend = self.backend
-        let find = surface ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
+        if let surface { surfaceSource = surface }
+        let find = surfaceSource ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
         let previews = control.previewSurfaces, pictures = control.pictureSurfaces
         @Sendable func sets(_ handles: [Int: [TextureHandle]]) -> [MachSurfaceSet] {
             handles.keys.sorted().compactMap { number in

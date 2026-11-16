@@ -59,11 +59,13 @@ public enum OEngineCommandLine {
     public static let usage = """
     usage: oengine <command> [options]
       version
-      run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio]
+      run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio] [--no-lan]
            the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port;
            the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder;
+           the LAN API on the machine's apiPort once its token is read from the login keychain (made there
+           at the first launch), advertised over Bonjour; --no-lan opens no listener and leaves the Keychain alone;
            exits with status 3 when another engine holds the machine root, 4 when the roots don't load
-      soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio]
+      soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio] [--no-lan]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure
       drive --to host:port --scenario <file> --library <root> [--seconds N]
            send a scenario to a running engine (the library validates media ids); one pass by default
@@ -142,6 +144,9 @@ public enum OEngineCommandLine {
         var options = EngineProcess.Options()
         options.oscPort = try args.int("--osc-port")
         options.audio = !args.flag("--no-audio")
+        // Spec 10 §2 — the LAN API: the system's WebSocket listener, and the token from the login keychain. A run
+        // with --no-lan opens neither and never touches the Keychain.
+        if !args.flag("--no-lan") { options.lan = EngineProcess.LanOptions(server: NetworkLanServer(), secrets: KeychainStore()) }
         let blackBoxFolder = blackBoxFolder(named: args.optionalURL("--blackbox"), machineRoot: roots.machineRoot, soak: soak,
                                             stamp: fileStamp(Date()), working: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         options.blackBoxFolder = blackBoxFolder

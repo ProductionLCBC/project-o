@@ -368,8 +368,9 @@ public final class MachChannel: @unchecked Sendable {
         let count = clients.count + greet.count
         lock.unlock()
         guard had else { return }
+        // The engine hears first: with nobody left, the picture work stops with the next build.
+        onClients(count)
         MachPorts.release(client)
         log.info("a Mach client went away (\(code)); \(count) left")
-        onClients(count)
     }
 }

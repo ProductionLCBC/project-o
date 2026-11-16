@@ -60,8 +60,11 @@ final class ApiStatus {
         if let at = watchdogAt, now.nanoseconds - at <= Self.recentNanoseconds { badge("watchdog") }
         if let at = gpuAt, now.nanoseconds - at <= Self.recentNanoseconds { badge("gpu") }
         if let scheduler = engine.scheduler, scheduler.activeClock !== engine.clock { badge("clock") }
-        let lan = engine.api.lan
+        var lan = engine.api.lan
         if lan.keychainUnreadable { badge("keychain") }
+        // Spec 10 §2 — "the engine retries a refused registration or send every few seconds, and the `engine` topic
+        // shows the LAN as waiting meanwhile": a listener that is open while OSC sends are held back is waiting too.
+        if lan.state == .open, engine.oscRefused?() == true { lan.state = .waiting }
 
         let lastState: JSONValue
         switch engine.launchReport?.lastState {

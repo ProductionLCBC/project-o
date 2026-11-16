@@ -420,6 +420,20 @@ public final class ApiHub: @unchecked Sendable {
         for connection in targets { connection.send(line: line) }
     }
 
+    /// Spec 10 §3, `preview` — "a JPEG of each stack the client names when it
+    /// subscribes": the connections subscribed to `preview`, by the stacks
+    /// they named.
+    func previewSubscribers() -> [Int: [ApiConnection]] {
+        lock.lock()
+        defer { lock.unlock() }
+        var wanted: [Int: [ApiConnection]] = [:]
+        for key in connections.keys.sorted() {
+            guard let connection = connections[key], connection.topics.contains("preview") else { continue }
+            for stack in connection.previewStacks { wanted[stack, default: []].append(connection) }
+        }
+        return wanted
+    }
+
     /// The connections subscribed to `topic` now.
     func subscribers(of topic: String) -> [ApiConnection] {
         lock.lock()
@@ -485,7 +499,10 @@ public final class ApiHub: @unchecked Sendable {
         get {
             lock.lock()
             defer { lock.unlock() }
-            return lanStanding
+            var standing = lanStanding
+            // "client count": the LAN connections that have signed in.
+            standing.clients = connections.values.filter { $0.origin == .lan && $0.authorized }.count
+            return standing
         }
         set {
             lock.lock()
@@ -546,12 +563,19 @@ public final class ApiHub: @unchecked Sendable {
         }
     }
 
-    // MARK: - The LAN's token (Spec 2 §9; Area 19's stage 5 fills these in)
+    // MARK: - The LAN's token (Spec 2 §9)
 
-    /// What a LAN connection's `auth` is checked against; nil until the token is read.
-    var token: String?
+    /// What a LAN connection's `auth` is checked against; nil until the token is read. Under the lock.
+    private var token: String?
 
-    private func isAuthorized(_ connection: ApiConnection) -> Bool {
+    /// Spec 10 §2 — the token, once the Keychain has given it: from then on a LAN client can sign in.
+    public func setToken(_ token: String?) {
+        lock.lock()
+        self.token = token
+        lock.unlock()
+    }
+
+    func isAuthorized(_ connection: ApiConnection) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         return connection.authorized

@@ -28,7 +28,7 @@ final class ApiFixture {
 
     /// A client on the LAN, authorized with the token (Spec 2 §9).
     func lan() -> ApiTestClient {
-        hub.token = Self.token
+        hub.setToken(Self.token)
         let client = ApiTestClient(hub: hub, origin: .lan)
         client.send("auth", ["token": .string(Self.token)])
         engine.tick()

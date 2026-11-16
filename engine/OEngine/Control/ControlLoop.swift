@@ -158,6 +158,9 @@ public final class ControlLoop: @unchecked Sendable {
     /// planned picture; the next one takes the surface after it, "the oldest of the three".
     public private(set) var previewSlots: [Int: Int] = [:]
     public private(set) var pictureSlots: [Int: Int] = [:]
+    /// How many previews have been planned for each stack: once it is three, every one of its surfaces has been
+    /// asked for a frame.
+    public private(set) var previewsPlanned: [Int: Int] = [:]
     /// Spec 4 §2 — "While the operator app holds its Mach channel, the strip's channel pictures are a consumer at the
     /// preview rate too": set while a client holds the channel, read by each build. With no client no picture is
     /// planned and no channel pass is added for one.
@@ -1422,6 +1425,7 @@ public final class ControlLoop: @unchecked Sendable {
                 guard let targets = previewSurfaces[stack.number], targets.count == FrameRing.depth, let ring = stackRings[stack.number] else { continue }
                 let slot = ((previewSlots[stack.number] ?? -1) + 1) % FrameRing.depth
                 previewSlots[stack.number] = slot
+                previewsPlanned[stack.number, default: 0] += 1
                 plan.auxPasses.append(AuxPass(kind: .preview, stack: stack.number, source: ring[Int(frame % Int64(FrameRing.depth))],
                                               target: targets[slot], slot: slot))
             }

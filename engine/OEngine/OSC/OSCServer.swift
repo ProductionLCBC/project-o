@@ -64,6 +64,11 @@ public final class OSCServer: @unchecked Sendable {
     private let sentCount = Atomic<Int64>(0)
     /// Spec 2 §6 — "Any client may ask for a current value with /o/query".
     public var queryHandler: (@Sendable (String) -> OSCMessage?)?
+    /// Spec 10 §2 — the sends the system refused, waiting to go again: the newest message per address, by peer. Under `lock`.
+    private var refusedSends: [OSCPeer: [String: OSCMessage]] = [:]
+    private var retryTimer: DispatchSourceTimer?
+    /// For the tests: stands in for the socket's `sendto`, answering 0 or the error.
+    var transmit: (@Sendable (Data, OSCPeer) -> Int32)?
 
     public init(port: UInt16, targets: [OSCTarget], mediaIDs: Set<String>, log: EngineLog,
                 now: @escaping @Sendable () -> MonotonicTime = { MonotonicClock.now() },
@@ -131,11 +136,19 @@ public final class OSCServer: @unchecked Sendable {
         thread.qualityOfService = .userInteractive
         self.thread = thread
         thread.start()
+        // Spec 10 §2 — "retries a refused ... send every few seconds".
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(deadline: .now() + Self.retrySeconds, repeating: Self.retrySeconds)
+        timer.setEventHandler { [weak self] in self?.retryRefused() }
+        timer.resume()
+        retryTimer = timer
         log.info("OSC listening on port \(boundPort)")
     }
 
     public func stop() {
         guard running.exchange(false, ordering: .acquiringAndReleasing) else { return }
+        retryTimer?.cancel()
+        retryTimer = nil
         if socket >= 0 {
             shutdown(socket, SHUT_RDWR)
             close(socket)
@@ -333,22 +346,99 @@ public final class OSCServer: @unchecked Sendable {
         return subscriptions.count
     }
 
+    /// Spec 10 §2 — "macOS asks on behalf of the app that started the engine,
+    /// may refuse Bonjour and OSC sends until someone answers, and may ask
+    /// again after an update (ADR 0007), so the engine retries a refused
+    /// registration or send every few seconds". A send the system refuses
+    /// keeps its message, the newest per address for that peer (Area 19
+    /// reading: feedback mirrors state, so only the latest value of an
+    /// address is worth sending late), and `retryRefused` sends it again.
     public func send(_ message: OSCMessage, to peer: OSCPeer) {
-        guard socket >= 0 else { return }
+        let code = transmitNow(message, to: peer)
+        lock.lock()
+        var firstRefusal = false
+        if code == 0 {
+            // This address's newest value has gone: an older one kept for it must not follow.
+            refusedSends[peer]?[message.address] = nil
+            if refusedSends[peer]?.isEmpty == true { refusedSends[peer] = nil }
+        } else if Self.refusedCodes.contains(code) {
+            firstRefusal = refusedSends.isEmpty
+            if refusedSends[peer] != nil || refusedSends.count < Self.refusedPeerLimit {
+                var kept = refusedSends[peer] ?? [:]
+                if kept[message.address] != nil || kept.count < Self.refusedAddressLimit { kept[message.address] = message }
+                refusedSends[peer] = kept
+            }
+        }
+        lock.unlock()
+        if firstRefusal {
+            log.warning("OSC to \(peer.host):\(peer.port) was refused (\(String(cString: strerror(code)))); trying again every \(Int(Self.retrySeconds)) s")
+        }
+    }
+
+    /// The errors a send gets while the system holds local-network traffic
+    /// back, or the target can't be reached for now.
+    static let refusedCodes: Set<Int32> = [EHOSTUNREACH, EPERM, ENETUNREACH, EHOSTDOWN, ENETDOWN]
+    static let refusedPeerLimit = 64
+    static let refusedAddressLimit = 256
+    /// "every few seconds" (Area 19 reading: five).
+    public static let retrySeconds = 5.0
+
+    /// Spec 10 §2 — whether a send is being held back now; the `engine` topic shows the LAN as waiting meanwhile.
+    public var sendsRefused: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return !refusedSends.isEmpty
+    }
+
+    /// Sends what was refused again: each peer's kept messages until one is refused again.
+    func retryRefused() {
+        lock.lock()
+        let waiting = refusedSends
+        lock.unlock()
+        guard !waiting.isEmpty else { return }
+        for (peer, messages) in waiting {
+            for address in messages.keys.sorted() {
+                guard let message = messages[address] else { continue }
+                guard transmitNow(message, to: peer) == 0 else { break }
+                lock.lock()
+                // Only what was sent: a newer value refused meanwhile stays for the next round.
+                if refusedSends[peer]?[address] == message {
+                    refusedSends[peer]?[address] = nil
+                    if refusedSends[peer]?.isEmpty == true { refusedSends[peer] = nil }
+                }
+                lock.unlock()
+            }
+        }
+        if !sendsRefused { log.info("OSC sends are going out again") }
+    }
+
+    /// One datagram now: 0 when it went, else the error.
+    private func transmitNow(_ message: OSCMessage, to peer: OSCPeer) -> Int32 {
+        let data = message.encoded()
+        if let transmit {
+            let code = transmit(data, peer)
+            if code == 0 { sentCount.add(1, ordering: .relaxed) }
+            return code
+        }
+        guard socket >= 0 else { return EBADF }
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = peer.port.bigEndian
-        guard inet_pton(AF_INET, peer.host, &address.sin_addr) == 1 else { return }
-        let data = message.encoded()
+        guard inet_pton(AF_INET, peer.host, &address.sin_addr) == 1 else { return EINVAL }
+        var failure: Int32 = 0
         let sentBytes = data.withUnsafeBytes { raw in
             withUnsafePointer(to: &address) { pointer in
                 pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    sendto(socket, raw.baseAddress, data.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    let count = sendto(socket, raw.baseAddress, data.count, 0, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    if count < 0 { failure = errno }
+                    return count
                 }
             }
         }
-        if sentBytes == data.count { sentCount.add(1, ordering: .relaxed) }
+        guard sentBytes == data.count else { return failure == 0 ? EIO : failure }
+        sentCount.add(1, ordering: .relaxed)
+        return 0
     }
 
     public var liveRegistrations: [OSCPeer] {
