@@ -44,11 +44,21 @@ final class MachChannelEngineTests: XCTestCase {
         XCTAssertTrue(waitUntil(5) { self.client.state.previewSets == 2 && self.client.state.pictureSets == 3 }, "its surfaces arrive at connect")
     }
 
-    /// Ticks, then waits for the sender to have passed on what the render thread drew.
+    /// Ticks, then waits for the sender to have passed on what the render
+    /// thread drew and for the client to have taken it: each is a thread of
+    /// its own, so the wait is for the client's count to stand still.
     func tick(_ count: Int = 1) {
         engine.tick(count: count)
         _ = waitUntil(2) { self.engine.engine.render.auxNotices.unread == 0 }
-        Thread.sleep(forTimeInterval: 0.03)
+        let deadline = Date().addingTimeInterval(2)
+        var seen = client.state.messages
+        var still = 0
+        while still < 6, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+            let now = client.state.messages
+            still = now == seen ? still + 1 : 0
+            seen = now
+        }
     }
 
     func test_theChannelIsNamedForTheRunAsHelloSays() throws {
@@ -253,11 +263,13 @@ final class MachChannelEngineTests: XCTestCase {
         client = MachClient()
         try client.connect(name: channel.name)
         XCTAssertTrue(waitUntil(5) { self.client.state.meterFrames > 0 })
+        // The rate over the time that really passed: a sleep on a busy machine runs long.
         let first = client.state.meterFrames
-        Thread.sleep(forTimeInterval: 1)
-        let arrived = client.state.meterFrames - first
-        XCTAssertGreaterThanOrEqual(arrived, 13, "15 a second: \(arrived)")
-        XCTAssertLessThanOrEqual(arrived, 16)
+        let began = MonotonicClock.now().nanoseconds
+        Thread.sleep(forTimeInterval: 2)
+        let arrived = Double(client.state.meterFrames - first)
+        let seconds = Double(MonotonicClock.now().nanoseconds - began) / 1e9
+        XCTAssertEqual(arrived / seconds, 15, accuracy: 1.5, "15 a second: \(arrived) frames in \(seconds) s")
         XCTAssertEqual(client.state.meters, levels, "each channel's peak and RMS, in dBFS")
     }
 

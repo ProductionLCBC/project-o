@@ -176,18 +176,19 @@ final class LanListenerTests: XCTestCase {
     /// "a Bonjour registration ... refused while the system asks is retried",
     /// "and the `engine` topic shows the LAN as waiting meanwhile".
     func test_aRefusedRegistrationIsRetriedAndTheLanShowsWaitingMeanwhile() throws {
-        try make(retrySeconds: 0.15, token: "the-token")
+        // The time between tries is long enough here that a slow machine still sees the state in between.
+        try make(retrySeconds: 0.8, token: "the-token")
         server.refuseNext(2)
         listener.start()
         XCTAssertTrue(waitUntil(5) { self.standing.state == .waiting })
         XCTAssertEqual(said(), ["waiting"])
         XCTAssertNil(server.connect(), "nothing listens while it is refused")
-        XCTAssertTrue(waitUntil(5) { self.standing.state == .open }, "someone answered, and the next try went through")
+        XCTAssertTrue(waitUntil(10) { self.standing.state == .open }, "someone answered, and the next try went through")
         XCTAssertEqual(server.starts.count, 3, "the first try and two more")
         XCTAssertEqual(said(), ["open"])
         XCTAssertEqual(api.engine.log.recent.filter { $0.message.contains("isn't open") }.count, 1, "said once, however often it is tried")
         // Open, it is left alone.
-        Thread.sleep(forTimeInterval: 0.5)
+        Thread.sleep(forTimeInterval: 1.2)
         XCTAssertEqual(server.starts.count, 3)
     }
 
@@ -206,12 +207,12 @@ final class LanListenerTests: XCTestCase {
 
     /// Area 19 reading — a failure that isn't a refusal shows as closed and is retried the same way.
     func test_aPortSomethingElseHoldsShowsClosedAndIsRetried() throws {
-        try make(retrySeconds: 0.15, token: "the-token")
+        try make(retrySeconds: 0.8, token: "the-token")
         server.failNext(1)
         listener.start()
         XCTAssertTrue(waitUntil(5) { self.server.starts.count == 1 })
         XCTAssertEqual(standing.state, .closed)
-        XCTAssertTrue(waitUntil(5) { self.standing.state == .open }, "the port came free")
+        XCTAssertTrue(waitUntil(10) { self.standing.state == .open }, "the port came free")
         XCTAssertEqual(server.starts.count, 2)
         XCTAssertTrue(api.engine.log.contains("the address is already in use"))
     }

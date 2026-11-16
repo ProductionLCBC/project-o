@@ -116,6 +116,12 @@ final class LanLoopbackTests: XCTestCase {
         XCTAssertEqual(api.hub.lan.clients, 1)
 
         remote.send(.object(["id": .number(2), "type": .string("subscribe"), "topics": .array([.string("channels")])]))
+        // A subscription starts with the build that takes it (Spec 10 §3), so the command waits until it has been:
+        // over a real socket the two could otherwise land in one build, and the event would be the build's before it.
+        XCTAssertTrue(waitUntil(10) {
+            api.tick()
+            return remote.messages.contains { $0["id"] == .number(2) }
+        }, "the subscription is taken")
         remote.send(.object(["id": .number(3), "type": .string("command"), "command": try api.command("channel 2 write text \"Amen\"")]))
         remote.send(.object(["id": .number(4), "type": .string("query"), "what": .string("state")]))
         XCTAssertTrue(waitUntil(10) {
