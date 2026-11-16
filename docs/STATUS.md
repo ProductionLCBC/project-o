@@ -34,23 +34,33 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | in progress | In progress on `area/api` since 2026-11-15: Adam approved the plan that day, with three answers (first run writes channel 2's render size as `largest`, with a one-line Spec 10 §13 correction to come on the branch; the first-run library is named "<campus> Library"; a hand launch on a root with no `machine.json` and without `--campus` and `--operator-screen` is refused). It stops for review after the Mach proof, after the socket and §3, and after first run; the Mach proof passed on 2026-11-15 (af5456a, both calls, looked up from an app LaunchServices started) and the session waits there. Engine-only, so no bench run. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | in progress | In progress on `area/api` since 2026-11-15: Adam approved the plan that day, with three answers (first run writes channel 2's render size as `largest`, with a one-line Spec 10 §13 correction to come on the branch; the first-run library is named "<campus> Library"; a hand launch on a root with no `machine.json` and without `--campus` and `--operator-screen` is refused). It stops for review after the Mach proof, after the socket and §3, and after first run; the Mach proof passed on 2026-11-15 (af5456a, both calls, looked up from an app LaunchServices started), and the session waits at the second stop since 2026-11-16 (db60639: the engine as a process, the local socket and §3). Engine-only, so no bench run. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Area 19, engine API and first run, is in progress on `area/api`, stopped at its first
-stop for review.** Adam approved its plan on 2026-11-15, with three answers (row 19
-above). The Mach proof passed on the dev Mac (macOS 26.3) and is on the branch (af5456a,
-pushed): `bootstrap_check_in` registers a name launchd has not seen, the deprecated
-`bootstrap_register` does too, an app started by LaunchServices finds the name and reads an
-IOSurface sent as a Mach port, and a killed helper's name is gone. So no per-user launchd
-agent is needed and Spec 10 §2 stands. `scripts/mach-proof.sh` runs the proof again;
-`swift test` is green on the branch (1187 tests, the real-Trash test skipped). The session
-waits for Adam's word before stage 2, the engine as a process. Nothing is in review. Area
-12, log and saving, shipped the same day (327454f). The bench run with a card stays
-deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Area 19, engine API and first run, is in progress on `area/api`, stopped at its second
+stop for review, after the socket and §3.** Adam approved its plan on 2026-11-15, with
+three answers (row 19 above), and said to go on after the first stop, the Mach proof
+(af5456a: both calls work on the dev Mac, no launchd agent needed, Spec 10 §2 stands). On
+the branch since (db60639, pushed): the engine as a process (the lock file with exit
+status 3, the console log trimmed in place, output windows as non-activating panels,
+display outputs that wait for their own screen and never take another, the activity and
+sleep assertions, the device list), the local socket with `hello`, and §3 (one order per
+connection placed at build boundaries, results with `seq`, `group` and `applied`, the
+topics, the queries, `ping`, `stop`, `releaseScreen`, the notes, `localOnly` on the LAN).
+`swift test` is green on the branch (1288 tests, the real-Trash test skipped). Two things
+found on the way are fixed there: macOS made an accessory process the active app at
+launch, so the engine launches as a process that can't be activated and becomes an
+accessory process once launched; and a test caught a command sent on a LAN connection
+before `auth` reaching the engine. Left for this area: the Mach channel's payloads, the
+LAN listener with the token and Bonjour, first run (the third stop), the relaunch rule and
+the soak client. The spike fixture's outputs name no real screen, so `scripts/soak.sh`
+shows nothing until its clone's outputs are bound to the bench's screens, which this area
+does with the soak client. Nothing is in review. Area 12, log and saving, shipped on
+2026-11-15 (327454f). The bench run with a card stays deferred to a window Adam sets
+aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
