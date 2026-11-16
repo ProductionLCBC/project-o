@@ -1,6 +1,6 @@
 # Spec 4: Render pipeline
 
-Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25 · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
+Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-11-16 from the Area 19 review (§12, audio devices at launch) · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
 
 ## 1. Purpose and scope
 
@@ -272,6 +272,8 @@ The rule for every failure is the same: the audience sees the last good frame, t
 | Audio device vanishes | Core Audio device notification | Switch to the Audio Output's configured fallback device if one is set; otherwise drop that output's audio (silence, with a badge) rather than guessing; return when the device reappears |
 | Text raster fails (font missing, layout exception) | Raster job error | Draw with the fallback font; record the substitution for pre-flight |
 | Media file disappears mid-play | Reader error | Hold the last frame; mark missing; the next write replaces it |
+
+**Audio devices at launch.** The engine opens its audio devices beside its first frames; until a device has opened, its outputs are silent, as for a device that is absent.
 
 **Watchdog.** A utility thread checks every 250 ms that each active sink presented or scheduled within the last two frame intervals plus half a tick of slack (a display link that fires a millisecond late at the sampling instant is jitter, not a stall; the first three-hour soak logged eighty such lines, none a recovery) and that the render thread consumed a plan within the last tick; failures are logged with the state of every queue and ring at that moment, which is the information a Monday postmortem needs.
 

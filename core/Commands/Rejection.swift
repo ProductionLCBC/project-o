@@ -92,6 +92,9 @@ public enum RejectionReason: String, Codable, Equatable, Sendable {
     case noPasscode
     /// Spec 10 §12 — the Keychain can't be read.
     case keychain
+    /// Spec 10 §3 — a request only the engine's local socket takes, sent on
+    /// the LAN: "On the LAN they are rejected with `localOnly`."
+    case localOnly
 }
 
 /// Spec 2 §8 — "A command either runs or is rejected with a reason before

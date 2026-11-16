@@ -213,11 +213,32 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let url = try cache.store(png, for: key)
         lock.lock()
         stats.rendered += 1
+        let hook = written
         lock.unlock()
-        return Result(cue: cue.uuid, stack: stack, version: version, url: url, outcome: .rendered,
-                      frame: MetalBackend.linearFrame(bgra8: read.bytes, width: read.width, height: read.height),
-                      surfaceID: backend.surfaceID(of: target), size: size)
+        let result = Result(cue: cue.uuid, stack: stack, version: version, url: url, outcome: .rendered,
+                            frame: MetalBackend.linearFrame(bgra8: read.bytes, width: read.width, height: read.height),
+                            surfaceID: backend.surfaceID(of: target), size: size)
+        hook?(result, list)
+        return result
     }
+
+    /// Spec 10 §3, the `thumbnails` topic — "A cue thumbnail written, with
+    /// its stack, list, cue and file ... When written": called on the thread
+    /// that rendered it, once per file written; a thumbnail answered from
+    /// the cache writes nothing and calls nothing.
+    public var onWritten: (@Sendable (Result, List) -> Void)? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return written
+        }
+        set {
+            lock.lock()
+            written = newValue
+            lock.unlock()
+        }
+    }
+    private var written: (@Sendable (Result, List) -> Void)?
 
     private func countFailure() {
         lock.lock()

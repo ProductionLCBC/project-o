@@ -97,7 +97,7 @@ final class PreviewPlanTests: XCTestCase {
         for aux in plan.auxPasses {
             let stack = try XCTUnwrap(plan.stackPasses.first { $0.stack == aux.stack })
             XCTAssertEqual(aux.source, stack.target, "the preview downscales this tick's stack texture")
-            XCTAssertEqual(aux.target, engine.control.previewTargets[aux.stack])
+            XCTAssertEqual(aux.target, engine.control.previewSurfaces[aux.stack]?[aux.slot], "one of the stack's three preview surfaces (Spec 10 §2)")
         }
         // A 30 Hz master: every tick is a preview tick.
         let slow = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(rate: FrameRate(num: 30)), media: EngineFixtures.media)
@@ -153,17 +153,21 @@ final class PreviewPlanTests: XCTestCase {
     }
 
     /// Spec 4 §10 — "those IOSurfaces are shared with it over a local Mach
-    /// connection": the engine exposes one surface id per stack for that.
-    func test_theEngineExposesOnePreviewSurfacePerStack() throws {
+    /// connection"; Spec 10 §2 — "each stack's preview as three IOSurfaces":
+    /// the engine exposes three surface ids per stack for that.
+    func test_theEngineExposesThreePreviewSurfacesPerStack() throws {
         let metal = try MetalHarness.backend()
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
                                         media: EngineFixtures.media, metal: metal)
         let surfaces = engine.engine.previewSurfaces
         XCTAssertEqual(Set(surfaces.keys), [1, 2])
-        XCTAssertEqual(Set(surfaces.values).count, 2, "distinct surfaces")
+        XCTAssertEqual(surfaces.values.map(\.count), [3, 3], "three a stack")
+        XCTAssertEqual(Set(surfaces.values.flatMap { $0 }).count, 6, "distinct surfaces")
         engine.send("channel 2 write text \"Amen\"")
         engine.tick(count: 3)
-        let preview = try XCTUnwrap(metal.readback8(engine.control.previewTargets[1] ?? .none))
+        // The newest finished frame is in the surface the last planned preview wrote.
+        let newest = try XCTUnwrap(engine.control.previewSlots[1])
+        let preview = try XCTUnwrap(metal.readback8(engine.control.previewSurfaces[1]?[newest] ?? .none))
         XCTAssertEqual(preview.width, 120, "a quarter of the 480-wide main stack")
         XCTAssertGreaterThan(preview.pixels.filter { $0.r + $0.g + $0.b > 0.3 }.count, 10, "the text shows in the preview")
     }

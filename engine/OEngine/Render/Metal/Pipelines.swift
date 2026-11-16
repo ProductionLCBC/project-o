@@ -55,6 +55,7 @@ final class PipelineCache: @unchecked Sendable {
     private var encode: [EncodeVariant: MTLRenderPipelineState] = [:]
     private var linearize: MTLRenderPipelineState?
     private var downscale: MTLRenderPipelineState?
+    private var picture: MTLRenderPipelineState?
     /// Spec 4 §10 — the v210 kernel, plain and with the weave.
     private var v210: [Bool: MTLComputePipelineState] = [:]
     private let lock = NSLock()
@@ -109,6 +110,13 @@ final class PipelineCache: @unchecked Sendable {
         return downscale
     }
 
+    /// Spec 4 §10, Spec 10 §2 — the channel picture's pass into a BGRA8 sRGB target.
+    var picturePipeline: MTLRenderPipelineState? {
+        lock.lock()
+        defer { lock.unlock() }
+        return picture
+    }
+
     func v210Pipeline(weave: Bool) -> MTLComputePipelineState? {
         lock.lock()
         defer { lock.unlock() }
@@ -127,6 +135,7 @@ final class PipelineCache: @unchecked Sendable {
         encode = [:]
         linearize = nil
         downscale = nil
+        picture = nil
         v210 = [:]
         try? compileBlurLocked()
     }
@@ -143,6 +152,21 @@ final class PipelineCache: @unchecked Sendable {
         descriptor.fragmentFunction = try library.makeFunction(name: "downscaleFragment", constantValues: MTLFunctionConstantValues())
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb
         downscale = try device.makeRenderPipelineState(descriptor: descriptor)
+        compiled += 1
+    }
+
+    /// Spec 4 §10 — "Another aux pass ... makes a live picture of each channel with pixel content": one pipeline,
+    /// its target sRGB-typed.
+    func ensurePicture() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard picture == nil else { return }
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "picture"
+        descriptor.vertexFunction = try library.makeFunction(name: "pictureVertex", constantValues: MTLFunctionConstantValues())
+        descriptor.fragmentFunction = try library.makeFunction(name: "pictureFragment", constantValues: MTLFunctionConstantValues())
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb
+        picture = try device.makeRenderPipelineState(descriptor: descriptor)
         compiled += 1
     }
 

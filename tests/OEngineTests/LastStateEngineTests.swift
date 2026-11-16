@@ -28,11 +28,12 @@ final class LastStateEngineTests: XCTestCase {
     }
 
     /// The next run on a fixture's roots: after a kill, unless the fixture stopped first.
-    func next(after previous: DiskFixture, setting: Bool = true, startupMacro: Int? = nil, relaunch: Bool = false) throws -> DiskFixture {
+    func next(after previous: DiskFixture, setting: Bool = true, startupMacro: Int? = nil, relaunch: Bool = false,
+              bootedAt: Date? = nil) throws -> DiskFixture {
         try DiskFixture(continuing: previous, configure: { machine in
             machine.settings.restoreLastState = setting
             machine.settings.startupMacro = startupMacro
-        }, launch: true, relaunch: relaunch)
+        }, launch: true, relaunch: relaunch, bootedAt: bootedAt)
     }
 
     /// `state/last.json` as it is on disk now.
@@ -482,6 +483,86 @@ final class LastStateEngineTests: XCTestCase {
         XCTAssertEqual(notes(empty, "lastStateSkipped").last?.note["reason"], .string("old"), "at a relaunch the note is owed, setting or not")
         empty.engine.tick()
         XCTAssertFalse(entries(empty).contains { $0.source.kind == .startup })
+    }
+
+    // MARK: - Which launch is a relaunch (Spec 10 §2)
+
+    /// Spec 10 §18, Area 19 — "after a kill, the next launch is a relaunch
+    /// that puts the last state back with `restoreLastState` off and doesn't
+    /// run the startup macro". No flag: the file says the run ended without a
+    /// stop, and it was written after the Mac started.
+    func test_afterAKillInThisBootTheNextLaunchIsARelaunchWithoutTheFlag() throws {
+        let (before, saved) = try killedAfterAService()
+        let booted = Self.start.addingTimeInterval(-3600)   // the Mac has been up an hour
+        let disk = try next(after: before, setting: false, startupMacro: 2, bootedAt: booted)
+        XCTAssertEqual(disk.launchReport?.relaunch, true)
+        XCTAssertEqual(disk.engine.state.popups, [1: "Welcome"], "the last state is back, with the setting off")
+        XCTAssertEqual(disk.engine.state.pointer, saved.pointer)
+        XCTAssertEqual(notes(disk, "lastStateRestored").count, 1)
+        disk.engine.tick()
+        XCTAssertFalse(entries(disk).contains { $0.source.kind == .startup }, "and no startup macro runs")
+        XCTAssertTrue(disk.log.contains("this launch is a relaunch"))
+    }
+
+    /// "while a launch after a reboot follows the setting": the file was
+    /// written before the Mac started, so the Mac itself went down.
+    func test_aLaunchAfterARebootFollowsTheSetting() throws {
+        // The setting off: it starts empty and runs the startup macro, with no note owed.
+        let off = try killedAfterAService().before
+        off.clock.now = Self.start.addingTimeInterval(11 * 60)
+        let rebooted = Self.start.addingTimeInterval(10 * 60)   // the Mac started after the file was last written
+        let afterOff = try next(after: off, setting: false, startupMacro: 2, bootedAt: rebooted)
+        XCTAssertEqual(afterOff.launchReport?.relaunch, false)
+        XCTAssertEqual(afterOff.engine.state.popups, [:])
+        XCTAssertNil(afterOff.engine.state.pointer)
+        XCTAssertTrue(notes(afterOff, "lastStateSkipped").isEmpty)
+        afterOff.engine.tick()
+        XCTAssertTrue(entries(afterOff).contains { $0.source.kind == .startup && $0.command == .macro(2) }, "the startup macro runs")
+
+        // The setting on: the state is put back, as Spec 9 §4 has it, and no startup macro runs.
+        let (on, saved) = try killedAfterAService()
+        on.clock.now = Self.start.addingTimeInterval(11 * 60)
+        let afterOn = try next(after: on, setting: true, startupMacro: 2, bootedAt: rebooted)
+        XCTAssertEqual(afterOn.launchReport?.relaunch, false, "not a relaunch: the setting decided")
+        XCTAssertEqual(afterOn.engine.state.pointer, saved.pointer)
+        afterOn.engine.tick()
+        XCTAssertFalse(entries(afterOn).contains { $0.source.kind == .startup })
+    }
+
+    /// A stop on request in this boot is no relaunch: the file says `clean: true`.
+    func test_aCleanStopInThisBootIsNotARelaunch() throws {
+        let stopped = try killedAfterAService().before
+        stopped.engine.stop()
+        let disk = try next(after: stopped, setting: false, startupMacro: 2, bootedAt: Self.start.addingTimeInterval(-3600))
+        XCTAssertEqual(disk.launchReport?.relaunch, false)
+        XCTAssertNil(disk.engine.state.pointer)
+        disk.engine.tick()
+        XCTAssertTrue(entries(disk).contains { $0.source.kind == .startup && $0.command == .macro(2) })
+    }
+
+    /// "`--relaunch` with no `last.json`, as after a full disk, starts empty
+    /// and runs no startup macro".
+    func test_theFlagWithNoLastJsonStartsEmptyAndRunsNoStartupMacro() throws {
+        let disk = try fixture(setting: false, startupMacro: 2, relaunch: true, prepare: { folder in
+            try FileManager.default.removeItem(at: folder.appendingPathComponent("machine/state/last.json"))
+        })
+        XCTAssertEqual(disk.launchReport?.relaunch, true)
+        XCTAssertEqual(disk.launchReport?.previous, "none")
+        XCTAssertEqual(disk.launchReport?.lastState, LaunchReport.LastStateOutcome.none)
+        XCTAssertNil(disk.engine.state.pointer)
+        XCTAssertEqual(disk.engine.state.popups, [:])
+        XCTAssertTrue(notes(disk, "lastStateSkipped").isEmpty, "there was no state to skip")
+        disk.engine.tick(count: 3)
+        XCTAssertFalse(entries(disk).contains { $0.source.kind == .startup }, "a relaunch never runs the startup macro")
+        XCTAssertNil(disk.launchReport?.startupMacro)
+    }
+
+    /// Without a boot time to compare with, only the flag makes a relaunch.
+    func test_withNoBootTimeKnownAKilledRunFollowsTheSetting() throws {
+        let off = try killedAfterAService().before
+        let disk = try next(after: off, setting: false, startupMacro: 2)
+        XCTAssertEqual(disk.launchReport?.relaunch, false)
+        XCTAssertNil(disk.engine.state.pointer)
     }
 
     // MARK: - The launch order

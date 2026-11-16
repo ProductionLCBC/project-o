@@ -2,6 +2,7 @@
 // and its sinks injected".
 
 import Foundation
+import IOSurface
 import OCore
 import OFormats
 import Synchronization
@@ -17,8 +18,21 @@ public final class Engine: @unchecked Sendable {
     /// side; other threads read `control.publishedRoots`.
     public var library: Library { control.library }
     public var machine: Machine { control.machine }
-    /// Spec 2 §9 — the engine's own publisher, until the API exists (Area 19).
+    /// Spec 2 §9 — the engine's own publisher: every area publishes its events and answers its queries here.
     public let publisher = EnginePublisher()
+    /// Spec 10 §3 — the API's hub, which puts the publisher on the wire for every connection, in one order.
+    public let api: ApiHub
+    /// Spec 10 §3 — the topics this spec defines, published once a build on the control side.
+    private let topics = ApiTopics()
+    private let status = ApiStatus()
+    /// Spec 9 §4 — what the launch made of the last state, for the `engine` topic (Spec 10 §3); nil for an engine that was only built.
+    public internal(set) var launchReport: LaunchReport?
+    /// The machine root this engine launched on: thumbnails and tiles are named "relative to the machine root" (Spec 10 §3).
+    public internal(set) var machineRoot: URL?
+    /// Spec 4 §13 — the live summary for the `metrics` topic; the process gives it, since the black box is its own.
+    public var metricsSource: (@Sendable () -> MetricsSnapshot)?
+    /// Spec 10 §3 — the devices this Mac has, for the `devices` query and topic.
+    public var deviceLister: (any DeviceLister)?
     public let pacing: Pacing
     public let backend: any RenderBackend
     public let clock: any MasterClock
@@ -71,8 +85,20 @@ public final class Engine: @unchecked Sendable {
             pressure.add(thumbnails)
             let render = self.render
             thumbnails.auxBlocked = { render.isSkippingAux }
+            // Spec 10 §3, the `thumbnails` topic — "A cue thumbnail written, with its stack, list, cue and file".
+            thumbnails.onWritten = { [weak self] result, list in
+                guard let self else { return }
+                self.publisher.publish(ApiEvents.event("thumbnails", [
+                    "stack": .number(Double(result.stack)), "list": .number(Double(list.number)),
+                    "listUuid": .string(list.uuid.uuidString.lowercased()), "cue": .string(result.cue.uuidString.lowercased()),
+                    "file": .string(ApiQueries.relative(result.url, to: self.machineRoot)),
+                ], seq: self.control.commandLog.lastSeq))
+            }
         }
     }
+    /// Spec 10 §2 — "while any output presents it keeps the displays and the
+    /// system from sleeping": told the outputs' states after every build.
+    public var power: OutputPower?
     private var lastLiveList: UUID?
     private var lastLiveVersion: Int?
     /// Signalled by the control thread when it leaves its loop.
@@ -84,6 +110,7 @@ public final class Engine: @unchecked Sendable {
                 log: EngineLog = EngineLog(category: "engine")) throws {
         self.audio = audio
         self.pacing = try Pacing(machine: machine)
+        api = ApiHub(publisher: publisher, log: log)
         self.backend = backend
         self.clock = clock
         self.fallbackClocks = fallbackClocks
@@ -121,6 +148,7 @@ public final class Engine: @unchecked Sendable {
         publisher.publish(current: UndoHistory().event(seq: 0))
         // Spec 9 §7 — and the `saving` topic, "sent when a client subscribes and whenever a value changes".
         publisher.publish(current: SavingStatus().event(seq: 0))
+        api.engine = self
     }
 
     /// Spec 9 §6, "Picking one" — the `versions` and `snapshots` queries,
@@ -213,6 +241,7 @@ public final class Engine: @unchecked Sendable {
     public func runTick(_ time: TickTime, buildPlan: Bool = true) {
         if buildPlan {
             recoverIfNeeded()
+            api.buildWillStart()
             planRing.publish(control.build(for: time.tick, now: time.reference))
             finishBuild()
         }
@@ -226,6 +255,9 @@ public final class Engine: @unchecked Sendable {
     /// job given the edited library, the deferred releases, and the warm of a
     /// newly live list.
     func finishBuild() {
+        // Spec 10 §3 — one order per connection: the results of the groups that ran, then the build's events, then
+        // the answers to the requests this build took (at the end, below).
+        api.deliverResults(control)
         afterBuild?(control)
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
@@ -243,6 +275,91 @@ public final class Engine: @unchecked Sendable {
         }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
+        // Spec 10 §3 — the engine's values as this build left them: the topics' events are made from them now, and
+        // the answers to the requests this build took are made from the same.
+        let snapshot = ApiSnapshot(engine: self)
+        topics.publish(snapshot, control: control, to: publisher)
+        let now = clock.now()
+        status.publish(engine: self, snapshot: snapshot, now: now)
+        // Spec 10 §3 — the `preview` topic: "a JPEG of each stack the client names ..., twice a second".
+        preview.publish(engine: self, snapshot: snapshot, now: now)
+        power?.update(snapshot.standings)
+        api.takeRequests(self, snapshot: snapshot)
+    }
+
+    /// Spec 10 §3 — the `preview` topic's own state: when it last sent.
+    let preview = ApiPreview()
+
+    /// Spec 10 §2 — whether the system is holding OSC sends back now, which the `engine` topic shows as the LAN
+    /// waiting; the process sets it to its OSC server's.
+    public var oscRefused: (@Sendable () -> Bool)?
+
+    /// A test's own surfaces for the preview and picture textures; nil for the Metal backend's.
+    public var surfaceSource: (@Sendable (TextureHandle) -> IOSurfaceRef?)?
+
+    /// Spec 4 §10 — "backed by IOSurfaces": the surface behind a preview or picture texture.
+    func surface(of handle: TextureHandle) -> IOSurfaceRef? {
+        if let surfaceSource { return surfaceSource(handle) }
+        return (backend as? MetalBackend)?.surface(of: handle)
+    }
+
+    /// Spec 10 §2 — the Mach channel, once it is open: the preview surfaces, the channel pictures and the meters.
+    public private(set) var mach: MachChannel?
+
+    /// Spec 10 §2 — "The engine registers a Mach service in the user's bootstrap namespace under the name `hello`
+    /// gives": opens the Mach channel for this run. `surface` finds the IOSurface behind a preview or picture
+    /// texture; it is the Metal backend's unless a test gives its own. While a client holds the channel the strip's
+    /// pictures are planned (Spec 4 §2) and the render thread says which surface each frame went to.
+    @discardableResult
+    public func openMachChannel(service: any MachService = BootstrapMachService(), surface: (@Sendable (TextureHandle) -> IOSurfaceRef?)? = nil,
+                                allows: @escaping @Sendable (uid_t) -> Bool = { $0 == geteuid() }) throws -> MachChannel {
+        if let mach { return mach }
+        let backend = self.backend
+        if let surface { surfaceSource = surface }
+        let find = surfaceSource ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
+        let previews = control.previewSurfaces, pictures = control.pictureSurfaces
+        @Sendable func sets(_ handles: [Int: [TextureHandle]]) -> [MachSurfaceSet] {
+            handles.keys.sorted().compactMap { number in
+                let surfaces = (handles[number] ?? []).compactMap(find)
+                guard surfaces.count == FrameRing.depth, let first = surfaces.first else { return nil }
+                return MachSurfaceSet(number: number, width: IOSurfaceGetWidth(first), height: IOSurfaceGetHeight(first), surfaces: surfaces)
+            }
+        }
+        let audio = self.audio
+        let control = self.control
+        let render = self.render
+        let source = MachChannel.Source(previews: { sets(previews) }, pictures: { sets(pictures) },
+                                        finished: { receipt in backend.completion(of: receipt).map { !$0.failed } },
+                                        meters: { audio?.takeMeters() ?? [] })
+        let channel = MachChannel(service: service, name: MachServiceName.engine(run: run), notices: render.auxNotices, source: source, log: log,
+                                  allows: allows, onClients: { count in
+            control.picturesWanted.store(count > 0, ordering: .releasing)
+            render.auxListening.store(count > 0, ordering: .releasing)
+        })
+        try channel.start()
+        mach = channel
+        return channel
+    }
+
+    /// Spec 10 §3, the `devices` topic — sent "On subscribe and when a screen, a card or an audio device comes or
+    /// goes": the list is read again, off the caller's thread, and kept as the topic's current value.
+    public func devicesChanged() {
+        guard let deviceLister else { return }
+        let publisher = self.publisher
+        let control = self.control
+        api.workers.async {
+            publisher.publish(current: ApiEvents.event("devices", ApiQueries.devices(deviceLister), seq: control.commandLog.lastSeq))
+        }
+    }
+
+    /// Spec 10 §3, the `outputs` topic — each output's state, by number:
+    /// "`presenting`, `paused` while its screen or card is gone, `released`,
+    /// or `absent` when its device isn't there". An output with no sink (a
+    /// kind v1 doesn't present) is `absent`. Control side.
+    public func outputStandings() -> [Int: OutputStanding] {
+        var standings: [Int: OutputStanding] = [:]
+        for output in control.machine.outputs { standings[output.number] = sinks[output.number]?.standing ?? .absent }
+        return standings
     }
 
     /// Spec 4 §10 and the Area 5 reading approved on 2026-11-03: "when the
@@ -261,10 +378,11 @@ public final class Engine: @unchecked Sendable {
     }
 
     /// Spec 4 §10 — "those IOSurfaces are shared with it over a local Mach
-    /// connection": the surface behind each stack's preview, by stack number.
-    public var previewSurfaces: [Int: UInt32] {
+    /// connection": the surfaces behind each stack's preview, by stack number,
+    /// three each (Spec 10 §2).
+    public var previewSurfaces: [Int: [UInt32]] {
         guard let metal = backend as? MetalBackend else { return [:] }
-        return control.previewTargets.compactMapValues { metal.surfaceID(of: $0) }
+        return control.previewSurfaces.mapValues { $0.compactMap { metal.surfaceID(of: $0) } }
     }
 
     /// Spec 4 §3 — "A released handle is not reused until the control side says
@@ -284,6 +402,8 @@ public final class Engine: @unchecked Sendable {
     func recoverIfNeeded() {
         guard render.takeGPUFailure() else { return }
         backend.rebuild()
+        // Spec 10 §2 — the surfaces are sent again "whenever they are made again, as after a GPU reset (Spec 4 §12)".
+        mach?.resendSurfaces()
         recoveries += 1
         watchdog.recordRecovery(.pipelinesRebuilt)
         log.severe("GPU work of a tick failed; sinks hold their last good frame; pipelines rebuilt")
@@ -298,10 +418,14 @@ public final class Engine: @unchecked Sendable {
         for output in sinks.keys.sorted() {
             do { try sinks[output]?.start() } catch { log.error("output \(output) did not start: \(error)") }
         }
-        // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each.
-        audio?.start()
+        // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each. On a thread of
+        // its own: Core Audio can take seconds to open a device, and the first frame doesn't wait for it (Spec 4 §1,
+        // "Every output presents a frame every refresh"; Adam's answer at Area 19's third stop). Until a device has
+        // opened its outputs are silent, on a stand-in that keeps the channels' clocks moving.
+        audio?.start(openingInBackground: true)
         // The first plan, so the first tick has something to render; what it
         // ran gets its feedback and its errors like any other build.
+        api.buildWillStart()
         planRing.publish(control.build(for: 0, now: clock.now()))
         finishBuild()
         nextFrameToBuild.store(1, ordering: .releasing)
@@ -315,6 +439,7 @@ public final class Engine: @unchecked Sendable {
                 autoreleasepool {
                     recoverIfNeeded()
                     let started = MonotonicClock.now()
+                    api.buildWillStart()
                     planRing.publish(control.build(for: frame, now: clock.now()))
                     finishBuild()
                     let took = MonotonicClock.now() - started
@@ -423,6 +548,7 @@ public final class Engine: @unchecked Sendable {
             // source `shutdown`), with whatever was still queued behind it.
             if let macro = control.machine.settings.shutdownMacro {
                 control.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .shutdown), commands: [Command.macro(macro)]))
+                api.buildWillStart()
                 planRing.publish(control.build(for: control.model.frame + 1, now: clock.now()))
                 finishBuild()
             }
@@ -446,6 +572,9 @@ public final class Engine: @unchecked Sendable {
             recorder?.stop()
             audio?.stop()
             for sink in sinks.values { sink.stop() }
+            // Spec 10 §2 — nothing presents any more, so the displays and the system may sleep.
+            power?.end()
+            mach?.stop()
             controlThread = nil
             readbackThread = nil
         }

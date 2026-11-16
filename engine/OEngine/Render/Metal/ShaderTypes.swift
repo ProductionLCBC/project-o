@@ -55,6 +55,12 @@ struct DownscaleUniforms {
     var taps: SIMD4<Float>       // taps across, taps down, source texel width, source texel height
 }
 
+/// `PictureUniforms` in Picture.metal.
+struct PictureUniforms {
+    var fit: SIMD4<Float>        // the picture's part the source fills: left, top, width, height, of the target
+    var taps: SIMD4<Float>       // taps across, taps down, source texel width, source texel height
+}
+
 /// `EncodeUniforms` in Encode.metal.
 struct EncodeUniforms {
     var mix: SIMD4<Float>        // amount of the second texture, hasSecond (0/1), secondIsBlack (0/1), unused

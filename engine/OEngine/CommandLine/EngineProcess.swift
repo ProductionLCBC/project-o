@@ -10,13 +10,11 @@ import OFormats
 import Synchronization
 
 public enum ProcessError: Error, CustomStringConvertible {
-    case noScreens
     case missingArgument(String)
     case badArgument(String, String)
 
     public var description: String {
         switch self {
-        case .noScreens: return "no screens: a display output needs one"
         case .missingArgument(let name): return "missing \(name)"
         case .badArgument(let name, let value): return "bad value for \(name): \(value)"
         }
@@ -61,11 +59,13 @@ public struct LoadedRoots: Sendable {
 }
 
 /// Spec 4 §15 — the `oengine` process: the Metal backend, a display sink per
-/// display output on its screen, a DeckLink sink per SDI output, the master
-/// clock (the DeckLink clock when the card is there, else the display link,
-/// with the timer as the last fallback, Spec 4 §2), the real sources, posters
-/// and text cache, the audio graph on the machine's device, the OSC server on
-/// the machine's port with feedback to its targets, and the black box.
+/// display output, on its own screen or waiting for it (Spec 10 §2), a
+/// DeckLink sink per SDI output, the master clock (the DeckLink clock when
+/// the card is there, else the display link of the first display output with
+/// a screen, with the timer as the last fallback, Spec 4 §2), the real
+/// sources, posters and text cache, the audio graph on the machine's device,
+/// the OSC server on the machine's port with feedback to its targets, and the
+/// black box.
 public final class EngineProcess: @unchecked Sendable {
     public struct Options: Sendable {
         public var oscPort: Int?
@@ -74,8 +74,30 @@ public final class EngineProcess: @unchecked Sendable {
         /// Spec 10 §2 — whether this launch is a relaunch; Area 19 sets it
         /// from `--relaunch` and from how the last run ended in this boot.
         public var relaunch = false
+        /// Spec 10 §2 — when the Mac started, in milliseconds since 1970: a run
+        /// that "ended without a stop in this boot of the Mac" makes the next
+        /// launch a relaunch without the flag. Nil when it isn't known.
+        public var bootedAtMs: Int64?
+        /// Spec 10 §2 — "`--released display:<uuid>` for each screen [the
+        /// app] has released while it runs": screens whose outputs stay
+        /// closed from the start of this run.
+        public var released: [String] = []
+        /// Spec 10 §2 — the LAN API's wire and the Keychain it reads its token from; nil opens no listener and
+        /// touches no Keychain, which is what a test or a run with `--no-lan` wants.
+        public var lan: LanOptions?
 
         public init() {}
+    }
+
+    /// Spec 10 §2, "The LAN API" — what the listener runs on: both are seams (Spec 4 §14).
+    public struct LanOptions: Sendable {
+        public var server: any LanServer
+        public var secrets: any SecretStore
+
+        public init(server: any LanServer, secrets: any SecretStore) {
+            self.server = server
+            self.secrets = secrets
+        }
     }
 
     public let roots: LoadedRoots
@@ -89,6 +111,16 @@ public final class EngineProcess: @unchecked Sendable {
     public let audio: AudioSystem?
     public let displaySinks: [DisplaySink]
     public let deckLinkSinks: [DeckLinkSink]
+    /// Spec 10 §3 — the devices this Mac has, for the `devices` query and topic.
+    public let devices: SystemDevices
+    /// Spec 10 §2 — the display outputs and the screens they wait for.
+    public let displayOutputs: DisplayOutputs
+    /// Spec 10 §2 — the activity and the sleep assertion.
+    public let power = SystemPower()
+    /// Spec 10 §2 — the local socket, once the engine takes commands.
+    public private(set) var socket: LocalSocket?
+    /// Spec 10 §2 — the LAN API's listener, when this run has one.
+    public private(set) var lan: LanListener?
     /// Spec 1 §8 — documents that change on disk under the engine are reloaded.
     public let watcher: DiskWatcher
     private let startedAt = MonotonicClock.now()
@@ -106,22 +138,20 @@ public final class EngineProcess: @unchecked Sendable {
         let pipelines = backend.warmUp()
         log.info("warm-up: \(pipelines) channel pipelines in \((MonotonicClock.now() - warmStart) / 1_000_000) ms")
 
-        // Sinks, one per output (Spec 4 §10).
-        let screens = NSScreen.screens
+        // Sinks, one per output (Spec 4 §10). Spec 10 §2 — a display output is given its own screen or none:
+        // "it never falls back to another screen".
+        let devices = SystemDevices()
+        self.devices = devices
+        let released = Set(options.released.compactMap { DetectedScreen.uuid(ofDevice: $0) })
         var sinks: [any OutputSink] = []
         var displays: [DisplaySink] = []
         var deckLinks: [DeckLinkSink] = []
-        var displayIndex = 0
         for output in machine.outputs.sorted(by: { $0.number < $1.number }) {
             switch output.kind {
             case .display:
-                guard !screens.isEmpty else { throw ProcessError.noScreens }
-                let screen = EngineProcess.screen(for: output, index: displayIndex, screens: screens)
-                displayIndex += 1
-                let sink = DisplaySink(output: output.number, screen: screen, backend: backend, log: log)
+                let sink = DisplaySink(output: output.number, device: output.device, backend: backend, log: log)
                 displays.append(sink)
                 sinks.append(sink)
-                log.info("output \(output.number) (\(output.label)) on screen \(screen.localizedName)")
             case .sdi:
                 let id = output.device.hasPrefix("decklink:") ? String(output.device.dropFirst("decklink:".count)) : output.device
                 // Spec 4 §10 — the card's embedded channel count from the Audio Outputs on this SDI output.
@@ -136,21 +166,33 @@ public final class EngineProcess: @unchecked Sendable {
         }
         displaySinks = displays
         deckLinkSinks = deckLinks
+        // Spec 10 §2 — each display sink gets the screen its output names, or stays absent; the screens named
+        // by `--released` keep their outputs closed. The same rule runs again at every change of screens.
+        displayOutputs = DisplayOutputs(sinks: displays, outputs: machine.outputs, devices: devices, released: released, log: log)
+        displayOutputs.reconcile()
+        displayOutputs.watch()
+        for (number, place) in OutputPlacement.places(outputs: machine.outputs, screens: devices.keptScreens, released: released).sorted(by: { $0.key < $1.key }) {
+            log.info("output \(number): \(place)")
+        }
 
-        // Clocks (Spec 4 §2): DeckLink hardware when present, else the display link, then the timer.
+        // Clocks (Spec 4 §2): DeckLink hardware when present, else the display link of the first display output
+        // that has its screen, then the timer. With no output on a screen the engine runs on the timer.
         let timer = TimerClock()
         var master: any MasterClock = timer
         var fallbacks: [any MasterClock] = []
-        if let screen = screens.first {
-            let displayLink = DisplayLinkClock(screen: screen)
-            master = displayLink
+        var displayLink: DisplayLinkClock?
+        if let uuid = OutputPlacement.clockScreen(outputs: machine.outputs, screens: devices.keptScreens, released: released),
+           let screen = SystemDevices.screen(uuid: uuid) {
+            let link = DisplayLinkClock(screen: screen)
+            displayLink = link
+            master = link
             fallbacks = [timer]
-            if DeckLinkSink.sdkAvailable, let first = deckLinks.first {
-                try first.start()
-                if let clock = first.clock {
-                    master = clock
-                    fallbacks = [displayLink, timer]
-                }
+        }
+        if DeckLinkSink.sdkAvailable, let first = deckLinks.first {
+            try first.start()
+            if let clock = first.clock {
+                master = clock
+                fallbacks = displayLink.map { [$0 as any MasterClock, timer] } ?? [timer]
             }
         }
 
@@ -219,32 +261,37 @@ public final class EngineProcess: @unchecked Sendable {
         }
     }
 
-    /// The screen an output names (`display:<uuid>`), else the next screen in
-    /// order; with fewer screens than display outputs the last ones share.
-    @MainActor
-    static func screen(for output: Output, index: Int, screens: [NSScreen]) -> NSScreen {
-        if output.device.hasPrefix("display:") {
-            let wanted = String(output.device.dropFirst("display:".count)).uppercased()
-            if let match = screens.first(where: { displayUUID(of: $0)?.uppercased() == wanted }) { return match }
-        }
-        return screens[min(index, screens.count - 1)]
-    }
-
-    @MainActor
-    static func displayUUID(of screen: NSScreen) -> String? {
-        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-              let uuid = CGDisplayCreateUUIDFromDisplayID(CGDirectDisplayID(number.uint32Value)) else { return nil }
-        return CFUUIDCreateString(nil, uuid.takeRetainedValue()) as String
-    }
-
     // MARK: - Lifecycle
 
     public func start() {
+        // Spec 10 §2 — "It holds a latency-critical activity so macOS never naps or throttles it, and while any
+        // output presents it keeps the displays and the system from sleeping."
+        let outputPower = OutputPower(power: power)
+        outputPower.begin()
+        engine.power = outputPower
         // Spec 9 §4 — the launch order, on the roots this process loaded: the logs open and the run's `start`
         // note is written before anything can send a command ("The engine takes commands from step 5 on").
-        engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch))
+        engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch, bootedAtMs: options.bootedAtMs))
+        // Spec 10 §3 — the `devices` topic, "On subscribe and when a screen, a card or an audio device comes or goes",
+        // and the `metrics` topic's summary (Spec 4 §13), which is the process's to give.
+        let listed = engine
+        listed.deviceLister = devices
+        listed.metricsSource = { [weak self] in self?.metricsSnapshot() ?? MetricsSnapshot(tickNanoseconds: listed.pacing.tickNanoseconds) }
+        let outputs = displayOutputs
+        DispatchQueue.main.async { MainActor.assumeIsolated { outputs.onChange = { listed.devicesChanged() } } }
+        devices.watchAudio { listed.devicesChanged() }
+        listed.devicesChanged()
+        // Spec 10 §2 — "The engine registers a Mach service in the user's bootstrap namespace under the name `hello`
+        // gives". "If the Mach channel fails, the preview tiles and the strip's pictures say so, and everything else works."
+        do { try engine.openMachChannel() } catch { log.error("the Mach channel did not open: \(error)") }
+        // Spec 10 §2 — "opens its local socket ... at that list's step 5, when it takes commands, so `hello` means it
+        // is ready."
+        openSocket()
+        openLan()
         if let osc {
             do { try osc.start() } catch { log.error("OSC did not start: \(error)") }
+            // Spec 10 §2 — a refused OSC send shows on the `engine` topic as the LAN waiting.
+            engine.oscRefused = { osc.sendsRefused }
         }
         // Spec 1 §8 — the watcher, and one scan for anything that changed between the load and the watch.
         if !watcher.start() { log.error("the folder watcher did not start: changes on disk are read at the next launch") }
@@ -276,16 +323,70 @@ public final class EngineProcess: @unchecked Sendable {
         engine.start(blackBox: blackBox, minuteSources: sources)
     }
 
+    /// Spec 10 §2 — the local socket: each connection that passes the peer check joins the API's hub, which greets
+    /// it with `hello`. Spec 10 §3 — the requests that reach past the engine: `stop` and `releaseScreen`.
+    private func openSocket() {
+        let hub = engine.api
+        hub.identify(ApiHub.Identity(machine: roots.machine.settings.uuid, run: engine.run, mach: MachServiceName.engine(run: engine.run)))
+        hub.stopEngine = { [weak self] in self?.stop() ?? Engine.StopReport() }
+        let outputs = displayOutputs
+        hub.releaseScreen = { uuid, done in
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(outputs.release(screen: uuid)) } }
+        }
+        let socket = LocalSocket(url: LocalSocket.url(machineRoot: roots.machineRoot), log: log) { transport in
+            let connection = hub.accept(transport, origin: .local)
+            transport.read(onLine: { [weak connection] line in
+                if let connection { hub.receive(line, from: connection) }
+            }, onClose: { [weak connection] in
+                connection?.close()
+            })
+        }
+        do {
+            try socket.start()
+            self.socket = socket
+        } catch {
+            log.error("the local socket did not open: \(error)")
+        }
+    }
+
+    /// Spec 10 §2 — "opens its local socket and its LAN listener at that list's step 5": the listener starts here
+    /// and opens once the token has been read, on a thread of its own, so a Keychain prompt "never holds back the
+    /// outputs".
+    private func openLan() {
+        guard let wire = options.lan else {
+            log.info("the LAN API is off for this run")
+            return
+        }
+        let settings = roots.machine.settings
+        let listener = LanListener(hub: engine.api, server: wire.server, secrets: wire.secrets, machine: settings.uuid,
+                                   port: settings.network.apiPort, campus: settings.campusName, log: log)
+        listener.start()
+        lan = listener
+    }
+
     /// Spec 4 §13 — the live summary, now; empty before the black box starts.
     public func metricsSnapshot() -> MetricsSnapshot {
         let uptime = Int((MonotonicClock.now().nanoseconds - startedAt.nanoseconds) / 1_000_000_000)
         return engine.recorder?.snapshot(uptimeSeconds: uptime) ?? MetricsSnapshot(tickNanoseconds: engine.pacing.tickNanoseconds)
     }
 
-    public func stop() {
+    /// Spec 9 §4 — the stop on request, with what it couldn't write: the
+    /// answer to the request that stopped the engine (Spec 10 §3's `stop`).
+    @discardableResult
+    public func stop() -> Engine.StopReport {
         watcher.stop()
-        engine.stop()
+        let outputs = displayOutputs
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { outputs.stopWatching() }
+        } else {
+            DispatchQueue.main.sync { MainActor.assumeIsolated { outputs.stopWatching() } }
+        }
+        // No new connection once the stop has begun; the ones open stay, for the answer to the request that stopped it.
+        socket?.stop()
+        lan?.stop()
+        let report = engine.stop()
         osc?.stop()
+        return report
     }
 
     /// Spec 2 §6 — "/o/query with an address": the current value of a feedback

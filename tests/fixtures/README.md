@@ -30,7 +30,9 @@ in-point) are both absent: the missing state of §7.
 `machine/` is the machine root: settings (with Spec 8 §8's first-run `dropChannels`), stacks (Spec 6 §9's: Main holds channels 1 and 2,
 Confidence channels 2 and 3, neither with a default preset, so each slot takes its channel's
 preset: the confidence stack draws Preset 1's `"2"` layout for channel 2 and the Clock for channel
-3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings with one scheduler
+3), two outputs, two audio outputs, one input, `clocks.json` (reserved), key bindings (Spec 10 §9's
+defaults among them: Space and → for next, ← for previous, and `shift+escape` for clear all, since
+plain Escape is reserved and never sends a command) with one scheduler
 entry, the machine index with a path override, `media/` (the machine's own media folder, Spec 8 §2:
 `announcement.png`, local-only media indexed in the machine root, and `cross-fast.png`, the same
 bytes as `backgrounds/cross.png` and the target of cross's override: one identity, Spec 1 §4), the

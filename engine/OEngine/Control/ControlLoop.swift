@@ -12,6 +12,20 @@ public struct LiveFeedback: Sendable {
     public var event: JSONValue
 }
 
+/// Spec 2 §9 — a group that ran, for the answer to the request that sent it:
+/// the id it was sent under and every line it logged, in order. The lines of
+/// its own commands carry that id, or the id of the typing run they folded
+/// into; a cue it fired logs under a group of its own (Spec 2 §9).
+public struct GroupResult: Sendable {
+    public var id: GroupID
+    public var lines: [CommandLog.Logged]
+
+    public init(id: GroupID, lines: [CommandLog.Logged]) {
+        self.id = id
+        self.lines = lines
+    }
+}
+
 /// Spec 2 §8 — a group the runner rejected before anything ran: its id, its
 /// source and "the rejection [that] names the command and the reason".
 public struct RejectedGroup: Equatable, Sendable {
@@ -132,12 +146,39 @@ public final class ControlLoop: @unchecked Sendable {
     public let channelTextures: [Int: TextureHandle]
     public let channelSnapshots: [Int: TextureHandle]
     public let stackRings: [Int: [TextureHandle]]
-    public let previewTargets: [Int: TextureHandle]
+    /// Spec 10 §2 — "each stack's preview as three IOSurfaces": the three preview textures of each stack, by stack
+    /// number, written in turn.
+    public let previewSurfaces: [Int: [TextureHandle]]
+    /// Spec 10 §2 — "a live picture of each channel for the strip (§7), 256 by 144 pixels, as three IOSurfaces per
+    /// channel": by channel number, written in turn.
+    public let pictureSurfaces: [Int: [TextureHandle]]
+    /// Spec 4 §5 — "256 by 144 channel pictures".
+    public static let pictureSize = PixelSize(width: 256, height: 144)
+    /// Which of a stack's three preview surfaces the last planned preview writes, and of a channel's three the last
+    /// planned picture; the next one takes the surface after it, "the oldest of the three".
+    public private(set) var previewSlots: [Int: Int] = [:]
+    public private(set) var pictureSlots: [Int: Int] = [:]
+    /// How many previews have been planned for each stack: once it is three, every one of its surfaces has been
+    /// asked for a frame.
+    public private(set) var previewsPlanned: [Int: Int] = [:]
+    /// Spec 4 §2 — "While the operator app holds its Mach channel, the strip's channel pictures are a consumer at the
+    /// preview rate too": set while a client holds the channel, read by each build. With no client no picture is
+    /// planned and no channel pass is added for one.
+    public let picturesWanted = Atomic<Bool>(false)
+    /// The frame a stack pass last sampled each channel's texture at, for "a channel with pixel content that no stack
+    /// pass has sampled since the last [preview tick]".
+    private var lastSampled: [Int: Int64] = [:]
     public private(set) var lastExecuted: [ExecutedCommand] = []
     /// Spec 2 §8 — the groups this build rejected, with their ids and
     /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
     /// back to the sender"). Reset every build, like `lastExecuted`.
     public private(set) var lastRejected: [RejectedGroup] = []
+    /// Spec 2 §9 — "A client sends a request and receives a response with
+    /// the same `id`": the groups that ran in this build, each by the id it
+    /// was sent under, with its lines as the log took them (their `seq`, and
+    /// the group a typing run folded them into). A group the engine parked
+    /// is here in the build it finishes in. Reset every build.
+    public private(set) var lastResults: [GroupResult] = []
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
@@ -255,17 +296,26 @@ public final class ControlLoop: @unchecked Sendable {
             channelSnapshots[channel.number] = backend.makeTexture(TextureDescriptor(role: .channel, size: size, label: "channel \(channel.number) snapshot"))
         }
         var stackRings: [Int: [TextureHandle]] = [:]
-        var previewTargets: [Int: TextureHandle] = [:]
+        var previewSurfaces: [Int: [TextureHandle]] = [:]
+        var pictureSurfaces: [Int: [TextureHandle]] = [:]
+        for channel in library.channels {
+            pictureSurfaces[channel.number] = (0..<FrameRing.depth).map {
+                backend.makeTexture(TextureDescriptor(role: .preview, size: ControlLoop.pictureSize, label: "channel \(channel.number) picture \($0)"))
+            }
+        }
         for stack in machine.stacks {
             let size = geometry.stackSize(stack.number)
             stackRings[stack.number] = (0..<FrameRing.depth).map { backend.makeTexture(TextureDescriptor(role: .stack, size: size, label: "stack \(stack.number) slot \($0)")) }
             let preview = PixelSize(width: max(16, size.width / 4), height: max(9, size.height / 4))
-            previewTargets[stack.number] = backend.makeTexture(TextureDescriptor(role: .preview, size: preview, label: "stack \(stack.number) preview"))
+            previewSurfaces[stack.number] = (0..<FrameRing.depth).map {
+                backend.makeTexture(TextureDescriptor(role: .preview, size: preview, label: "stack \(stack.number) preview \($0)"))
+            }
         }
         self.channelTextures = channelTextures
         self.channelSnapshots = channelSnapshots
         self.stackRings = stackRings
-        self.previewTargets = previewTargets
+        self.previewSurfaces = previewSurfaces
+        self.pictureSurfaces = pictureSurfaces
     }
 
     /// Spec 4 §12 — for the watchdog: when a plan was last built.
@@ -425,6 +475,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastReplaced = pendingReplacement
         pendingReplacement = []
         lastRejected = []
+        lastResults = []
         lastLibraryEvents = []
         lastMediaEvents = []
         lastHistoryEvent = nil
@@ -742,6 +793,8 @@ public final class ControlLoop: @unchecked Sendable {
     func absorb(_ outcome: RunOutcome, client: String?, frame: Int64, now: MonotonicTime) {
         lastExecuted.append(contentsOf: outcome.executed)
         let logged = commandLog.record(outcome.executed, client: client, now: now, ts: variables.timestamp())
+        // Spec 2 §9 — the result of the group as it was sent: its first line is the first command's, under the id it came with.
+        if let sent = outcome.executed.first?.group { lastResults.append(GroupResult(id: sent, lines: logged)) }
         // Spec 5 §8 — the stacks as the run left them. Spec 5 §5 — a typing run is "one undo step, whose
         // inverse is the value from before the run": a later edit of a run folds into the run's step.
         history = outcome.history
@@ -1329,6 +1382,34 @@ public final class ControlLoop: @unchecked Sendable {
             plan.stackPasses.append(stackPass(stack, frame: frame, auxOnly: auxOnlyStacks.contains(stack.number), resolving: resolving,
                                               scratch: &scratch))
         }
+        // Spec 10 §2, choice U-3 — the channel pictures, while a client holds the Mach channel, on preview ticks:
+        // "a channel with pixel content that no stack pass has sampled since the last one runs its channel pass as aux
+        // work"; "A channel whose media is missing gets a black picture"; "Text gets no picture".
+        var pictures: [AuxPass] = []
+        if previewTick, picturesWanted.load(ordering: .relaxed) {
+            for channel in library.channels.map(\.number).sorted() {
+                guard let targets = pictureSurfaces[channel], targets.count == FrameRing.depth, let texture = channelTextures[channel] else { continue }
+                // Spec 10 §18 — "text and audio alone get none": sound with no picture has nothing to show, missing or not.
+                if let kind = model.channels[channel]?.live.media?.entry?.kind, kind == .audio || kind == .audioSet { continue }
+                let missing = model.state.channels[channel]?.content.media?.missing == true
+                var drawn = false
+                if !missing {
+                    if let asked = scratch.channelPasses[channel] {
+                        drawn = asked != nil                       // a stack samples it on this tick
+                    } else if let sampled = lastSampled[channel], frame - sampled < previewEvery {
+                        // A stack sampled it since the last preview tick: its texture is current, if it has a picture at all.
+                        drawn = makeChannelPass(channel, frame: frame, dueStackSizes: []) != nil
+                    } else {
+                        drawn = channelPass(channel, frame: frame, auxOnly: true, scratch: &scratch) != nil
+                    }
+                }
+                guard missing || drawn else { continue }
+                let slot = ((pictureSlots[channel] ?? -1) + 1) % FrameRing.depth
+                pictureSlots[channel] = slot
+                pictures.append(AuxPass(kind: .picture, stack: 0, source: texture, target: targets[slot], slot: slot, channel: channel, clear: missing))
+            }
+        }
+        for (channel, pass) in scratch.channelPasses where pass != nil { lastSampled[channel] = frame }
         plan.channelPasses = scratch.channelPasses.keys.sorted().compactMap { channel in
             guard var pass = scratch.channelPasses[channel] ?? nil else { return nil }
             pass.auxOnly = !scratch.liveChannels.contains(channel)
@@ -1339,12 +1420,19 @@ public final class ControlLoop: @unchecked Sendable {
             if let pass = sinkPass(output, frame: frame) { plan.sinkPasses.append(pass) }
         }
         // Spec 4 §10 — previews "at most 30 times a second": this tick's stack texture into the stack's preview texture.
+        // Spec 10 §2 — "the engine writes the next frame into the oldest of the three, so the app reads only finished
+        // frames": each planned preview takes the surface after the last one's.
         if previewTick {
             for stack in machine.stacks where rendering.contains(stack.number) {
-                guard let target = previewTargets[stack.number], let ring = stackRings[stack.number] else { continue }
-                plan.auxPasses.append(AuxPass(kind: .preview, stack: stack.number, source: ring[Int(frame % Int64(FrameRing.depth))], target: target))
+                guard let targets = previewSurfaces[stack.number], targets.count == FrameRing.depth, let ring = stackRings[stack.number] else { continue }
+                let slot = ((previewSlots[stack.number] ?? -1) + 1) % FrameRing.depth
+                previewSlots[stack.number] = slot
+                previewsPlanned[stack.number, default: 0] += 1
+                plan.auxPasses.append(AuxPass(kind: .preview, stack: stack.number, source: ring[Int(frame % Int64(FrameRing.depth))],
+                                              target: targets[slot], slot: slot))
             }
         }
+        plan.auxPasses += pictures
         return plan
     }
 
@@ -1519,6 +1607,22 @@ public final class ControlLoop: @unchecked Sendable {
         }
         remainingSent = remainingSent.filter { remaining[$0.key] != nil }
         return remaining
+    }
+
+    /// Spec 10 §3, the `channels` topic — "for timed media its duration,
+    /// position, loop and end behaviour"; "Timed media's duration and
+    /// position count within its in and out points". By channel, for media
+    /// that has a length: not a still, and with an out point or a known
+    /// duration. Paused or held media reads where it stands. Control side.
+    func mediaTimings(at frame: Int64) -> [Int: MediaTiming] {
+        var timings: [Int: MediaTiming] = [:]
+        for (channel, runtime) in model.channels {
+            guard case .media(let m) = runtime.live, !m.missing, !m.isStill, m.outMs.isFinite else { continue }
+            let duration = max(0, Int((m.outMs - m.inMs).rounded()))
+            let position = min(duration, max(0, Int((mediaTime(m, at: frame) - m.inMs).rounded())))
+            timings[channel] = MediaTiming(durationMs: duration, positionMs: position, playing: m.ready && m.transport == .playing)
+        }
+        return timings
     }
 
     /// Spec 6 §5 — a text box's variables resolved in the state being drawn,

@@ -8,6 +8,11 @@
 
 bool odl_sdk_available(void) { return false; }
 
+int32_t odl_list_output_ports(odl_port_t *ports, int32_t capacity) {
+    (void)ports; (void)capacity;
+    return 0;
+}
+
 odl_status_t odl_open(const char *persistent_id, odl_device_t **out_device) {
     (void)persistent_id;
     if (out_device) *out_device = NULL;

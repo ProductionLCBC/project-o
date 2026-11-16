@@ -19,7 +19,7 @@
     {
       "command": { "cmd": "system.clearAll" },
       "device": "keyboard",
-      "key": "escape"
+      "key": "shift+escape"
     },
     {
       "command": { "cmd": "stack.blackout", "stack": 1, "state": "toggle" },

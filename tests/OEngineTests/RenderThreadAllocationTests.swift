@@ -28,7 +28,37 @@ final class RenderThreadAllocationTests: XCTestCase {
         engine.tick(count: 40)   // warm: the sources are ready, the rings and picks have been through their first lap
         engine.send("next")
         engine.tick(count: 5)
+        try assertWarmTicksAllocateNothing(engine)
+    }
 
+    /// Spec 10 §2 — while a client holds the Mach channel the render thread
+    /// says which surface each preview and picture went to, and the plans
+    /// carry the channel pictures: a ring write and nothing more.
+    func test_aWarmRenderTickThatNamesPreviewAndPictureFramesAllocatesNothing() throws {
+        guard MallocCounter.available else { throw XCTSkip("malloc_logger is not reachable in this process") }
+        let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: EngineFixtures.spikeMachine(), media: EngineFixtures.media)
+        let backend = try XCTUnwrap(engine.recording)
+        backend.recordsEncodes = false
+        // What a connected client turns on, without the client: the pictures are planned and the notices written.
+        engine.control.picturesWanted.store(true, ordering: .releasing)
+        engine.renderLoop.auxListening.store(true, ordering: .releasing)
+        engine.send("channel 1 write media \(EngineFixtures.dawn)")
+        engine.send("list 42 cue 1")
+        engine.tick(count: 40)
+        engine.renderLoop.auxNotices.drain { _ in }
+        try assertWarmTicksAllocateNothing(engine)
+        var previews = 0
+        var pictures = 0
+        engine.renderLoop.auxNotices.drain { notice in
+            if notice.kind == .preview { previews += 1 } else { pictures += 1 }
+        }
+        XCTAssertEqual(previews, 30, "fifteen preview ticks of two stacks were named in the measured ticks")
+        XCTAssertEqual(pictures, 15, "and channel 1's picture on each")
+        XCTAssertEqual(engine.renderLoop.auxNotices.dropped, 0)
+    }
+
+    /// Thirty render ticks under the counter, each on a plan built outside it.
+    func assertWarmTicksAllocateNothing(_ engine: HeadlessEngine) throws {
         // The hook sees everything: a deliberate allocation proves the count is live.
         MallocCounter.begin()
         var proof = [Int](repeating: 0, count: 1024)

@@ -52,12 +52,89 @@ public final class AudioInstance: @unchecked Sendable {
     let underrunCount = Atomic<Int64>(0)
     let active = Atomic<Bool>(false)
 
-    public init(handle: InstanceHandle, ring: AudioRing, inMs: Double, syncOffsetMs: Int, routing: AudioRouting) {
+    /// Spec 10 §2 — "Meters: ... for each channel whose content has sound,
+    /// the peak and RMS level in dBFS since the last frame, after gain, of its
+    /// loudest audio channel." The channel this instance is metered for, or 0
+    /// for one that isn't: a channel routed to several devices is measured on
+    /// its clock device alone (Area 19 reading), so its level is counted once.
+    public let meterChannel: Int
+    /// How many of an instance's own channels are measured.
+    static let meteredChannels = 8
+    // The callback's own: each of the instance's channels since the callback began. Preallocated.
+    let meterPeaks: UnsafeMutablePointer<Float>
+    let meterSquares: UnsafeMutablePointer<Float>
+    // What the callback hands over, and the meter's thread takes. The peak is the highest since the last take. The
+    // sum of squares and the frames it covers only ever grow and are written by the callback alone, between two
+    // steps of `meterSeq` (odd while it writes), so the reader gets a pair that belongs together and takes the
+    // difference from its last one: nothing is counted twice and nothing is lost.
+    let meterPeak = Atomic<Float>(0)
+    let meterSeq = Atomic<Int64>(0)
+    let meterSquare = Atomic<Double>(0)
+    let meterFrames = Atomic<Int64>(0)
+    // The meter's thread's own: the totals at its last take.
+    var takenSquare: Double = 0
+    var takenFrames: Int64 = 0
+
+    public init(handle: InstanceHandle, ring: AudioRing, inMs: Double, syncOffsetMs: Int, routing: AudioRouting, meterChannel: Int = 0) {
         self.handle = handle
         self.ring = ring
         self.inMs = inMs
         holdFrames = max(0, syncOffsetMs) * 48
         self.routing = routing
+        self.meterChannel = meterChannel
+        meterPeaks = UnsafeMutablePointer<Float>.allocate(capacity: AudioInstance.meteredChannels)
+        meterPeaks.initialize(repeating: 0, count: AudioInstance.meteredChannels)
+        meterSquares = UnsafeMutablePointer<Float>.allocate(capacity: AudioInstance.meteredChannels)
+        meterSquares.initialize(repeating: 0, count: AudioInstance.meteredChannels)
+    }
+
+    deinit {
+        meterPeaks.deallocate()
+        meterSquares.deallocate()
+    }
+
+    /// The callback, when it has mixed `frames` of this instance: the
+    /// loudest of its channels in this callback joins what the meter's thread
+    /// will take — the highest peak among them, and the sum of squares of the
+    /// one with the most energy (Area 19 reading: "its loudest audio channel",
+    /// by each measure). Atomics and preallocated memory only.
+    func publishMeter(frames: Int64) {
+        let count = min(ring.channels, AudioInstance.meteredChannels)
+        var peak: Float = 0
+        var square: Float = 0
+        for c in 0..<count {
+            if meterPeaks[c] > peak { peak = meterPeaks[c] }
+            if meterSquares[c] > square { square = meterSquares[c] }
+            meterPeaks[c] = 0
+            meterSquares[c] = 0
+        }
+        if peak > meterPeak.load(ordering: .relaxed) { meterPeak.store(peak, ordering: .relaxed) }
+        meterSeq.add(1, ordering: .sequentiallyConsistent)
+        meterSquare.store(meterSquare.load(ordering: .sequentiallyConsistent) + Double(square), ordering: .sequentiallyConsistent)
+        meterFrames.store(meterFrames.load(ordering: .sequentiallyConsistent) + frames, ordering: .sequentiallyConsistent)
+        meterSeq.add(1, ordering: .sequentiallyConsistent)
+    }
+
+    /// The meter's thread, and only one at a time: the peak, the sum of
+    /// squares and the frames since the last take. It never waits on the
+    /// callback: a pair caught mid-write is read again, a few times at most.
+    func takeMeter() -> (peak: Float, square: Double, frames: Int64) {
+        var square = takenSquare
+        var frames = takenFrames
+        for _ in 0..<16 {
+            let before = meterSeq.load(ordering: .sequentiallyConsistent)
+            let s = meterSquare.load(ordering: .sequentiallyConsistent)
+            let f = meterFrames.load(ordering: .sequentiallyConsistent)
+            guard before & 1 == 0, meterSeq.load(ordering: .sequentiallyConsistent) == before else { continue }
+            square = s
+            frames = f
+            break
+        }
+        let peak = meterPeak.exchange(0, ordering: .relaxed)
+        let taken = (peak, max(0, square - takenSquare), max(0, frames - takenFrames))
+        takenSquare = square
+        takenFrames = frames
+        return taken
     }
 
     /// Spec 4 §11 — "An instance's media time is derived from the samples of
@@ -364,6 +441,7 @@ public final class AudioGraph: @unchecked Sendable {
             var gain = instance.gainCurrent
             let step = (target - gain) / Float(AudioGraph.gainRampFrames)
             var deliveredNow: Int64 = 0
+            var metered: Int64 = 0
             for f in 0..<frames {
                 if gain != target {
                     gain += step
@@ -392,8 +470,18 @@ public final class AudioGraph: @unchecked Sendable {
                     guard pair.source < instance.ring.channels, pair.target < channels else { continue }
                     output[f * channels + pair.target] += scratch[pair.source] * level
                 }
+                // Spec 10 §2 — the meters read each of the instance's channels "after gain", as it is heard.
+                if instance.meterChannel > 0 {
+                    for c in 0..<min(instance.ring.channels, AudioInstance.meteredChannels) {
+                        let value = abs(scratch[c] * level)
+                        if value > instance.meterPeaks[c] { instance.meterPeaks[c] = value }
+                        instance.meterSquares[c] += value * value
+                    }
+                    metered += 1
+                }
             }
             instance.gainCurrent = gain
+            if metered > 0 { instance.publishMeter(frames: metered) }
             if deliveredNow > 0 {
                 instance.delivered.add(deliveredNow, ordering: .relaxed)
                 instance.deliveredAtHostNs.store(hostTimeNs + Int64(frames) * frameNs, ordering: .releasing)

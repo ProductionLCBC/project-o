@@ -4,22 +4,28 @@ import Foundation
 import OCore
 
 /// Spec 9 §4 — what a launch is given: the machine root its files go in,
-/// whether the launch is a relaunch (Spec 10 §2: "a launch the app marks with
+/// what makes the launch a relaunch (Spec 10 §2: "a launch the app marks with
 /// `--relaunch`, or one after a run that ended without a stop in this boot of
-/// the Mac", which Area 19 works out and passes in), and the disk seam.
+/// the Mac"), and the disk seam.
 public struct LaunchOptions: Sendable {
     public var machineRoot: URL
+    /// The app said so, with `--relaunch`.
     public var relaunch: Bool
+    /// When the Mac started, in milliseconds since 1970, so a run that ended
+    /// without a stop in this boot is told from one before it; nil when it
+    /// isn't known, and then only the flag makes a relaunch.
+    public var bootedAtMs: Int64?
     public var disk: Disk
     /// Spec 9 §7 — how much of each log is kept in memory on a full disk:
     /// "the command log up to 64 MB of lines and the engine log up to 16
     /// MB", unless a test gives less.
     public var logMemory: (commands: Int, engine: Int)
 
-    public init(machineRoot: URL, relaunch: Bool = false, disk: Disk = .live,
+    public init(machineRoot: URL, relaunch: Bool = false, bootedAtMs: Int64? = nil, disk: Disk = .live,
                 logMemory: (commands: Int, engine: Int) = (LogWriter.commandMemoryBytes, LogWriter.engineMemoryBytes)) {
         self.machineRoot = machineRoot
         self.relaunch = relaunch
+        self.bootedAtMs = bootedAtMs
         self.disk = disk
         self.logMemory = logMemory
     }
@@ -45,11 +51,14 @@ public struct LaunchReport: Equatable, Sendable {
     public var lastState: LastStateOutcome
     /// Spec 9 §4, step 5 — the startup macro this launch queued, if it ran one.
     public var startupMacro: Int?
+    /// Spec 10 §2 — whether this launch was a relaunch: flagged, or after a run that ended without a stop in this boot.
+    public var relaunch: Bool
 
-    public init(previous: String = "none", lastState: LastStateOutcome = .none, startupMacro: Int? = nil) {
+    public init(previous: String = "none", lastState: LastStateOutcome = .none, startupMacro: Int? = nil, relaunch: Bool = false) {
         self.previous = previous
         self.lastState = lastState
         self.startupMacro = startupMacro
+        self.relaunch = relaunch
     }
 }
 
@@ -108,8 +117,15 @@ extension Engine {
                                "previous": .string(report.previous)],
                      text: "Engine \(OCore.appVersion) started")
 
+        // Spec 10 §2 — "A launch is a relaunch when the app says so with `--relaunch` ... or when the run before it
+        // ended without a stop in this boot of the Mac": worked out once, from the file as it was loaded, before
+        // this run writes its own over it.
+        let relaunch = LastState.isRelaunch(flagged: options.relaunch, last: machine.last, bootedAtMs: options.bootedAtMs)
+        report.relaunch = relaunch
+        if relaunch, !options.relaunch { log.info("this launch is a relaunch: the run before it ended without a stop since the Mac started") }
+
         // Step 3 — "`last.json` written for this run, then the last state put back or not."
-        report.lastState = restoreLastState(options)
+        report.lastState = restoreLastState(options, relaunch: relaunch)
 
         // Step 4 — "The launch snapshot (§3)": "At launch, after the last state and before the startup macro".
         // The roots are copied here, so the macro's edits aren't in it; the zip is written on the worker.
@@ -129,13 +145,16 @@ extension Engine {
         // from step 5 on." Spec 2 §5 — its own line has source `startup`.
         var restored = false
         if case .restored = report.lastState { restored = true }
-        if !restored, !options.relaunch, let macro = machine.settings.startupMacro {
+        if !restored, !relaunch, let macro = machine.settings.startupMacro {
             control.enqueue(CommandGroup(id: GroupID.random(), source: CommandSource(kind: .startup), commands: [Command.macro(macro)]))
             report.startupMacro = macro
         }
         // Step 6 — "The retention pass (§7)": the snapshots, on their worker, after the launch's own. The
         // logs' pass ran when this run's day began in each (step 2), and the black box's runs with its first line.
         control.snapshots?.retain()
+        // Spec 10 §3 — the `engine` topic carries "the last state this run", and files are named from the machine root.
+        launchReport = report
+        machineRoot = options.machineRoot
         return report
     }
 
@@ -147,14 +166,14 @@ extension Engine {
     /// put back, the way Spec 3 §8 replaces ShowState, and a
     /// `lastStateRestored` note carries it; or the launch starts empty, "and
     /// a `lastStateSkipped` note says why".
-    private func restoreLastState(_ options: LaunchOptions) -> LaunchReport.LastStateOutcome {
+    private func restoreLastState(_ options: LaunchOptions, relaunch: Bool) -> LaunchReport.LastStateOutcome {
         let variables = control.variables
         let keeper = LastStateKeeper(url: options.machineRoot.appendingPathComponent("state/last.json"), run: run, disk: options.disk,
                                      status: diskStatus, stamp: { variables.timestamp() })
         control.lastStateKeeper = keeper
         let now = clock.now()
         let last = machine.last
-        let decision = LastState.decide(last, restoreLastState: machine.settings.restoreLastState, relaunch: options.relaunch,
+        let decision = LastState.decide(last, restoreLastState: machine.settings.restoreLastState, relaunch: relaunch,
                                         nowMs: variables.wallMilliseconds)
         let writtenAt: JSONValue = last?.writtenAt.map(JSONValue.string) ?? .null
         switch decision {
