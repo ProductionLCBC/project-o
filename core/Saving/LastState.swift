@@ -121,6 +121,28 @@ extension LastState {
     }
 }
 
+// MARK: - Which launch is a relaunch (Spec 10 §2, choice U-14)
+
+extension LastState {
+    /// Spec 10 §2, "What a relaunch brings back" — "A launch is a relaunch
+    /// when the app says so with `--relaunch`, having seen the engine end or
+    /// ended it itself, or when the run before it ended without a stop in
+    /// this boot of the Mac: `state/last.json` says `clean: false` and was
+    /// written after the Mac started. The flag covers a full disk, which
+    /// removes that file (Spec 9 §7)."
+    ///
+    /// `bootedAtMs` is when the Mac started, in milliseconds since 1970, from
+    /// the caller; nil when it isn't known, and then only the flag makes a
+    /// relaunch. A file that doesn't say it ended cleanly counts as not clean,
+    /// as it does for the restore (Spec 9 §4, Area 12's reading); one that
+    /// doesn't say when it was written can't be shown to be of this boot.
+    public static func isRelaunch(flagged: Bool, last: LastState?, bootedAtMs: Int64?) -> Bool {
+        if flagged { return true }
+        guard let last, last.clean != true, let bootedAtMs, let written = last.writtenAt.flatMap(CivilTime.milliseconds) else { return false }
+        return written > bootedAtMs
+    }
+}
+
 // MARK: - What comes back (Spec 9 §4)
 
 extension LastState {

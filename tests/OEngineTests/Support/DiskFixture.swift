@@ -46,29 +46,29 @@ final class DiskFixture {
 
     /// `prepare` changes the copy before it loads.
     convenience init(wallClock: Date = HeadlessEngine.fixedWallClock(), prepare: (URL) throws -> Void = { _ in },
-                     configure: (inout Machine) -> Void = { _ in }, launch: Bool = false, relaunch: Bool = false) throws {
+                     configure: (inout Machine) -> Void = { _ in }, launch: Bool = false, relaunch: Bool = false, bootedAt: Date? = nil) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oengine-disk-\(UUID().uuidString)")
         try FileManager.default.copyItem(at: EngineFixtures.fixtureRoot, to: folder)
         try prepare(folder)
         try self.init(folder: folder, clock: MovableWallClock(wallClock), disk: TestDisk(), configure: configure, launch: launch,
-                      relaunch: relaunch)
+                      relaunch: relaunch, bootedAt: bootedAt)
     }
 
     /// The next run on `previous`'s roots, as they are on disk now, with its
     /// clock and its disk: a launch after `previous` stopped, or was killed
     /// (dropped without stopping).
     convenience init(continuing previous: DiskFixture, configure: (inout Machine) -> Void = { _ in }, launch: Bool = true,
-                     relaunch: Bool = false) throws {
+                     relaunch: Bool = false, bootedAt: Date? = nil) throws {
         previous.engine.waitForWrites()
         previous.engine.settleLogs()
         previous.engine.settleState()
         previous.handedOn = true
         try self.init(folder: previous.folder, clock: previous.clock, disk: previous.disk, configure: configure, launch: launch,
-                      relaunch: relaunch)
+                      relaunch: relaunch, bootedAt: bootedAt)
     }
 
     private init(folder: URL, clock: MovableWallClock, disk: TestDisk, configure: (inout Machine) -> Void, launch: Bool,
-                 relaunch: Bool) throws {
+                 relaunch: Bool, bootedAt: Date?) throws {
         self.folder = folder
         self.clock = clock
         self.disk = disk
@@ -87,8 +87,11 @@ final class DiskFixture {
         engine.attachDocuments(roots, disk: disk.disk)
         let events = self.events
         engine.engine.publisher.subscribe(["library"]) { events.record($0) }
-        if launch { self.launch(relaunch: relaunch) }
+        if launch { launchReport = self.launch(relaunch: relaunch, bootedAt: bootedAt) }
     }
+
+    /// What the launch this fixture was made with reported; nil when it didn't launch.
+    private(set) var launchReport: LaunchReport?
 
     deinit {
         if !handedOn { try? FileManager.default.removeItem(at: folder) }
@@ -99,8 +102,10 @@ final class DiskFixture {
     /// first tick finds the worker's report and a test's log lines fall in
     /// the same order every run (Spec 9 §3: the engine itself never waits).
     @discardableResult
-    func launch(relaunch: Bool = false, logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
-        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, disk: disk.disk, logMemory: logMemory)
+    func launch(relaunch: Bool = false, bootedAt: Date? = nil, logMemory: (commands: Int, engine: Int)? = nil) -> LaunchReport {
+        // Spec 10 §2 — when the Mac started, for the relaunch rule; a test that gives none has no boot to compare with.
+        let booted = bootedAt.map { Int64(($0.timeIntervalSince1970 * 1000).rounded()) }
+        let report = engine.launch(machineRoot: machineRoot, relaunch: relaunch, bootedAtMs: booted, disk: disk.disk, logMemory: logMemory)
         engine.waitForSnapshots()
         return report
     }

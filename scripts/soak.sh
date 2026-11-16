@@ -2,6 +2,7 @@
 # Project O — test-bench soak run (Spec 4 §13 and §15).
 #
 # Usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio]
+#                         [--no-lan] [--screens display:<uuid>,display:<uuid>]
 #
 # Builds the engine in release, writes the synthetic spike media if it is not
 # there yet, then runs `oengine soak`: the engine on the machine's outputs with
@@ -11,6 +12,14 @@
 # first minute, zero audio underruns, zero watchdog recoveries, memory flat
 # within 5% after minute ten). Exit 1 on any failure. The default run is the
 # three hours of Spec 4 §15; --minutes 1 is the smoke run.
+#
+# Since Area 19 a display output opens only on the screen its device names
+# (Spec 10 §2), and the spike's outputs name none a Mac has, so `oengine soak`
+# gives its display outputs this Mac's screens, left to right, or the ones
+# --screens names (`oengine devices` lists them). It also holds the engine's
+# Mach channel with a client of its own for the whole run, so the previews and
+# the channel pictures are in the GPU time it judges (Spec 10 §18), and it
+# opens the LAN listener and reads the login keychain unless --no-lan is given.
 #
 # The engine runs on temporary clones of both roots, never on them in place
 # (Spec 8 §9: a launch walks the media and can write the indexes and the
@@ -22,7 +31,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio]" >&2
+  echo "usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio] [--no-lan] [--screens display:<uuid>,...]" >&2
   exit 2
 fi
 

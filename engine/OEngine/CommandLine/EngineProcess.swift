@@ -74,6 +74,10 @@ public final class EngineProcess: @unchecked Sendable {
         /// Spec 10 §2 — whether this launch is a relaunch; Area 19 sets it
         /// from `--relaunch` and from how the last run ended in this boot.
         public var relaunch = false
+        /// Spec 10 §2 — when the Mac started, in milliseconds since 1970: a run
+        /// that "ended without a stop in this boot of the Mac" makes the next
+        /// launch a relaunch without the flag. Nil when it isn't known.
+        public var bootedAtMs: Int64?
         /// Spec 10 §2 — "`--released display:<uuid>` for each screen [the
         /// app] has released while it runs": screens whose outputs stay
         /// closed from the start of this run.
@@ -267,7 +271,7 @@ public final class EngineProcess: @unchecked Sendable {
         engine.power = outputPower
         // Spec 9 §4 — the launch order, on the roots this process loaded: the logs open and the run's `start`
         // note is written before anything can send a command ("The engine takes commands from step 5 on").
-        engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch))
+        engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch, bootedAtMs: options.bootedAtMs))
         // Spec 10 §3 — the `devices` topic, "On subscribe and when a screen, a card or an audio device comes or goes",
         // and the `metrics` topic's summary (Spec 4 §13), which is the process's to give.
         let listed = engine

@@ -51,6 +51,30 @@ public enum OutputPlacement {
         return places
     }
 
+    /// The soak's outputs on real screens (Area 19). The spike's display
+    /// outputs name screens no Mac has (`display:main`), and a display output
+    /// "opens only on the screen its device names" (Spec 10 §2), so a soak
+    /// would draw on nothing. Each display output, in number order, is given
+    /// the next of `screens` (`display:<uuid>`, in the order given); one past
+    /// the last screen keeps its device and stays absent. Everything else of
+    /// an output, its format included, is as the machine has it.
+    public static func bound(_ outputs: [Output], to screens: [String]) -> [Output] {
+        var remaining = screens[...]
+        var bound = outputs
+        for index in bound.indices.sorted(by: { bound[$0].number < bound[$1].number }) where bound[index].kind == .display {
+            guard let screen = remaining.popFirst() else { break }
+            bound[index].device = screen
+        }
+        return bound
+    }
+
+    /// The screens a soak uses when it is told none: every screen of the Mac,
+    /// left to right, top to bottom where two share a left edge, as first run
+    /// numbers them (Spec 10 §13).
+    public static func soakScreens(_ screens: [DetectedScreen]) -> [String] {
+        screens.sorted { ($0.frame.x, $0.frame.y) < ($1.frame.x, $1.frame.y) }.map(\.device)
+    }
+
     /// Spec 10 §9 — the display outputs on the screen with this uuid, in
     /// number order: what `releaseScreen` closes and answers with.
     public static func outputs(onScreen uuid: String, of outputs: [Output]) -> [Int] {

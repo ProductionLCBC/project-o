@@ -60,7 +60,7 @@ public enum OEngineCommandLine {
     usage: oengine <command> [options]
       version
       run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio] [--no-lan]
-           [--campus <name> --operator-screen display:<uuid>]
+           [--campus <name> --operator-screen display:<uuid>] [--relaunch] [--released display:<uuid> ...]
            the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port;
            the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder;
            the LAN API on the machine's apiPort once its token is read from the login keychain (made there
@@ -69,9 +69,15 @@ public enum OEngineCommandLine {
            without machine.json gets this Mac's (its outputs are every DeckLink port, then every screen but the
            one --operator-screen names; --campus names it); a file that is there is never written over, and
            without both options a root with no machine.json is refused, with nothing written (status 2);
+           --relaunch says the engine before this one ended: the last state is put back whatever
+           restoreLastState says, and no startup macro runs; a run that ended without a stop since the Mac
+           started makes a relaunch without it; --released keeps every output on that screen closed;
            exits with status 3 when another engine holds the machine root, 4 when the roots don't load
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio] [--no-lan]
-           run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure
+           [--screens display:<uuid>,display:<uuid>]
+           run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure;
+           its display outputs take the screens --screens names, in order, or every screen of this Mac left to right,
+           and a client of its own holds the Mach channel throughout, so the previews and channel pictures are in its GPU time
       drive --to host:port --scenario <file> --library <root> [--seconds N]
            send a scenario to a running engine (the library validates media ids); one pass by default
       evaluate --blackbox <folder> [--tick-ns N] [--sdi 2,3] [--display 1,2]
@@ -175,16 +181,30 @@ public enum OEngineCommandLine {
 
     private static func runLocked(_ args: Arguments, soak: Bool, libraryRoot: URL, machineRoot: URL) throws -> Int32 {
         // Spec 8 §2, choice M-8 — the engine reads media only where media may live on this Mac.
-        let roots = try LoadedRoots.load(libraryRoot: libraryRoot, machineRoot: machineRoot, places: .thisMac())
+        var roots = try LoadedRoots.load(libraryRoot: libraryRoot, machineRoot: machineRoot, places: .thisMac())
         for line in roots.issueLines { fail(line) }
         if roots.hasErrors {
             fail("the roots did not load cleanly; fix the issues above")
             releaseLock()
             return rootsExitStatus
         }
+        if soak {
+            // The spike's outputs name screens no Mac has, and an output opens only on its own screen (Spec 10 §2):
+            // the soak's display outputs take the screens --screens names, or this Mac's, left to right.
+            let named = args.options["--screens"].map { $0.split(separator: ",").map(String.init) }
+            let screens = named ?? OutputPlacement.soakScreens(MainActor.assumeIsolated { _ = NSApplication.shared; return SystemDevices().devices() }.screens)
+            roots.machine.outputs = OutputPlacement.bound(roots.machine.outputs, to: screens)
+            for output in roots.machine.outputs where output.kind == .display { print("oengine: soak output \(output.number) on \(output.device)") }
+        }
         var options = EngineProcess.Options()
         options.oscPort = try args.int("--osc-port")
         options.audio = !args.flag("--no-audio")
+        // Spec 10 §2 — "When the app starts an engine after the last one ended, it adds `--relaunch` (below), and
+        // `--released display:<uuid>` for each screen it has released while it runs (§9)." Without the flag, a run
+        // that ended without a stop since the Mac started makes this launch a relaunch too.
+        options.relaunch = args.flag("--relaunch")
+        options.bootedAtMs = BootTime.wallMilliseconds()
+        options.released = args.all("--released")
         // Spec 10 §2 — the LAN API: the system's WebSocket listener, and the token from the login keychain. A run
         // with --no-lan opens neither and never touches the Keychain.
         if !args.flag("--no-lan") { options.lan = EngineProcess.LanOptions(server: NetworkLanServer(), secrets: KeychainStore()) }
@@ -202,6 +222,10 @@ public enum OEngineCommandLine {
         let process = try MainActor.assumeIsolated { try EngineProcess(roots: roots, options: options) }
         process.start()
         print("oengine: running on \(roots.machine.settings.campusName); OSC on port \(process.osc?.boundPort ?? 0); black box in \(blackBoxFolder.path)")
+        // Spec 10 §18 — "The soak scenario gains a client holding the Mach channel, so the previews and the channel
+        // pictures count in its GPU p99 (Spec 4 §13)."
+        let machClient: SoakMachClient? = soak ? SoakMachClient() : nil
+        machClient?.hold(run: process.engine.run)
         if let seconds { print("oengine: stopping after \(seconds) s") }
 
         let finishing = Atomic<Bool>(false)
@@ -213,9 +237,16 @@ public enum OEngineCommandLine {
             guard !finishing.exchange(true, ordering: .acquiringAndReleasing) else { return }
             DispatchQueue.global(qos: .userInitiated).async {
                 driver?.stop()
+                let held = machClient?.verdict()
+                machClient?.release()
                 process.stop()
                 print(process.summary())
                 var code = requested
+                if let held {
+                    print(held.lines.joined(separator: "\n"))
+                    for failure in held.failures { print("FAIL: " + failure) }
+                    if !held.failures.isEmpty { code = 1 }
+                }
                 if soak {
                     do {
                         let run = try BlackBoxReader.load(folder: blackBoxFolder, tickNanoseconds: process.engine.pacing.tickNanoseconds,
@@ -452,6 +483,8 @@ final class EngineAppDelegate: NSObject, NSApplicationDelegate {
 struct Arguments {
     var positional: [String] = []
     var options: [String: String] = [:]
+    /// Every value of an option given more than once, in order (`--released`, once a screen).
+    var repeated: [String: [String]] = [:]
     var flags: Set<String> = []
 
     init(_ list: [String]) {
@@ -461,6 +494,7 @@ struct Arguments {
             if word.hasPrefix("--") {
                 if index + 1 < list.count, !list[index + 1].hasPrefix("--") {
                     options[word] = list[index + 1]
+                    repeated[word, default: []].append(list[index + 1])
                     index += 2
                 } else {
                     flags.insert(word)
@@ -474,6 +508,9 @@ struct Arguments {
     }
 
     func flag(_ name: String) -> Bool { flags.contains(name) }
+
+    /// Every value given for `name`, in order.
+    func all(_ name: String) -> [String] { repeated[name] ?? [] }
 
     func string(_ name: String) throws -> String {
         guard let value = options[name] else { throw ProcessError.missingArgument(name) }
