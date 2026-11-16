@@ -28,59 +28,47 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `area/api`, in review: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start once the spike passes on the bench; Area 19, which it also waited for, is merged. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `main` since Area 19: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. Area 19 keeps only the token's Keychain item, behind its seam (`SecretStore`), and answers `passcode`, `unlock`, `resetPasscode`, `token` and `newToken` with `notInV1` until then; `newToken` has to close every LAN connection. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | brief waiting for approval | Brief waiting since 2026-11-16, as the final message of the Area 19 session. On `area/api` (1ecfe1f, pushed; `swift test` green, hosted CI green on both jobs): the Mach proof, the engine as a process, the local socket and §3, the Mach channel's payloads, the LAN listener with the token, Bonjour and the `preview` topic, first run, the relaunch rule with `--relaunch` and `--released`, the soak's Mach client and its screens, and the fixture's clear-all key on `shift+escape`, built tests first with the stops for review its block names, each of which Adam saw. With his answers: channel 2 is `largest` at first run (Spec 10 §13 corrected on the branch, 5e63a20), the library is "<campus> Library", a hand launch without the options is refused, and, at the third stop, the engine draws its first frame without waiting for its audio devices. Not run: the soak, and, since Adam paused runs that open outputs on 2026-11-16, the hands-on checks of the last stage. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | merged | Adam's `approved` on 2026-11-16 as built, with every reading in the brief and its recommended answers; the Spec 4 §12 and Spec 10 §13 corrections applied on the branch (6554d0c), `area/api` merged into `main` with `--no-ff` (73ab889), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Runs that open outputs stayed paused through the approval, so the last stage's checks on a screen (a relaunch after a real kill, `--released`, the audio start on the real device) and the soak are still to run, and one run's watchdog events are unexplained (Needs Adam). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Area 19, engine API and first run, is in review on `area/api`** (1ecfe1f, pushed; `swift
-test` green on the branch and hosted CI green on both jobs). Its brief is the final message
-of its session and waits for Adam's `approved`; nothing of the area is on `main` but these
-status documents. The block's work is all there: the Mach proof, the engine as a process,
-the local socket and §3, the Mach channel's payloads, the LAN listener, first run, the
-relaunch rule, the soak's client and the fixture's key, with Adam's answers to the plan and
-his answers at the third stop (the engine now draws its first frame without waiting for its
-audio devices, and the real Keychain and Bonjour ran once on the dev Mac on 2026-11-16: the
-token was made, written and read back, the listener opened on `apiPort`, another process
-found it advertised, and the keychain item was deleted afterwards). Runs that open outputs
-are paused on Adam's word of 2026-11-16, so the last stage has its tests and no hands-on
-run: a relaunch after a kill, `--released`, and the soak are untried on a screen. One
-observation is open with them: after the audio change, one hands-on run counted watchdog
-events, with no recovery, and the next counted none; it wants a few more runs on a screen
-to say whether it comes back. Area 12, log and saving, shipped on 2026-11-15 (327454f). The
-bench run with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
+**Nothing is in review; everything is on `main`.** Area 19, engine API and first run,
+shipped on 2026-11-16. Adam approved it as built, with every reading in the brief and its
+recommended answers; its Spec 4 §12 and Spec 10 §13 corrections were applied on the branch
+(6554d0c), and it was merged with `--no-ff` (73ab889) and pushed. No area can start until
+the bench run: every area left is in `app/` or is Area 7's bench verification, and the
+bench run with a card gates both; it stays deferred to a window Adam sets aside, and Area
+13, show-mode UI, is next after it, in its own session. Runs that open outputs are paused
+on Adam's word of 2026-11-16, and the approval left the pause on, so the last stage of Area
+19 has its tests and no run on a screen: a relaunch after a real kill, `--released`, the
+audio start on the real device, and the soak. One observation is open with them: after the
+audio change, one hands-on run counted watchdog events, with no recovery, and the next
+counted none; it wants a few more runs on a screen to say whether it comes back.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 19, engine API and first run**: the final message of the Area 19 session,
-  2026-11-16, on `area/api` (1ecfe1f). It asks:
-  - *The runs on a screen that are paused.* The last stage's hands-on checks (a relaunch
-    after a kill, `--released`, the audio start on the real device a few times to see
-    whether one run's watchdog events come back). Recommended: let them run when the Mac is
-    free, before `approved`; the alternative is to approve and take them with the bench run.
-  - *The Spec 4 §12 sentence* on audio devices at launch, and *the Spec 10 §13 sentence*
-    recording the refused launch (Spec corrections proposed, below). Recommended: accept
-    both; they are applied on the branch on `approved`.
-  - *The readings*, below, of which the brief puts these first: a preview or picture frame
-    is named to the app only once the GPU has finished it, and a client that doesn't read
-    misses messages without holding the engine; the LAN isn't limited to the same link; the
-    Keychain is read once at launch and a refusal stands until the next launch; when the
-    app's screen isn't among the Mac's screens no screen becomes an output; the soak takes
-    every screen left to right unless `--screens` names them, fails when its Mach client was
-    sent nothing, and reaches the Keychain and the LAN unless `--no-lan`; and a `last.json`
-    that doesn't say it ended cleanly counts as not clean for the relaunch rule.
-    Recommended: as built.
+None. The Area 19 brief (the final message of the Area 19 session, 2026-11-16) was answered
+the same day: approved as built, with its recommended answers, merged (73ab889).
 
 ### Decisions
+
+- **When the paused runs on a screen happen.** Adam paused runs that open outputs on
+  2026-11-16 and approved Area 19 with the pause still on. The brief recommended these runs
+  before the merge; the merge went ahead on his `approved`, so they are owed on the dev Mac
+  when he lifts the pause, or else go with the bench run: a relaunch after a real kill,
+  `--released`, and the audio start on the real device several times, to see whether one
+  run's watchdog events come back (Housekeeping, below). Until then the audio change is on
+  `main` with that observation unexplained.
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -104,13 +92,12 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
   lands each generated file on its fixed id; the bench run is the first end-to-end run of
   that script change. Since Area 12, an `oengine run` on that root also writes its
   logs, its hourly black box, its snapshots and `state/last.json` there; the soak keeps its
-  own black box folder. With Area 19 (on `area/api` until it merges) a display output opens
-  only on the screen its device names, so `oengine soak` gives its display outputs the
-  screens `--screens` names, or every screen of the Mac left to right; it holds the
-  engine's Mach channel with a client of its own for the whole run, so the previews and the
-  channel pictures are in the GPU time it judges, and fails the run when that client was
-  sent nothing; and it reads the login keychain and opens the LAN listener unless
-  `--no-lan` is given.
+  own black box folder. Since Area 19 a display output opens only on the screen its device
+  names, so `oengine soak` gives its display outputs the screens `--screens` names, or
+  every screen of the Mac left to right; it holds the engine's Mach channel with a client
+  of its own for the whole run, so the previews and the channel pictures are in the GPU
+  time it judges, and fails the run when that client was sent nothing; and it reads the
+  login keychain and opens the LAN listener unless `--no-lan` is given.
 
 ### The attended run
 
@@ -134,7 +121,7 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
   `tests/fixtures/library-v1` therefore changes the fixture in the repository; the tests run
   on temporary copies (the harness refuses a media worker on `tests/fixtures/`), and the
   spike runs through `soak.sh` on clones.
-- **`oengine run` reaches the Keychain and the network** (Area 19, on its branch). Unless
+- **`oengine run` reaches the Keychain and the network** (since Area 19). Unless
   `--no-lan` is given it reads its token from the login keychain, making a "Project O"
   item for the machine at the first launch, opens a WebSocket listener on the machine's
   `apiPort` and advertises `_projecto._tcp`. macOS may ask about the keychain item after an
@@ -145,10 +132,12 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
   otherwise: no `oengine run` or soak on the dev Mac. `swift test` opens nothing on a screen
   and goes on.
 - **One run's watchdog events.** After the engine began opening its audio devices beside its
-  first frames (609b609 on `area/api`), one hands-on run with sound into BlackHole counted
-  watchdog events, with no recovery and its outputs and meters as they should be; the run
-  before the change and the run after it counted none, and that run's log wasn't kept. A few
-  runs on a screen will say whether the opening disturbs the first ticks.
+  first frames (609b609, on `main` since Area 19's merge), one hands-on run with sound into
+  BlackHole counted watchdog events, with no recovery and its outputs and meters as they
+  should be; the run before the change and the run after it counted none, and that run's
+  log wasn't kept. A few runs on a screen will say whether the opening disturbs the first
+  ticks. The hand-check scripts of the Area 19 session are kept, uncommitted, in the main
+  checkout's `.build/area-api-scratch/` for those runs.
 - **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
   for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
   before the job finished, and it passed on the next full run and alone. It didn't recur
@@ -170,8 +159,8 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 12's task is `shipped`, Area
-  19's is `in review`, and Area 14's carries its block as changed on 2026-11-15.
+  dependencies from the block's "Starts after" line. Area 12's and Area 19's tasks are
+  `shipped`, and Area 14's carries its block as changed on 2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -199,7 +188,8 @@ bench run with a card stays deferred to a window Adam sets aside; it gates `app/
 
 ### Spec interpretations made so far
 
-Area 19's readings, below, wait for Adam's answer with its brief. "Adam's answer" marks a
+None outstanding. Area 19's readings, below, were approved as built on 2026-11-16, with the
+recommended answers, and are recorded here and in its brief. "Adam's answer" marks a
 choice he made on 2026-11-15 before he approved the plan, or on 2026-11-16 at the third stop
 where the row says so; "with the plan" a reading he approved with it; "at stop 1", "at stop
 2" and "at stop 3" one he saw in the report at that stop and let the session go on from; and
@@ -213,8 +203,8 @@ f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on 2026-11-14; Ar
 | --- | --- | --- | --- |
 | Spec 10 §13, channel 2 | Its render size at first run, where "the fixture library's values" gives a fixed 1920 by 1080 | `largest`, as Spec 1 §9 shows it; Spec 10 §13 corrected on the branch (5e63a20), and the fixture keeps its fixed size (Adam's answer) | The fixture's fixed size |
 | Spec 10 §13, the library | What the first-run library is called | "<campus> Library", from `--campus`, or from the machine's own campus when only the library side is missing; "Library" with no campus (Adam's answer) | A fixed name |
-| Spec 10 §13, a hand launch | A root with no `machine.json`, launched without `--campus` and `--operator-screen` | Refused with a line and nothing written; writing only a missing library side needs neither option (Adam's answer) | Write with defaults |
-| Spec 4 §11, §12 and Spec 10 §2, audio at launch | Whether the first frame waits for the audio devices | No: they open on a thread of their own, and until a device has opened its outputs are silent on the stand-in that keeps the channels' clocks moving, as for a device that is absent (Adam's answer at stop 3) | Open them first, as Area 16 built |
+| Spec 10 §13, a hand launch | A root with no `machine.json`, launched without `--campus` and `--operator-screen` | Refused with a line and nothing written; writing only a missing library side needs neither option (Adam's answer; Spec 10 §13 says so since 6554d0c) | Write with defaults |
+| Spec 4 §11, §12 and Spec 10 §2, audio at launch | Whether the first frame waits for the audio devices | No: they open on a thread of their own, and until a device has opened its outputs are silent on the stand-in that keeps the channels' clocks moving, as for a device that is absent (Adam's answer at stop 3; Spec 4 §12 says so since 6554d0c) | Open them first, as Area 16 built |
 | Spec 10 §3, order | Where a request is answered | At a build boundary; in each build a connection gets its results, then the build's events, then its answers (with the plan) | On the asking thread, which can double an event |
 | Spec 10 §2, `ping` | Who answers | The control side, so a control thread that has stopped shows as not responding (with the plan) | The socket's thread |
 | Spec 2 §9, `commands` | The result of several commands; `group` absent or false | One result, `ok` with the last line's `seq` and `results`, one per command; absent means one group; `false` runs each as its own group (with the plan) | A result per command |
@@ -294,27 +284,18 @@ f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on 2026-11-14; Ar
 
 ### Spec corrections proposed
 
-Both wait for Adam's answer with the Area 19 brief, and are applied on the branch on
-`approved`.
-
-- **Spec 4 §12, the audio device row.** It says a device absent at launch gets the same rule
-  as one that vanishes, and nothing of one that is slow to open. The code opens the audio
-  devices on a thread of their own, after the frame clock has started. The fix: add "The
-  engine opens its audio devices beside its first frames; until a device has opened, its
-  outputs are silent, as for a device that is absent."
-- **Spec 10 §13, the roots.** It says the app starts the engine with `--campus`, and nothing
-  of a launch without it. The code refuses one on a root with no `machine.json`. The fix:
-  add "A launch on a machine root with no `machine.json` and without `--campus` and
-  `--operator-screen` writes nothing and exits with status 2."
-
-Applied already: Spec 10 §13's sentence on channel 2's render size (5e63a20, on Adam's
-answer of 2026-11-15).
+None. Area 19's proposals were accepted and applied (6554d0c): Spec 4 §12 now says the
+engine opens its audio devices beside its first frames, an output being silent until its
+device has opened, as for a device that is absent; Spec 10 §13 now says a launch on a
+machine root with no `machine.json` and without `--campus` and `--operator-screen` writes
+nothing and exits with status 2. Spec 10 §13's sentence on channel 2's render size was
+applied earlier (5e63a20, on Adam's answer of 2026-11-15).
 
 ## Next
 
-**Area 13 — Show-mode UI** (branch `area/show`), once Area 19 is merged and the bench run
-has passed. It runs in its own session from the common preamble in `docs/build-order.md`
-and its own block there, verbatim:
+**Area 13 — Show-mode UI** (branch `area/show`), once the bench run has passed; Area 19,
+which it also waited for, is merged. It runs in its own session from the common preamble in
+`docs/build-order.md` and its own block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -350,16 +331,16 @@ Stop for review after the engine connection, after the grid and the strip, and a
 keys.
 ```
 
-**After Area 19:**
+**Area 13 and after:**
 
-- **What Area 19 hands Area 13.** On `area/api` until it merges: the local socket in the
-  machine root with `hello`, the topics, queries and requests of Spec 10 §3, the Mach
-  channel with the previews, the channel pictures and the meters (`MachClient` is its other
-  end, and `oengine mach-watch` shows what it carries), first run with `--campus` and
+- **What Area 19 hands Area 13.** On `main`: the local socket in the machine root with
+  `hello`, the topics, queries and requests of Spec 10 §3, the Mach channel with the
+  previews, the channel pictures and the meters (`MachClient` is its other end, and
+  `oengine mach-watch` shows what it carries), first run with `--campus` and
   `--operator-screen`, `--relaunch` and `--released`, and the exit statuses the app tells
   apart: 3 for a held root, 4 for roots that don't load, 2 for a first run asked wrongly.
-- **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
-  follows 14, 17 follows 13 and 14, and 18 follows 17.
+- **The app's areas, after the bench run.** Area 13 comes first, 14 follows 13, 10 follows
+  14, 17 follows 13 and 14, and 18 follows 17. None can start independently before it.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
   machine root copied again from the spike fixtures first. It must pass before anything in
   `app/` starts and before Area 7's bench verification.
