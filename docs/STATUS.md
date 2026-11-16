@@ -28,54 +28,57 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 19 and once the spike passes on the bench. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `area/api`, in review: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
-| 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). |
-| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | in progress | In progress on `area/api` since 2026-11-15: Adam approved the plan that day, with three answers (first run writes channel 2's render size as `largest`, with a one-line Spec 10 §13 correction to come on the branch; the first-run library is named "<campus> Library"; a hand launch on a root with no `machine.json` and without `--campus` and `--operator-screen` is refused). It stops for review after the Mach proof, after the socket and §3, and after first run; the Mach proof passed on 2026-11-15 (af5456a, both calls, looked up from an app LaunchServices started), Adam said to go on from the second stop on 2026-11-16 (db60639: the engine as a process, the local socket and §3), and the session waits at the third stop since 2026-11-16 (aa8ec8e, pushed, `swift test` and CI green: the Mach channel's payloads, the LAN listener with the token, Bonjour and the `preview` topic, and first run, with the Spec 10 §13 correction applied on the branch in 5e63a20). Left: the relaunch rule, `--released`, the soak's Mach client and the fixture's clear-all key, then the brief. Engine-only, so no bench run. Area 12 built the stop sequence (the shutdown macro, the last try at unwritten documents, the `stop` note, `last.json` clean) and the launch decision that takes "this is a relaunch" as an input, so Area 19 adds the `stop` request with its answer, `--relaunch` and the detection of a run that ended without a stop. It puts on the API what waits in the engine's own publisher: the `outputs` and `audio` topics, Area 9's `library` and `live` events, Area 11's `timers` events, Area 8's `media` topic and `mediaUse` and `media` queries, and Area 12's `history` and `saving` topics, `note` request, `versions` and `snapshots` queries and the snapshot's id in `system snapshot`'s result. Its first run writes Spec 6 §9's channels, presets and stacks, and `dropChannels` from `DropChannels.firstRun` (Spec 8 §8). |
+| 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
+| 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. Area 19 keeps only the token's Keychain item, behind its seam (`SecretStore`), and answers `passcode`, `unlock`, `resetPasscode`, `token` and `newToken` with `notInV1` until then; `newToken` has to close every LAN connection. |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | brief waiting for approval | Brief waiting since 2026-11-16, as the final message of the Area 19 session. On `area/api` (1ecfe1f, pushed; `swift test` green, hosted CI green on both jobs): the Mach proof, the engine as a process, the local socket and §3, the Mach channel's payloads, the LAN listener with the token, Bonjour and the `preview` topic, first run, the relaunch rule with `--relaunch` and `--released`, the soak's Mach client and its screens, and the fixture's clear-all key on `shift+escape`, built tests first with the stops for review its block names, each of which Adam saw. With his answers: channel 2 is `largest` at first run (Spec 10 §13 corrected on the branch, 5e63a20), the library is "<campus> Library", a hand launch without the options is refused, and, at the third stop, the engine draws its first frame without waiting for its audio devices. Not run: the soak, and, since Adam paused runs that open outputs on 2026-11-16, the hands-on checks of the last stage. |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
 
-**Area 19, engine API and first run, is in progress on `area/api`, stopped at its third
-stop for review, after first run.** Adam approved its plan on 2026-11-15, with three
-answers (row 19 above), and said to go on after the first stop (the Mach proof, af5456a)
-and the second (the engine as a process, the local socket and §3, db60639). On the branch
-since (aa8ec8e, pushed; `swift test` green, 1378 tests with the two usual skips; CI green on
-macOS and Linux): the Mach channel's payloads (three preview surfaces a stack written in
-turn, a frame message once the GPU has finished each, a 256 by 144 picture of each channel
-with pixel content from a new aux pass, meters 15 times a second measured in the audio
-callback); the LAN listener (a WebSocket on `apiPort` that opens only once the token is read
-from the Keychain on a background thread, `auth` first or the socket closes, Bonjour as
-`_projecto._tcp`, a refused registration or OSC send retried every five seconds, the
-`preview` topic's JPEGs); and first run (a pure builder in `core/` and a writer that puts
-down only the missing side, once and never over a file that is there, with `--campus` and
-`--operator-screen`), with the one-line Spec 10 §13 correction Adam approved with the plan
-(5e63a20: channel 2's render size is `largest`). Hands-on runs on the dev Mac, on Adam's go,
-showed a second process receiving 30 preview frames a second per stack, a clip's picture
-and meters at 15 a second, and a first run from this Mac's own devices that the engine then
-ran on. Three things for Adam at this stop, none of which holds the rest up: `Engine.start()`
-opens the audio devices before the first frame, and on one launch Core Audio took 14 seconds
-to open BlackHole, so that launch drew nothing for 14 seconds after `hello` (found by hand;
-the part of it that was this area's, the Mach channel waiting on the same lock, is fixed
-with a test; the launch order is older and was left alone); the real Keychain, Bonjour and
-the system's prompts have not been exercised on the dev Mac, where every hands-on run passed
-`--no-lan`; and the hosted runner failed two of the new tests on timing, which are fixed
-(aa8ec8e). Left for this area: the relaunch rule with `--relaunch`, `--released`, the soak's
-Mach client with the clone's outputs bound to the bench's screens, and the fixture's
-clear-all key moved to `shift+escape`; then the brief. Nothing is in review. Area 12, log and saving, shipped on
-2026-11-15 (327454f). The bench run with a card stays deferred to a window Adam sets
-aside; it gates `app/` and Area 7.
+**Area 19, engine API and first run, is in review on `area/api`** (1ecfe1f, pushed; `swift
+test` green on the branch and hosted CI green on both jobs). Its brief is the final message
+of its session and waits for Adam's `approved`; nothing of the area is on `main` but these
+status documents. The block's work is all there: the Mach proof, the engine as a process,
+the local socket and §3, the Mach channel's payloads, the LAN listener, first run, the
+relaunch rule, the soak's client and the fixture's key, with Adam's answers to the plan and
+his answers at the third stop (the engine now draws its first frame without waiting for its
+audio devices, and the real Keychain and Bonjour ran once on the dev Mac on 2026-11-16: the
+token was made, written and read back, the listener opened on `apiPort`, another process
+found it advertised, and the keychain item was deleted afterwards). Runs that open outputs
+are paused on Adam's word of 2026-11-16, so the last stage has its tests and no hands-on
+run: a relaunch after a kill, `--released`, and the soak are untried on a screen. One
+observation is open with them: after the audio change, one hands-on run counted watchdog
+events, with no recovery, and the next counted none; it wants a few more runs on a screen
+to say whether it comes back. Area 12, log and saving, shipped on 2026-11-15 (327454f). The
+bench run with a card stays deferred to a window Adam sets aside; it gates `app/` and Area 7.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-None. The Area 12 brief (the final message of the Area 12 session, 2026-11-15) was answered
-the same day: approved as built, with its recommended answers, merged (327454f).
+- **Area 19, engine API and first run**: the final message of the Area 19 session,
+  2026-11-16, on `area/api` (1ecfe1f). It asks:
+  - *The runs on a screen that are paused.* The last stage's hands-on checks (a relaunch
+    after a kill, `--released`, the audio start on the real device a few times to see
+    whether one run's watchdog events come back). Recommended: let them run when the Mac is
+    free, before `approved`; the alternative is to approve and take them with the bench run.
+  - *The Spec 4 §12 sentence* on audio devices at launch, and *the Spec 10 §13 sentence*
+    recording the refused launch (Spec corrections proposed, below). Recommended: accept
+    both; they are applied on the branch on `approved`.
+  - *The readings*, below, of which the brief puts these first: a preview or picture frame
+    is named to the app only once the GPU has finished it, and a client that doesn't read
+    misses messages without holding the engine; the LAN isn't limited to the same link; the
+    Keychain is read once at launch and a refusal stands until the next launch; when the
+    app's screen isn't among the Mac's screens no screen becomes an output; the soak takes
+    every screen left to right unless `--screens` names them, fails when its Mach client was
+    sent nothing, and reaches the Keychain and the LAN unless `--no-lan`; and a `last.json`
+    that doesn't say it ended cleanly counts as not clean for the relaunch rule.
+    Recommended: as built.
 
 ### Decisions
 
@@ -101,7 +104,13 @@ the same day: approved as built, with its recommended answers, merged (327454f).
   lands each generated file on its fixed id; the bench run is the first end-to-end run of
   that script change. Since Area 12, an `oengine run` on that root also writes its
   logs, its hourly black box, its snapshots and `state/last.json` there; the soak keeps its
-  own black box folder.
+  own black box folder. With Area 19 (on `area/api` until it merges) a display output opens
+  only on the screen its device names, so `oengine soak` gives its display outputs the
+  screens `--screens` names, or every screen of the Mac left to right; it holds the
+  engine's Mach channel with a client of its own for the whole run, so the previews and the
+  channel pictures are in the GPU time it judges, and fails the run when that client was
+  sent nothing; and it reads the login keychain and opens the LAN listener unless
+  `--no-lan` is given.
 
 ### The attended run
 
@@ -119,14 +128,31 @@ the same day: approved as built, with its recommended answers, merged (327454f).
   and index changes. With Area 12 a launched engine also writes `machine/logs/`,
   `machine/blackbox/`, `machine/snapshots/` and `machine/state/last.json`, removes the
   snapshots and logs retention no longer keeps, and a list restore writes a kept version
-  under `library/versions/`. Running `oengine` against `tests/fixtures/library-v1` therefore
-  changes the fixture in the repository; the tests run on temporary copies (the harness
-  refuses a media worker on `tests/fixtures/`), and the spike runs through `soak.sh` on
-  clones.
+  under `library/versions/`. With Area 19 it also keeps `machine/.engine.lock` and
+  `machine/engine.sock`, and a launch on a root without `library.json` or `machine.json`
+  writes the first-run documents there. Running `oengine` against
+  `tests/fixtures/library-v1` therefore changes the fixture in the repository; the tests run
+  on temporary copies (the harness refuses a media worker on `tests/fixtures/`), and the
+  spike runs through `soak.sh` on clones.
+- **`oengine run` reaches the Keychain and the network** (Area 19, on its branch). Unless
+  `--no-lan` is given it reads its token from the login keychain, making a "Project O"
+  item for the machine at the first launch, opens a WebSocket listener on the machine's
+  `apiPort` and advertises `_projecto._tcp`. macOS may ask about the keychain item after an
+  update, about the local network, or about incoming connections. Hands-on runs on the dev
+  Mac pass `--no-lan`; the one run with the LAN on, on 2026-11-16 at Adam's word, saw no
+  refusal and left no item behind.
+- **Runs that open outputs are paused** on Adam's word of 2026-11-16, until he says
+  otherwise: no `oengine run` or soak on the dev Mac. `swift test` opens nothing on a screen
+  and goes on.
+- **One run's watchdog events.** After the engine began opening its audio devices beside its
+  first frames (609b609 on `area/api`), one hands-on run with sound into BlackHole counted
+  watchdog events, with no recovery and its outputs and meters as they should be; the run
+  before the change and the run after it counted none, and that run's log wasn't kept. A few
+  runs on a screen will say whether the opening disturbs the first ticks.
 - **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
   for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
-  before the job finished, and it passed on the next full run and alone. It doesn't touch
-  Area 12's code. Worth watching on the bench; nothing was changed for it.
+  before the job finished, and it passed on the next full run and alone. It didn't recur
+  during Area 19. Worth watching on the bench; nothing was changed for it.
 - **The real-Trash check.** `O_REAL_TRASH=1 swift test --filter MediaTrashTests` moves a
   few-byte file into the Trash and back; it passed on the dev Mac on 2026-11-14 from a
   process without Full Disk Access, and ordinary runs skip it. Worth rerunning by hand after
@@ -144,8 +170,8 @@ the same day: approved as built, with its recommended answers, merged (327454f).
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 12's task is `shipped`; Area
-  14's task carries its block as changed on 2026-11-15.
+  dependencies from the block's "Starts after" line. Area 12's task is `shipped`, Area
+  19's is `in review`, and Area 14's carries its block as changed on 2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -155,131 +181,140 @@ the same day: approved as built, with its recommended answers, merged (327454f).
 - **The bench Mac is the only place the hardware tests run.** Since 962dd4b the hosted test
   step sets `O_HOSTED_RUNNER`, which makes the Metal and codec tests skip there with a
   visible message, because the runner's virtual GPU or VideoToolbox stalled some runs in a
-  kernel call nothing could kill. Area 8's real-frame poster tests skip there too. A
-  self-hosted runner on the bench Mac, without the variable, is what should run the goldens,
-  the decode tests and the soak; until it exists, `swift test` on the bench by hand is the
-  proof, as CLAUDE.md says. GitHub's macOS runner queue cancels a job after fifteen minutes
-  of waiting when several pushes land together; `gh run rerun <id> --failed` is the remedy.
+  kernel call nothing could kill. Area 8's real-frame poster tests skip there too. Area
+  19's Mach, socket and loopback WebSocket tests do run there; the runner is slower than the
+  dev Mac, and tests of Area 19 that leaned on timing failed there until they were made to
+  wait on what they were waiting for. A self-hosted runner on the bench Mac, without the
+  variable, is what should run the goldens, the decode tests and the soak; until it exists,
+  `swift test` on the bench by hand is the proof, as CLAUDE.md says. GitHub's macOS runner
+  queue cancels a job after fifteen minutes of waiting when several pushes land together;
+  `gh run rerun <id> --failed` is the remedy.
 - **GitHub Actions billing** no longer blocks CI: on the public repository standard hosted
   runners are free. The ProductionLCBC account's payment problem (Settings, Billing and
   plans) matters again only if the repository goes private or a paid feature is wanted.
-- **Two tests skip in the main checkout.** `EmbeddedAudioFeedTests`' unavailable-sink test
-  skips wherever `vendor/DeckLinkSDK` is present ("a card may be present"); a fresh worktree
-  has no SDK and runs it. `MediaTrashTests`' real-Trash test skips everywhere unless
-  `O_REAL_TRASH=1`.
+- **Tests that skip.** `EmbeddedAudioFeedTests`' unavailable-sink test skips wherever
+  `vendor/DeckLinkSDK` is present ("a card may be present"), as in the main checkout and in
+  a worktree with the SDK linked in; `MediaTrashTests`' real-Trash test skips everywhere
+  unless `O_REAL_TRASH=1`.
 
 ### Spec interpretations made so far
 
-None outstanding. Area 12's readings, below, were approved as built on 2026-11-15, with the
-recommended answers, and are recorded here and in its brief. "Adam's answer" marks a
-choice he made on 2026-11-14 before he approved the plan, "with the plan" a reading he
-approved with it, "at stop 1", "at stop 2" and "at stop 3" one he saw in the report at that
-stop and let the session go on from, and "new" one first named in the brief. Earlier areas'
-readings were approved with their briefs and are in the specs' text, the briefs, or this
-page as it stood before: Area 8's at a8e741b, approved on 2026-11-14; Area 11's at 4096ede,
-approved on 2026-11-11; Area 6's at a77bf69; Area 9's at f4b43ac; Area 15's on 2026-11-10,
-Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
+Area 19's readings, below, wait for Adam's answer with its brief. "Adam's answer" marks a
+choice he made on 2026-11-15 before he approved the plan, or on 2026-11-16 at the third stop
+where the row says so; "with the plan" a reading he approved with it; "at stop 1", "at stop
+2" and "at stop 3" one he saw in the report at that stop and let the session go on from; and
+"new" one first named in the brief. Earlier areas' readings were approved with their briefs
+and are in the specs' text, the briefs, or this page as it stood before: Area 12's at
+f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on 2026-11-14; Area 11's at
+4096ede, approved on 2026-11-11; Area 6's at a77bf69; Area 9's at f4b43ac; Area 15's on
+2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
-| Spec 9 §3, the zip | Which deflate | Apple's Compression framework in `engine/`, without an ADR, as CryptoKit was taken for Spec 8; the zip container and CRC-32 are written in Swift, and a test opens the result with `unzip` (Adam's answer) | A zip library, with an ADR |
-| Spec 9 §4 and Spec 10 §2, the stop | Who builds the stop sequence | Area 12: the shutdown macro, one more try at unwritten documents, the `stop` note with `unsaved`, `last.json` clean; the terminate and interrupt signals and the `--seconds` end reach it. Area 19 adds the `stop` request and its answer (Adam's answer) | Area 19 builds it |
-| Spec 9 §4, the relaunch rule | Who decides a launch is a relaunch | Area 12 builds the decision with "this launch is a relaunch" as an input; Area 19 adds `--relaunch` and the detection (Adam's answer) | Area 12 detects it |
-| Spec 9 §3, `system snapshot` | When its line is logged, and what waits | Logged `ok` once the zip is complete; a failed write rejects it; a group sent directly waits whole; held by a cue, macro or key the rest runs at once; it never holds an edit back (Adam's answer) | Logged at once |
-| Spec 9 §6, channels | A snapshot that adds, removes or resizes a channel | Refused with `notInV1`, naming the channels, until Area 14 rebuilds the channels between ticks; a channel on air that would go still answers `onAir` first; labels, defaults and decoder caps restore (Adam's answer) | Rebuild the channels in Area 12 |
-| Spec 9 §6, a list version | Where its file is read | On the worker, behind the same gate as a snapshot, so the control thread never waits for the disk (with the plan) | In the tick |
-| Spec 9 §6, "kept as a version first" | The number the current document is kept under | Its own when its file holds that document and the number isn't kept; else the next above every kept one. The inverse names it (with the plan) | Always its own |
-| Spec 9 §6 and §5, undoing a snapshot restore | Whether the undo takes a snapshot of its own | Yes: every snapshot restore takes one, an undo's included (with the plan) | None for an undo |
-| Spec 9 §6, the worker | A worker that never answers; a file arriving meanwhile | No answer in thirty seconds is `conflict`; an arriving file is looked at after the restore applies and then meets Spec 5 §10 (with the plan) | Wait; reject the restore |
-| Spec 9 §6, the renumber check | Which objects | Every numbered type of both roots, stacks and outputs included (with the plan) | Library types only |
-| Spec 9 §6, folders | A folder the snapshot doesn't list that still holds other files | Kept, with the folders above it; one with nothing visible left is removed (with the plan) | Refuse the restore |
-| Spec 5 §8, the `undo` line | Whether `undo` and `redo` log a line of their own | Yes, not undoable, before the group with source `restore`; with nothing to undo it is `noop` (with the plan) | The group's lines alone |
-| Spec 2 §3, `history jump` | Held by a cue, macro or key | `blocked` with `notInV1`; sent directly, rejected (with the plan) | Always rejected |
-| Spec 9 §4, an older `last.json` | A file without `writtenAt` or `clean`; no file | Without `writtenAt` it isn't restored, reason `old`; without `clean` it counts as not clean; no file starts empty with no `lastStateSkipped` and `previous: none` (with the plan) | Restore it |
-| Spec 9 §4, what else is gone | An output, a stack or a popup slot the machine no longer has | Left out and named in `left`, as a vanished channel is (with the plan) | Refuse the restore |
-| Spec 9 §4, "after a runtime group" | What makes a write due | ShowState or the pending clears differing from what was last written, so a `noop` writes nothing and an edit never does (with the plan) | Every runtime group |
-| Spec 9 §4, stop on request | Which ends are clean | The terminate and interrupt signals and the `--seconds` end; a kill is not (with the plan) | The terminate signal only |
-| Spec 9 §3, "copies the documents on the control thread" | Copy or encode | The roots are copied as values there, one consistent moment; encoding and zipping happen on the worker (with the plan) | Encode on the control thread |
-| Spec 9 §3, equal content | How it is compared | Each document's bytes against the newest zip's, on the worker; no key added to the manifest (with the plan) | A digest in the manifest |
-| Spec 9 §3, the ten minutes | Which clock | Engine time since the last timer snapshot was due (with the plan) | The wall clock |
-| Spec 9 §7, retention ages | How days are counted | Local calendar days between the day in the name and today; a year is 365 days; a file the engine didn't name is never touched (with the plan) | Hours since `takenAt` |
-| Spec 9 §7, a full disk | Which failures; what is retried; what the memory cap drops | `ENOSPC` and `EDQUOT` from any of the engine's writers; every thirty seconds the waiting documents, or with none the held log lines; the first write that succeeds ends it; past the cap the oldest lines go, counted in `lost` (with the plan) | Any failure; a scratch file; drop the newest |
-| Spec 9 §2, the note cap and limits | The second, and the sizes | A sliding second of engine time per client; `note` at most 4 KB as its one-line JSON in UTF-8; `text` at most 1,000 characters as a reader counts them (with the plan) | A calendar second |
-| Spec 9 §2, a `media` line | Its fields | The walk's operation name and the ids, no paths (with the plan) | With paths |
-| Spec 9 §2, the engine log | A media index change beside its worded log line | Written once, as its `media` line; the worded line stays in the engine's memory and the unified log (at stop 1) | Both lines |
-| Spec 9 §2, `conflict` and `unsaved` | How a document is named | By its root and its path in it, `library/lists/007-a.json` (at stop 1) | By object and number |
-| Spec 9 §2, a typing run's line | Which day's file | The day of its own stamp, the last keystroke's, though it is written when the run closes (at stop 1) | The day it is written |
-| Spec 9 §2, "A group's lines go out in one write" | A navigation and the cue it fires | One write for both groups, as one call logs them (at stop 1) | A write per group |
-| Spec 9 §2, the sync | Which files, on which clock | Only a file written since its last sync, once a second of engine time (at stop 1) | Every file, on the wall clock |
-| Spec 9 §2, the engine's notes | What `text` holds | A plain line of words for a reader of the log (at stop 1) | Empty |
-| Spec 9 §2, `dropped` | Counted for whom | Per client: the next note that client writes carries its own count (at stop 1) | One count for all |
-| Spec 9 §2, a malformed `note` request | Its answer | `badValue` (at stop 1) | Ignored |
-| Spec 2 §6, the restores over OSC | Their arguments | One string after `/o/system/restore`, as Spec 9 §9's row shows; no typed form (at stop 1) | Typed arguments too |
-| Spec 9 §2 and §7, old daily black box files | What becomes of them | Trimmed with the earlier hours under the same cap (at stop 1) | Left for ever |
-| Spec 9 §4, the stop | Whether the shutdown macro's picture is shown | No: the stop halts the frame clock first, then runs the macro in one last build with whatever was queued; its commands run and are logged (at stop 2) | Present until its transitions end |
-| Spec 9 §4 and Spec 3 §8, a restore | Timers, and text | Timers are left as the launch has them; running text transitions are dropped, so restored text appears at once (at stop 2) | — |
-| Spec 9 §4, a `writtenAt` ahead of the clock | How old it is | By its distance from now, so more than two hours ahead is `old` (at stop 2) | Any future stamp is `old` |
-| Spec 9 §4, `lastStateSkipped` | The reason when more than one holds; a missing `writtenAt` | The first of `clean`, `old`, `restoredBefore`; `writtenAt` null (at stop 2) | Every reason |
-| Spec 9 §2, `lastStateRestored` | The shape of `left` | A list of `{"channel": 9, "why": "gone"}`, `{"popup": 2, "why": "clearing"}`, `{"channel": 1, "why": "missing", "media": "ID"}` (at stop 2) | Words |
-| Spec 9 §4, what comes back | An output whose stack is gone; what the file doesn't mention; an empty channel never written | The output stays on its default stack; the rest starts fresh; no provenance (at stop 2) | — |
-| Spec 9 §4, the launch write | What it holds when a state comes back | The state about to be put back, with `restored: true`, so a kill during the restore gives `restoredBefore` (at stop 2) | The empty state |
-| Spec 9 §4, the restore | Which frame, which clocks | The first frame built; the write cadence on engine time and `writtenAt` on the wall clock (at stop 2) | — |
-| Spec 9 §4, the startup macro | A macro that doesn't exist | Its group is rejected and logged, and the launch goes on (at stop 2) | Stop the launch |
-| Spec 3 §8, the replacement's effects | What feedback mirrors | The cuts and attributes, and stack, blackout, mute, popup and lock without a transition, once (at stop 2) | The spec's three kinds alone |
-| Spec 4 §6, a restored paused channel | Its clock | A media clock starts as the channel's transport says; before, it always started playing (at stop 2) | — |
-| Spec 9 §3, the `system snapshot` line | Whether it names the snapshot | No: the result names it, and the manifest names the last line logged by `run` and `seq`; Spec 2 §9's `snapshot` key is kept for runtime undo (at stop 3) | A key on the line |
-| Spec 5 §8, a failed undo | Its code | `conflict` when a rule would break; `diskFull`, `noTrash` and `onAir` keep their own (at stop 3) | `conflict` always |
-| Spec 9 §6, `system restore list N` | A number only a local copy has | `notInV1`; a number nothing has is `unknownObject` (at stop 3) | `unknownObject` |
-| Spec 9 §6, a restore that changes nothing | Its result | `noop`, with no inverse and no undo step; the snapshot taken before it stays, as it does when the second checks refuse (at stop 3) | `ok` |
-| Spec 9 §3, a group with `system snapshot` and edits | What the snapshot holds | The documents as they were before that group's own edits (at stop 3) | After them |
-| Spec 9 §3, equal content | What counts | The documents and the library's folders (at stop 3) | Documents alone |
-| Spec 9 §6, reading a snapshot | Which documents must read | All of them, those a restore leaves alone included, since the renumber check reads them (at stop 3) | The replaced kinds |
-| Spec 5 §8, after a redo | Which group a later `undoes` names | The redo's; the step's `source` stays where the edits first came from (at stop 3) | The first group |
-| Spec 5 §5, an undo during typing | Which runs close | Every open run, whichever client typed it (at stop 3) | The sender's |
-| Spec 9 §3, paths in the zip | Where a document sits | Where its file is, or where its first save will put it; two never share a path (at stop 3) | The canonical name always |
-| Spec 9 §3, a snapshot that can't be written | Its code | `diskFull` for want of space, else `conflict`; an engine with no roots on disk answers `conflict` (at stop 3) | — |
-| Spec 9 §6, a snapshot id | What may be one | Letters, digits, `-`, `_` and `.`; anything else is `unknownObject` (at stop 3) | Any string |
-| Spec 9 §6, a restored list's `version` | In memory, before its save | Never below the current one; a list that differs only by `version` isn't touched (at stop 3) | The snapshot's |
-| Spec 9 §6, `readOnlyMasters` | Which checks run | The channel checks are skipped; the renumber check runs over both roots (at stop 3) | — |
-| Spec 9 §6, while a restore is read | The writer's own reports | Taken in as usual; only what a scan of the disk found waits (at stop 3) | Everything waits |
-| Spec 9 §2, the launch snapshot's note | Its place in the log | It takes the next `seq` when the worker's report is read, at the first tick or later (at stop 3) | — |
-| Spec 5 §2, an undo, redo or restore a cue holds | When it runs | After the fire, in order with the cue's edits (new) | At its place in the cue |
-| Spec 5 §8, a direct group with several undos | Which wait for the worker | The step on top is read first; a later one that needs a read the group didn't get is `conflict` (new) | — |
-| Spec 5 §8, "A reload drops steps" | Which documents count | Those whose content a reload changed or took away, not ones the engine's edits won for; a step also touches the lists and playlists whose files it moved or removed (new) | Every file that arrived |
-| Spec 9 §6, a version's file | Whose it is | The file at the list's uuid folder and `vNNNN`; its own `uuid` must be the list's (new) | Its inner `version` too |
-| Spec 9 §6, a restore's refusals | Their order for a list | Operator lock, library mode, the full disk, the list, the version (new) | — |
-| Spec 9 §6, a snapshot's library | How it is known | The manifest's `library` and the zip's `library.json` must both be this library's; a zip without one is `badValue` (new) | The manifest alone |
-| Spec 9 §6, on air | When a channel that would go refuses | It has content and sits in a stack an output now shows; "resized" means its `renderSize` differs (new) | — |
-| Spec 9 §6, a restored list's folder and file | Where it goes | Back to the folder the snapshot had it in, by a move; its name follows its number and title at its save; a playlist's file is renamed when its title's slug changed (new) | Left where it is |
-| Spec 5 §2, a restore's `library` event | What `changed` names | Each list, folder, playlist and local copy, and each numbered object of a catalog, that changed, came or went; `library` and `keys` for those documents (new) | One entry for all |
-| Spec 9 §6, a version that arrived by sync | Whether it counts | Yes: the worker lists the folder, and nothing is written over what it finds (new) | Only those the engine kept |
-| Spec 9 §6, the queries | `keptAt`, and a file that doesn't read | A stamp in the machine's zone; a version or a snapshot whose file doesn't read is left out (new) | — |
-| Spec 9 §5, the `history` topic | Before any edit | Sent on subscribe with both stacks null and `seq` 0 (new) | Nothing until a change |
-| Spec 8 §6 and Spec 9 §6, the gate's timeout | Where it is checked | On every build, whichever workers run; before, only with a media worker (new) | — |
-| Spec 9 §7, retention's ages | The boundaries | To and including 7, 30 and 365 days; a log more than 90 days old goes (new) | Up to but not including |
-| Spec 9 §7, a week that straddles thirty days | What stays | Each day's newest among its newer days, and the week's newest among its older ones (new) | One for the week |
-| Spec 9 §7, when the pass runs | The logs and the snapshots | The logs' on the log thread when a day's file starts, that day being today; the snapshots' on their worker at launch and after each one written (new) | One pass for both |
-| Spec 9 §7, "the newest of each day" | Two in one second | The one with the higher `-N` is the newer (new) | — |
-| Spec 9 §7, the named snapshots | When they are read | As the steps named them when a plan was last built (new) | — |
-| Spec 9 §7, a low disk | The black box's minute records; a paused snapshot | The minute records go on in the black box too; a paused automatic snapshot is taken by the next timer once there is space (new) | Minute records in the engine log only |
-| Spec 9 §7, the full state | When it starts and ends | With any writer's failure for want of space, for all of them; it ends when a waiting document's write or the logs' own try succeeds, each thirty seconds apart (new) | Per writer |
-| Spec 9 §7, between tries | What the engine knows | Nothing until the next try: `system snapshot` and the restores stay `diskFull` for up to thirty seconds after space returns (new) | Probe on every command |
-| Spec 9 §7, `last.json` at a stop on a full disk | Whether it is written | No: it stays removed, so the next launch finds none and starts empty (new) | Try once more |
-| Spec 9 §2, `lost` | What it counts | Lines of either log dropped while they were in memory, as one number; `logToMemory` carries what was lost by then (new) | Per log |
-| Spec 9 §7, `saving` | `unsaved` and `lastSnapshot` | Documents whose first unwritten edit is more than a second old, with those whose write failed; the newest snapshot this run knows of, one it wrote or one its launch matched, null before (new) | — |
-| Spec 5 §2 and Spec 9 §7, a save that fails after its rename | The file's name | Put back, so the document is named where its file still is (new) | Left under the new name |
-| Spec 9 §8, the fixture | The values of the new keys | `writtenAt` 2026-11-08T09:41:07.002-05:00 and a fixed `run`; no test restores from it, since its machine has `restoreLastState` off and the tests' clock is days away (new) | — |
+| Spec 10 §13, channel 2 | Its render size at first run, where "the fixture library's values" gives a fixed 1920 by 1080 | `largest`, as Spec 1 §9 shows it; Spec 10 §13 corrected on the branch (5e63a20), and the fixture keeps its fixed size (Adam's answer) | The fixture's fixed size |
+| Spec 10 §13, the library | What the first-run library is called | "<campus> Library", from `--campus`, or from the machine's own campus when only the library side is missing; "Library" with no campus (Adam's answer) | A fixed name |
+| Spec 10 §13, a hand launch | A root with no `machine.json`, launched without `--campus` and `--operator-screen` | Refused with a line and nothing written; writing only a missing library side needs neither option (Adam's answer) | Write with defaults |
+| Spec 4 §11, §12 and Spec 10 §2, audio at launch | Whether the first frame waits for the audio devices | No: they open on a thread of their own, and until a device has opened its outputs are silent on the stand-in that keeps the channels' clocks moving, as for a device that is absent (Adam's answer at stop 3) | Open them first, as Area 16 built |
+| Spec 10 §3, order | Where a request is answered | At a build boundary; in each build a connection gets its results, then the build's events, then its answers (with the plan) | On the asking thread, which can double an event |
+| Spec 10 §2, `ping` | Who answers | The control side, so a control thread that has stopped shows as not responding (with the plan) | The socket's thread |
+| Spec 2 §9, `commands` | The result of several commands; `group` absent or false | One result, `ok` with the last line's `seq` and `results`, one per command; absent means one group; `false` runs each as its own group (with the plan) | A result per command |
+| Spec 10 §2, `source` | Absent, or not one of the three | Absent is `ui`; anything else is `badValue` (with the plan) | Always `ui` |
+| Spec 10 §3, a slow client | What happens to it | Closed once 4 MB wait for it; it connects again and asks again (with the plan) | Drop its events |
+| Spec 10 §3, `render` and `uses` | Before Area 14 | `notInV1` on the local socket, `localOnly` for `render` on the LAN (with the plan) | `badValue` |
+| Spec 10 §12, the lock's requests | Area 18's requests before Area 18; the `engine` topic's `passcode` | `notInV1` locally and `localOnly` on the LAN; `passcode` false; Area 19 keeps only the token's item (with the plan) | Build them now |
+| Spec 10 §9, `releaseScreen` | Its fields | `screen` in, `outputs` out, and the note carries both (with the plan) | — |
+| Spec 10 §3, `preview` | Its event, and who may subscribe | `stack`, `width`, `height` and `jpeg` as base64; any connection, the local socket included (with the plan) | A binary frame; the LAN only |
+| Spec 10 §2, the Mach channel | Who may connect, and how many | The engine's own user, by the message's audit token; up to four clients (with the plan) | Anyone in the session; one |
+| Spec 10 §2, the Mach channel | The message layouts | Fixed layouts of 32-bit words, each with a version (with the plan) | — |
+| Spec 10 §18, "skipped first" | Among the aux work | The pictures are aux work, which is what is skipped first; there is no order within it (with the plan) | Pictures before previews |
+| Spec 10 §2, a GPU reset | What "made again" means today | The recovery keeps the textures, so the same surfaces are sent again (with the plan) | — |
+| Spec 10 §2, channels added, renumbered or removed | What drives it before Area 14 | One entry point for each, tested directly; Area 14 calls them when it rebuilds the channel list (with the plan) | — |
+| Spec 10 §2, the meters | Silence; a channel on several devices; no sound anywhere | A floor of −120 dBFS; measured on the channel's clock device; one empty frame, then none (with the plan) | — |
+| Spec 4 §10, the output window | Its level | The screen-saver level (with the plan) | As it was |
+| Spec 10 §11, a screen's mode | What follows a change now | The window; the output's render size and rate stay its `format` until Area 17 rebuilds outputs (with the plan) | Rebuild here |
+| Spec 10 §2, exit statuses | Roots that don't load, which exited 3 like a held root | They exit 4 (with the plan) | — |
+| Spec 10 §13, uuids | Which are fixed | The built-ins keep the fixtures': Preset 1, transitions 1 to 3 and audio transitions 1 to 3; everything else is new (with the plan) | All new |
+| Spec 10 §13, the rate family | Screens of both families | The ports take the family of the first screen output (with the plan) | — |
+| Spec 10 §2, the OSC retry | What is sent again | The newest message per address for that target (with the plan) | Nothing |
+| CLAUDE.md, dependencies | Apple frameworks, and a C shim | Network, Security and IOKit without an ADR, as Compression and CryptoKit were taken; no C target was needed (with the plan) | An ADR each |
+| Spec 10 §2, the Mach call | Which call registers the service | `bootstrap_check_in` first, the deprecated `bootstrap_register` behind the seam when it is refused; both work on the dev Mac, from an app LaunchServices started too, so no launchd agent (at stop 1) | A per-user agent |
+| Spec 10 §2, the deprecated call | How Swift reaches it | Looked up by name when it is needed, with no C target (at stop 1) | A C shim |
+| Spec 10 §2, the service's name | Its form | `org.lcbc.projecto.engine.` and the run's uuid (at stop 1) | — |
+| Spec 10 §18, the proof | What becomes of its tools | `oengine mach-proof` and `scripts/mach-proof.sh` are kept as tooling, with `oengine devices` and, later, `oengine mach-watch` (at stop 1) | Removed after the proof |
+| Spec 10 §2, the lock file | After the engine exits | The file stays, with the last engine's process id; only the kernel's lock on it says an engine runs (at stop 2) | Removed at exit |
+| Spec 10 §2, the socket | A path over 103 bytes; another failure to open it | The launch stops with a line; any other failure is logged and the engine runs on without its socket (at stop 2) | — |
+| Spec 10 §3, `outputs` | `absent` beside `paused` | `absent` is an output whose device hasn't been there this run, `paused` one that presented and lost it; a screen that goes hides the window, and it opens again when the screen returns (at stop 2) | One state |
+| Spec 4 §2, the master clock | When it is chosen | At launch: the card's, else the first display output with a screen, else the timer; it isn't chosen again when screens change (at stop 2) | Chosen again |
+| Spec 10 §2, the accessory process | Launching without becoming the active app | It launches as a process that can't be activated and becomes an accessory process once launched, since macOS made an accessory process the active app at launch (at stop 2, found by hand) | An accessory from the start |
+| Spec 10 §3, order | When each kind of request is taken | A command goes to the engine's queue as it arrives; every other request is taken when the next build starts and answered when it ends; `auth` is checked as it arrives (at stop 2) | All at the boundary |
+| Spec 2 §9, `auth` | A command sent on a LAN connection before it | The connection is closed and the command never runs; a test caught one reaching the engine (at stop 2) | — |
+| Spec 10 §3, the events' own keys | Names the spec doesn't give | `audioOutput` on the `audio` topic, `clearInMs` on `popups`, null when nothing counts, and `named` in the catalog for the list or playlist its number or title names (at stop 2) | — |
+| Spec 10 §3, `state` | Its shape | `state`, `timers` and `events`, with `seq` and `rev` (at stop 2) | — |
+| Spec 10 §3, `thumbnails` | A stack other than the thumbnail stack | `notInV1` (at stop 2) | Draw on any stack |
+| Spec 10 §3, files on the API | How a tile or a thumbnail is named | By its path relative to the machine root when it is inside it (at stop 2) | Absolute |
+| Spec 10 §3, `fonts` | Which faces | Installed and bundled, without the system's hidden faces, whose names begin with a dot (at stop 2) | Every face |
+| Spec 4 §13, `metrics` | When it is worked out | Once a second while someone is subscribed, off the control thread (at stop 2) | Always |
+| Spec 10 §3, `remote` | Whether a rejected command counts | Yes: its source is activity too (at stop 2) | Only commands that ran |
+| Spec 10 §3, a result | Which lines it speaks for | Those under the group's id from its sender's source, and an edit folded into a typing run (at stop 2) | — |
+| Spec 10 §2, a frame message | When a preview or picture frame is named | Only when that tick's GPU work has finished; a frame still unfinished after a second is dropped, and nothing is named for a tick that failed (at stop 3) | Named as it is planned |
+| Spec 10 §2, a client that doesn't read | What the engine does | That message is dropped for it; the engine never waits for a client (at stop 3) | Close the client |
+| Spec 10 §2, the meters | "Its loudest audio channel" | The highest peak among the content's channels, and the RMS of the one with the most energy (at stop 3) | One channel for both |
+| Spec 10 §2, the meters | A paused channel that has sound | It reads the floor (at stop 3) | No reading |
+| Spec 10 §12, the token's item | Its name and what it holds | Account `api-token.` and the machine's uuid; whatever text it holds is the token; an item that isn't text is unreadable and is not replaced (at stop 3) | Replace it |
+| Spec 10 §2, the Keychain | How often it is read | Once, at launch; a refusal stands until the next launch (at stop 3) | Ask again |
+| Spec 10 §2, the retry | "Every few seconds"; a refusal the system doesn't report | Five; a listener that opens and isn't advertised within five seconds counts as refused (at stop 3) | — |
+| Spec 10 §2, the listener | A failure that isn't a refusal, such as a port something else holds | Shown as `closed` and retried the same way (at stop 3) | Give up |
+| Spec 2 §9, a silent client | A LAN connection that sends nothing | Closed after ten seconds (at stop 3) | Left open |
+| Spec 2 §9, "Nothing listens beyond the local network" | Whether connections are limited to the same link | No relay, and no limit to the same link, since a campus may route between the engine's network and a remote's; the token admits a client (at stop 3) | Same link only |
+| Spec 10 §3, `preview` | How fresh, and under pressure | The stack's preview from two previews back, so never a frame half drawn; none while the previews are being skipped (at stop 3) | The newest |
+| Spec 10 §13, the app's screen | It isn't among the Mac's screens | No screen becomes an output; the card's ports still do (at stop 3) | Every screen does |
+| Spec 10 §13, audio output 1 | A Mac with no default output device | No audio output 1 is written, and the embedded ones still number from 2, so the channels feed none of them (at stop 3) | Embedded from 1 |
+| Spec 10 §13, a refused launch | Its exit, and what it leaves | Status 2, and the lock takes back the file and the folders it made (at stop 3) | Status 1 |
+| Spec 10 §13, where the roots may live | Who checks the place | The app's sheet; the engine checks only that the socket's path fits (at stop 3) | The engine refuses too |
+| Spec 4 §4, a reused plan | Its previews and pictures | Skipped, as under pressure, so no surface is drawn twice from one plan (new) | Drawn again |
+| Spec 10 §2, the picture | How it is filtered, and a missing channel's | Each picture pixel is the mean of the block it covers, up to 32 samples a side; opaque over black; a missing channel's is cleared without reading its texture (new) | — |
+| Spec 10 §18, sound alone | A channel whose media is audio with no picture | No picture, and no channel pass is run for one (new) | — |
+| Spec 10 §2, the meters | How the level leaves the audio callback; mute and delay | With atomics and memory the instance holds from the start, where the plan said a ring; after the channel's gain and its transition, before the output's mute and delay (new) | A ring; after mute |
+| Spec 10 §2, a client leaving | How the engine learns of it | Its next send to that client fails, within a thirtieth of a second while previews flow (new) | A death notice |
+| Spec 10 §3, `engine` | The client count; the LAN's state while an OSC send is refused | Connections that have signed in; `waiting` though the listener is open (new) | Every open connection; `open` |
+| Spec 10 §2, the OSC retry | Which failures count as refused | The errors a send gets while the system holds local traffic back or the target can't be reached; a message the socket can't carry is not kept (new) | Every failure |
+| Spec 2 §9, a WebSocket frame | What one carries | One JSON object in a text frame; a binary frame or a message over 1 MB closes the connection (new) | — |
+| Spec 2 §9, Bonjour's name | A machine with no campus name; a campus edited while it runs | "Project O"; a changed name or port takes effect at the next launch until Area 17 (new) | — |
+| Spec 10 §12, a new token | One that can't be written to the Keychain | Not used: the listener stays closed with the `keychain` badge, since the next launch would make another (new) | Used for this run |
+| Spec 10 §2, a run without the LAN | Whether there is one | `--no-lan` opens no listener and never touches the Keychain (new) | Always on |
+| Spec 10 §13, labels and channels | Audio output 1's label; an embedded output's; a one-channel device | The device's name; the port's name with "embedded"; channel 0 alone (new) | "System default" |
+| Spec 10 §13, a root half written | Documents there but no `library.json` or `machine.json` | The missing ones are written and those there are kept; the side's own document goes last, so a launch cut short is finished by the next (new) | Refuse |
+| Spec 10 §13, the first window's line | The engine's part of it | It prints "output N is NAME" for each new output in its console log (new) | — |
+| Spec 10 §2, the launch's first checks | Their order | The lock, then the socket's path, then first run's options; a launch that stops at either check leaves nothing behind (new) | — |
+| Spec 10 §2, the relaunch rule | A file without `clean` or `writtenAt`; a boot time that isn't known | Without `clean` it counts as not clean, as for the restore; without `writtenAt` it isn't of this boot; with no boot time only the flag makes a relaunch (new) | — |
+| Spec 10 §2, "after the Mac started" | Where the boot time comes from | The kernel's, a wall-clock stamp like the file's (new) | Uptime |
+| Spec 10 §2, `--released` | Its form | Given once for each screen (new) | One list |
+| Spec 10 §18, the soak | Its screens, and what its client must be sent | Its display outputs take the screens `--screens` names, or every screen of the Mac left to right, and one past the last screen stays absent; the run fails when the client was sent no surfaces or no preview frame for a stack (new) | — |
+| Spec 4 §12, a stop while a device opens | Whether the stop waits | No; a device that opens after the stop is stopped again (new) | Wait for it |
 
 ### Spec corrections proposed
 
-None. Area 12's one proposal was accepted and applied (7dbdf7d): Spec 9 §6 and §10 now say
-that, until Area 14 rebuilds the channel list between ticks, a snapshot that adds, removes
-or resizes a channel is refused with `notInV1`, naming the channels.
+Both wait for Adam's answer with the Area 19 brief, and are applied on the branch on
+`approved`.
+
+- **Spec 4 §12, the audio device row.** It says a device absent at launch gets the same rule
+  as one that vanishes, and nothing of one that is slow to open. The code opens the audio
+  devices on a thread of their own, after the frame clock has started. The fix: add "The
+  engine opens its audio devices beside its first frames; until a device has opened, its
+  outputs are silent, as for a device that is absent."
+- **Spec 10 §13, the roots.** It says the app starts the engine with `--campus`, and nothing
+  of a launch without it. The code refuses one on a root with no `machine.json`. The fix:
+  add "A launch on a machine root with no `machine.json` and without `--campus` and
+  `--operator-screen` writes nothing and exits with status 2."
+
+Applied already: Spec 10 §13's sentence on channel 2's render size (5e63a20, on Adam's
+answer of 2026-11-15).
 
 ## Next
 
-**Area 19 — Engine API and first run** (branch `area/api`). It runs in its own session from
-the common preamble in `docs/build-order.md` and its own block there, verbatim:
+**Area 13 — Show-mode UI** (branch `area/show`), once Area 19 is merged and the bench run
+has passed. It runs in its own session from the common preamble in `docs/build-order.md`
+and its own block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -296,45 +331,33 @@ message under the four headings in CLAUDE.md. Then stop. Merge only when I write
 ```
 
 ```
-Area: 19, engine API and first run. Spec: docs/specs/10-show-mode-ui.md §2 (the engine
-side), §3, §13 and §16, with §18's Area 19 tests; Spec 2 §5, §8 and §9, Spec 4 §2, §5,
-§10, §12 and §14, Spec 5 §6 and Spec 9 §2–§5 as Spec 10 corrected them. Starts after
-Area 12 is merged: until then Areas 8, 9, 11 and 12 publish their topics and answer their
-queries and requests through the engine's own publisher, and this area puts them on the
-API. It is engine-only and needs no bench run. On main: the engine driven over OSC, a
-quarter-size preview texture per stack backed by an IOSurface (Area 5), cue thumbnails
-and pool tiles as files, and EngineProcess, whose screen(for:) falls back to the next
-screen. Prove the Mach call first, on the dev Mac: bootstrap_check_in, or
-bootstrap_register behind its seam, looked up from an app that didn't start the engine;
-stop for review there, and if neither works, propose the per-user launchd agent before
-anything else. Then the engine as a process (§2): the local socket with its owner-only
-mode, the peer check, and hello once the engine takes commands; sources taken from that
-socket only; the lock file with the process id and exit status 3; the console log
-trimmed in place; the accessory process with its activity and sleep assertions; output
-windows as non-activating panels on every Space that absorb clicks; and display outputs
-that wait for their own screen. Then §3: subscriptions with answers and events in the
-order produced and their seq, the topics and the queries, each answered with its
-request's id or refused (Spec 2 §9 as Spec 11 corrected it), results with group and
-applied, the requests the LAN refuses with localOnly, the notes, and Spec 2 §8's group
-validation against the state the earlier commands leave. Then the Mach channel's
-payloads: three preview surfaces per stack and three picture surfaces per channel with
-their frame messages and the pictures' aux pass (choice U-3), and the meters. Then the
-LAN listener with the token read on a background thread, Bonjour and the preview topic;
-the first-run writer of §13 with output detection and --campus; the relaunch rule with
---relaunch and --released (Spec 9 §4 as corrected); the soak client that holds the Mach
-channel; and the fixture's clear-all binding moved to shift+escape (§16). Tests first
-from §18. Stop for review after the Mach proof, after the socket and §3, and after first
-run. Nothing in app/.
+Area: 13, show-mode UI. Spec: docs/specs/10-show-mode-ui.md §1–§10, §14 and §15, with
+§18's Area 13 tests; the UX spec (docs/ux-spec.md) and the clickable demo for look and
+feel where the spec is silent, asking before guessing. Starts after Area 19 is merged
+and after the bench run passes (Spec 4 §15). The app is new: an Xcode project in app/
+that depends on the package at the root, with AppKit and SwiftUI as CLAUDE.md divides
+them. Build the engine connection first: the roots in the app's preferences; finding,
+starting and restarting the engine with the curtains and the restart rule (§2, choice
+U-7); Quit; the scripted engine on a local socket that the tests drive; and the models
+fed by §3's topics and queries. Then the window and its regions (§4–§8), with the
+previews, the channel pictures and the meters from the Mach channel; the keys with their
+precedence and the fixed keys (§9); the edits of §10 with undo and redo; drops from the
+Finder that import and then write (choice U-8); the restore sheets and the tags (§14);
+the notes and view.json; and VoiceOver labels and the string catalog from the first
+build (§15). Edit mode is Area 14's, Bind a Key… waits for Area 17, and Lock Station and
+the lock tag for Area 18: their entries stay disabled until then. Tests first from §18.
+Stop for review after the engine connection, after the grid and the strip, and after the
+keys.
 ```
 
 **After Area 19:**
 
-- **Area 19 meets Area 12's work on `main`.** The engine's publisher already holds the `history` and
-  `saving` topics (each sent to a new subscriber at once), the `note` request and the
-  `versions` and `snapshots` queries; the stop sequence returns what it couldn't write, for
-  the `stop` request's answer; the launch returns what became of the last state, for the
-  `engine` topic; and the launch decision takes the relaunch as an input that `--relaunch`
-  and the detection set.
+- **What Area 19 hands Area 13.** On `area/api` until it merges: the local socket in the
+  machine root with `hello`, the topics, queries and requests of Spec 10 §3, the Mach
+  channel with the previews, the channel pictures and the meters (`MachClient` is its other
+  end, and `oengine mach-watch` shows what it carries), first run with `--campus` and
+  `--operator-screen`, `--relaunch` and `--released`, and the exit statuses the app tells
+  apart: 3 for a held root, 4 for roots that don't load, 2 for a first run asked wrongly.
 - **The app's areas, after the bench run.** Area 13 follows Area 19, 14 follows 13, 10
   follows 14, 17 follows 13 and 14, and 18 follows 17.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
