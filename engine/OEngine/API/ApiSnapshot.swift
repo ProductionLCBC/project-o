@@ -40,8 +40,8 @@ struct ApiSnapshot: Sendable {
     var timers: [Int: TimerReading]
     var timerSlots: Int
     var popupSlots: Int
-    /// Spec 7 §6 — the `live` event as its topic would send it now.
-    var live: JSONValue
+    /// Spec 7 §6 — the live reading, for the `live` event as its topic would send it now.
+    var live: LiveSnapshot
     var standings: [Int: OutputStanding]
     /// Spec 10 §3 — for SDI outputs, "its reference (`locked`, `freeRun` or `none`)".
     var references: [Int: String]
@@ -68,7 +68,7 @@ struct ApiSnapshot: Sendable {
         timers = control.timerReadings(at: frame)
         timerSlots = control.variables.timerSlots
         popupSlots = control.variables.popupSlots
-        live = control.lastLive.event(frame: Int(frame), rate: rate, seq: seq)
+        live = control.lastLive
         standings = engine.outputStandings()
         var references: [Int: String] = [:]
         for output in machine.outputs where output.kind == .sdi {
@@ -96,6 +96,11 @@ struct ApiSnapshot: Sendable {
         mediaFiles = control.mediaFiles
         mediaTiles = control.mediaTiles
         tilesFolder = control.mediaWorker?.tilesFolder
+    }
+
+    /// Spec 7 §6 — "The `live` event", as its topic would send it now.
+    var liveEvent: JSONValue {
+        live.event(frame: Int(frame), rate: rate, seq: seq)
     }
 
     /// Milliseconds from this snapshot's frame to `frame`, never negative.

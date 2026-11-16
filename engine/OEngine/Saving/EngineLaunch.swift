@@ -136,6 +136,9 @@ extension Engine {
         // Step 6 — "The retention pass (§7)": the snapshots, on their worker, after the launch's own. The
         // logs' pass ran when this run's day began in each (step 2), and the black box's runs with its first line.
         control.snapshots?.retain()
+        // Spec 10 §3 — the `engine` topic carries "the last state this run", and files are named from the machine root.
+        launchReport = report
+        machineRoot = options.machineRoot
         return report
     }
 

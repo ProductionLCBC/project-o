@@ -252,6 +252,15 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 9 §4 — the launch order, on the roots this process loaded: the logs open and the run's `start`
         // note is written before anything can send a command ("The engine takes commands from step 5 on").
         engine.launch(LaunchOptions(machineRoot: roots.machineRoot, relaunch: options.relaunch))
+        // Spec 10 §3 — the `devices` topic, "On subscribe and when a screen, a card or an audio device comes or goes",
+        // and the `metrics` topic's summary (Spec 4 §13), which is the process's to give.
+        let listed = engine
+        listed.deviceLister = devices
+        listed.metricsSource = { [weak self] in self?.metricsSnapshot() ?? MetricsSnapshot(tickNanoseconds: listed.pacing.tickNanoseconds) }
+        let outputs = displayOutputs
+        DispatchQueue.main.async { MainActor.assumeIsolated { outputs.onChange = { listed.devicesChanged() } } }
+        devices.watchAudio { listed.devicesChanged() }
+        listed.devicesChanged()
         // Spec 10 §2 — "opens its local socket ... at that list's step 5, when it takes commands, so `hello` means it
         // is ready."
         openSocket()

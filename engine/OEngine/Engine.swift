@@ -21,6 +21,17 @@ public final class Engine: @unchecked Sendable {
     public let publisher = EnginePublisher()
     /// Spec 10 §3 — the API's hub, which puts the publisher on the wire for every connection, in one order.
     public let api: ApiHub
+    /// Spec 10 §3 — the topics this spec defines, published once a build on the control side.
+    private let topics = ApiTopics()
+    private let status = ApiStatus()
+    /// Spec 9 §4 — what the launch made of the last state, for the `engine` topic (Spec 10 §3); nil for an engine that was only built.
+    public internal(set) var launchReport: LaunchReport?
+    /// The machine root this engine launched on: thumbnails and tiles are named "relative to the machine root" (Spec 10 §3).
+    public internal(set) var machineRoot: URL?
+    /// Spec 4 §13 — the live summary for the `metrics` topic; the process gives it, since the black box is its own.
+    public var metricsSource: (@Sendable () -> MetricsSnapshot)?
+    /// Spec 10 §3 — the devices this Mac has, for the `devices` query and topic.
+    public var deviceLister: (any DeviceLister)?
     public let pacing: Pacing
     public let backend: any RenderBackend
     public let clock: any MasterClock
@@ -73,6 +84,15 @@ public final class Engine: @unchecked Sendable {
             pressure.add(thumbnails)
             let render = self.render
             thumbnails.auxBlocked = { render.isSkippingAux }
+            // Spec 10 §3, the `thumbnails` topic — "A cue thumbnail written, with its stack, list, cue and file".
+            thumbnails.onWritten = { [weak self] result, list in
+                guard let self else { return }
+                self.publisher.publish(ApiEvents.event("thumbnails", [
+                    "stack": .number(Double(result.stack)), "list": .number(Double(list.number)),
+                    "listUuid": .string(list.uuid.uuidString.lowercased()), "cue": .string(result.cue.uuidString.lowercased()),
+                    "file": .string(ApiQueries.relative(result.url, to: self.machineRoot)),
+                ], seq: self.control.commandLog.lastSeq))
+            }
         }
     }
     /// Spec 10 §2 — "while any output presents it keeps the displays and the
@@ -254,8 +274,24 @@ public final class Engine: @unchecked Sendable {
         }
         sweepReleases()
         warmThumbnailsIfTheListChanged()
-        power?.update(outputStandings())
-        api.takeRequests(self)
+        // Spec 10 §3 — the engine's values as this build left them: the topics' events are made from them now, and
+        // the answers to the requests this build took are made from the same.
+        let snapshot = ApiSnapshot(engine: self)
+        topics.publish(snapshot, control: control, to: publisher)
+        status.publish(engine: self, snapshot: snapshot, now: clock.now())
+        power?.update(snapshot.standings)
+        api.takeRequests(self, snapshot: snapshot)
+    }
+
+    /// Spec 10 §3, the `devices` topic — sent "On subscribe and when a screen, a card or an audio device comes or
+    /// goes": the list is read again, off the caller's thread, and kept as the topic's current value.
+    public func devicesChanged() {
+        guard let deviceLister else { return }
+        let publisher = self.publisher
+        let control = self.control
+        api.workers.async {
+            publisher.publish(current: ApiEvents.event("devices", ApiQueries.devices(deviceLister), seq: control.commandLog.lastSeq))
+        }
     }
 
     /// Spec 10 §3, the `outputs` topic — each output's state, by number:

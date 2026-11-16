@@ -1,6 +1,7 @@
 // OEngine — Spec 10 §3 and §13, the devices of this Mac.
 
 import AppKit
+import CoreAudio
 import CoreGraphics
 import Foundation
 import OCore
@@ -41,6 +42,17 @@ public final class SystemDevices: DeviceLister, @unchecked Sendable {
 
     public func devices() -> DetectedDevices {
         DetectedDevices(screens: keptScreens, ports: Self.readPorts(), audio: HALOutputDevice.outputDevices())
+    }
+
+    /// Spec 10 §3, the `devices` topic — "when ... an audio device comes or
+    /// goes": calls `onChange`, on a utility queue, whenever Core Audio's list
+    /// of devices or its default output changes. For the process's life.
+    public func watchAudio(_ onChange: @escaping @Sendable () -> Void) {
+        let queue = DispatchQueue(label: "o.engine.devices.audio", qos: .utility)
+        for selector in [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultOutputDevice] {
+            var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+            AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue) { _, _ in onChange() }
+        }
     }
 
     /// Spec 10 §3 — each screen with its `display:<uuid>`, name, frame,

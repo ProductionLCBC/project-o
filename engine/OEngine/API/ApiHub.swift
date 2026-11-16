@@ -198,6 +198,17 @@ public final class ApiHub: @unchecked Sendable {
         }
         let id = members["id"] ?? .null
         let type = members["type"]?.stringValue ?? ""
+        // Spec 2 §9 — "the first message on a connection must be `{"type": "auth", "token": "..."}` or the socket
+        // closes." Nothing else is taken from a LAN connection until then: not a command, which would otherwise be
+        // on its way to the engine's queue already, and not a request.
+        if connection.origin == .lan, !isAuthorized(connection) {
+            guard type == "auth" else {
+                connection.close()
+                return
+            }
+            authorize(connection, id: id, offered: members["token"]?.stringValue)
+            return
+        }
         switch type {
         case "command", "commands":
             if let refusal = submit(members, id: id, type: type, from: connection) {
@@ -323,27 +334,18 @@ public final class ApiHub: @unchecked Sendable {
 
     /// The build's events have gone: now the requests it took, in the order
     /// they came.
-    func takeRequests(_ engine: Engine) {
+    func takeRequests(_ engine: Engine, snapshot: ApiSnapshot) {
         lock.lock()
         let requests = sealed
         sealed = []
         lock.unlock()
-        for request in requests where !request.connection.isClosed { answer(request, engine: engine) }
+        for request in requests where !request.connection.isClosed { answer(request, engine: engine, snapshot: snapshot) }
     }
 
-    private func answer(_ request: Request, engine: Engine) {
+    private func answer(_ request: Request, engine: Engine, snapshot: ApiSnapshot) {
         let connection = request.connection
         if let ready = request.ready {
             connection.send(ready)
-            return
-        }
-        // Spec 2 §9 — "the first message on a connection must be `auth` or the socket closes".
-        if connection.origin == .lan, !isAuthorized(connection) {
-            guard request.type == "auth" else {
-                connection.close()
-                return
-            }
-            authorize(request)
             return
         }
         if connection.origin == .lan, Self.localOnly.contains(request.type) {
@@ -356,7 +358,7 @@ public final class ApiHub: @unchecked Sendable {
         case "subscribe":
             subscribe(request)
         case "query":
-            query(request, engine: engine)
+            query(request, engine: engine, snapshot: snapshot)
         case "note":
             // Spec 9 §2 — "the engine stamps `ts`, `seq` and the client's source".
             connection.send(publisher.request(.object(request.members), source: CommandSource(kind: sourceKind(of: request)), client: connection.client))
@@ -365,7 +367,9 @@ public final class ApiHub: @unchecked Sendable {
         case "releaseScreen":
             release(request, engine: engine)
         case "auth":
-            connection.send(Self.rejected(request.id, Rejection(reason: .badValue, message: "the local socket takes no token")))
+            // Spec 10 §2 — "No token is sent" on the local socket; a LAN connection that is here has given its own already.
+            connection.send(Self.rejected(request.id, Rejection(reason: .badValue, message: connection.origin == .local
+                                                                    ? "the local socket takes no token" : "this connection is already authorized")))
         case let type where Self.later.contains(type):
             connection.send(Self.rejected(request.id, Rejection(reason: .notInV1, message: "\(type) comes with the operator lock (Area 18)")))
         default:
@@ -429,15 +433,67 @@ public final class ApiHub: @unchecked Sendable {
     /// "type": "answer", …}` ... and refused with the rejected result". The
     /// answer's place is taken now, in order; its content is worked out off
     /// the control thread and fills the place.
-    private func query(_ request: Request, engine: Engine) {
-        let place = request.connection.reserve()
-        let publisher = self.publisher
+    private func query(_ request: Request, engine: Engine, snapshot: ApiSnapshot) {
         let connection = request.connection
-        let asked = JSONValue.object(request.members)
+        let id = request.id
+        let members = request.members
+        let what = members["what"]?.stringValue ?? ""
+        // Spec 10 §3 — "`render` answers with a file on this Mac, so on the LAN it is `localOnly`"; both are Area 14's.
+        if what == "render" || what == "uses" {
+            let rejection = what == "render" && connection.origin == .lan
+                ? Rejection(reason: .localOnly, message: "render answers with a file on the engine's Mac")
+                : Rejection(reason: .notInV1, message: "the \(what) query comes with edit mode (Area 14)")
+            connection.send(Self.rejected(id, rejection))
+            return
+        }
+        let place = connection.reserve()
+        let publisher = self.publisher
+        let machineRoot = engine.machineRoot
+        let lister = engine.deviceLister
+        let thumbnails = engine.thumbnails
         workers.async {
-            connection.fill(place, with: publisher.query(asked))
+            let outcome: Result<[String: JSONValue], Rejection>?
+            switch what {
+            case _ where ApiQueries.fromSnapshot.contains(what):
+                outcome = ApiQueries.answer(what, members, in: snapshot, machineRoot: machineRoot)
+            case "devices":
+                outcome = lister.map { .success(ApiQueries.devices($0)) } ?? .failure(Rejection(reason: .conflict, message: "this engine lists no devices"))
+            case "fonts":
+                outcome = .success(ApiQueries.fonts())
+            case "thumbnails":
+                outcome = ApiQueries.thumbnails(members, in: snapshot, service: thumbnails, machineRoot: machineRoot)
+            default:
+                // Spec 9 §6 — `versions` and `snapshots` read files, where the area that built them answers them.
+                outcome = nil
+            }
+            switch outcome {
+            case .success(var fields)?:
+                fields["id"] = id
+                fields["type"] = .string("answer")
+                connection.fill(place, with: .object(fields))
+            case .failure(let rejection)?:
+                connection.fill(place, with: Self.rejected(id, rejection))
+            case nil:
+                connection.fill(place, with: publisher.query(.object(members)))
+            }
         }
     }
+
+    /// Spec 10 §2 — the LAN listener's state and client count, and whether the Keychain could be read, as the
+    /// `engine` topic reports them.
+    public var lan: LanStanding {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return lanStanding
+        }
+        set {
+            lock.lock()
+            lanStanding = newValue
+            lock.unlock()
+        }
+    }
+    private var lanStanding = LanStanding()
 
     // MARK: - The local requests
 
@@ -502,21 +558,23 @@ public final class ApiHub: @unchecked Sendable {
     }
 
     /// Spec 2 §9 — "the first message on a connection must be `{"type":
-    /// "auth", "token": "..."}` or the socket closes."
-    private func authorize(_ request: Request) {
+    /// "auth", "token": "..."}` or the socket closes." Checked as it
+    /// arrives, on the connection's own thread: it reads nothing of the
+    /// engine's, and what the client sends next must find it authorized.
+    private func authorize(_ connection: ApiConnection, id: JSONValue, offered: String?) {
         lock.lock()
         let expected = token
         lock.unlock()
-        guard let expected, let offered = request.members["token"]?.stringValue, Self.same(offered, expected) else {
-            request.connection.close()
+        guard let expected, let offered, Self.same(offered, expected) else {
+            connection.close()
             return
         }
         lock.lock()
-        request.connection.authorized = true
+        connection.authorized = true
         lock.unlock()
         // "The envelope carries `"api": 1` in the auth reply".
-        request.connection.send(.object(["id": request.id, "type": .string("result"), "result": .string("ok"),
-                                         "api": .number(Double(Self.apiVersion)), "engine": .string(OCore.appVersion)]))
+        connection.send(.object(["id": id, "type": .string("result"), "result": .string("ok"),
+                                 "api": .number(Double(Self.apiVersion)), "engine": .string(OCore.appVersion)]))
     }
 
     /// Two strings compared in time that doesn't depend on where they differ.
