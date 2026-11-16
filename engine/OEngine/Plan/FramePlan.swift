@@ -415,23 +415,42 @@ public enum AuxKind: String, Codable, Sendable {
     case preview
     case multiviewer
     case thumbnail
+    /// Spec 10 §2, choice U-3 — a channel's live picture for the operator app's strip.
+    case picture
 }
 
 /// Spec 4 §10 — "Aux passes downscale the stack textures into small BGRA8
-/// sRGB textures": the stack texture rendered this tick (`source`) into the
-/// stack's preview texture (`target`, IOSurface-backed, a quarter of the
-/// output size per Spec 4 §5).
+/// sRGB textures": the stack texture rendered this tick (`source`) into one
+/// of the stack's preview textures (`target`, IOSurface-backed, a quarter of
+/// the output size per Spec 4 §5).
+///
+/// Spec 10 §2 — a preview is "written into three IOSurfaces in turn", and
+/// "the engine writes the next frame into the oldest of the three, so the app
+/// reads only finished frames": `slot` says which of the three this pass
+/// writes, and the frame message names it once the GPU has finished.
+///
+/// A `picture` pass (Spec 4 §10, Spec 10 §2) takes a channel's texture "fit
+/// into 256 by 144 over black, filtered in one pass": `channel` names it, and
+/// `clear` makes the picture black without reading the texture, for "A
+/// channel whose media is missing gets a black picture, never its texture's
+/// old pixels."
 public struct AuxPass: Equatable, Codable, Sendable {
     public var kind: AuxKind
     public var stack: Int
     public var source: TextureHandle
     public var target: TextureHandle
+    public var slot: Int
+    public var channel: Int
+    public var clear: Bool
 
-    public init(kind: AuxKind, stack: Int, source: TextureHandle, target: TextureHandle) {
+    public init(kind: AuxKind, stack: Int, source: TextureHandle, target: TextureHandle, slot: Int = 0, channel: Int = 0, clear: Bool = false) {
         self.kind = kind
         self.stack = stack
         self.source = source
         self.target = target
+        self.slot = slot
+        self.channel = channel
+        self.clear = clear
     }
 }
 

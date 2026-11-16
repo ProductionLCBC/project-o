@@ -80,6 +80,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         samplerLevelZero = device.makeSamplerState(descriptor: samplerDescriptor)
         try pipelines.ensureBlur()
         try pipelines.ensureDownscale()
+        try pipelines.ensurePicture()
         queue.label = "o.engine.render"
         auxQueue.label = "o.engine.aux"
     }
@@ -185,6 +186,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         }
         if !plan.auxPasses.isEmpty {
             do { try pipelines.ensureDownscale() } catch { log.error("downscale pipeline: \(error)") }
+            do { try pipelines.ensurePicture() } catch { log.error("picture pipeline: \(error)") }
         }
     }
 
@@ -598,7 +600,55 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     /// sRGB textures at most 30 times a second, backed by IOSurfaces."
     private func encodeAux(_ pass: AuxPass, into buffer: MTLCommandBuffer) {
         guard let source = texture(pass.source), let target = texture(pass.target) else { return }
-        encodeDownscale(source: source, target: target, into: buffer, label: "preview stack \(pass.stack)")
+        if pass.kind == .picture {
+            encodePicture(source: source, target: target, clear: pass.clear, into: buffer)
+        } else {
+            encodeDownscale(source: source, target: target, into: buffer, label: "preview stack \(pass.stack)")
+        }
+    }
+
+    /// Spec 4 §10, Spec 10 §2 — the channel picture: "its channel texture fit into 256 by 144 over black, filtered in
+    /// one pass so it doesn't alias", "without a mip chain". Every target pixel inside the fitted picture is the
+    /// mean of the block of the channel's pixels it covers; outside it, and for a channel whose media is missing
+    /// (`clear`), the picture is black.
+    func encodePicture(source: MTLTexture, target: MTLTexture, clear: Bool, into buffer: MTLCommandBuffer) {
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = target
+        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        descriptor.colorAttachments[0].storeAction = .store
+        guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        encoder.label = "channel picture"
+        defer { encoder.endEncoding() }
+        guard !clear else { return }
+        guard let pipeline = pipelines.picturePipeline else {
+            missingPipelineCount += 1
+            return
+        }
+        var uniforms = MetalBackend.pictureUniforms(source: PixelSize(width: source.width, height: source.height),
+                                                    target: PixelSize(width: target.width, height: target.height))
+        encoder.setRenderPipelineState(pipeline)
+        encoder.setFragmentTexture(source, index: 0)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<PictureUniforms>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+    }
+
+    /// Where a channel's texture lands in its picture, and how many of its pixels each picture pixel takes in: the
+    /// texture keeps its shape, centred, and the taps cover the block of source pixels one picture pixel stands for.
+    static func pictureUniforms(source: PixelSize, target: PixelSize) -> PictureUniforms {
+        let sw = Float(max(1, source.width)), sh = Float(max(1, source.height))
+        let tw = Float(max(1, target.width)), th = Float(max(1, target.height))
+        let scale = min(tw / sw, th / sh)
+        let width = sw * scale / tw, height = sh * scale / th
+        let across = min(32, max(1, Int((1 / scale).rounded(.up)))), down = across
+        return PictureUniforms(fit: SIMD4((1 - width) / 2, (1 - height) / 2, width, height),
+                               taps: SIMD4(Float(across), Float(down), 1 / sw, 1 / sh))
+    }
+
+    /// Spec 10 §2 — "each stack's preview as three IOSurfaces, sent as Mach ports": the surface behind a preview or
+    /// picture texture.
+    public func surface(of handle: TextureHandle) -> IOSurfaceRef? {
+        texture(handle)?.iosurface
     }
 
     /// The box-filter downscale of `source` into `target`, at whatever ratio

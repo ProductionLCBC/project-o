@@ -40,6 +40,8 @@ public enum OEngineCommandLine {
                 return try machProof(rest)
             case "devices":
                 return devices()
+            case "mach-watch":
+                return try machWatch(rest)
             default:
                 fail("unknown command \(first)\n" + usage)
                 return 2
@@ -77,6 +79,10 @@ public enum OEngineCommandLine {
            --register) and answer each lookup with one surface until killed; opens no screen (Spec 10 §2)
       mach-proof lookup <name> [<result-file>]
            look <name> up, read the surface it sends and say what was read; exit 1 when it isn't there
+      mach-watch <name> [--seconds N]
+           hold a running engine's Mach channel (the name its hello gives) for N seconds, 3 by default, and say
+           what arrived: each stack's preview surfaces and each channel's pictures, how many frames a second
+           were named, whether the newest hold a picture, and the meters; exit 1 when nothing arrived
     A display output opens only on the screen its device names (display:<uuid>); while that screen isn't there
     the output is absent, and it opens when the screen appears.
     """
@@ -296,6 +302,27 @@ public enum OEngineCommandLine {
         guard let json = try? JSONCoding.encode(list) else { return 1 }
         print(JSONCanonical.string(json), terminator: "")
         return 0
+    }
+
+    // MARK: - mach-watch
+
+    /// Spec 10 §2, "The Mach channel" — the channel from a process that
+    /// didn't start the engine, as the operator app will hold it: looks the
+    /// service up under the name `hello` gives, holds it for a few seconds and
+    /// says what arrived. The check by hand on the bench.
+    static func machWatch(_ args: Arguments) throws -> Int32 {
+        guard let name = args.positional.first else { throw ProcessError.missingArgument("<name>") }
+        let seconds = Double(try args.int("--seconds") ?? 3)
+        let client = MachClient()
+        try client.connect(name: name)
+        Thread.sleep(forTimeInterval: seconds)
+        let lines = client.report(seconds: seconds)
+        let arrived = client.state.previewSets + client.state.pictureSets
+        client.disconnect()
+        print("mach-watch: pid \(getpid()) held \(name) for \(Int(seconds)) s")
+        print(lines.joined(separator: "\n"))
+        if arrived == 0 { print("mach-watch: no surface arrived") }
+        return arrived == 0 ? 1 : 0
     }
 
     // MARK: - mach-proof

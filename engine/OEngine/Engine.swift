@@ -2,6 +2,7 @@
 // and its sinks injected".
 
 import Foundation
+import IOSurface
 import OCore
 import OFormats
 import Synchronization
@@ -283,6 +284,43 @@ public final class Engine: @unchecked Sendable {
         api.takeRequests(self, snapshot: snapshot)
     }
 
+    /// Spec 10 §2 — the Mach channel, once it is open: the preview surfaces, the channel pictures and the meters.
+    public private(set) var mach: MachChannel?
+
+    /// Spec 10 §2 — "The engine registers a Mach service in the user's bootstrap namespace under the name `hello`
+    /// gives": opens the Mach channel for this run. `surface` finds the IOSurface behind a preview or picture
+    /// texture; it is the Metal backend's unless a test gives its own. While a client holds the channel the strip's
+    /// pictures are planned (Spec 4 §2) and the render thread says which surface each frame went to.
+    @discardableResult
+    public func openMachChannel(service: any MachService = BootstrapMachService(), surface: (@Sendable (TextureHandle) -> IOSurfaceRef?)? = nil,
+                                allows: @escaping @Sendable (uid_t) -> Bool = { $0 == geteuid() }) throws -> MachChannel {
+        if let mach { return mach }
+        let backend = self.backend
+        let find = surface ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
+        let previews = control.previewSurfaces, pictures = control.pictureSurfaces
+        @Sendable func sets(_ handles: [Int: [TextureHandle]]) -> [MachSurfaceSet] {
+            handles.keys.sorted().compactMap { number in
+                let surfaces = (handles[number] ?? []).compactMap(find)
+                guard surfaces.count == FrameRing.depth, let first = surfaces.first else { return nil }
+                return MachSurfaceSet(number: number, width: IOSurfaceGetWidth(first), height: IOSurfaceGetHeight(first), surfaces: surfaces)
+            }
+        }
+        let audio = self.audio
+        let control = self.control
+        let render = self.render
+        let source = MachChannel.Source(previews: { sets(previews) }, pictures: { sets(pictures) },
+                                        finished: { receipt in backend.completion(of: receipt).map { !$0.failed } },
+                                        meters: { audio?.takeMeters() ?? [] })
+        let channel = MachChannel(service: service, name: MachServiceName.engine(run: run), notices: render.auxNotices, source: source, log: log,
+                                  allows: allows, onClients: { count in
+            control.picturesWanted.store(count > 0, ordering: .releasing)
+            render.auxListening.store(count > 0, ordering: .releasing)
+        })
+        try channel.start()
+        mach = channel
+        return channel
+    }
+
     /// Spec 10 §3, the `devices` topic — sent "On subscribe and when a screen, a card or an audio device comes or
     /// goes": the list is read again, off the caller's thread, and kept as the topic's current value.
     public func devicesChanged() {
@@ -320,10 +358,11 @@ public final class Engine: @unchecked Sendable {
     }
 
     /// Spec 4 §10 — "those IOSurfaces are shared with it over a local Mach
-    /// connection": the surface behind each stack's preview, by stack number.
-    public var previewSurfaces: [Int: UInt32] {
+    /// connection": the surfaces behind each stack's preview, by stack number,
+    /// three each (Spec 10 §2).
+    public var previewSurfaces: [Int: [UInt32]] {
         guard let metal = backend as? MetalBackend else { return [:] }
-        return control.previewTargets.compactMapValues { metal.surfaceID(of: $0) }
+        return control.previewSurfaces.mapValues { $0.compactMap { metal.surfaceID(of: $0) } }
     }
 
     /// Spec 4 §3 — "A released handle is not reused until the control side says
@@ -343,6 +382,8 @@ public final class Engine: @unchecked Sendable {
     func recoverIfNeeded() {
         guard render.takeGPUFailure() else { return }
         backend.rebuild()
+        // Spec 10 §2 — the surfaces are sent again "whenever they are made again, as after a GPU reset (Spec 4 §12)".
+        mach?.resendSurfaces()
         recoveries += 1
         watchdog.recordRecovery(.pipelinesRebuilt)
         log.severe("GPU work of a tick failed; sinks hold their last good frame; pipelines rebuilt")
@@ -510,6 +551,7 @@ public final class Engine: @unchecked Sendable {
             for sink in sinks.values { sink.stop() }
             // Spec 10 §2 — nothing presents any more, so the displays and the system may sleep.
             power?.end()
+            mach?.stop()
             controlThread = nil
             readbackThread = nil
         }

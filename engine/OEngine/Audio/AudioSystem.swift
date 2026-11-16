@@ -89,6 +89,10 @@ public final class AudioSystem: @unchecked Sendable {
     private let lock = NSLock()
     private var started = false
     private var notedChannels: Set<Int> = []
+    /// Spec 10 §2 — the instances the meters read: one per attached sound, on its clock device.
+    /// Guarded by `meterLock` alone, never by `lock`.
+    private var metered: [ObjectIdentifier: AudioInstance] = [:]
+    private let meterLock = NSLock()
     /// Spec 4 §12 and §13 — a loss while running is a recovery the soak counts.
     public var onRecovery: (@Sendable (WatchdogRecovery) -> Void)?
 
@@ -291,8 +295,10 @@ public final class AudioSystem: @unchecked Sendable {
         var members: [AudioAttachment.Member] = []
         for (i, slot) in reached.enumerated() {
             let ring = rings[i]
+            // Spec 10 §2 — a channel's level is measured once, on the first device it reaches, which is its clock.
             let instance = AudioInstance(handle: handle, ring: ring, inMs: inMs, syncOffsetMs: syncOffsetMs,
-                                         routing: slot.graph.routing(forAudioOutputs: numbers, instanceChannels: ring.channels))
+                                         routing: slot.graph.routing(forAudioOutputs: numbers, instanceChannels: ring.channels),
+                                         meterChannel: i == 0 ? channel : 0)
             guard slot.graph.add(instance, gainDb: gainDb) else {
                 for member in members { member.graph.remove(member.instance) }
                 return nil
@@ -309,11 +315,45 @@ public final class AudioSystem: @unchecked Sendable {
                 log.info("channel \(channel) routes to audio outputs on more than one device; device \(clock.key) (output \(clock.outputs.map(\.number).filter { numbers.contains($0) }.min() ?? 0)) is its clock and the others may drift")
             }
         }
+        if let first = members.first {
+            meterLock.lock()
+            metered[ObjectIdentifier(first.instance)] = first.instance
+            meterLock.unlock()
+        }
         return AudioAttachment(handle: handle, members: members)
     }
 
     public func detach(_ attachment: AudioAttachment) {
+        meterLock.lock()
+        for member in attachment.members { metered[ObjectIdentifier(member.instance)] = nil }
+        meterLock.unlock()
         for member in attachment.members { member.graph.remove(member.instance) }
+    }
+
+    /// Spec 10 §2 — "Meters: 15 times a second, for each channel whose
+    /// content has sound, the peak and RMS level in dBFS since the last
+    /// frame, after gain, of its loudest audio channel." The levels since the
+    /// last call, one reading per channel that has sound attached now; a
+    /// channel crossing from one instance to the next reads both. Called
+    /// from the Mach channel's sender, never the audio callback.
+    public func takeMeters() -> [MeterReading] {
+        // One reader at a time: each instance keeps where its last take stood. The meters have a lock of their own,
+        // held for a few atomic reads and never while a device opens: the system's lock is held through a device's
+        // start, which can take seconds, and neither the Mach channel's sender nor an attach may wait on that.
+        meterLock.lock()
+        defer { meterLock.unlock() }
+        let instances = Array(metered.values)
+        var levels: [Int: (peak: Float, square: Double, frames: Int64)] = [:]
+        for instance in instances {
+            let taken = instance.takeMeter()
+            let so = levels[instance.meterChannel] ?? (0, 0, 0)
+            levels[instance.meterChannel] = (max(so.peak, taken.peak), so.square + taken.square, max(so.frames, taken.frames))
+        }
+        return levels.keys.sorted().compactMap { channel in
+            guard let level = levels[channel] else { return nil }
+            let rms = level.frames > 0 ? Float((level.square / Double(level.frames)).squareRoot()) : 0
+            return MeterReading(channel: channel, peak: MeterReading.decibels(level.peak), rms: MeterReading.decibels(rms))
+        }
     }
 
     /// Spec 4 §11 — "per-instance gain ... with a 50 ms ramp on change", on every device.

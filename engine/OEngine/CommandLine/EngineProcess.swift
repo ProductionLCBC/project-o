@@ -261,6 +261,9 @@ public final class EngineProcess: @unchecked Sendable {
         DispatchQueue.main.async { MainActor.assumeIsolated { outputs.onChange = { listed.devicesChanged() } } }
         devices.watchAudio { listed.devicesChanged() }
         listed.devicesChanged()
+        // Spec 10 §2 — "The engine registers a Mach service in the user's bootstrap namespace under the name `hello`
+        // gives". "If the Mach channel fails, the preview tiles and the strip's pictures say so, and everything else works."
+        do { try engine.openMachChannel() } catch { log.error("the Mach channel did not open: \(error)") }
         // Spec 10 §2 — "opens its local socket ... at that list's step 5, when it takes commands, so `hello` means it
         // is ready."
         openSocket()

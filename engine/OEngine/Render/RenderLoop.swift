@@ -54,6 +54,11 @@ public final class RenderLoop: @unchecked Sendable {
     private let lastDepths = Atomic<UInt64>(0)
     private let lastDepthCount = Atomic<Int>(0)
     private let skippingAux = Atomic<Bool>(false)
+    /// Spec 10 §2 — each preview and picture the render thread drew, for the Mach channel's sender, which names the
+    /// surface once the GPU has finished it. Written only while someone listens.
+    public let auxNotices = AuxNoticeRing()
+    /// Set while a client holds the Mach channel; with nobody listening no notice is written.
+    public let auxListening = Atomic<Bool>(false)
 
     public init(backend: any RenderBackend, planRing: PlanRing, sources: SourceTable, sinks: [Int: any OutputSink],
                 metrics: MetricsRing, pacing: Pacing, maxChannelPasses: Int = 32) {
@@ -137,10 +142,23 @@ public final class RenderLoop: @unchecked Sendable {
             }
         }
 
-        // 3. Encode and commit; 5. aux only with headroom.
-        let options = EncodeOptions(skipAux: pressure.skipAux, dropExtras: pressure.droppingExtras)
-        skippingAux.store(options.skipAux, ordering: .relaxed)
+        // 3. Encode and commit; 5. aux only with headroom. Spec 10 §2 — "the app reads only finished frames": a plan
+        //    used a second time would draw its previews into the surfaces it has already named, under the reader, so a
+        //    reused plan skips its aux passes; the next plan draws into the next surface.
+        let options = EncodeOptions(skipAux: pressure.skipAux || record.planReused, dropExtras: pressure.droppingExtras)
+        skippingAux.store(pressure.skipAux, ordering: .relaxed)
         let receipt = backend.encode(time, plan: plan, picks: picks, options: options)
+        // Spec 10 §2 — "After each preview frame completes, a message names the stack and the surface that holds the
+        // newest frame": the render thread says what it drew and with which GPU work; the sender does the waiting.
+        if !options.skipAux, auxListening.load(ordering: .relaxed) {
+            for pass in plan.auxPasses {
+                if pass.kind == .preview {
+                    auxNotices.write(AuxNotice(kind: .preview, number: Int32(truncatingIfNeeded: pass.stack), slot: Int32(truncatingIfNeeded: pass.slot), receipt: receipt))
+                } else if pass.kind == .picture {
+                    auxNotices.write(AuxNotice(kind: .picture, number: Int32(truncatingIfNeeded: pass.channel), slot: Int32(truncatingIfNeeded: pass.slot), receipt: receipt))
+                }
+            }
+        }
 
         // 4. Publish each due output's frame into its ring; the sink presents on its own cadence.
         for sink in plan.sinkPasses {
