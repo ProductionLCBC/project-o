@@ -38,10 +38,16 @@ public final class EngineLock: @unchecked Sendable {
     public let url: URL
     private let descriptor: Int32
     private let released = Atomic<Bool>(false)
+    /// What taking the lock made that wasn't there: the lock file, and the folders down to the machine root,
+    /// deepest first. `withdraw` takes them away again.
+    private let madeFile: Bool
+    private let madeFolders: [URL]
 
-    private init(url: URL, descriptor: Int32) {
+    private init(url: URL, descriptor: Int32, madeFile: Bool, madeFolders: [URL]) {
         self.url = url
         self.descriptor = descriptor
+        self.madeFile = madeFile
+        self.madeFolders = madeFolders
     }
 
     deinit { release() }
@@ -51,6 +57,14 @@ public final class EngineLock: @unchecked Sendable {
     /// engine's to write (Spec 10 §13) and the lock comes first.
     public static func acquire(machineRoot: URL) -> Result<EngineLock, Failure> {
         let url = machineRoot.appendingPathComponent(fileName)
+        // The folders this launch is about to make, deepest first, so a launch that gives up can leave nothing behind.
+        var missing: [URL] = []
+        var folder = machineRoot.standardizedFileURL
+        while folder.path != "/", !FileManager.default.fileExists(atPath: folder.path) {
+            missing.append(folder)
+            folder = folder.deletingLastPathComponent()
+        }
+        let madeFile = !FileManager.default.fileExists(atPath: url.path)
         try? FileManager.default.createDirectory(at: machineRoot, withIntermediateDirectories: true)
         let descriptor = open(url.path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
         guard descriptor >= 0 else { return .failure(.unavailable(path: url.path, code: errno)) }
@@ -65,7 +79,7 @@ public final class EngineLock: @unchecked Sendable {
         _ = ftruncate(descriptor, 0)
         _ = pwrite(descriptor, text, text.count, 0)
         _ = fsync(descriptor)
-        return .success(EngineLock(url: url, descriptor: descriptor))
+        return .success(EngineLock(url: url, descriptor: descriptor, madeFile: madeFile, madeFolders: missing))
     }
 
     /// Spec 10 §2 — "finding the engine by the process id in `.engine.lock`":
@@ -82,5 +96,18 @@ public final class EngineLock: @unchecked Sendable {
         guard !released.exchange(true, ordering: .acquiringAndReleasing) else { return }
         _ = flock(descriptor, LOCK_UN)
         close(descriptor)
+    }
+
+    /// Spec 10 §13 (Adam's answer of 2026-11-15) — a launch that is refused
+    /// "writes nothing": lets the root go and takes away the lock file and the
+    /// folders that taking the lock made. A folder that holds anything, or
+    /// was there before, stays.
+    public func withdraw() {
+        guard !released.exchange(true, ordering: .acquiringAndReleasing) else { return }
+        // The file goes while the lock is still held, so no other engine can have taken it in between.
+        if madeFile { unlink(url.path) }
+        _ = flock(descriptor, LOCK_UN)
+        close(descriptor)
+        for folder in madeFolders where rmdir(folder.path) != 0 { break }
     }
 }

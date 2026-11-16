@@ -77,6 +77,38 @@ final class EngineLockTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: library.path))
     }
 
+    /// Spec 10 §13 (Adam's answer of 2026-11-15) — a launch that is refused
+    /// "writes nothing": what taking the lock made goes again, and nothing
+    /// that was there before does.
+    func test_withdrawingTakesAwayWhatTakingTheLockMadeAndNothingElse() throws {
+        // A machine root two folders deep that isn't there yet.
+        let fresh = root.appendingPathComponent("Project O/machine")
+        try EngineLock.acquire(machineRoot: fresh).get().withdraw()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("Project O").path), "the folders it made are gone")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path), "the folder that was there stays")
+
+        // A folder that was there, with something in it: only the lock file goes.
+        let used = root.appendingPathComponent("used")
+        try FileManager.default.createDirectory(at: used, withIntermediateDirectories: true)
+        try Data("kept".utf8).write(to: used.appendingPathComponent("note.txt"))
+        try EngineLock.acquire(machineRoot: used).get().withdraw()
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: used.path), ["note.txt"])
+
+        // A lock file an earlier engine left stays, and the root can be taken again.
+        let before = root.appendingPathComponent("before")
+        try EngineLock.acquire(machineRoot: before).get().release()
+        try EngineLock.acquire(machineRoot: before).get().withdraw()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: before.appendingPathComponent(".engine.lock").path))
+        try EngineLock.acquire(machineRoot: before).get().release()
+
+        // Something written into a fresh root while it was held keeps the folder.
+        let filled = root.appendingPathComponent("filled")
+        let lock = try EngineLock.acquire(machineRoot: filled).get()
+        try Data("{}".utf8).write(to: filled.appendingPathComponent("machine.json"))
+        lock.withdraw()
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: filled.path), ["machine.json"])
+    }
+
     /// Status 3 is the app's sign that another engine holds the root, which
     /// it doesn't count as an end; roots that don't load are an end, with a
     /// status of their own, and they let the root go.

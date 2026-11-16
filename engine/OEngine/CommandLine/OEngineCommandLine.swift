@@ -60,10 +60,15 @@ public enum OEngineCommandLine {
     usage: oengine <command> [options]
       version
       run  --library <root> --machine <root> [--osc-port N] [--blackbox <folder>] [--seconds N] [--no-audio] [--no-lan]
+           [--campus <name> --operator-screen display:<uuid>]
            the engine on the machine's outputs until Ctrl-C or --seconds; OSC on the machine's port;
            the logs in <machine>/logs and the black box in <machine>/blackbox unless --blackbox names a folder;
            the LAN API on the machine's apiPort once its token is read from the login keychain (made there
            at the first launch), advertised over Bonjour; --no-lan opens no listener and leaves the Keychain alone;
+           first run: a library root without library.json gets the first-run library, and a machine root
+           without machine.json gets this Mac's (its outputs are every DeckLink port, then every screen but the
+           one --operator-screen names; --campus names it); a file that is there is never written over, and
+           without both options a root with no machine.json is refused, with nothing written (status 2);
            exits with status 3 when another engine holds the machine root, 4 when the roots don't load
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio] [--no-lan]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure
@@ -99,6 +104,10 @@ public enum OEngineCommandLine {
     /// Spec 10 §2 — the root's lock, held for as long as the process runs.
     nonisolated(unsafe) static var engineLock: EngineLock?
 
+    /// Spec 10 §13 (Area 19 reading) — a launch that can't do the first run it
+    /// would have to do was asked wrongly: it exits as a wrong command does.
+    static let firstRunRefusedExitStatus: Int32 = 2
+
     static func runEngine(_ args: Arguments, soak: Bool) throws -> Int32 {
         let libraryRoot = try args.url("--library"), machineRoot = try args.url("--machine")
         // Spec 10 §2 — "One engine per machine root": the lock first, before the roots are read or anything is written.
@@ -110,11 +119,37 @@ public enum OEngineCommandLine {
             if case .held = failure { return EngineLock.heldExitStatus }
             return 1
         }
-        // Spec 10 §2 — "the engine trims the file in place to its last 10 MB at launch".
-        ConsoleLog.trim(ConsoleLog.url(machineRoot: machineRoot))
-        // Spec 10 §2 — "The socket's path must fit macOS's limit of 103 bytes": an engine the app can't reach doesn't start.
+        // Spec 10 §2 — "The socket's path must fit macOS's limit of 103 bytes, so first run refuses a location that
+        // would make it longer (§13)": an engine the app can't reach doesn't start, and leaves nothing behind.
         if let failure = LocalSocket.check(path: LocalSocket.url(machineRoot: machineRoot).path) {
             fail("\(failure)")
+            withdrawLock()
+            return 1
+        }
+        // Spec 10 §13 — first run needs the campus and the app's screen; a launch without them writes nothing, so
+        // what taking the lock made goes again too.
+        let firstRun = FirstRunWriter.Request(libraryRoot: libraryRoot, machineRoot: machineRoot, campus: args.options["--campus"],
+                                              operatorScreen: args.options["--operator-screen"])
+        if let refusal = FirstRunWriter.refusal(firstRun) {
+            fail(refusal)
+            withdrawLock()
+            return firstRunRefusedExitStatus
+        }
+        // Spec 10 §2 — "the engine trims the file in place to its last 10 MB at launch".
+        ConsoleLog.trim(ConsoleLog.url(machineRoot: machineRoot))
+        // Spec 10 §2 — "It writes any first-run documents before Spec 9 §4's first step": whichever side is missing,
+        // once, and never over a file that is there (Spec 10 §13).
+        switch FirstRunWriter.run(firstRun, devices: { MainActor.assumeIsolated { _ = NSApplication.shared; return SystemDevices().devices() } }) {
+        case .nothing:
+            break
+        case .wrote(let written):
+            for line in FirstRunWriter.lines(written, request: firstRun) { print("oengine: " + line) }
+        case .refused(let why):
+            fail(why)
+            releaseLock()
+            return firstRunRefusedExitStatus
+        case .failed(let why):
+            fail(why)
             releaseLock()
             return 1
         }
@@ -129,6 +164,12 @@ public enum OEngineCommandLine {
     /// Lets the machine root go: at a stop, and when a launch gives up.
     static func releaseLock() {
         engineLock?.release()
+        engineLock = nil
+    }
+
+    /// Lets the machine root go and takes away what taking it made: a launch that was refused before it wrote anything.
+    static func withdrawLock() {
+        engineLock?.withdraw()
         engineLock = nil
     }
 
