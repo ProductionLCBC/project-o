@@ -1,7 +1,6 @@
 import XCTest
 import OCore
 @testable import OEngine
-import protocol OEngine.AudioDevice   // the engine's, not Core Audio's type of the same name
 
 /// Spec 10 §2, "The Mach channel" — "Meters: 15 times a second, for each
 /// channel whose content has sound, the peak and RMS level in dBFS since the
@@ -142,29 +141,12 @@ final class AudioMeterTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(audio.takeMeters().first).peak, -18.06, accuracy: 0.05, "after it, the incoming alone")
     }
 
-    /// A factory whose devices open only when the test lets them: a HAL device can take seconds to start.
-    final class SlowFactory: AudioDeviceFactory, @unchecked Sendable {
-        let inner = SoftwareAudioDeviceFactory()
-        let opening = DispatchSemaphore(value: 0)
-        let gate = DispatchSemaphore(value: 0)
-
-        func isPresent(key: String) -> Bool { true }
-        func makeDevice(key: String, channelCount: Int) -> (any AudioDevice)? {
-            opening.signal()
-            gate.wait()
-            return inner.makeDevice(key: key, channelCount: channelCount)
-        }
-        func makeSilenceDevice(name: String, channelCount: Int) -> PacedAudioDevice { inner.makeSilenceDevice(name: name, channelCount: channelCount) }
-        func observeDeviceList(_ handler: @escaping @Sendable () -> Void) { inner.observeDeviceList(handler) }
-        func stopObserving() { inner.stopObserving() }
-    }
-
     /// Found on the dev Mac on 2026-11-16: a launch whose audio device was
     /// slow to open left the Mach channel sending nothing, because the meters
     /// were read under the lock the system holds while a device opens. The
     /// meters have their own lock now, and reading them never waits on a device.
     func test_takingTheMetersNeverWaitsOnADeviceThatIsSlowToOpen() throws {
-        let factory = SlowFactory()
+        let factory = SlowAudioFactory()
         let audio = AudioSystem(outputs: [output(1, device: "A")], factory: factory, log: EngineLog(category: "test-meters"))
         let starter = Thread { audio.start() }
         starter.start()

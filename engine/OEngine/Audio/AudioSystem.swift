@@ -86,7 +86,13 @@ public final class AudioSystem: @unchecked Sendable {
     private let factory: any AudioDeviceFactory
     private let destinations: [Int: any StreamAudioDestination]
     private let log: EngineLog
+    /// Guards the small state other threads read: whether the system is started, each slot's standing and
+    /// stand-in, the channels already noted. Held for a few lines at a time and never while a device opens.
     private let lock = NSLock()
+    /// One settle at a time. Held while a device is made and started, which Core Audio can take seconds over
+    /// (fourteen, on the dev Mac on 2026-11-16), so only the opening thread and the device-list recheck take it:
+    /// never the control thread, the meters, a badge's reader or a stop.
+    private let settleLock = NSLock()
     private var started = false
     private var notedChannels: Set<Int> = []
     /// Spec 10 §2 — the instances the meters read: one per attached sound, on its clock device.
@@ -149,25 +155,77 @@ public final class AudioSystem: @unchecked Sendable {
 
     /// Spec 4 §11 — open every device; Spec 4 §12 — a device absent at launch
     /// gets its fallback or silence, never a guess; then watch the device list.
-    public func start() {
+    ///
+    /// With `openingInBackground` the call returns at once (Adam's answer at
+    /// Area 19's third stop, 2026-11-16: the frame clock first, the audio
+    /// devices on a thread of their own). Every device's graph runs from that
+    /// moment on its silence stand-in, so a channel's clock and its picture go
+    /// on, and "an output is silent until its device has opened, as it is for
+    /// a device that is absent"; the embedded feeds, which open nothing slow,
+    /// start before the call returns. Without it the devices are open when the
+    /// call returns, as the harness wants.
+    public func start(openingInBackground: Bool = false) {
         lock.lock()
-        defer { lock.unlock() }
-        guard !started else { return }
+        guard !started else {
+            lock.unlock()
+            return
+        }
         started = true
-        for slot in slots { settle(slot, atStartup: true) }
-        factory.observeDeviceList { [weak self] in self?.recheckDevices() }
+        lock.unlock()
+        if openingInBackground {
+            for slot in slots {
+                guard case .device = slot.kind else { continue }
+                // The stand-in the graph was made with: starting it is quick, and opens nothing.
+                do { try slot.graph.swapDevice(to: slot.graph.device) } catch { log.error("audio device \(slot.key): its silence stand-in did not start (\(error))") }
+            }
+            settleLock.lock()
+            for slot in slots {
+                if case .embedded = slot.kind { settle(slot, atStartup: true) }
+            }
+            settleLock.unlock()
+        }
         for (_, destination) in destinations {
             destination.observeStream { [weak self] in self?.recheckDevices() }
         }
+        let open: @Sendable () -> Void = { [self] in
+            settleLock.lock()
+            defer { settleLock.unlock() }
+            guard isStarted else { return }
+            for slot in slots {
+                if openingInBackground, case .embedded = slot.kind { continue }
+                settle(slot, atStartup: true)
+            }
+            guard isStarted else { return }
+            factory.observeDeviceList { [weak self] in self?.recheckDevices() }
+        }
+        guard openingInBackground else {
+            open()
+            return
+        }
+        let thread = Thread(block: open)
+        thread.name = "o.engine.audio.open"
+        thread.qualityOfService = .userInitiated
+        thread.start()
     }
 
+    /// Stops every graph. It doesn't wait for a device that is still opening:
+    /// that device is stopped again as soon as it has opened.
     public func stop() {
         lock.lock()
-        defer { lock.unlock() }
-        guard started else { return }
+        guard started else {
+            lock.unlock()
+            return
+        }
         started = false
+        lock.unlock()
         factory.stopObserving()
         for slot in slots { slot.graph.stop() }
+    }
+
+    private var isStarted: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return started
     }
 
     /// Spec 4 §12 — "Core Audio device notification": every graph checks its
@@ -175,10 +233,31 @@ public final class AudioSystem: @unchecked Sendable {
     /// card starting or stopping, and by the tests after they mark a device
     /// absent or back.
     public func recheckDevices() {
+        settleLock.lock()
+        defer { settleLock.unlock() }
+        guard isStarted else { return }
+        for slot in slots { settle(slot, atStartup: false) }
+    }
+
+    /// A slot's standing and stand-in, read and written under the state's lock.
+    private func standing(of slot: Slot) -> (standing: AudioDeviceStanding, standIn: String?) {
         lock.lock()
         defer { lock.unlock() }
-        guard started else { return }
-        for slot in slots { settle(slot, atStartup: false) }
+        return (slot.standing, slot.standIn)
+    }
+
+    private func set(_ slot: Slot, standing: AudioDeviceStanding, standIn: String?) {
+        lock.lock()
+        slot.standing = standing
+        slot.standIn = standIn
+        lock.unlock()
+    }
+
+    /// With the settle lock held: moves the graph to `device`. A system that
+    /// was stopped while the device opened doesn't keep it running.
+    private func move(_ slot: Slot, to device: any AudioDevice) throws {
+        try slot.graph.swapDevice(to: device)
+        if !isStarted { slot.graph.stop() }
     }
 
     private func isPrimaryPresent(_ slot: Slot) -> Bool {
@@ -199,15 +278,14 @@ public final class AudioSystem: @unchecked Sendable {
     /// fallback when configured and present, else silence. Every change logs
     /// one line per output; a loss while running is a recovery.
     private func settle(_ slot: Slot, atStartup: Bool) {
-        let previous = slot.standing
+        let (previous, previousStandIn) = standing(of: slot)
         let numbers = slot.outputs.map(\.number)
         if isPrimaryPresent(slot) {
             if previous == .primary, slot.graph.device.isRunning { return }
             if let device = primaryDevice(for: slot) {
                 do {
-                    try slot.graph.swapDevice(to: device)
-                    slot.standing = .primary
-                    slot.standIn = nil
+                    try move(slot, to: device)
+                    set(slot, standing: .primary, standIn: nil)
                     for number in numbers {
                         slot.graph.setSilenced(false, output: number)
                         if !atStartup { log.info("audio output \(number): device \(slot.key) back") }
@@ -220,10 +298,10 @@ public final class AudioSystem: @unchecked Sendable {
         }
         let wording = previous == .primary && !atStartup ? "lost" : "absent"
         if let fallback = slot.fallbackKey, factory.isPresent(key: fallback) {
-            if previous == .fallback, slot.standIn == fallback, slot.graph.device.isRunning { return }
+            if previous == .fallback, previousStandIn == fallback, slot.graph.device.isRunning { return }
             if let device = factory.makeDevice(key: fallback, channelCount: slot.channelCount) {
                 do {
-                    try slot.graph.swapDevice(to: device)
+                    try move(slot, to: device)
                     for output in slot.outputs {
                         if output.fallbackDevice == fallback {
                             slot.graph.setSilenced(false, output: output.number)
@@ -233,8 +311,7 @@ public final class AudioSystem: @unchecked Sendable {
                             log.warning("audio output \(output.number): device \(slot.key) \(wording); silent until it returns")
                         }
                     }
-                    slot.standing = .fallback
-                    slot.standIn = fallback
+                    set(slot, standing: .fallback, standIn: fallback)
                     if previous == .primary, !atStartup { onRecovery?(.audioDeviceLost(slot.key)) }
                     return
                 } catch {
@@ -242,24 +319,27 @@ public final class AudioSystem: @unchecked Sendable {
                 }
             }
         }
-        if previous == .silent, slot.graph.device.isRunning { return }
+        // Already silent and running: nothing to do, except at launch, where a graph opened in the background runs on
+        // its stand-in from the start and the absence still has to be said.
+        if previous == .silent, slot.graph.device.isRunning, !atStartup { return }
         for number in numbers {
             slot.graph.setSilenced(false, output: number)
-            if previous == .fallback, let standIn = slot.standIn {
+            if previous == .fallback, let standIn = previousStandIn {
                 log.warning("audio output \(number): fallback device \(standIn) lost; silent until a device returns")
             } else {
                 log.warning("audio output \(number): device \(slot.key) \(wording); silent until it returns")
             }
         }
-        let lostKey = previous == .fallback ? (slot.standIn ?? slot.key) : slot.key
-        let standIn: any AudioDevice = slot.feed ?? factory.makeSilenceDevice(name: slot.key, channelCount: slot.channelCount)
+        let lostKey = previous == .fallback ? (previousStandIn ?? slot.key) : slot.key
+        // A graph already on a silence stand-in, as one opened in the background is from the start, keeps it.
+        let current = slot.graph.device as? PacedAudioDevice
+        let standIn: any AudioDevice = slot.feed ?? (current?.destination == nil ? current : nil) ?? factory.makeSilenceDevice(name: slot.key, channelCount: slot.channelCount)
         do {
-            try slot.graph.swapDevice(to: standIn)
+            try move(slot, to: standIn)
         } catch {
             log.error("audio output \(numbers.map(String.init).joined(separator: ", ")): the silence stand-in did not start (\(error))")
         }
-        slot.standing = .silent
-        slot.standIn = nil
+        set(slot, standing: .silent, standIn: nil)
         if previous != .silent, !atStartup { onRecovery?(.audioDeviceLost(lostKey)) }
     }
 

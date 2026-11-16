@@ -418,8 +418,11 @@ public final class Engine: @unchecked Sendable {
         for output in sinks.keys.sorted() {
             do { try sinks[output]?.start() } catch { log.error("output \(output) did not start: \(error)") }
         }
-        // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each.
-        audio?.start()
+        // Spec 4 §11 and §12 — every device opens, or its fallback, or silence; the system logs each. On a thread of
+        // its own: Core Audio can take seconds to open a device, and the first frame doesn't wait for it (Spec 4 §1,
+        // "Every output presents a frame every refresh"; Adam's answer at Area 19's third stop). Until a device has
+        // opened its outputs are silent, on a stand-in that keeps the channels' clocks moving.
+        audio?.start(openingInBackground: true)
         // The first plan, so the first tick has something to render; what it
         // ran gets its feedback and its errors like any other build.
         api.buildWillStart()
