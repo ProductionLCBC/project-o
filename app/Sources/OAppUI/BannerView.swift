@@ -63,8 +63,12 @@ final class BannerView: NSView {
         restart.isHidden = !banner.offersRestart
         console.stringValue = banner.console.joined(separator: "\n")
         console.isHidden = banner.console.isEmpty
-        // Spec 10 §4 — red for errors; the sentence says it too, so colour is never the only signal (§15).
-        layer?.backgroundColor = (banner.tone == .failure ? Palette.live.withAlphaComponent(0.28) : Palette.panel).cgColor
+        // Spec 10 §4 — red for errors, amber for warnings; the sentence says it too, so colour is never the only signal (§15).
+        switch banner.tone {
+        case .failure: layer?.backgroundColor = Palette.live.withAlphaComponent(0.28).cgColor
+        case .notice: layer?.backgroundColor = Palette.browsing.withAlphaComponent(0.22).cgColor
+        case .working: layer?.backgroundColor = Palette.panel.cgColor
+        }
         // Spec 10 §15 — "Every control has a label and its state".
         setAccessibilityElement(true)
         setAccessibilityRole(.group)

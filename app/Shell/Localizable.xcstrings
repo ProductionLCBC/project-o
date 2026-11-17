@@ -62,13 +62,13 @@
       }
     },
     "engine.anotherBuild" : {
-      "comment" : "Offered when the app finds an engine of another build running and nothing is on screen. %1$@ is the engine's version, %2$@ the app's.",
+      "comment" : "A banner, with the Restart the engine button, for as long as the engine running is from another build than the app. %1$@ is the engine's version, %2$@ the app's.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The engine running is version %1$@ and this is Project O %2$@. Restart it while nothing is live?"
+            "value" : "The engine running is version %1$@ and this is Project O %2$@. Restart it when the screens can go black for a moment."
           }
         }
       }

@@ -72,9 +72,9 @@ final class MainWindowController {
         window.contentView = content
     }
 
-    /// Shows where the app stands with the engine.
-    func show(_ phase: EngineSupervisor.Phase) {
-        banner.show(EngineBanner.make(for: phase))
+    /// Shows where the app stands with the engine, and that a connected engine is of another build (Spec 10 §2, "Versions").
+    func show(_ phase: EngineSupervisor.Phase, anotherBuild: AnotherBuild? = nil) {
+        banner.show(EngineBanner.make(for: phase, anotherBuild: anotherBuild))
         status.stringValue = phase == .connected ? Strings.text(.engineConnected) : ""
         status.isHidden = status.stringValue.isEmpty
     }

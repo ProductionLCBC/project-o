@@ -52,35 +52,21 @@ final class EngineBannerTests: XCTestCase {
         XCTAssertEqual(RestartConfirmation.make(unsaved: 1).body.last, "1 change isn’t saved yet and will be lost.")
     }
 
-    /// Spec 10 §2, "Versions" — "When the app finds an engine of another
-    /// build running, as after Keep outputs running and an update, it offers
-    /// to restart it while nothing is live". Area 13 reading — "nothing is
-    /// live" as Spec 10 §7 defines the words: "no playlist loaded and no
-    /// list fired from the library"; and the offer is made once for each
-    /// engine run, so Cancel isn't answered with the same question again.
-    func test_anEngineOfAnotherBuildIsOfferedARestartOnceARunAndOnlyWhileNothingIsLive() {
-        var offer = AnotherBuildOffer()
-        let old = Hello.test(engine: "0.9.0", run: "51e2")
-        var loaded = LiveStatus()
-        loaded.playlist = "a9f0"
-        var fromTheLibrary = LiveStatus()
-        fromTheLibrary.listUuid = "c3d1"
-
-        XCTAssertNil(offer.question(anotherBuild: true, hasState: false, live: LiveStatus(), hello: old, app: "1.0.0"), "not before the app knows what is live")
-        XCTAssertNil(offer.question(anotherBuild: true, hasState: true, live: loaded, hello: old, app: "1.0.0"), "a playlist loaded is something live")
-        XCTAssertNil(offer.question(anotherBuild: true, hasState: true, live: fromTheLibrary, hello: old, app: "1.0.0"), "and so is a list fired from the library")
-        XCTAssertNil(offer.question(anotherBuild: false, hasState: true, live: LiveStatus(), hello: old, app: "0.9.0"), "the same build is left alone")
-        XCTAssertNil(offer.question(anotherBuild: true, hasState: true, live: LiveStatus(), hello: nil, app: "1.0.0"))
-
-        let question = offer.question(anotherBuild: true, hasState: true, live: LiveStatus(), hello: old, app: "1.0.0")
-        XCTAssertEqual(question?.title, "The engine running is version 0.9.0 and this is Project O 1.0.0. Restart it while nothing is live?")
-        XCTAssertEqual(question?.body, "The screens go black for a moment.")
-        XCTAssertEqual([question?.cancel, question?.restart], ["Cancel", "Restart the engine"])
-
-        offer.asked(run: old.run)
-        XCTAssertNil(offer.question(anotherBuild: true, hasState: true, live: LiveStatus(), hello: old, app: "1.0.0"), "once for each engine run")
-        XCTAssertNotNil(offer.question(anotherBuild: true, hasState: true, live: LiveStatus(), hello: .test(engine: "0.9.0", run: "77b0"), app: "1.0.0"),
-                        "another run of the old engine is asked about again")
+    /// Spec 10 §2, "Versions", as corrected on Adam's answer at Area 13's
+    /// first stop, 2026-11-17 — "When the app finds an engine of another
+    /// build running, as after Keep outputs running and an update, the
+    /// banner says so and offers Restart the engine for as long as the
+    /// builds differ, so the new build's Keychain prompt comes while
+    /// someone is there (R2)." No sheet opens by itself: the banner
+    /// interrupts nothing, and its button asks before it restarts.
+    func test_anEngineOfAnotherBuildIsSaidInTheBannerWithRestartTheEngine() {
+        let another = AnotherBuild(engine: "0.9.0", app: "1.0.0")
+        XCTAssertEqual(EngineBanner.make(for: .connected, anotherBuild: another),
+                       EngineBanner(text: "The engine running is version 0.9.0 and this is Project O 1.0.0. Restart it when the screens can go black for a moment.",
+                                    tone: .notice, console: [], offersRestart: true))
+        XCTAssertNil(EngineBanner.make(for: .connected, anotherBuild: nil), "the same build: no banner")
+        XCTAssertEqual(EngineBanner.make(for: .starting, anotherBuild: another)?.text, "Starting the engine…", "while the engine is away the banner says that")
+        XCTAssertEqual(EngineBanner.make(for: .notResponding, anotherBuild: another)?.text, "The engine isn’t responding")
     }
 
     func test_quitAsksWithItsThreeButtonsAndCountsWhatIsNotSaved() {

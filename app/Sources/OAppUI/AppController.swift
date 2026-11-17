@@ -26,8 +26,6 @@ final class AppController {
     private(set) var firstRun: FirstRunModel?
     /// Spec 10 §9 — the screens the app released while it runs; the fixed key fills it (stage 3).
     var releasedScreens: [String] = []
-    /// Spec 10 §2, "Versions" — the offer to restart an engine of another build, and the run it was last made for.
-    private var anotherBuild = AnotherBuildOffer()
 
     init(rootsStore: any RootsStore = DefaultsRootsStore(), launcher: any EngineLauncher = PosixEngineLauncher(),
          connector: any EngineConnector = UnixEngineConnector(), clock: any AppClock = SystemAppClock(),
@@ -40,7 +38,6 @@ final class AppController {
         windowController.banner.onRestart = { [weak self] in self?.askToRestart() }
         store.observe { [weak self] changes in
             if !changes.isDisjoint(with: [.catalog, .outputs, .devices, .connection]) { self?.screensChanged() }
-            if changes.contains(.live) { self?.offerRestartOfAnotherBuild() }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.screensChanged() }
@@ -75,34 +72,15 @@ final class AppController {
         phaseChanged(supervisor.phase)
     }
 
+    /// Spec 10 §2 — the window says where the app stands with the engine,
+    /// and, with an engine of another build connected, that: the banner
+    /// "says so and offers Restart the engine for as long as the builds
+    /// differ" ("Versions").
     private func phaseChanged(_ phase: EngineSupervisor.Phase) {
-        windowController.show(phase)
+        windowController.show(phase, anotherBuild: supervisor?.anotherBuild)
         screensChanged()
         // Adam's answer, 2026-11-17 — a refused first run stops and shows the sheet again.
         if case .firstRunRefused = phase { askForRoots() }
-        offerRestartOfAnotherBuild()
-    }
-
-    /// Spec 10 §2, "Versions" — "When the app finds an engine of another
-    /// build running, as after Keep outputs running and an update, it offers
-    /// to restart it while nothing is live, so the new build's Keychain
-    /// prompt comes while someone is there (R2)." `AnotherBuildOffer`
-    /// decides; the sheet waits while another sheet is up or the window isn't shown.
-    private func offerRestartOfAnotherBuild() {
-        guard let supervisor, let hello = store.hello,
-              let question = anotherBuild.question(anotherBuild: supervisor.isAnotherBuild, hasState: store.hasState, live: store.live,
-                                                   hello: hello, app: OCore.appVersion),
-              windowController.window.attachedSheet == nil, windowController.window.isVisible else { return }
-        anotherBuild.asked(run: hello.run)
-        let alert = NSAlert()
-        alert.messageText = question.title
-        alert.informativeText = question.body
-        alert.addButton(withTitle: question.cancel)
-        alert.addButton(withTitle: question.restart)
-        Self.keepReturnFromPressing(alert)
-        presentAlert(alert, sheetParent) { [weak self] response in
-            if response == .alertSecondButtonReturn { self?.supervisor?.restartEngine() }
-        }
     }
 
     // MARK: - Sheets (Spec 10 §4)

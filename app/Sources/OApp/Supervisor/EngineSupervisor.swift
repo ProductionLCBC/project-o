@@ -109,9 +109,8 @@ public final class EngineSupervisor {
     private var nextLaunchIsRelaunch = false
     /// The kill the operator asked for is on its way; the end it causes is no end to count.
     private var operatorRestart = false
+    /// The ends of the last two minutes: how soon the engine is started again, and the number the banner shows.
     private var cadence = RestartCadence()
-    /// Adam's answer, 2026-11-17 — "The banner counts ends since the app last had an engine connected."
-    private var endsSinceConnected = 0
     /// Spec 10 §3, `engineEnded` — "sent to the next engine it connects to, the one thing the app holds back (§1)".
     private var pendingEnd: (status: Int32?, restart: Bool, count: Int)?
     private var connectTask: (any ClockTask)?
@@ -291,7 +290,6 @@ public final class EngineSupervisor {
             session.send(.note(note, text: end.restart ? "Restart the engine ended the engine" : (end.count == 1 ? "The engine ended" : "The engine ended \(end.count) times")))
             pendingEnd = nil
         }
-        endsSinceConnected = 0
         launchedAt = nil
         nextLaunchIsRelaunch = false
         onConnected?(session)
@@ -357,17 +355,24 @@ public final class EngineSupervisor {
 
     /// Spec 10 §2 — "a banner across the window says "The engine stopped.
     /// Restarting…", and the app starts it again ... at once for the first
-    /// three ends within two minutes, then five seconds after each".
+    /// three ends within two minutes, then five seconds after each". "From
+    /// the third such end the banner says how many there have been and shows
+    /// the console log's last lines".
+    ///
+    /// Adam's answer at Area 13's first stop, 2026-11-17 — the banner counts
+    /// the ends in the two minutes before, the same ones the cadence counts,
+    /// whether or not an engine connected in between: one that says `hello`
+    /// and then ends every time still reaches the console lines.
     private func engineEnded(status: Int32?, because: String?) {
         dropConnection()
-        endsSinceConnected += 1
         pendingEnd = (status: status, restart: false, count: (pendingEnd?.count ?? 0) + 1)
         let delay = cadence.ended(at: clock.now)
+        let ends = cadence.recent(at: clock.now)
         nextLaunchIsRelaunch = true
         launchedAt = nil
-        var console = endsSinceConnected >= Self.endsBeforeConsole ? roots.consoleTail() : []
+        var console = ends >= Self.endsBeforeConsole ? roots.consoleTail() : []
         if let because { console.append(because) }
-        phase = .restarting(ends: endsSinceConnected, console: console)
+        phase = .restarting(ends: ends, console: console)
         restartTask?.cancel()
         restartTask = clock.after(delay) { [weak self] in
             guard let self, case .restarting = self.phase else { return }
@@ -449,11 +454,14 @@ public final class EngineSupervisor {
     }
 
     /// Spec 10 §2, "Versions" — "When the app finds an engine of another
-    /// build running, as after Keep outputs running and an update, it offers
-    /// to restart it while nothing is live".
-    public var isAnotherBuild: Bool {
-        guard phase == .connected, let hello = lastHello else { return false }
-        return hello.engine != settings.appVersion
+    /// build running, as after Keep outputs running and an update, the
+    /// banner says so and offers Restart the engine for as long as the
+    /// builds differ". The two versions while such an engine is connected;
+    /// nil otherwise. `hello` names a version only, so the versions are what
+    /// is compared (Area 13 reading).
+    public var anotherBuild: AnotherBuild? {
+        guard phase == .connected, let hello = lastHello, hello.engine != settings.appVersion else { return nil }
+        return AnotherBuild(engine: hello.engine, app: settings.appVersion)
     }
 
     // MARK: - Quitting (Spec 10 §2, choice U-2)

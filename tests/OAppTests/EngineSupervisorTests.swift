@@ -227,6 +227,31 @@ final class EngineSupervisorTests: XCTestCase {
         XCTAssertEqual(ended["status"], .number(1))
     }
 
+    /// Spec 10 §2 — "From the third such end the banner says how many there
+    /// have been and shows the console log's last lines". Adam's answer at
+    /// Area 13's first stop, 2026-11-17 — the banner counts the ends in the
+    /// two minutes before, the ones the cadence counts, so an engine that
+    /// says `hello` and then ends every time still gets there.
+    func test_theBannerCountsTheEndsOfTheLastTwoMinutesEvenWhenEachEngineConnectedFirst() throws {
+        let rig = try rig()
+        try rig.writeConsole("the engine's last words\n")
+        rig.supervisor.start()
+        for end in 1...3 {
+            rig.engineComesUp()
+            XCTAssertEqual(rig.supervisor.phase, .connected)
+            rig.engineDies()
+            XCTAssertEqual(rig.supervisor.phase, .restarting(ends: end, console: end >= 3 ? ["the engine's last words"] : []),
+                           "end \(end), each after a connection")
+            rig.clock.advance(by: 0)
+        }
+        // The fourth engine is slow to open its socket, and two minutes pass before it ends too.
+        rig.clock.advance(by: 121)
+        rig.engineComesUp()
+        XCTAssertEqual(rig.supervisor.phase, .connected)
+        rig.engineDies()
+        XCTAssertEqual(rig.supervisor.phase, .restarting(ends: 1, console: []), "the three ends of more than two minutes ago are no longer counted")
+    }
+
     func test_rootsThatDoNotLoadAreRetriedOnTheSameCadenceWithTheConsoleLines() throws {
         let rig = try rig()
         try rig.writeConsole("the machine root doesn't load: stacks.json\n")
@@ -357,11 +382,13 @@ final class EngineSupervisorTests: XCTestCase {
         rig.supervisor.start()
         rig.engineComesUp(engine: "0.0.9")
         XCTAssertEqual(rig.supervisor.phase, .connected, "versions may differ while api matches")
-        XCTAssertTrue(rig.supervisor.isAnotherBuild, "the window offers to restart it while nothing is live")
+        XCTAssertEqual(rig.supervisor.anotherBuild, AnotherBuild(engine: "0.0.9", app: "0.1.0"), "the banner says so and offers Restart the engine")
+        rig.engineDies()
+        XCTAssertNil(rig.supervisor.anotherBuild, "while the engine is away the banner says that")
         let same = try self.rig()
         same.supervisor.start()
         same.engineComesUp()
-        XCTAssertFalse(same.supervisor.isAnotherBuild)
+        XCTAssertNil(same.supervisor.anotherBuild)
     }
 
     func test_noHelloFromAnEngineHoldingTheRootOffersTheRestartByTheLockFilesPid() throws {

@@ -247,6 +247,21 @@ final class EntryTests: XCTestCase {
         XCTAssertEqual(pressed, 1)
     }
 
+    /// Spec 10 §2, "Versions" — with an engine of another build connected
+    /// "the banner says so and offers Restart the engine for as long as the
+    /// builds differ": a line that interrupts nothing, over a window that
+    /// works as it does with any engine.
+    func test_anEngineOfAnotherBuildIsSaidInTheBannerWhileTheWindowWorks() {
+        let window = MainWindowController()
+        window.show(.connected, anotherBuild: AnotherBuild(engine: "0.9.0", app: "1.0.0"))
+        XCTAssertFalse(window.banner.isHidden)
+        XCTAssertEqual(window.banner.shownText, "The engine running is version 0.9.0 and this is Project O 1.0.0. Restart it when the screens can go black for a moment.")
+        XCTAssertTrue(window.banner.offersRestart)
+        XCTAssertEqual(window.shownStatus, "Connected to the engine.")
+        window.show(.connected, anotherBuild: nil)
+        XCTAssertTrue(window.banner.isHidden, "the same build: no banner")
+    }
+
     func test_whileAnOutputCoversTheWindowPointerEventsAreDroppedAndKeysAreNot() {
         for type: NSEvent.EventType in [.leftMouseDown, .leftMouseUp, .leftMouseDragged, .rightMouseDown, .otherMouseDown, .scrollWheel] {
             XCTAssertTrue(MainWindow.isPointerEvent(type), "presses, drags and scrolls")
@@ -282,8 +297,8 @@ final class EntryTests: XCTestCase {
             try ViewStrings.install(transform: transform)
             let banner = BannerView(frame: NSRect(x: 0, y: 0, width: 1440, height: 60))
             for phase: EngineSupervisor.Phase in [.starting, .notResponding, .noSocket(console: []), .noHello, .restarting(ends: 12, console: []),
-                                                  .wrongAPI(engine: "10.20.30"), .firstRunRefused(console: [])] {
-                banner.show(EngineBanner.make(for: phase))
+                                                  .wrongAPI(engine: "10.20.30"), .firstRunRefused(console: []), .connected] {
+                banner.show(EngineBanner.make(for: phase, anotherBuild: AnotherBuild(engine: "10.20.30", app: "10.20.31")))
                 banner.layoutSubtreeIfNeeded()
                 var widest: CGFloat = 0
                 func walk(_ view: NSView) {
