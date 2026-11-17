@@ -1,4 +1,4 @@
-// OEngine — Spec 10 §2, the Mach service in the user's bootstrap namespace.
+// OMach — Spec 10 §2, the Mach service in the user's bootstrap namespace.
 
 import Bootstrap
 @preconcurrency import Darwin

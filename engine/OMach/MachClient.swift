@@ -1,4 +1,4 @@
-// OEngine — Spec 10 §2, the other end of the Mach channel.
+// OMach — Spec 10 §2, the other end of the Mach channel.
 
 @preconcurrency import Darwin
 import Foundation

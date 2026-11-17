@@ -86,13 +86,21 @@ package.targets += [
             : [],
         linkerSettings: [.linkedFramework("CoreFoundation")]
     ),
+    // Spec 10 §2 — the Mach channel's seam, message layout, wire constants and
+    // client: what both ends share. Its own module so the operator app links
+    // the client's end without the engine (Area 13 plan, Adam's answer of
+    // 2026-11-17). Darwin, Foundation and IOSurface only.
+    .target(
+        name: "OMach",
+        path: "engine/OMach"
+    ),
     // Spec 4 (render pipeline). Metal, VideoToolbox, AVFoundation, CoreAudio,
     // CoreText, CoreGraphics and the DeckLink SDK live here and nowhere else.
     // Spec 6 §4 — the OFL fonts the engine registers at launch ride in its
     // resource bundle (ADR 0008).
     .target(
         name: "OEngine",
-        dependencies: ["OCore", "OFormats", "ODeckLink"],
+        dependencies: ["OCore", "OFormats", "ODeckLink", "OMach"],
         path: "engine/OEngine",
         resources: [.copy("Resources/Fonts")],
         plugins: ["MetalCompiler"]
@@ -108,7 +116,7 @@ package.targets += [
     ),
     .testTarget(
         name: "OEngineTests",
-        dependencies: ["OEngine", "OCore", "OFormats"],
+        dependencies: ["OEngine", "OCore", "OFormats", "OMach"],
         path: "tests/OEngineTests"
     ),
 ]

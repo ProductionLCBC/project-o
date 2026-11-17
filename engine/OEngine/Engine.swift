@@ -4,6 +4,7 @@
 import Foundation
 import IOSurface
 import OCore
+import OMach
 import OFormats
 import Synchronization
 

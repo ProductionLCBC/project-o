@@ -3,6 +3,7 @@
 
 import Foundation
 import OCore
+import OMach
 
 /// Spec 4 §11 — one media instance's sound across the devices its channel's
 /// outputs reach: one `AudioInstance` per graph, each on its own ring, in

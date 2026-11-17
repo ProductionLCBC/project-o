@@ -1,4 +1,4 @@
-// OEngine — Spec 4 §14, a seam: the Mach service the operator app looks up.
+// OMach — Spec 4 §14, a seam: the Mach service the operator app looks up.
 
 import Darwin
 import Foundation

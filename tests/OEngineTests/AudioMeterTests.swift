@@ -1,6 +1,7 @@
 import XCTest
 import OCore
 @testable import OEngine
+@testable import OMach
 
 /// Spec 10 §2, "The Mach channel" — "Meters: 15 times a second, for each
 /// channel whose content has sound, the peak and RMS level in dBFS since the
