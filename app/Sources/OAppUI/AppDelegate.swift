@@ -1,13 +1,15 @@
-// OAppUI — Spec 10 §4, the application delegate: the one main window.
+// OAppUI — Spec 10 §4, the application delegate: the one main window, the menu bar, Quit.
 
 import AppKit
 import OApp
 
-/// Spec 10 §4, "One main window" — the delegate opens the main window and
-/// owns it for the app's life.
+/// Spec 10 §4, "One main window" — "Closing it is ⌘Q (§2). It can't be
+/// hidden or minimized: the app has no Hide, Minimize or Zoom items and no
+/// Window menu, so ⌘H and ⌘M do nothing."
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    private(set) var mainWindow: NSWindow?
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private(set) var controller: AppController?
+    var mainWindow: NSWindow? { controller?.windowController.window }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         openMainWindow(show: true)
@@ -15,22 +17,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Spec 10 §4 — the one main window, made once. "Dark only in v1."
-    /// `show` is false where a test lays the window out without putting it on a screen.
-    func openMainWindow(show: Bool) {
-        guard mainWindow == nil else { return }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1440, height: 900),
-                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
-                              backing: .buffered, defer: !show)
-        window.title = "Project O"
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.isReleasedWhenClosed = false
-        mainWindow = window
-        guard show else { return }
-        window.center()
-        window.makeKeyAndOrderFront(nil)
+    /// `show` is false where a test builds the window without putting it on
+    /// a screen or looking for an engine.
+    func openMainWindow(show: Bool, controller made: AppController? = nil) {
+        guard controller == nil else { return }
+        let controller = made ?? AppController()
+        self.controller = controller
+        controller.windowController.window.delegate = self
+        NSApplication.shared.mainMenu = Self.makeMenu(target: self)
+        if show { controller.start() }
+    }
+
+    /// Spec 10 §4, "Menus" — the Project O menu's About and Quit. The rest
+    /// of the menu bar comes with the window's regions.
+    static func makeMenu(target: AppDelegate) -> NSMenu {
+        let bar = NSMenu()
+        let appItem = NSMenuItem()
+        let app = NSMenu(title: Strings.text(.appName))
+        let about = NSMenuItem(title: Strings.text(.menuAbout), action: #selector(showAbout), keyEquivalent: "")
+        about.target = target
+        app.addItem(about)
+        app.addItem(.separator())
+        let quit = NSMenuItem(title: Strings.text(.menuQuit), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        app.addItem(quit)
+        appItem.submenu = app
+        bar.addItem(appItem)
+        return bar
+    }
+
+    @objc func showAbout() {
+        controller?.showAbout()
+    }
+
+    /// Spec 10 §4 — "Closing it is ⌘Q": the close button asks what Quit asks, and the window stays unless the app quits.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        NSApplication.shared.terminate(nil)
+        return false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let controller else { return .terminateNow }
+        return controller.shouldTerminate(systemAsked: Self.systemAskedToQuit)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        controller?.closeScreens()
+    }
+
+    /// Spec 10 §2 — "A logout, a restart or a shutdown doesn't ask": the
+    /// quit event the system sends then says why it was sent.
+    static var systemAskedToQuit: Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              let reason = event.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue else { return false }
+        return [OSType(kAELogOut), OSType(kAEReallyLogOut), OSType(kAERestart), OSType(kAEShutDown)].contains(reason)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
     }
 }
