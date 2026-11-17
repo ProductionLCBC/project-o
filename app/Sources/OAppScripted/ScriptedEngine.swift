@@ -181,11 +181,9 @@ public final class ScriptedEngine: @unchecked Sendable {
         var on: Int32 = 1
         // A client that has gone must not end the test process with a signal when it is written to.
         setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
-        let first: JSONValue? = locked {
-            connections.append(client)
-            return firstMessage
-        }
-        if let first { write(first, to: client) }
+        // `hello` goes before the connection is known to `send`, so nothing a test sends can arrive ahead of it.
+        if let first = locked({ firstMessage }) { write(first, to: client) }
+        locked { connections.append(client) }
         signalChange()
         let thread = Thread { [weak self] in
             var pending = Data()
