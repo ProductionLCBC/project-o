@@ -20,7 +20,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | shipped |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | shipped |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | not started |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | in progress |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | shipped |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | shipped |
@@ -28,7 +28,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started |
 | 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | shipped |
 
-Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15.
+Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15. Lifted for Area 13 on Adam's word, 2026-11-17 (Spec 4 §15); Areas 14, 10, 17 and 18, and Area 7's bench verification, still wait for the bench run.
 
 ## v1.5 — after the pilot
 
@@ -305,23 +305,24 @@ state, and after the restore commands. Nothing in app/.
 **Area 13 — Show-mode UI** (branch `area/show`)
 
 ```
-Area: 13, show-mode UI. Spec: docs/specs/10-show-mode-ui.md §1–§10, §14 and §15, with
-§18's Area 13 tests; the UX spec (docs/ux-spec.md) and the clickable demo for look and
-feel where the spec is silent, asking before guessing. Starts after Area 19 is merged
-and after the bench run passes (Spec 4 §15). The app is new: an Xcode project in app/
-that depends on the package at the root, with AppKit and SwiftUI as CLAUDE.md divides
-them. Build the engine connection first: the roots in the app's preferences; finding,
-starting and restarting the engine with the curtains and the restart rule (§2, choice
-U-7); Quit; the scripted engine on a local socket that the tests drive; and the models
-fed by §3's topics and queries. Then the window and its regions (§4–§8), with the
-previews, the channel pictures and the meters from the Mach channel; the keys with their
-precedence and the fixed keys (§9); the edits of §10 with undo and redo; drops from the
-Finder that import and then write (choice U-8); the restore sheets and the tags (§14);
-the notes and view.json; and VoiceOver labels and the string catalog from the first
-build (§15). Edit mode is Area 14's, Bind a Key… waits for Area 17, and Lock Station and
-the lock tag for Area 18: their entries stay disabled until then. Tests first from §18.
-Stop for review after the engine connection, after the grid and the strip, and after the
-keys.
+Area: 13, show-mode UI. Spec: docs/specs/10-show-mode-ui.md §1–§10, §14 and §15, and
+§13's app side (the first-run sheet and the first window's line), with §18's Area 13
+tests; the UX spec (docs/ux-spec.md) and the clickable demo for look and feel where the
+spec is silent, asking before guessing. Starts after Area 19 is merged; the bench-run
+gate (Spec 4 §15) was lifted for this area on Adam's word, 2026-11-17. The app is new: an
+Xcode project in app/ that depends on the package at the root, with AppKit and SwiftUI as
+CLAUDE.md divides them. Build the engine connection first: the roots in the app's
+preferences, with the first-run sheet that sets them (§13); finding, starting and
+restarting the engine with the curtains and the restart rule (§2, choice U-7); Quit; the
+scripted engine on a local socket that the tests drive; and the models fed by §3's topics
+and queries. Then the window and its regions (§4–§8), with the previews, the channel
+pictures and the meters from the Mach channel; the keys with their precedence and the
+fixed keys (§9); the edits of §10 with undo and redo; drops from the Finder that import
+and then write (choice U-8); the restore sheets and the tags (§14); the notes and
+view.json; and VoiceOver labels and the string catalog from the first build (§15). Edit
+mode is Area 14's, Bind a Key… waits for Area 17, and Lock Station and the lock tag for
+Area 18: their entries stay disabled until then. Tests first from §18. Stop for review
+after the engine connection, after the grid and the strip, and after the keys.
 ```
 
 **Area 14 — Edit mode** (branch `area/edit`)
