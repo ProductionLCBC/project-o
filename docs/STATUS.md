@@ -19,7 +19,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 1 | Channel state and projection (`core/`) | `specs/3-channel-state-and-projection.md` | merged | Adam's `approved` on 2026-10-27; spec corrections applied (e57728f), `area/projection` merged into `main` with `--no-ff` (d7465b8), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 2 | Object model and library format (`core/`, `formats/`) | `specs/1-objects-and-format.md` | merged | Adam's `approved` on 2026-10-28 with one reversal (a missing transition degrades to the channel default, then to a zero-second cut; 78902ef on the branch); spec corrections applied (cc404c0), `area/format` merged into `main` with `--no-ff` (70bf958), `swift test` and CI green on `main`, branch and worktree removed, task `shipped`. |
 | 3 | Command vocabulary: grammar, parser and printer, validation, OSC mapping (`core/`) | `specs/2-commands.md` | merged | Adam's `approved` on 2026-10-28 with the recommended answers; spec corrections applied (fd2f4d2), `area/commands` merged into `main` with `--no-ff` (06a3ef1), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 holds; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. |
+| 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 held at the soak of 2026-11-02; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. The display-only soak of 2026-11-16, the first of everything merged since, holds the display, GPU, audio and watchdog lines and fails late text and the two memory lines (Needs Adam). |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers; the Spec 3 §6 correction and ADR 0008's acceptance on the branch (85b4e88), `area/presets` merged into `main` with `--no-ff` (af3c948), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Spec 1 §2's `weight` went into Area 11's block. |
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
@@ -34,7 +34,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. Area 19 keeps only the token's Keychain item, behind its seam (`SecretStore`), and answers `passcode`, `unlock`, `resetPasscode`, `token` and `newToken` with `notInV1` until then; `newToken` has to close every LAN connection. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | merged | Adam's `approved` on 2026-11-16 as built, with every reading in the brief and its recommended answers; the Spec 4 §12 and Spec 10 §13 corrections applied on the branch (6554d0c), `area/api` merged into `main` with `--no-ff` (73ab889), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. After the merge Adam lifted his pause on runs that open outputs, and the last stage's checks ran on the external screen the same day: a relaunch after a real kill, a clean stop that isn't one, `--released`, the audio start on the real device with no watchdog event, and a one-minute smoke of the soak command with its own Mach client. The soak itself is not run, and that smoke failed its GPU budget on a Mac that was busy (Housekeeping). |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | merged | Adam's `approved` on 2026-11-16 as built, with every reading in the brief and its recommended answers; the Spec 4 §12 and Spec 10 §13 corrections applied on the branch (6554d0c), `area/api` merged into `main` with `--no-ff` (73ab889), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. After the merge Adam lifted his pause on runs that open outputs, and the last stage's checks ran on the external screen the same day: a relaunch after a real kill, a clean stop that isn't one, `--released`, the audio start on the real device with no watchdog event, and a one-minute smoke of the soak command with its own Mach client, which failed its GPU budget on a Mac that was busy (Housekeeping). The three-hour display-only soak that followed held its GPU budget throughout and had the soak's Mach client sent every preview and picture; what it failed is not Area 19's (Needs Adam). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
@@ -43,19 +43,21 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 **Nothing is in review; everything is on `main`.** Area 19, engine API and first run,
 shipped on 2026-11-16. Adam approved it as built, with every reading in the brief and its
 recommended answers; its Spec 4 §12 and Spec 10 §13 corrections were applied on the branch
-(6554d0c), and it was merged with `--no-ff` (73ab889) and pushed. No area can start until
-the bench run: every area left is in `app/` or is Area 7's bench verification, and the
-bench run with a card gates both; it stays deferred to a window Adam sets aside, and Area
-13, show-mode UI, is next after it, in its own session. Adam lifted his pause on runs that
-open outputs after the merge, and the last stage's checks then ran on the dev Mac's external
-screen, from `main`: an engine killed with content on the stage came back with that content
-on the next launch, without `--relaunch` and with `restoreLastState` off; a launch after a
-clean stop did not; `--released` kept the screen closed and the output `released`; the
-audio start, run several times with sound, counted no watchdog event; and a one-minute smoke
-of `oengine soak` held the Mach channel with its own client on the screen `--screens`
-named. That smoke failed its GPU budget, as every run that evening would have: the Mac was
-busy, and the frame path is the code that read a fraction of that in the morning
-(Housekeeping). The soak itself has not been run.
+(6554d0c), and it was merged with `--no-ff` (73ab889) and pushed. Its last stage's checks
+ran on a screen that evening, once Adam lifted his pause on runs that open outputs, and
+behaved (the Area 19 row; Housekeeping for the GPU time read that evening). A display-only
+soak then ran on his word and failed three lines: three hours of `scripts/soak.sh` on
+`main`, both screens, no DeckLink, the first soak since 2026-11-02 and so the first of
+Areas 5, 6, 8, 9, 11, 12, 15, 16 and 19. It held every display line, the GPU and CPU
+budgets, audio with no underrun and the watchdog with no recovery, and failed late text and
+the two memory lines, each with a known cause: the confidence stack's clock draws nothing
+for one frame as each minute changes, and the engine's in-memory command log is still
+filling at three hours. Both want an engine fix or a spec answer from Adam (Needs Adam,
+Decisions). No area can start until the bench run: every area left is in `app/` or is Area
+7's bench verification, the bench run with a card gates both, and a display-only soak
+cannot lift that gate, since Spec 4 §15's DeckLink and capture lines need the card. The
+bench run stays deferred to a window Adam sets aside; Area 13, show-mode UI, is next after
+it, in its own session.
 
 ## Needs Adam
 
@@ -65,6 +67,36 @@ None. The Area 19 brief (the final message of the Area 19 session, 2026-11-16) w
 the same day: approved as built, with its recommended answers, merged (73ab889).
 
 ### Decisions
+
+- **The display-only soak's failures** (2026-11-16 into 2026-11-17; the record is
+  `tests/soak-output/2026-11-16-225637/`, with the engine's own logs kept, uncommitted, in
+  `.build/soak-2026-11-16-engine-logs/`). Fixes are engine work, so each wants a plan and
+  Adam's OK, as the soak fixes of 2026-11-02 did.
+  - *Late text, once a minute.* One line is late on the tick each wall-clock minute changes,
+    all through the run; the soak of 2026-11-02 counted none after its first minute. It is
+    the `[Time]` box of the Clock preset on the confidence stack: when its value changes,
+    the new text is rasterized only when it is first needed, so that tick the box draws
+    nothing and the next tick it draws the new time (`SlotResolver.textBox`, as Spec 4 §9
+    says of any missing cache entry). On a screen that is the clock missing for one frame a
+    minute; read from the code and the count, not seen on a capture. A timer's box changes
+    each second by the same path. Spec 4 §8 says a variable's new raster replaces the old
+    and that late text should read zero, and not how the two meet. Recommended: the box
+    keeps drawing its previous lines until the new raster is ready, the rule §9 already has
+    for an edit, and such a change counts nothing late; the alternative is to rasterize a
+    clock's next value a second ahead. Which change since 2026-11-02 brought it in was not
+    found.
+  - *Memory, both lines.* The heap's live bytes rose slowly all run, from 78 MB to 86 MB by
+    the five-minute medians, and the footprint less graphics from 316 MB to 334 MB, each
+    past §13's limit. The heap's rise is the command log the engine keeps in memory, its
+    last ten thousand lines (`CommandLog`): the soak had logged about half of that when it
+    ended, and a check afterwards, with no output window, filled it twice over and saw the
+    heap rise while it filled and stand still once it was full. So it is bounded and not a
+    leak, but at the soak's pace it fills for about six hours, and until then §13's rule
+    fails by its letter. No spec sets that size and nothing in the engine reads the kept
+    lines but the tests. Recommended: keep far fewer lines in memory, so the log is full
+    within the first minutes and costs little; the alternative is a §13 rule that allows
+    for it. The rest of the footprint's rise is the purgeable zone, which stopped growing
+    partway through (below).
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -99,9 +131,11 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
 
 - A second attended memory run is wanted only if the bench record shows the purgeable zone
   not capping: about ten minutes of the engine under Instruments' Allocations (`xctrace`,
-  the purgeable category by call stack), in a window Adam sets aside. The quick external
-  check stays on `main`: `scripts/soak-memory-sample.sh`, with `--minutes 1 --at "0.25 0.75"`
-  for a smoke run.
+  the purgeable category by call stack), in a window Adam sets aside. The display-only soak
+  of 2026-11-16 showed it capping on this Mac: it grew from 23 MB to 57 MB over the first
+  hour and a half and stood at 57 MB for the rest. So no attended run is wanted unless the
+  bench record differs. The quick external check stays on `main`:
+  `scripts/soak-memory-sample.sh`, with `--minutes 1 --at "0.25 0.75"` for a smoke run.
 
 ### Housekeeping
 
@@ -132,7 +166,9 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
   and meters as they should be, and that run's log wasn't kept. Every run since has counted
   none: the next one that day, then, once the pause was lifted, the same check repeated on
   the external screen, the relaunch and `--released` runs, and a minute of the soak command.
-  It stays one unexplained occurrence; the bench record is the next place it would show.
+  The three-hour soak logged a few one-off events of another kind, the external screen
+  presenting nothing for just under fifty milliseconds, with no recovery, as the soak of
+  2026-11-02 did. The first run's stays one unexplained occurrence.
   The hand-check scripts of the Area 19 session are kept, uncommitted, in the main
   checkout's `.build/area-api-scratch/` (`onscreen-audio.sh`, `onscreen-relaunch.sh`,
   `onscreen-released.sh`, `onscreen-soak-smoke.sh`).
@@ -146,9 +182,17 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
   did what Spec 4 §12 asks: every output frame was presented, none dropped or late, no
   watchdog event, no audio underrun, and the previews and channel pictures gave way, named
   less often than their thirty a second. The one-minute smoke of `oengine soak` failed on
-  its GPU budget alone for this reason, on a debug build. So a soak or a bench run wants
-  the Mac to itself, with no remote session on it, and a short run first to read the GPU
-  time.
+  its GPU budget alone for this reason, on a debug build. The three-hour soak that started
+  minutes later, a release build with both screens covered, read a GPU time well inside
+  its budget in every half hour, so the frame path is sound; what made the evening's
+  readings high was the Mac at that hour, and it was not separated out. A soak or a bench
+  run still wants the Mac to itself, with no remote session on it.
+- **How the display-only soak was run** (2026-11-16): `scripts/soak.sh` unchanged, with
+  `--no-lan`, `--screens` naming both screens and `--machine` a copy of the spike machine
+  root whose audio output names BlackHole, so the audio path ran and the room stayed
+  silent; both outputs at the fixture's 1920 by 1080, not the LED wall's format. The script
+  removes its clone of the roots at the end, and the engine's own logs with it, so a copy
+  of `machine/logs` was taken every two minutes while it ran.
 - **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
   for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
   before the job finished, and it passed on the next full run and alone. It didn't recur
