@@ -32,15 +32,20 @@ final class MainWindow: NSWindow {
     override func zoom(_ sender: Any?) {}
 }
 
-/// Spec 10 §4, "One main window". In the first build it holds the banner
-/// and one line of status; the regions of §4–§8 take the line's place.
+/// Spec 10 §4, "One main window": the banner over the regions of §4–§8.
 @MainActor
 final class MainWindowController {
     let window: MainWindow
     let banner = BannerView()
-    private let status = NSTextField(labelWithString: "")
+    /// The window's regions (Spec 10 §4).
+    let regions: ShowWindowView
 
-    init() {
+    /// A window over a store of its own, with no engine: what a test lays out.
+    convenience init() {
+        self.init(model: ShowModel(store: ShowStore(), clock: SystemAppClock()), mach: nil)
+    }
+
+    init(model: ShowModel, mach: MachLink?) {
         // "The window is at least 1440 by 900 points, or the screen's visible area where that is smaller".
         let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
         let size = NSSize(width: min(1440, visible.width), height: min(900, visible.height))
@@ -55,29 +60,16 @@ final class MainWindowController {
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
-        status.font = .systemFont(ofSize: 15, weight: .regular)
-        status.textColor = Palette.dimText
-        status.alignment = .center
-        let content = NSView(frame: NSRect(origin: .zero, size: size))
-        banner.translatesAutoresizingMaskIntoConstraints = false
-        status.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(banner)
-        content.addSubview(status)
-        NSLayoutConstraint.activate([
-            banner.leadingAnchor.constraint(equalTo: content.leadingAnchor), banner.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            banner.topAnchor.constraint(equalTo: content.topAnchor),
-            status.centerXAnchor.constraint(equalTo: content.centerXAnchor), status.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            status.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 20),
-        ])
-        window.contentView = content
+        regions = ShowWindowView(model: model, mach: mach, banner: banner)
+        regions.frame = NSRect(origin: .zero, size: size)
+        regions.autoresizingMask = [.width, .height]
+        window.contentView = regions
+        regions.refreshAll()
     }
 
     /// Shows where the app stands with the engine, and that a connected engine is of another build (Spec 10 §2, "Versions").
     func show(_ phase: EngineSupervisor.Phase, anotherBuild: AnotherBuild? = nil) {
         banner.show(EngineBanner.make(for: phase, anotherBuild: anotherBuild))
-        status.stringValue = phase == .connected ? Strings.text(.engineConnected) : ""
-        status.isHidden = status.stringValue.isEmpty
+        regions.needsLayout = true
     }
-
-    var shownStatus: String { status.stringValue }
 }

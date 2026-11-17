@@ -11,7 +11,10 @@ import OCore
 @MainActor
 final class AppController {
     let store = ShowStore()
-    let windowController = MainWindowController()
+    /// The show-mode window's model, the Mach channel it draws from, and the window.
+    let model: ShowModel
+    let mach: MachLink
+    let windowController: MainWindowController
     private let rootsStore: any RootsStore
     private let launcher: any EngineLauncher
     private let connector: any EngineConnector
@@ -35,6 +38,10 @@ final class AppController {
         self.connector = connector
         self.clock = clock
         self.executable = executable
+        model = ShowModel(store: store, clock: clock)
+        mach = MachLink(clock: clock)
+        windowController = MainWindowController(model: model, mach: mach)
+        model.doubleClickInterval = { NSEvent.doubleClickInterval }
         windowController.banner.onRestart = { [weak self] in self?.askToRestart() }
         store.observe { [weak self] changes in
             if !changes.isDisjoint(with: [.catalog, .outputs, .devices, .connection]) { self?.screensChanged() }
@@ -67,6 +74,10 @@ final class AppController {
         supervisor.releasedScreens = { [weak self] in self?.releasedScreens ?? [] }
         supervisor.campus = { [weak self] in self?.rootsStore.campus }
         supervisor.onPhase = { [weak self] phase in self?.phaseChanged(phase) }
+        supervisor.onConnected = { [weak self] session in self?.connected(session) }
+        // Spec 10 §13 — the app starts a first run when the machine root has no `machine.json` yet.
+        model.isFirstRun = roots.isFirstRun
+        windowController.regions.machineRoot = roots.machine
         self.supervisor = supervisor
         supervisor.start()
         phaseChanged(supervisor.phase)
@@ -76,7 +87,24 @@ final class AppController {
     /// and, with an engine of another build connected, that: the banner
     /// "says so and offers Restart the engine for as long as the builds
     /// differ" ("Versions").
+    /// Spec 10 §2 — a session with an engine: the window's actions go
+    /// through it, it holds the lists the grid shows, and the Mach channel
+    /// its `hello` names carries the pictures.
+    private func connected(_ session: EngineSession) {
+        model.transmit = { [weak session] request, answer in
+            guard let session else { return answer(nil) }
+            session.send(request, completion: answer)
+        }
+        model.hold = { [weak session] lists in session?.hold(lists: lists) }
+        mach.connect(name: session.hello.mach)
+    }
+
     private func phaseChanged(_ phase: EngineSupervisor.Phase) {
+        if phase != .connected {
+            // Spec 10 §2 — nothing is sent while the engine is away, and nothing kept for later.
+            model.transmit = nil
+            mach.disconnect()
+        }
         windowController.show(phase, anotherBuild: supervisor?.anotherBuild)
         screensChanged()
         // Adam's answer, 2026-11-17 — a refused first run stops and shows the sheet again.

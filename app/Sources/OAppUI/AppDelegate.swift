@@ -9,6 +9,7 @@ import OApp
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private(set) var controller: AppController?
+    private(set) var menuBar: MenuBar?
     var mainWindow: NSWindow? { controller?.windowController.window }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,29 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let controller = made ?? AppController()
         self.controller = controller
         controller.windowController.window.delegate = self
-        NSApplication.shared.mainMenu = Self.makeMenu(target: self)
+        // Spec 10 §4, "Menus" — "The menu bar holds every app-level action".
+        let menuBar = MenuBar(controller: controller)
+        self.menuBar = menuBar
+        NSApplication.shared.mainMenu = menuBar.menu
         if show { controller.start() }
-    }
-
-    /// Spec 10 §4, "Menus" — the Project O menu's About and Quit. The rest
-    /// of the menu bar comes with the window's regions.
-    static func makeMenu(target: AppDelegate) -> NSMenu {
-        let bar = NSMenu()
-        let appItem = NSMenuItem()
-        let app = NSMenu(title: Strings.text(.appName))
-        let about = NSMenuItem(title: Strings.text(.menuAbout), action: #selector(showAbout), keyEquivalent: "")
-        about.target = target
-        app.addItem(about)
-        app.addItem(.separator())
-        let quit = NSMenuItem(title: Strings.text(.menuQuit), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        app.addItem(quit)
-        appItem.submenu = app
-        bar.addItem(appItem)
-        return bar
-    }
-
-    @objc func showAbout() {
-        controller?.showAbout()
     }
 
     /// Spec 10 §4 — "Closing it is ⌘Q": the close button asks what Quit asks, and the window stays unless the app quits.

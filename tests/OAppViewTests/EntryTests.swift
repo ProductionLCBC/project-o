@@ -99,10 +99,38 @@ final class EntryTests: XCTestCase {
         XCTAssertFalse(window.isMiniaturized)
         let menu = try XCTUnwrap(NSApplication.shared.mainMenu)
         let titles = menu.items.flatMap { $0.submenu?.items.map(\.title) ?? [] }
-        XCTAssertEqual(titles.filter { !$0.isEmpty }, ["About Project O", "Quit Project O"])
+        XCTAssertEqual(menu.items.first?.submenu?.items.last?.title, "Quit Project O")
         XCTAssertEqual(menu.items.first?.submenu?.items.last?.keyEquivalent, "q")
         XCTAssertFalse(titles.contains { $0.contains("Hide") || $0.contains("Minimize") || $0.contains("Zoom") }, "no Hide, Minimize or Zoom items")
-        XCTAssertEqual(menu.items.count, 1, "and no Window menu")
+        XCTAssertFalse(menu.items.contains { $0.submenu?.title == "Window" }, "and no Window menu")
+    }
+
+    /// Spec 10 §4, "Menus" — "The menu bar holds every app-level action,
+    /// with these shortcuts." An entry whose area isn't built yet is there
+    /// and disabled (Spec 10 §16).
+    func test_theMenuBarHoldsEveryMenuAndEntryOfTheSpec() throws {
+        let delegate = AppDelegate()
+        delegate.openMainWindow(show: false, controller: controller().0)
+        let bar = try XCTUnwrap(delegate.menuBar)
+        XCTAssertEqual(bar.titles, ["Project O", "File", "Edit", "View", "Go", "Mode", "Help"])
+        func entries(_ menu: String) -> [String] { bar.entries(of: menu).map { $0.title + ($0.keyEquivalent.isEmpty ? "" : " " + $0.keyEquivalent) } }
+        XCTAssertEqual(entries("Project O"), ["About Project O", "Settings… ,", "Lock Station l", "Quit Project O q"])
+        XCTAssertEqual(entries("File"), ["New Playlist n", "New List n", "Import Media… i", "Take Snapshot", "Restore a Snapshot…"])
+        XCTAssertEqual(entries("Edit"), ["Undo z", "Redo z", "Cut x", "Copy c", "Paste v", "Select All a", "Find in List f"])
+        XCTAssertEqual(entries("View"), ["Multiviewer m", "Show Archived Playlists", "Compact Grid", "Collapse Panel", "Reset Layout", "Enter Full Screen"])
+        XCTAssertEqual(entries("Go"), ["Back to Live l", "Go to Cue… j", "Hold Auto-Advance", "Command Bar k"])
+        XCTAssertEqual(entries("Mode"), ["Show 1", "Edit 2"])
+        XCTAssertEqual(entries("Help"), ["Keys /", "Release Output from This Screen \u{1B}"])
+        let later = ["Settings…", "Lock Station", "New Playlist", "New List", "Import Media…", "Take Snapshot", "Restore a Snapshot…", "Undo", "Redo", "Command Bar",
+                     "Edit", "Keys", "Release Output from This Screen"]
+        for menu in bar.titles {
+            for item in bar.entries(of: menu) where later.contains(item.title) && item.submenu == nil {
+                XCTAssertFalse(item.isEnabled, "\(item.title) waits for its area")
+                XCTAssertEqual(item.toolTip, "Not in this build yet.")
+            }
+        }
+        let mods = bar.entries(of: "View").first?.keyEquivalentModifierMask
+        XCTAssertEqual(mods, [.option, .command], "Multiviewer ⌥⌘M")
     }
 
     func test_withNoRootsYetTheFirstRunSheetAsksForThem() throws {
@@ -230,11 +258,9 @@ final class EntryTests: XCTestCase {
         let window = MainWindowController()
         window.show(.connected)
         XCTAssertTrue(window.banner.isHidden)
-        XCTAssertEqual(window.shownStatus, "Connected to the engine.")
         window.show(.restarting(ends: 1, console: []))
         XCTAssertEqual(window.banner.shownText, "The engine stopped. Restarting…")
         XCTAssertFalse(window.banner.offersRestart)
-        XCTAssertEqual(window.shownStatus, "")
         window.show(.restarting(ends: 3, console: ["line one", "line two"]))
         XCTAssertEqual(window.banner.shownText, "The engine has stopped 3 times. Restarting…")
         XCTAssertEqual(window.banner.shownConsole, "line one\nline two")
@@ -257,7 +283,6 @@ final class EntryTests: XCTestCase {
         XCTAssertFalse(window.banner.isHidden)
         XCTAssertEqual(window.banner.shownText, "The engine running is version 0.9.0 and this is Project O 1.0.0. Restart it when the screens can go black for a moment.")
         XCTAssertTrue(window.banner.offersRestart)
-        XCTAssertEqual(window.shownStatus, "Connected to the engine.")
         window.show(.connected, anotherBuild: nil)
         XCTAssertTrue(window.banner.isHidden, "the same build: no banner")
     }
@@ -277,16 +302,7 @@ final class EntryTests: XCTestCase {
         let window = MainWindowController()
         for phase: EngineSupervisor.Phase in [.starting, .notResponding, .noSocket(console: ["a line"]), .restarting(ends: 4, console: ["a line"]), .wrongAPI(engine: "0.9.0")] {
             window.show(phase)
-            var unlabelled: [String] = []
-            func walk(_ view: NSView) {
-                if let control = view as? NSControl, !control.isHidden {
-                    let label = control.accessibilityLabel() ?? (control as? NSButton)?.title ?? (control as? NSTextField)?.stringValue ?? ""
-                    if label.isEmpty { unlabelled.append("\(type(of: control))") }
-                }
-                for subview in view.subviews { walk(subview) }
-            }
-            walk(try XCTUnwrap(window.window.contentView))
-            XCTAssertEqual(unlabelled, [], "Spec 10 §15: every control has a label (\(phase))")
+            XCTAssertEqual(Audit.unlabelled(in: try XCTUnwrap(window.window.contentView)), [], "Spec 10 §15: every control has a label (\(phase))")
             XCTAssertEqual(window.banner.accessibilityLabel(), window.banner.shownText)
         }
     }

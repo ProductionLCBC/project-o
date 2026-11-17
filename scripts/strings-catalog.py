@@ -303,6 +303,16 @@ ENTRIES = [
     ("strip.from.api", "from the API", "Written over the network API."),
     ("strip.from.other", "from %@", "Written by another source. %@ is its name."),
     ("meter.label", "Level of channel %lld", "VoiceOver: a channel's audio meter."),
+    ("strip.lock", "Lock", "A channel's menu: keeps cues from writing to it."),
+    ("strip.unlock", "Unlock", "A channel's menu."),
+    ("strip.resetAttributes", "Reset Attributes", "A channel's menu: puts its grade, transition and gain back to their defaults."),
+    ("strip.endBehaviour", "End Behaviour", "A channel's menu: what its media does at its end."),
+    ("strip.grade", "Grade", "A channel's menu: its colour grade."),
+    ("strip.grade.none", "None", "A channel's Grade menu: no grade."),
+    ("strip.grade.numbered", "%1$lld %2$@", "A channel's Grade and Transition menus: an entry's number and label."),
+    ("strip.transition", "Transition", "A channel's menu: how its content changes."),
+    ("strip.selectOnly", "Select Only This Channel", "A channel's menu."),
+    ("preview.picker", "Preview stack", "The label of the menu that picks which stack the preview shows."),
 
     # The first window (Spec 10 §13)
     ("first.output", "Output %1$lld is %2$@", "After first run: an output's number and its device."),

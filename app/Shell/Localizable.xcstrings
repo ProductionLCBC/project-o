@@ -1969,6 +1969,18 @@
         }
       }
     },
+    "preview.picker" : {
+      "comment" : "The label of the menu that picks which stack the preview shows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview stack"
+          }
+        }
+      }
+    },
     "preview.stack" : {
       "comment" : "A stack: its number and label.",
       "extractionState" : "manual",
@@ -2161,6 +2173,18 @@
         }
       }
     },
+    "strip.endBehaviour" : {
+      "comment" : "A channel's menu: what its media does at its end.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End Behaviour"
+          }
+        }
+      }
+    },
     "strip.from.aCue" : {
       "comment" : "As above, when neither is known.",
       "extractionState" : "manual",
@@ -2281,6 +2305,54 @@
         }
       }
     },
+    "strip.grade" : {
+      "comment" : "A channel's menu: its colour grade.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
+    "strip.grade.none" : {
+      "comment" : "A channel's Grade menu: no grade.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "strip.grade.numbered" : {
+      "comment" : "A channel's Grade and Transition menus: an entry's number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld %2$@"
+          }
+        }
+      }
+    },
+    "strip.lock" : {
+      "comment" : "A channel's menu: keeps cues from writing to it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock"
+          }
+        }
+      }
+    },
     "strip.loops" : {
       "comment" : "On media that loops.",
       "extractionState" : "manual",
@@ -2341,6 +2413,18 @@
         }
       }
     },
+    "strip.resetAttributes" : {
+      "comment" : "A channel's menu: puts its grade, transition and gain back to their defaults.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Attributes"
+          }
+        }
+      }
+    },
     "strip.select" : {
       "comment" : "The label of a channel's number badge.",
       "extractionState" : "manual",
@@ -2349,6 +2433,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select channel %lld"
+          }
+        }
+      }
+    },
+    "strip.selectOnly" : {
+      "comment" : "A channel's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select Only This Channel"
+          }
+        }
+      }
+    },
+    "strip.transition" : {
+      "comment" : "A channel's menu: how its content changes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition"
+          }
+        }
+      }
+    },
+    "strip.unlock" : {
+      "comment" : "A channel's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock"
           }
         }
       }

@@ -78,6 +78,14 @@ public final class ShowModel {
         onChange?(changes)
     }
 
+    /// The app's clock, for a view that times something of its own.
+    public var now: TimeInterval { clock.now }
+
+    /// A channel's label, for a chip's words.
+    public func channelLabel(_ number: Int) -> String {
+        store.catalog?.channels.first { $0.number == number }?.label ?? ""
+    }
+
     // MARK: - The store
 
     private func storeChanged(_ changes: Set<StoreChange>) {

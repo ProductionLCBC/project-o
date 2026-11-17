@@ -80,6 +80,18 @@ public enum StringKey: String, CaseIterable, Sendable {
     case aboutEngineAway = "about.engineAway"
 
     // The window's regions (Spec 10 §4-§8, §13)
+    case stripLock = "strip.lock"
+    case stripUnlock = "strip.unlock"
+    case stripResetAttributes = "strip.resetAttributes"
+    case stripEndBehaviour = "strip.endBehaviour"
+    case stripGrade = "strip.grade"
+    case stripGradeNone = "strip.grade.none"
+    case stripGradeNumbered = "strip.grade.numbered"
+    case stripTransition = "strip.transition"
+    case stripSelectOnly = "strip.selectOnly"
+    case previewPicker = "preview.picker"
+
+    // The window's regions (Spec 10 §4-§8, §13)
     case unavailableLater = "unavailable.later"
     case menuSettings = "menu.settings"
     case menuLock = "menu.lock"

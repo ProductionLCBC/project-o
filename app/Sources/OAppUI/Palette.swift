@@ -8,25 +8,49 @@ import OCore
 /// for the selected preview, amber for browsing away from live (§6) and for
 /// warnings, and blue for selection and focus."
 ///
-/// The values are provisional: the clickable demo isn't in the repository,
-/// so the look is proposed as a mockup at Area 13's first stop and these
-/// take the values Adam approves there (his answer of 2026-11-17).
+/// The look is the one Adam approved in layout at Area 13's first stop
+/// (2026-11-17), drawn cleaner as he asked: surfaces told apart by their
+/// fill and not by borders, one hairline where two meet, and colour kept for
+/// the four meanings and the section hues. The clickable demo isn't in the
+/// repository, so these are the app's own.
 @MainActor
 enum Palette {
+    private static func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+    }
+
     /// Red: live, and errors.
-    static let live = NSColor(srgbRed: 0.94, green: 0.27, blue: 0.27, alpha: 1)
+    static let live = rgb(0xF2453D)
     /// Green: outputting, and the selected preview.
-    static let outputting = NSColor(srgbRed: 0.20, green: 0.78, blue: 0.47, alpha: 1)
+    static let outputting = rgb(0x30C36B)
     /// Amber: browsing away from live, and warnings.
-    static let browsing = NSColor(srgbRed: 0.96, green: 0.68, blue: 0.20, alpha: 1)
+    static let browsing = rgb(0xF5A623)
     /// Blue: selection and focus.
-    static let selection = NSColor(srgbRed: 0.31, green: 0.55, blue: 0.98, alpha: 1)
-    /// The window behind everything.
-    static let window = NSColor(srgbRed: 0.067, green: 0.071, blue: 0.082, alpha: 1)
-    /// A panel raised from the window.
-    static let panel = NSColor(srgbRed: 0.106, green: 0.114, blue: 0.129, alpha: 1)
-    static let text = NSColor(white: 0.93, alpha: 1)
-    static let dimText = NSColor(white: 0.62, alpha: 1)
+    static let selection = rgb(0x4C8DFF)
+
+    /// The window behind everything, a column's panel on it, and what is raised from a panel: a cell, a field, a button.
+    static let window = rgb(0x0E0F12)
+    static let panel = rgb(0x15171B)
+    static let raised = rgb(0x1E2127)
+    /// A raised thing under the pointer or pressed.
+    static let raisedHigh = rgb(0x282C34)
+    /// Where a picture goes before it is there.
+    static let well = rgb(0x08090B)
+    /// The one line between two surfaces.
+    static let hairline = NSColor(white: 1, alpha: 0.07)
+
+    static let text = rgb(0xECEEF2)
+    static let dimText = rgb(0x9AA0AB)
+    static let faintText = rgb(0x626975)
+
+    /// Spec 10 §6 — "a fixed palette of eight hues that are neither the live
+    /// red nor the browse amber", in `SectionHue`'s order: verse, chorus,
+    /// bridge, pre-chorus, tag, intro, outro, and one more for other names.
+    static let sections: [NSColor] = [rgb(0x2CB5A9), rgb(0x8B6CF6), rgb(0xD45DB5), rgb(0x5B74E8), rgb(0x9BC53D), rgb(0x3BB6DE), rgb(0x7A8BA8), rgb(0xB07CC6)]
+
+    static func section(_ hue: Int?) -> NSColor? {
+        hue.flatMap { sections.indices.contains($0) ? sections[$0] : nil }
+    }
 }
 
 extension NSScreen {
