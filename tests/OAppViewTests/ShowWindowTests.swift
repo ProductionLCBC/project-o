@@ -370,8 +370,17 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(picture.pixelsWide >= 1440, true)
         let data = try XCTUnwrap(picture.representation(using: .png, properties: [:]))
         XCTAssertGreaterThan(data.count, 20_000, "something was drawn")
-        if let folder = ProcessInfo.processInfo.environment["O_RENDER_DIR"] {
-            try data.write(to: URL(fileURLWithPath: folder).appendingPathComponent("show-window.png"))
-        }
+        guard let folder = ProcessInfo.processInfo.environment["O_RENDER_DIR"] else { return }
+        try data.write(to: URL(fileURLWithPath: folder).appendingPathComponent("show-window.png"))
+        // A taller window, where the tabbed panel is open, browsing a list from the library with two channels selected.
+        rig.resize(NSSize(width: 1440, height: 1100))
+        rig.model.browse(.list(Self.list7))
+        rig.model.toggleSelection(1)
+        rig.model.toggleSelection(2)
+        rig.view.tabs.show(.clears)
+        rig.view.layoutSubtreeIfNeeded()
+        let tall = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: tall)
+        try XCTUnwrap(tall.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("show-window-browsing.png"))
     }
 }
