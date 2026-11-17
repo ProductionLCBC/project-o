@@ -31,7 +31,9 @@ final class MemoryRootsStore: RootsStore {
 final class NoLauncher: EngineLauncher, @unchecked Sendable {
     private let lock = NSLock()
     private var started: [EngineLaunch] = []
+    private var killed: [Int32] = []
     var launches: [EngineLaunch] { lock.lock(); defer { lock.unlock() }; return started }
+    var kills: [Int32] { lock.lock(); defer { lock.unlock() }; return killed }
 
     private final class Watch: ProcessWatch, @unchecked Sendable {
         func cancel() {}
@@ -47,7 +49,12 @@ final class NoLauncher: EngineLauncher, @unchecked Sendable {
     func watch(pid: Int32, onExit: @escaping @Sendable (EngineExit) -> Void) -> any ProcessWatch { Watch() }
     func isRunning(pid: Int32) -> Bool { true }
     func executablePath(pid: Int32) -> String? { nil }
-    func kill(pid: Int32) -> Bool { false }
+    func kill(pid: Int32) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        killed.append(pid)
+        return false
+    }
 }
 
 struct NoConnector: EngineConnector {
@@ -116,6 +123,106 @@ final class EntryTests: XCTestCase {
         XCTAssertEqual(launcher.launches.first?.executable.path, "/nowhere/oengine")
         XCTAssertEqual(controller.windowController.banner.shownText, "Starting the engine…")
         XCTAssertNil(controller.firstRun)
+        controller.supervisor?.leaveEngineRunning()
+    }
+
+    /// Spec 10 §2, "Quitting" — "⌘Q, or closing the main window, asks ...
+    /// A logout, a restart or a shutdown doesn't ask". Spec 10 §4 — "every
+    /// confirmation and file dialog is a sheet on the main window", so the
+    /// app's answer to the system waits for the sheet's.
+    func test_quitAsksInASheetAndALogoutOrShutdownDoesNotAsk() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oapp-view-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let roots = EngineRoots(library: folder.appendingPathComponent("library"), machine: folder.appendingPathComponent("machine"))
+
+        let (system, _, _) = controller(roots: roots)
+        var systemAlerts = 0
+        system.presentAlert = { _, _, _ in systemAlerts += 1 }
+        system.start(showWindow: false)
+        XCTAssertEqual(system.shouldTerminate(systemAsked: true), .terminateNow, "the system's request is not questioned")
+        XCTAssertEqual(systemAlerts, 0)
+        XCTAssertFalse(system.isQuitting)
+
+        let (asked, _, launcher) = controller(roots: roots)
+        var alerts: [(alert: NSAlert, window: NSWindow, answer: @MainActor (NSApplication.ModalResponse) -> Void)] = []
+        var replies: [Bool] = []
+        asked.presentAlert = { alert, window, answer in alerts.append((alert, window, answer)) }
+        asked.replyToTerminate = { replies.append($0) }
+        asked.start(showWindow: false)
+        XCTAssertEqual(asked.shouldTerminate(systemAsked: false), .terminateLater, "the answer waits for the sheet")
+        XCTAssertEqual(alerts.count, 1)
+        let question = try XCTUnwrap(alerts.first)
+        XCTAssertEqual(question.alert.messageText, "Quit Project O? The outputs will stop.")
+        XCTAssertEqual(question.alert.buttons.map(\.title), ["Cancel", "Quit", "Keep outputs running"])
+        XCTAssertEqual(question.alert.buttons.map(\.keyEquivalent), ["\u{1B}", "", ""],
+                       "Spec 10 §9: a button that quits is never the default, so Return can't press it; Escape cancels")
+        XCTAssertTrue(question.window === asked.windowController.window, "Spec 10 §4: a sheet on the main window")
+        XCTAssertEqual(asked.shouldTerminate(systemAsked: false), .terminateLater)
+        XCTAssertEqual(alerts.count, 1, "a second ⌘Q asks nothing more")
+
+        question.answer(.alertFirstButtonReturn)
+        XCTAssertEqual(replies, [false], "Cancel: the app goes on")
+        XCTAssertFalse(asked.isQuitting)
+
+        XCTAssertEqual(asked.shouldTerminate(systemAsked: false), .terminateLater)
+        XCTAssertEqual(alerts.count, 2, "and can be asked again")
+        alerts[1].answer(.alertThirdButtonReturn)
+        XCTAssertEqual(replies, [false, true], "Keep outputs running: the app quits")
+        XCTAssertEqual(launcher.kills, [], "and the engine is left as it is")
+
+        let (firstRun, _, _) = controller()
+        var firstRunAlerts = 0
+        firstRun.presentAlert = { _, _, _ in firstRunAlerts += 1 }
+        firstRun.start(showWindow: false)
+        XCTAssertEqual(firstRun.shouldTerminate(systemAsked: false), .terminateNow, "with no engine there is nothing to stop, so nothing to ask")
+        XCTAssertEqual(firstRunAlerts, 0)
+    }
+
+    /// Spec 10 §2, "When it doesn't answer" — Restart the engine "says the
+    /// screens go black for a moment"; Spec 10 §9 — Return can't press it.
+    func test_restartTheEngineAsksFirstInASheetAndCancelLeavesTheEngineAlone() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oapp-view-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let roots = EngineRoots(library: folder.appendingPathComponent("library"), machine: folder.appendingPathComponent("machine"))
+        let (controller, _, launcher) = controller(roots: roots)
+        var alerts: [(alert: NSAlert, answer: @MainActor (NSApplication.ModalResponse) -> Void)] = []
+        controller.presentAlert = { alert, _, answer in alerts.append((alert, answer)) }
+        controller.start(showWindow: false)
+        controller.askToRestart()
+        let question = try XCTUnwrap(alerts.first)
+        XCTAssertEqual(question.alert.messageText, "Restart the engine?")
+        XCTAssertEqual(question.alert.informativeText, "The screens go black for a moment.")
+        XCTAssertEqual(question.alert.buttons.map(\.title), ["Cancel", "Restart the engine"])
+        XCTAssertEqual(question.alert.buttons.map(\.keyEquivalent), ["\u{1B}", ""], "Return can't press Restart the engine; Escape cancels")
+        question.answer(.alertFirstButtonReturn)
+        XCTAssertEqual(launcher.launches.count, 1, "Cancel: nothing is started again")
+        XCTAssertEqual(launcher.kills, [])
+        controller.supervisor?.leaveEngineRunning()
+    }
+
+    /// Spec 10 §9 — "A button that deletes, restores or quits is never a
+    /// sheet's default, so Return can't press it". AppKit gives Escape to a
+    /// button called "Cancel" in English; the app sets the keys itself, so
+    /// the rule holds in a language where it is called something else.
+    func test_returnPressesNoButtonOnAConfirmationWhateverTheLanguage() throws {
+        try ViewStrings.install(transform: Pseudolanguage.accented)
+        addTeardownBlock { @MainActor in try? ViewStrings.install() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("oapp-view-\(UUID().uuidString)")
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let roots = EngineRoots(library: folder.appendingPathComponent("library"), machine: folder.appendingPathComponent("machine"))
+        let (controller, _, _) = controller(roots: roots)
+        var alerts: [NSAlert] = []
+        controller.presentAlert = { alert, _, _ in alerts.append(alert) }
+        controller.replyToTerminate = { _ in }
+        controller.start(showWindow: false)
+        controller.askToRestart()
+        _ = controller.shouldTerminate(systemAsked: false)
+        XCTAssertEqual(alerts.count, 2)
+        for alert in alerts {
+            XCTAssertNotEqual(alert.buttons.first?.title, "Cancel", "the pseudolanguage renames it")
+            XCTAssertEqual(alert.buttons.first?.keyEquivalent, "\u{1B}", "Escape cancels")
+            XCTAssertEqual(alert.buttons.dropFirst().map(\.keyEquivalent).filter { !$0.isEmpty }, [], "and no other button has a key")
+        }
         controller.supervisor?.leaveEngineRunning()
     }
 

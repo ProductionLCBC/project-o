@@ -118,7 +118,16 @@ struct FirstRunSheet: View {
                     panel.canChooseFiles = false
                     panel.canCreateDirectories = true
                     panel.directoryURL = url
-                    if panel.runModal() == .OK, let picked = panel.url { set(picked) }
+                    // Spec 10 §4 — "every confirmation and file dialog is a sheet on the main window": this one on
+                    // the first-run sheet, which is itself a sheet there.
+                    let picked: (NSApplication.ModalResponse) -> Void = { response in
+                        if response == .OK, let folder = panel.url { set(folder) }
+                    }
+                    if let window = NSApplication.shared.keyWindow {
+                        panel.beginSheetModal(for: window, completionHandler: picked)
+                    } else {
+                        panel.begin(completionHandler: picked)
+                    }
                 }
                 .accessibilityLabel("\(Strings.text(label)): \(Strings.text(.firstRunChoose))")
             }

@@ -99,9 +99,37 @@ final class AppController {
         alert.informativeText = question.body
         alert.addButton(withTitle: question.cancel)
         alert.addButton(withTitle: question.restart)
-        alert.beginSheetModal(for: windowController.window) { [weak self] response in
+        Self.keepReturnFromPressing(alert)
+        presentAlert(alert, sheetParent) { [weak self] response in
             if response == .alertSecondButtonReturn { self?.supervisor?.restartEngine() }
         }
+    }
+
+    // MARK: - Sheets (Spec 10 §4)
+
+    /// Spec 10 §4 — "every confirmation and file dialog is a sheet on the
+    /// main window". How an alert is put up, as a seam, so a test can read
+    /// the alert and give its answer with no window on a screen.
+    var presentAlert: @MainActor (NSAlert, NSWindow, @escaping @MainActor (NSApplication.ModalResponse) -> Void) -> Void = { alert, window, answer in
+        alert.beginSheetModal(for: window) { response in answer(response) }
+    }
+
+    /// Spec 10 §9 — "A button that deletes, restores or quits is never a
+    /// sheet's default, so Return can't press it". The first button, Cancel,
+    /// takes Escape and no button takes Return, set here and not left to
+    /// AppKit, which goes by the button's title in English.
+    static func keepReturnFromPressing(_ alert: NSAlert) {
+        for (index, button) in alert.buttons.enumerated() {
+            button.keyEquivalent = index == 0 ? "\u{1B}" : ""
+        }
+    }
+
+    /// How the app answers the system once Quit's question is answered; a seam, since the real one ends the process.
+    var replyToTerminate: @MainActor (Bool) -> Void = { NSApplication.shared.reply(toApplicationShouldTerminate: $0) }
+
+    /// The window a new sheet goes on: the main window, or the sheet already on it.
+    private var sheetParent: NSWindow {
+        windowController.window.attachedSheet ?? windowController.window
     }
 
     // MARK: - First run (Spec 10 §13)
@@ -135,7 +163,8 @@ final class AppController {
     /// "offers "Restart the engine", which says the screens go black for a
     /// moment and, while the `saving` topic counts unsaved documents, that
     /// they will be lost." Spec 10 §9 — "A button that deletes, restores or
-    /// quits is never a sheet's default, so Return can't press it": Cancel is.
+    /// quits is never a sheet's default, so Return can't press it": Escape
+    /// cancels, and Return presses nothing.
     func askToRestart() {
         let words = RestartConfirmation.make(unsaved: store.saving.unsaved)
         let alert = NSAlert()
@@ -144,7 +173,8 @@ final class AppController {
         alert.informativeText = words.body.joined(separator: "\n")
         alert.addButton(withTitle: Strings.text(.cancel))
         alert.addButton(withTitle: Strings.text(.engineRestart))
-        alert.beginSheetModal(for: windowController.window) { [weak self] response in
+        Self.keepReturnFromPressing(alert)
+        presentAlert(alert, sheetParent) { [weak self] response in
             if response == .alertSecondButtonReturn { self?.supervisor?.restartEngine() }
         }
     }
@@ -154,44 +184,73 @@ final class AppController {
     /// "⌘Q, or closing the main window, asks ... with Quit, Keep outputs
     /// running and Cancel." "A logout, a restart or a shutdown doesn't ask,
     /// and the engine stops on the system's request."
+    ///
+    /// Spec 10 §4 — "every confirmation and file dialog is a sheet on the
+    /// main window": the question is a sheet there, over any sheet that is
+    /// already up, and the app's answer to the system waits for it.
     func shouldTerminate(systemAsked: Bool) -> NSApplication.TerminateReply {
         guard let supervisor, !systemAsked else {
             supervisor?.leaveEngineRunning()
             return .terminateNow
         }
+        // Asked already: the question is up, or the engine is being stopped.
+        guard !isQuitting else { return .terminateLater }
+        isQuitting = true
         let words = QuitQuestion.make(unsaved: store.saving.unsaved)
         let alert = NSAlert()
         alert.messageText = words.title
         if let detail = words.detail { alert.informativeText = detail }
-        // Cancel is the default, on Return and on Escape; Quit and Keep outputs running each need their own press.
+        // Escape cancels and Return presses nothing: Quit and Keep outputs running each need their own press.
         alert.addButton(withTitle: words.cancel)
         alert.addButton(withTitle: words.quit)
         alert.addButton(withTitle: words.keepOutputs)
-        switch alert.runModal() {
+        Self.keepReturnFromPressing(alert)
+        presentAlert(alert, sheetParent) { [weak self] response in
+            self?.quitAnswered(response)
+        }
+        return .terminateLater
+    }
+
+    /// Whether Quit has been asked and not cancelled.
+    private(set) var isQuitting = false
+
+    private func quitAnswered(_ response: NSApplication.ModalResponse) {
+        guard let supervisor else {
+            replyToTerminate(true)
+            return
+        }
+        switch response {
         case .alertSecondButtonReturn:
             windowController.banner.show(EngineBanner(text: Strings.text(.quitStopping), tone: .working, console: [], offersRestart: false))
+            let reply = replyToTerminate
             supervisor.stopEngine { [weak self] unsaved in
-                self?.showUnsaved(unsaved ?? [])
-                NSApplication.shared.reply(toApplicationShouldTerminate: true)
+                guard let self else {
+                    reply(true)
+                    return
+                }
+                self.showUnsaved(unsaved ?? []) { reply(true) }
             }
-            return .terminateLater
         case .alertThirdButtonReturn:
             supervisor.leaveEngineRunning()
-            return .terminateNow
+            replyToTerminate(true)
         default:
-            return .terminateCancel
+            isQuitting = false
+            replyToTerminate(false)
         }
     }
 
     /// "shows the documents the answer names as unsaved (Spec 9 §7), then quits".
-    private func showUnsaved(_ documents: [String]) {
-        guard !documents.isEmpty else { return }
+    private func showUnsaved(_ documents: [String], then quit: @escaping @MainActor () -> Void) {
+        guard !documents.isEmpty else {
+            quit()
+            return
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = Strings.text(.quitNotSavedTitle)
         alert.informativeText = Strings.counted(.quitNotSavedBody, documents.count, ListFormatter.localizedString(byJoining: documents))
         alert.addButton(withTitle: Strings.text(.ok))
-        alert.runModal()
+        presentAlert(alert, sheetParent) { _ in quit() }
     }
 
     // MARK: - About (Spec 10 §2, "Versions")

@@ -82,7 +82,7 @@ public struct RestartConfirmation: Equatable, Sendable {
 /// playlist loaded and no list fired from the library"; and the offer is
 /// made once for each engine run, so a Cancel isn't asked again.
 public struct AnotherBuildOffer: Equatable, Sendable {
-    /// What the offer asks, with Cancel its default (Spec 10 §9: Return never presses a button that restarts).
+    /// What the offer asks. Escape cancels it and Return presses nothing (Spec 10 §9).
     public struct Question: Equatable, Sendable {
         public var title: String
         public var body: String
