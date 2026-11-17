@@ -65,13 +65,16 @@ top bar and the whole menu bar; the Mach link for the pictures and the meters; 2
 in the catalog; every control labelled for VoiceOver, and nothing of the app's own wording
 clipped at 1440 by 900 in English or under either pseudolanguage.
 
-Waiting on Adam at this stop, each in the session's report with two pictures of the drawn
-window: the look as drawn; what of stage 2's list is not built yet (dragging: the column
-dividers, the pool's divider, a pool tile onto a strip cell; the window moving off an
-output's screen; an output's full details; the items' own menus) and whether it goes
-before the keys or with the edits; stage 3's readings; and his go for a hands-on run of
-the app against a real engine, the first time the preview, the channel pictures and the
-meters can be seen, since it opens outputs. His eight answers with the plan are in row 13
+Adam answered the stop's report the same day, from two pictures of the drawn window: the
+look is approved as drawn, so Spec 10 §4's "the demo's palette" is to be corrected on the
+branch to name the app's colours; what of stage 2's list is not built yet goes before the
+keys (dragging the column dividers and the pool's divider, the window moving off an
+output's screen, an output's full details, the items' own menus), with a pool tile onto a
+strip cell left for the drops' stage; and the readings of stage 2 and of stage 3 are taken
+as chosen. He gave no go for a hands-on run of the app against a real engine, so no
+preview, channel picture or meter has been seen with real frames yet, and he asked that
+`main` not be pushed at this stop. The session is waiting on his questions before it goes
+on; none of those answers is built yet. His eight answers with the plan are in row 13
 above. Nothing is in review for a merge.
 
 Everything else is on `main`. Area 19, engine API and first run, shipped on 2026-11-16
