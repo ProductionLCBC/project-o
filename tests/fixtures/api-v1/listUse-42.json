@@ -1,0 +1,8 @@
+{
+  "playlists": [
+    { "archived": false, "title": "Sunday Night", "uuid": "b1a70000-0000-4000-8000-000000000010" },
+    { "archived": false, "title": "Sunday", "uuid": "b1a70000-0000-4000-8000-000000000001" },
+    { "archived": true, "title": "Sunday 2026-11-01", "uuid": "b1a70000-0000-4000-8000-000000000011" }
+  ],
+  "type": "answer"
+}

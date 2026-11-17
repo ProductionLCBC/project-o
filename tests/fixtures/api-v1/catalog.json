@@ -1,0 +1,790 @@
+{
+  "library": {
+    "audioTransitions": [
+      { "easing": "linear", "label": "Cut", "ms": 0, "number": 1, "offsetMs": 0, "type": "cut", "uuid": "a0d10000-0000-4000-8000-000000000001" },
+      { "easing": "easeInOut", "label": "Crossfade", "ms": 500, "number": 2, "offsetMs": 0, "type": "crossfade", "uuid": "a0d10000-0000-4000-8000-000000000002" },
+      { "easing": "easeOut", "label": "Fade through silence", "ms": 800, "number": 3, "offsetMs": -200, "type": "fadeThroughSilence", "uuid": "a0d10000-0000-4000-8000-000000000003" }
+    ],
+    "channels": [
+      {
+        "audioOutputs": [1],
+        "decoderCap": 2,
+        "defaultPreset": 1,
+        "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+        "label": "Background",
+        "number": 1,
+        "renderSize": "largest",
+        "textThumbnail": "body",
+        "usualContent": "media",
+        "uuid": "8d1e0000-0000-4000-8000-000000000001"
+      },
+      {
+        "audioOutputs": [1],
+        "decoderCap": 2,
+        "defaultPreset": 1,
+        "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+        "label": "Foreground",
+        "number": 2,
+        "renderSize": { "height": 1080, "width": 1920 },
+        "textThumbnail": "body",
+        "usualContent": "text",
+        "uuid": "2b770000-0000-4000-8000-000000000002"
+      },
+      {
+        "audioOutputs": [1],
+        "decoderCap": 2,
+        "defaultPreset": 2,
+        "defaults": { "audioTransition": 1, "gain": 0, "transition": 1 },
+        "label": "Clock",
+        "number": 3,
+        "renderSize": "largest",
+        "textThumbnail": "body",
+        "usualContent": "any",
+        "uuid": "3c3c0000-0000-4000-8000-000000000003"
+      }
+    ],
+    "folders": ["Christmas", "Hymns"],
+    "grades": [
+      {
+        "blur": 0,
+        "brightness": -0.05,
+        "contrast": 1.1,
+        "hue": 8,
+        "label": "Warm",
+        "number": 1,
+        "opacity": 1,
+        "saturation": 1.15,
+        "tint": { "a": 0.12, "b": 0.6, "g": 0.85, "r": 1 },
+        "uuid": "6ade0000-0000-4000-8000-000000000001"
+      }
+    ],
+    "info": { "name": "LCBC Library", "uuid": "11b0a000-0000-4000-8000-000000000001" },
+    "macros": [
+      {
+        "color": { "a": 1, "b": 0.9, "g": 0.5, "r": 0.2 },
+        "commands": [
+          {
+            "channel": 2,
+            "cmd": "channel.write",
+            "content": {
+              "fields": { "body": "Welcome" },
+              "kind": "text"
+            },
+            "when": { "op": "is empty", "var": "Channel 2 Content" }
+          },
+          { "cmd": "timer.set", "ms": 300000, "timer": 1 },
+          { "cmd": "timer.start", "timer": 1 },
+          { "clearAfterMs": 30000, "cmd": "popup.set", "popup": 3, "text": "Nursery: please come to room 12" }
+        ],
+        "label": "Welcome",
+        "number": 1,
+        "tileLabel": "WELCOME",
+        "uuid": "3ac70000-0000-4000-8000-000000000001"
+      }
+    ],
+    "presets": [
+      {
+        "builtIn": true,
+        "label": "Default",
+        "layouts": {
+          "*": {
+            "boxes": [
+              {
+                "binding": { "kind": "pixels" },
+                "fallback": false,
+                "fit": "fit",
+                "frame": { "h": 1, "w": 1, "x": 0, "y": 0 },
+                "grade": null,
+                "offset": 0,
+                "transition": { "ms": null, "ref": 1 }
+              },
+              {
+                "binding": { "kind": "field", "name": "body" },
+                "fallback": true,
+                "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
+                "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "center",
+                  "allCaps": false,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Bold",
+                  "fromStyle": 1,
+                  "letterSpacing": 0,
+                  "lineSpacing": 1.1,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 0
+                  },
+                  "shadow": {
+                    "blur": 8,
+                    "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 2
+                  },
+                  "size": { "unit": "pt", "value": 72 },
+                  "variations": {},
+                  "verticalAlignment": "center",
+                  "weight": 700
+                },
+                "transition": { "ms": 250, "ref": 2 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          },
+          "2": {
+            "boxes": [
+              {
+                "binding": { "kind": "field", "name": "body" },
+                "fallback": false,
+                "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
+                "frame": { "h": 0.56, "w": 0.94, "x": 0.03, "y": 0.11 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "left",
+                  "allCaps": false,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Bold",
+                  "fromStyle": 1,
+                  "letterSpacing": 0,
+                  "lineSpacing": 1.1,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 0
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "pt", "value": 64 },
+                  "variations": {},
+                  "verticalAlignment": "top",
+                  "weight": 700
+                },
+                "transition": { "ms": null, "ref": 1 },
+                "transitionOnVariableChange": false
+              },
+              {
+                "binding": { "kind": "field", "name": "body" },
+                "fallback": false,
+                "fit": { "maxLines": 3, "minSize": 24, "policy": "maxLines" },
+                "frame": { "h": 0.27, "w": 0.94, "x": 0.03, "y": 0.7 },
+                "grade": null,
+                "offset": 1,
+                "textStyle": {
+                  "alignment": "left",
+                  "allCaps": false,
+                  "color": { "a": 1, "b": 0.7, "g": 0.7, "r": 0.7 },
+                  "font": "HelveticaNeue-Bold",
+                  "fromStyle": 1,
+                  "letterSpacing": 0,
+                  "lineSpacing": 1.1,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 0
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "pt", "value": 40 },
+                  "variations": {},
+                  "verticalAlignment": "top",
+                  "weight": 700
+                },
+                "transition": { "ms": null, "ref": 1 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          }
+        },
+        "number": 1,
+        "uuid": "c0de0000-0000-4000-8000-000000000001"
+      },
+      {
+        "builtIn": false,
+        "label": "Clock",
+        "layouts": {
+          "*": {
+            "boxes": [
+              {
+                "binding": { "kind": "static", "text": "[Time]" },
+                "fallback": false,
+                "fit": { "maxLines": 1, "minSize": 12, "policy": "shrinkToFit" },
+                "frame": { "h": 0.09, "w": 0.28, "x": 0.69, "y": 0.01 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "right",
+                  "allCaps": true,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Medium",
+                  "fromStyle": 2,
+                  "letterSpacing": 0.5,
+                  "lineSpacing": 1.2,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 1
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "percent", "value": 4.5 },
+                  "variations": { "wdth": 110, "wght": 500 },
+                  "verticalAlignment": "center",
+                  "weight": 500
+                },
+                "transition": { "ms": null, "ref": 1 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          }
+        },
+        "number": 2,
+        "uuid": "c0de0000-0000-4000-8000-000000000002"
+      },
+      {
+        "builtIn": false,
+        "label": "Lower third",
+        "layouts": {
+          "*": {
+            "boxes": [
+              {
+                "binding": { "kind": "field", "name": "title" },
+                "fallback": false,
+                "fit": { "maxLines": 2, "minSize": 18, "policy": "shrinkToFit" },
+                "frame": { "h": 0.12, "w": 0.9, "x": 0.05, "y": 0.78 },
+                "grade": 1,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "left",
+                  "allCaps": true,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Medium",
+                  "fromStyle": 2,
+                  "letterSpacing": 0.5,
+                  "lineSpacing": 1.2,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 1
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "percent", "value": 4.5 },
+                  "variations": { "wdth": 110, "wght": 500 },
+                  "verticalAlignment": "center",
+                  "weight": 500
+                },
+                "transition": { "ms": 300, "ref": 2 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          },
+          "2": {
+            "boxes": [
+              {
+                "binding": { "kind": "field", "name": "body" },
+                "fallback": false,
+                "fit": { "maxLines": 2, "minSize": 16, "policy": "maxLines" },
+                "frame": { "h": 0.16, "w": 0.94, "x": 0.03, "y": 0.82 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "left",
+                  "allCaps": false,
+                  "color": { "a": 1, "b": 0.8, "g": 0.8, "r": 0.8 },
+                  "font": "HelveticaNeue-Bold",
+                  "fromStyle": 1,
+                  "letterSpacing": 0,
+                  "lineSpacing": 1.1,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 0
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "pt", "value": 36 },
+                  "variations": {},
+                  "verticalAlignment": "center",
+                  "weight": 700
+                },
+                "transition": { "ms": null, "ref": 1 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          }
+        },
+        "number": 3,
+        "uuid": "c0de0000-0000-4000-8000-000000000003"
+      },
+      {
+        "builtIn": false,
+        "label": "Credits",
+        "layouts": {
+          "*": {
+            "boxes": [
+              {
+                "binding": { "kind": "field", "name": "title" },
+                "fallback": false,
+                "fit": { "maxLines": 2, "minSize": 24, "policy": "shrinkToFit" },
+                "frame": { "h": 0.14, "w": 0.9, "x": 0.05, "y": 0.3 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "center",
+                  "allCaps": false,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Bold",
+                  "fromStyle": 1,
+                  "letterSpacing": 0,
+                  "lineSpacing": 1.1,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 0
+                  },
+                  "shadow": {
+                    "blur": 8,
+                    "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 2
+                  },
+                  "size": { "unit": "pt", "value": 56 },
+                  "variations": {},
+                  "verticalAlignment": "center",
+                  "weight": 700
+                },
+                "transition": { "ms": 250, "ref": 2 },
+                "transitionOnVariableChange": false
+              },
+              {
+                "binding": { "kind": "field", "name": "author" },
+                "fallback": false,
+                "fit": { "maxLines": 1, "minSize": 18, "policy": "shrinkToFit" },
+                "frame": { "h": 0.07, "w": 0.9, "x": 0.05, "y": 0.48 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "center",
+                  "allCaps": true,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Medium",
+                  "fromStyle": 2,
+                  "letterSpacing": 0.5,
+                  "lineSpacing": 1.2,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 1
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "percent", "value": 4.5 },
+                  "variations": { "wdth": 110, "wght": 500 },
+                  "verticalAlignment": "center",
+                  "weight": 500
+                },
+                "transition": { "ms": 250, "ref": 2 },
+                "transitionOnVariableChange": false
+              },
+              {
+                "binding": { "kind": "field", "name": "copyright" },
+                "fallback": false,
+                "fit": { "maxLines": 1, "minSize": 18, "policy": "shrinkToFit" },
+                "frame": { "h": 0.07, "w": 0.9, "x": 0.05, "y": 0.57 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "center",
+                  "allCaps": true,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Medium",
+                  "fromStyle": 2,
+                  "letterSpacing": 0.5,
+                  "lineSpacing": 1.2,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 1
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "percent", "value": 4.5 },
+                  "variations": { "wdth": 110, "wght": 500 },
+                  "verticalAlignment": "center",
+                  "weight": 500
+                },
+                "transition": { "ms": 250, "ref": 2 },
+                "transitionOnVariableChange": false
+              },
+              {
+                "binding": { "kind": "field", "name": "ccli" },
+                "fallback": false,
+                "fit": { "maxLines": 1, "minSize": 18, "policy": "shrinkToFit" },
+                "frame": { "h": 0.07, "w": 0.9, "x": 0.05, "y": 0.66 },
+                "grade": null,
+                "offset": 0,
+                "textStyle": {
+                  "alignment": "center",
+                  "allCaps": true,
+                  "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+                  "font": "HelveticaNeue-Medium",
+                  "fromStyle": 2,
+                  "letterSpacing": 0.5,
+                  "lineSpacing": 1.2,
+                  "outline": {
+                    "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+                    "width": 1
+                  },
+                  "shadow": {
+                    "blur": 0,
+                    "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+                    "x": 0,
+                    "y": 0
+                  },
+                  "size": { "unit": "percent", "value": 4.5 },
+                  "variations": { "wdth": 110, "wght": 500 },
+                  "verticalAlignment": "center",
+                  "weight": 500
+                },
+                "transition": { "ms": 250, "ref": 2 },
+                "transitionOnVariableChange": false
+              }
+            ],
+            "mask": null
+          }
+        },
+        "number": 4,
+        "uuid": "c0de0000-0000-4000-8000-000000000004"
+      }
+    ],
+    "textStyles": [
+      {
+        "alignment": "center",
+        "allCaps": false,
+        "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+        "font": "HelveticaNeue-Bold",
+        "label": "Body",
+        "letterSpacing": 0,
+        "lineSpacing": 1.1,
+        "number": 1,
+        "outline": {
+          "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+          "width": 0
+        },
+        "shadow": {
+          "blur": 8,
+          "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 },
+          "x": 0,
+          "y": 2
+        },
+        "size": { "unit": "pt", "value": 72 },
+        "uuid": "7e570000-0000-4000-8000-000000000001",
+        "variations": {},
+        "verticalAlignment": "center",
+        "weight": 700
+      },
+      {
+        "alignment": "left",
+        "allCaps": true,
+        "color": { "a": 1, "b": 1, "g": 1, "r": 1 },
+        "font": "HelveticaNeue-Medium",
+        "label": "Caption",
+        "letterSpacing": 0.5,
+        "lineSpacing": 1.2,
+        "number": 2,
+        "outline": {
+          "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+          "width": 1
+        },
+        "shadow": {
+          "blur": 0,
+          "color": { "a": 0, "b": 0, "g": 0, "r": 0 },
+          "x": 0,
+          "y": 0
+        },
+        "size": { "unit": "percent", "value": 4.5 },
+        "uuid": "7e570000-0000-4000-8000-000000000002",
+        "variations": { "wdth": 110, "wght": 500 },
+        "verticalAlignment": "center",
+        "weight": 500
+      }
+    ],
+    "transitions": [
+      { "builtIn": true, "color": null, "easing": "linear", "label": "Cut", "ms": 0, "number": 1, "type": "cut", "uuid": "7a110000-0000-4000-8000-000000000001" },
+      { "builtIn": true, "color": null, "easing": "easeInOut", "label": "Dissolve", "ms": 500, "number": 2, "type": "dissolve", "uuid": "7a110000-0000-4000-8000-000000000002" },
+      {
+        "builtIn": true,
+        "color": { "a": 1, "b": 0, "g": 0, "r": 0 },
+        "easing": "easeInOut",
+        "label": "Fade through black",
+        "ms": 1000,
+        "number": 3,
+        "type": "fadeThroughColor",
+        "uuid": "7a110000-0000-4000-8000-000000000003"
+      }
+    ]
+  },
+  "lists": [
+    { "author": "Thomas Ken", "ccli": "56204", "copyright": "Public domain", "cues": 3, "folder": "", "local": false, "named": true, "number": 7, "title": "Doxology", "trackThrough": true, "uuid": "a9f00000-0000-4000-8000-000000000007", "version": 3 },
+    { "author": "Thomas Chisholm", "ccli": "18723", "copyright": "Public domain", "cues": 4, "folder": "Hymns", "local": false, "named": true, "number": 42, "title": "Great Is Thy Faithfulness", "trackThrough": false, "uuid": "a9f00000-0000-4000-8000-00000000002a", "version": 17 },
+    { "author": "Thomas Chisholm", "ccli": "18723", "copyright": "Public domain", "cues": 2, "folder": "", "local": true, "named": false, "number": 42, "title": "Great Is Thy Faithfulness (Manheim)", "trackThrough": false, "uuid": "10ca1000-0000-4000-8000-00000000002a", "version": 2 }
+  ],
+  "machine": {
+    "audioOutputs": [
+      {
+        "channels": [0, 1],
+        "delayMs": 0,
+        "device": "BuiltInSpeakerDevice",
+        "fallbackDevice": null,
+        "kind": "device",
+        "label": "System default",
+        "number": 1,
+        "uuid": "a0d00000-0000-4000-8000-000000000001"
+      },
+      {
+        "channels": [0, 1],
+        "delayMs": 80,
+        "device": 2,
+        "fallbackDevice": "BuiltInSpeakerDevice",
+        "kind": "sdiEmbedded",
+        "label": "SDI embedded",
+        "number": 2,
+        "uuid": "a0d00000-0000-4000-8000-000000000002"
+      }
+    ],
+    "inputs": [
+      {
+        "audioMap": [0, 1],
+        "bufferingMs": 40,
+        "colorRange": "limited",
+        "deinterlace": true,
+        "device": "decklink:8f3a21c0:in1",
+        "expected": false,
+        "format": {
+          "height": 1080,
+          "interlaced": true,
+          "rate": { "den": 1001, "num": 30000 },
+          "width": 1920
+        },
+        "kind": "sdi",
+        "label": "Camera 1",
+        "number": 1,
+        "uuid": "19b00000-0000-4000-8000-000000000001"
+      }
+    ],
+    "keys": [
+      {
+        "command": { "cmd": "playlist.next" },
+        "device": "keyboard",
+        "key": "space"
+      },
+      {
+        "command": { "cmd": "playlist.next" },
+        "device": "keyboard",
+        "key": "right"
+      },
+      {
+        "command": { "cmd": "playlist.previous" },
+        "device": "keyboard",
+        "key": "left"
+      },
+      {
+        "command": { "cmd": "system.clearAll" },
+        "device": "keyboard",
+        "key": "shift+escape"
+      },
+      {
+        "command": { "cmd": "stack.blackout", "stack": 1, "state": "toggle" },
+        "device": "streamdeck:AL12K3",
+        "key": "button 1"
+      },
+      {
+        "command": { "cmd": "macro.run", "macro": 2 },
+        "device": "scheduler",
+        "when": {
+          "days": ["sunday"],
+          "time": "09:55"
+        }
+      }
+    ],
+    "macros": [
+      {
+        "color": { "a": 1, "b": 0.2, "g": 0.3, "r": 0.9 },
+        "commands": [
+          { "cmd": "system.clearAll" },
+          { "cmd": "output.stack", "output": 1, "stack": 1 },
+          { "cmd": "stack.blackout", "stack": 1, "state": "off" },
+          { "channel": 2, "cmd": "stack.mute", "stack": 2, "state": "off" },
+          { "audio": "all", "cmd": "audio.mute", "state": "off" },
+          {
+            "channel": 1,
+            "cmd": "channel.write",
+            "content": { "kind": "media", "ref": "sha256:eb6384847a49f7a4ef82aedb9e2019080777b8be748690c33d91bba67c32a3d2" },
+            "when": { "op": "is", "value": "1", "var": "Output 1 Stack" }
+          },
+          { "channel": 1, "cmd": "channel.endBehavior", "mode": "hold" },
+          { "channel": 1, "cmd": "channel.lock", "locked": false },
+          { "channel": "all", "cmd": "channel.reset" }
+        ],
+        "label": "Preshow",
+        "number": 2,
+        "tileLabel": "PRESHOW",
+        "uuid": "3ac70000-0000-4000-8000-000000000002"
+      }
+    ],
+    "outputs": [
+      {
+        "colorRange": "full",
+        "defaultStack": 1,
+        "device": "display:37D8832A-2D66-02CA-B9F7-8F30A301B230",
+        "format": {
+          "height": 1080,
+          "interlaced": false,
+          "rate": { "den": 1, "num": 60 },
+          "width": 1920
+        },
+        "genlock": null,
+        "keyFillPartner": null,
+        "keyMode": "shaped",
+        "kind": "display",
+        "label": "Main",
+        "number": 1,
+        "transitions": { "blackout": 3, "switch": 2 },
+        "uuid": "0d7d0000-0000-4000-8000-000000000001"
+      }
+    ],
+    "playlists": [
+      {
+        "archived": false,
+        "items": [
+          { "kind": "header", "label": "Evening", "uuid": "2c1a7ad9-af8d-5747-8a1b-29001e675ce3" },
+          { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "f5ddefa0-c441-5343-9e77-91de5edd9942" },
+          { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "2737e45b-7e33-53d9-945c-f40180531b1d" },
+          { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "48e0a1dc-d221-5b6b-a50f-d253edc1eef1" }
+        ],
+        "named": true,
+        "serviceDate": null,
+        "serviceTime": "18:00",
+        "title": "Sunday Night",
+        "uuid": "b1a70000-0000-4000-8000-000000000010"
+      },
+      {
+        "archived": false,
+        "items": [
+          { "kind": "header", "label": "Welcome", "uuid": "2de885a8-d9df-55fd-930f-aea46bbde287" },
+          { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "ae3aafe3-4744-5aa5-ab4a-37d19b07310e" },
+          { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a", "uuid": "31845941-cc66-5ef9-be93-51543ea04243" },
+          { "kind": "header", "label": "Response", "uuid": "76f0f264-3333-5f94-ab02-b814ad12cbf8" },
+          { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "22c65e63-afbb-56ce-b638-3e9bb342e0b9" }
+        ],
+        "named": true,
+        "serviceDate": "2026-11-01",
+        "serviceTime": null,
+        "title": "Sunday",
+        "uuid": "b1a70000-0000-4000-8000-000000000001"
+      },
+      {
+        "archived": true,
+        "items": [
+          { "kind": "header", "label": "Welcome", "uuid": "72e356be-7e43-5f75-9cf4-b0dc70d68087" },
+          { "kind": "linked", "list": 42, "listUuid": "a9f00000-0000-4000-8000-00000000002a", "uuid": "cebae757-017d-525e-87f1-0ef754c42ad8" },
+          { "kind": "local", "localUuid": "10ca1000-0000-4000-8000-00000000002a", "uuid": "9e1e888d-08f7-5918-93db-9b030feabf66" },
+          { "kind": "header", "label": "Response", "uuid": "10f7b33a-6ce4-539d-bbf0-17776e24de88" },
+          { "kind": "linked", "list": 7, "listUuid": "a9f00000-0000-4000-8000-000000000007", "uuid": "d0b826d9-12a4-5ca9-93e2-08524cadda50" }
+        ],
+        "named": true,
+        "serviceDate": "2026-11-01",
+        "serviceTime": null,
+        "title": "Sunday 2026-11-01",
+        "uuid": "b1a70000-0000-4000-8000-000000000011"
+      }
+    ],
+    "settings": {
+      "campusName": "Manheim",
+      "commandBar": false,
+      "decoderCapDefault": 2,
+      "defaultImportFolder": "imports",
+      "defaultRole": "editor",
+      "dropChannels": { "audio": null, "image": 1, "video": 1 },
+      "fallbackFont": "HelveticaNeue",
+      "libraryMode": "writable",
+      "mediaRoot": "../library/media",
+      "network": {
+        "apiPort": 8220,
+        "apiToken": "keychain",
+        "oscInPort": 8000,
+        "oscOutTargets": [
+          { "host": "10.20.0.15", "port": 9000 }
+        ]
+      },
+      "operatorLock": { "enabled": false },
+      "popups": 4,
+      "restoreLastState": false,
+      "shutdownMacro": null,
+      "snapshots": { "cadence": "launchAndService", "retention": "7d-daily-weekly" },
+      "startupMacro": null,
+      "thumbnailStack": 1,
+      "timeFormat": "h:mm a",
+      "timeZone": "America/New_York",
+      "timers": 4,
+      "tracking": { "audioTransition": true, "chase": true, "gain": true, "grade": true, "transition": true },
+      "uuid": "7a7a0000-0000-4000-8000-000000000001"
+    },
+    "stacks": [
+      {
+        "base": "black",
+        "defaultPreset": null,
+        "gammaBlend": false,
+        "label": "Main",
+        "number": 1,
+        "slots": [
+          { "channel": 1, "mute": false, "opacity": 1, "preset": null },
+          { "channel": 2, "mute": false, "opacity": 1, "preset": null }
+        ],
+        "uuid": "5e5e0000-0000-4000-8000-000000000001"
+      },
+      {
+        "base": "black",
+        "defaultPreset": null,
+        "gammaBlend": false,
+        "label": "Confidence",
+        "number": 2,
+        "slots": [
+          { "channel": 2, "mute": false, "opacity": 1, "preset": null },
+          { "channel": 3, "mute": false, "opacity": 1, "preset": null }
+        ],
+        "uuid": "6f6f0000-0000-4000-8000-000000000002"
+      }
+    ]
+  },
+  "rev": 1,
+  "type": "answer"
+}
