@@ -34,7 +34,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 17. Keeping the edit that turns the lock on off the undo stack (Spec 5 §8) is its work: Area 12's stack takes every applied edit. Area 19 keeps only the token's Keychain item, behind its seam (`SecretStore`), and answers `passcode`, `unlock`, `resetPasscode`, `token` and `newToken` with `notInV1` until then; `newToken` has to close every LAN connection. |
-| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | merged | Adam's `approved` on 2026-11-16 as built, with every reading in the brief and its recommended answers; the Spec 4 §12 and Spec 10 §13 corrections applied on the branch (6554d0c), `area/api` merged into `main` with `--no-ff` (73ab889), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Runs that open outputs stayed paused through the approval, so the last stage's checks on a screen (a relaunch after a real kill, `--released`, the audio start on the real device) and the soak are still to run, and one run's watchdog events are unexplained (Needs Adam). |
+| 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | merged | Adam's `approved` on 2026-11-16 as built, with every reading in the brief and its recommended answers; the Spec 4 §12 and Spec 10 §13 corrections applied on the branch (6554d0c), `area/api` merged into `main` with `--no-ff` (73ab889), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. After the merge Adam lifted his pause on runs that open outputs, and the last stage's checks ran on the external screen the same day: a relaunch after a real kill, a clean stop that isn't one, `--released`, the audio start on the real device with no watchdog event, and a one-minute smoke of the soak command with its own Mach client. The soak itself is not run, and that smoke failed its GPU budget on a Mac that was busy (Housekeeping). |
 | v1.5 | After the pilot: runtime undo, library mode and local copies, NDI, live inputs, audio transitions, pre-flight report, optimize on import, macro guards and the scheduler, lookahead polish, distribution conventions | `docs/build-order.md` | not started | Specs wait until the pilot is scheduled. Each row has its own task in the Build tracker. |
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
@@ -46,12 +46,16 @@ recommended answers; its Spec 4 §12 and Spec 10 §13 corrections were applied o
 (6554d0c), and it was merged with `--no-ff` (73ab889) and pushed. No area can start until
 the bench run: every area left is in `app/` or is Area 7's bench verification, and the
 bench run with a card gates both; it stays deferred to a window Adam sets aside, and Area
-13, show-mode UI, is next after it, in its own session. Runs that open outputs are paused
-on Adam's word of 2026-11-16, and the approval left the pause on, so the last stage of Area
-19 has its tests and no run on a screen: a relaunch after a real kill, `--released`, the
-audio start on the real device, and the soak. One observation is open with them: after the
-audio change, one hands-on run counted watchdog events, with no recovery, and the next
-counted none; it wants a few more runs on a screen to say whether it comes back.
+13, show-mode UI, is next after it, in its own session. Adam lifted his pause on runs that
+open outputs after the merge, and the last stage's checks then ran on the dev Mac's external
+screen, from `main`: an engine killed with content on the stage came back with that content
+on the next launch, without `--relaunch` and with `restoreLastState` off; a launch after a
+clean stop did not; `--released` kept the screen closed and the output `released`; the
+audio start, run several times with sound, counted no watchdog event; and a one-minute smoke
+of `oengine soak` held the Mach channel with its own client on the screen `--screens`
+named. That smoke failed its GPU budget, as every run that evening would have: the Mac was
+busy, and the frame path is the code that read a fraction of that in the morning
+(Housekeeping). The soak itself has not been run.
 
 ## Needs Adam
 
@@ -61,14 +65,6 @@ None. The Area 19 brief (the final message of the Area 19 session, 2026-11-16) w
 the same day: approved as built, with its recommended answers, merged (73ab889).
 
 ### Decisions
-
-- **When the paused runs on a screen happen.** Adam paused runs that open outputs on
-  2026-11-16 and approved Area 19 with the pause still on. The brief recommended these runs
-  before the merge; the merge went ahead on his `approved`, so they are owed on the dev Mac
-  when he lifts the pause, or else go with the bench run: a relaunch after a real kill,
-  `--released`, and the audio start on the real device several times, to see whether one
-  run's watchdog events come back (Housekeeping, below). Until then the audio change is on
-  `main` with that observation unexplained.
 
 - **Where the media root may live, later.** Spec 8 keeps v1's media root on the startup
   volume, outside Desktop, Documents and Downloads (§2, M-8), because macOS asks an
@@ -128,16 +124,31 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
   update, about the local network, or about incoming connections. Hands-on runs on the dev
   Mac pass `--no-lan`; the one run with the LAN on, on 2026-11-16 at Adam's word, saw no
   refusal and left no item behind.
-- **Runs that open outputs are paused** on Adam's word of 2026-11-16, until he says
-  otherwise: no `oengine run` or soak on the dev Mac. `swift test` opens nothing on a screen
-  and goes on.
-- **One run's watchdog events.** After the engine began opening its audio devices beside its
-  first frames (609b609, on `main` since Area 19's merge), one hands-on run with sound into
-  BlackHole counted watchdog events, with no recovery and its outputs and meters as they
-  should be; the run before the change and the run after it counted none, and that run's
-  log wasn't kept. A few runs on a screen will say whether the opening disturbs the first
-  ticks. The hand-check scripts of the Area 19 session are kept, uncommitted, in the main
-  checkout's `.build/area-api-scratch/` for those runs.
+- **Runs that open outputs** were paused on Adam's word on 2026-11-16 and allowed again by
+  him later that day. A soak still runs only on his word, in a window he sets aside.
+- **One run's watchdog events, not seen again.** After the engine began opening its audio
+  devices beside its first frames (609b609, on `main` since Area 19's merge), one hands-on
+  run with sound into BlackHole counted watchdog events, with no recovery and its outputs
+  and meters as they should be, and that run's log wasn't kept. Every run since has counted
+  none: the next one that day, then, once the pause was lifted, the same check repeated on
+  the external screen, the relaunch and `--released` runs, and a minute of the soak command.
+  It stays one unexplained occurrence; the bench record is the next place it would show.
+  The hand-check scripts of the Area 19 session are kept, uncommitted, in the main
+  checkout's `.build/area-api-scratch/` (`onscreen-audio.sh`, `onscreen-relaunch.sh`,
+  `onscreen-released.sh`, `onscreen-soak-smoke.sh`).
+- **GPU time on the dev Mac while it is in use.** On the evening of 2026-11-16 every
+  on-screen run read a GPU time several times that morning's on the same scenario, near a
+  whole tick at its worst, and so did runs with no window on a screen (`--released`). The
+  frame path had not changed in between: since the morning's runs only a rule that draws
+  less (no picture for sound alone) went in. The Mac was busy at the time, with a
+  remote-control session capturing its screens and the window server working hard while no
+  engine ran; that is the likely cause, and it was not separated out. Under it the engine
+  did what Spec 4 §12 asks: every output frame was presented, none dropped or late, no
+  watchdog event, no audio underrun, and the previews and channel pictures gave way, named
+  less often than their thirty a second. The one-minute smoke of `oengine soak` failed on
+  its GPU budget alone for this reason, on a debug build. So a soak or a bench run wants
+  the Mac to itself, with no remote session on it, and a short run first to read the GPU
+  time.
 - **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
   for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
   before the job finished, and it passed on the next full run and alone. It didn't recur
