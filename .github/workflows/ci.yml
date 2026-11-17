@@ -30,6 +30,22 @@ jobs:
         env:
           NSUnbufferedIO: "YES"
           O_HOSTED_RUNNER: "1"
+      # Spec 10 §2 — the operator app's shell. The gate is `swift test` above,
+      # which builds and tests the app's code as package targets; this step
+      # only keeps the shell from rotting: the hand-written project file
+      # reads, the app builds around those targets, and the bundle with the
+      # engine embedded (the debug build already in .build) verifies as
+      # signed. Nothing is run and no UI test is: those need a screen.
+      - name: Build Project O.app
+        timeout-minutes: 15
+        run: |
+          plutil -lint app/ProjectO.xcodeproj/project.pbxproj
+          xcodebuild -project app/ProjectO.xcodeproj -scheme "Project O" -configuration Debug \
+            -derivedDataPath .build/xcode OENGINE_CONFIGURATION=debug build
+          APP=".build/xcode/Build/Products/Debug/Project O.app"
+          test -x "$APP/Contents/Helpers/oengine"
+          test -d "$APP/Contents/Resources/ProjectO_OEngine.bundle"
+          codesign --verify --deep --strict --verbose=2 "$APP"
 
   # OCore must build and test with no Apple framework in it. A Linux toolchain
   # is the strongest proof: if anything Apple-only creeps in, this job fails.

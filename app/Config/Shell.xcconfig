@@ -1,0 +1,52 @@
+// Project O.app — the settings of the shell target, each with its reason.
+//
+// The app's code is targets of the package at the repository root (OApp,
+// OAppUI); this target holds main.swift, Info.plist, the string catalog, the
+// icon and the step that embeds the engine (Spec 10 §2, Area 13 plan).
+
+// Spec 10 §2 — "The app is `Project O.app`". The module can't have a space in its name.
+PRODUCT_NAME = Project O
+PRODUCT_MODULE_NAME = ProjectOShell
+// The defaults domain that holds the two roots (Spec 10 §2), and the name
+// macOS files the app's privacy answers under. The engine's Mach service
+// names start with it (`org.lcbc.projecto.engine.`).
+PRODUCT_BUNDLE_IDENTIFIER = org.lcbc.projecto
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+// The package's deployment target and language mode (Package.swift).
+SDKROOT = macosx
+MACOSX_DEPLOYMENT_TARGET = 15.0
+SWIFT_VERSION = 6.0
+// The embedded engine is built for this Mac alone, so the app is too.
+ONLY_ACTIVE_ARCH = YES
+
+// A full Info.plist beside the project, not one Xcode writes from settings:
+// the local-network keys of Spec 10 §2 are easier to read there.
+INFOPLIST_FILE = Info.plist
+GENERATE_INFOPLIST_FILE = NO
+
+// ADR 0007 — ad hoc signing, no team, no entitlement a paid team would have
+// to grant, no sandbox (the app starts the engine and reads the roots), no
+// hardened runtime.
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+ENABLE_HARDENED_RUNTIME = NO
+ENABLE_APP_SANDBOX = NO
+
+// The embed step runs `swift build` and writes into the bundle, which the
+// script sandbox would refuse.
+ENABLE_USER_SCRIPT_SANDBOXING = NO
+// One executable in Contents/MacOS in Debug as in Release, with no stub and
+// debug library beside it.
+ENABLE_DEBUG_DYLIB = NO
+
+// Spec 10 §15 — the string catalog is written by hand with symbolic keys;
+// Xcode must not add keys it finds in code or rewrite the file on a build.
+SWIFT_EMIT_LOC_STRINGS = NO
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+DEVELOPMENT_LANGUAGE = en
+
+COMBINE_HIDPI_IMAGES = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks

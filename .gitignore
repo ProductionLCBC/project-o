@@ -1,7 +1,6 @@
 # Swift Package Manager
 .build/
-.swiftpm/xcode/xcuserdata/
-.swiftpm/configuration/registries.json
+.swiftpm/
 Package.resolved.lock
 
 # Xcode
