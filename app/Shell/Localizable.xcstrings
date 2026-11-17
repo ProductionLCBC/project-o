@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "about.engineAway" : {
+      "comment" : "In the About panel while no engine is connected. %@ is the app's version.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project O %@ · the engine is away"
+          }
+        }
+      }
+    },
+    "about.versions" : {
+      "comment" : "In the About panel: %1$@ is the app's version, %2$@ the running engine's.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project O %1$@ · engine %2$@"
+          }
+        }
+      }
+    },
     "app.name" : {
       "comment" : "The app's name, as the main window's title shows it.",
       "extractionState" : "manual",
@@ -9,6 +33,678 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Project O"
+          }
+        }
+      }
+    },
+    "common.cancel" : {
+      "comment" : "A button that closes a dialog and does nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "common.ok" : {
+      "comment" : "A button that closes a message.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "engine.anotherBuild" : {
+      "comment" : "Offered when the app finds an engine of another build running and nothing is on screen. %1$@ is the engine's version, %2$@ the app's.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine running is version %1$@ and this is Project O %2$@. Restart it while nothing is live?"
+          }
+        }
+      }
+    },
+    "engine.behindOutput" : {
+      "comment" : "A note shown above an output for ten seconds when it covers the app's window. %lld is the output's number; ⌃⌥⌘⎋ is Control-Option-Command-Escape.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project O is behind output %lld. Press ⌃⌥⌘⎋ to take it off this screen."
+          }
+        }
+      }
+    },
+    "engine.connected" : {
+      "comment" : "The status line of the first build's window, once the engine has answered.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected to the engine."
+          }
+        }
+      }
+    },
+    "engine.console.label" : {
+      "comment" : "The VoiceOver label of the box that shows the engine's last console lines under a banner.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine’s console log, last lines"
+          }
+        }
+      }
+    },
+    "engine.firstRunRefused" : {
+      "comment" : "A banner when the engine refused a first run; the setup sheet opens again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine couldn’t set up a new library here."
+          }
+        }
+      }
+    },
+    "engine.noHello" : {
+      "comment" : "A banner when an engine process is running on this machine's root and says nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An engine holds this Mac’s folder and isn’t answering."
+          }
+        }
+      }
+    },
+    "engine.noSocket" : {
+      "comment" : "A banner when an engine was started and fifteen seconds passed without it becoming reachable.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine hasn’t opened its connection."
+          }
+        }
+      }
+    },
+    "engine.notResponding" : {
+      "comment" : "A banner when the engine hasn't answered for five seconds. The outputs may still be playing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine isn’t responding"
+          }
+        }
+      }
+    },
+    "engine.restart" : {
+      "comment" : "A button on the banner. It ends the engine process and starts it again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the engine"
+          }
+        }
+      }
+    },
+    "engine.restart.body" : {
+      "comment" : "The confirmation's first sentence.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The screens go black for a moment."
+          }
+        }
+      }
+    },
+    "engine.restart.title" : {
+      "comment" : "The title of the confirmation that the Restart the engine button opens.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the engine?"
+          }
+        }
+      }
+    },
+    "engine.restart.unsaved" : {
+      "comment" : "The confirmation's second sentence, only while changes are waiting to be saved.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change isn’t saved yet and will be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes aren’t saved yet and will be lost."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "engine.starting" : {
+      "comment" : "Shown while the app waits for the engine it started, up to fifteen seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting the engine…"
+          }
+        }
+      }
+    },
+    "engine.stopped" : {
+      "comment" : "A banner across the window when the engine process ends. The app starts it again by itself.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine stopped. Restarting…"
+          }
+        }
+      }
+    },
+    "engine.stopped.count" : {
+      "comment" : "The same banner from the third end in a row: how many times the engine has ended since it last ran. The console log's last lines show under it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The engine has stopped %lld time. Restarting…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The engine has stopped %lld times. Restarting…"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "engine.wrongAPI" : {
+      "comment" : "A banner when the engine running is from an incompatible build. %@ is the engine's version number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This engine is version %@ and speaks another version of the API, so Project O can’t drive it."
+          }
+        }
+      }
+    },
+    "firstRun.campus" : {
+      "comment" : "The label of the field for the campus's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Campus name"
+          }
+        }
+      }
+    },
+    "firstRun.campus.placeholder" : {
+      "comment" : "Placeholder text in the empty campus name field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The name of this campus"
+          }
+        }
+      }
+    },
+    "firstRun.choose" : {
+      "comment" : "A button that opens a folder picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose…"
+          }
+        }
+      }
+    },
+    "firstRun.existingLibrary" : {
+      "comment" : "A choice on the setup sheet: use a library folder that exists, such as one synced from central.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use a library that is already here"
+          }
+        }
+      }
+    },
+    "firstRun.folder" : {
+      "comment" : "The label of the folder a new library and this Mac's setup go in.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder"
+          }
+        }
+      }
+    },
+    "firstRun.intro" : {
+      "comment" : "The setup sheet's first line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project O keeps a library and this Mac’s own setup in two folders. Choose where they go."
+          }
+        }
+      }
+    },
+    "firstRun.libraryFolder" : {
+      "comment" : "The label of the existing library's folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library folder"
+          }
+        }
+      }
+    },
+    "firstRun.machineFolder" : {
+      "comment" : "The label of the folder that holds this Mac's own setup.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s folder"
+          }
+        }
+      }
+    },
+    "firstRun.newLibrary" : {
+      "comment" : "A choice on the setup sheet: make a new, empty library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new library"
+          }
+        }
+      }
+    },
+    "firstRun.problem.campus" : {
+      "comment" : "Shown on the setup sheet while the campus name is empty.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the campus name."
+          }
+        }
+      }
+    },
+    "firstRun.problem.inside" : {
+      "comment" : "Shown when the machine folder is inside the existing library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s folder can’t be inside the library’s folder, which is synced."
+          }
+        }
+      }
+    },
+    "firstRun.problem.library.guarded" : {
+      "comment" : "%@ is Desktop, Documents or Downloads.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The library can’t be in %@, which macOS guards. Choose a folder outside Desktop, Documents and Downloads."
+          }
+        }
+      }
+    },
+    "firstRun.problem.library.notAbsolute" : {
+      "comment" : "Shown when no usable folder is chosen for the library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a folder for the library."
+          }
+        }
+      }
+    },
+    "firstRun.problem.library.otherVolume" : {
+      "comment" : "Shown when the library's folder is on an external drive or a share.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The library must be on this Mac’s startup disk."
+          }
+        }
+      }
+    },
+    "firstRun.problem.machine.guarded" : {
+      "comment" : "%@ is Desktop, Documents or Downloads.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s folder can’t be in %@, which macOS guards. Choose a folder outside Desktop, Documents and Downloads."
+          }
+        }
+      }
+    },
+    "firstRun.problem.machine.notAbsolute" : {
+      "comment" : "Shown when no usable folder is chosen for the machine.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a folder for this Mac."
+          }
+        }
+      }
+    },
+    "firstRun.problem.machine.otherVolume" : {
+      "comment" : "Shown when the machine folder is on an external drive or a share.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s folder must be on its startup disk."
+          }
+        }
+      }
+    },
+    "firstRun.problem.noLibrary" : {
+      "comment" : "Shown when the folder picked as an existing library is empty or isn't there.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That folder holds no library: there is no library.json in it."
+          }
+        }
+      }
+    },
+    "firstRun.problem.noLibrary.found" : {
+      "comment" : "%@ is a list of a few of the names found in the folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That folder holds no library: there is no library.json in it. It holds %@."
+          }
+        }
+      }
+    },
+    "firstRun.problem.socket" : {
+      "comment" : "%lld is the length in bytes of the path the engine's socket would have.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That folder’s path is too long: the engine’s connection would need %lld bytes there, and macOS allows 103. Choose a folder with a shorter path."
+          }
+        }
+      }
+    },
+    "firstRun.start" : {
+      "comment" : "The setup sheet's button that saves the choices and starts the engine.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        }
+      }
+    },
+    "firstRun.title" : {
+      "comment" : "The title of the sheet a new Mac shows before anything else.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set up Project O"
+          }
+        }
+      }
+    },
+    "menu.about" : {
+      "comment" : "The app menu's first item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About Project O"
+          }
+        }
+      }
+    },
+    "menu.quit" : {
+      "comment" : "The app menu's last item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Project O"
+          }
+        }
+      }
+    },
+    "quit.keepOutputs" : {
+      "comment" : "The quit dialog's button that quits the app and leaves the engine and the outputs running.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep outputs running"
+          }
+        }
+      }
+    },
+    "quit.notSaved.body" : {
+      "comment" : "%lld is how many documents; %@ is the list of their file names.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The engine couldn’t write %lld document: %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The engine couldn’t write %lld documents: %@"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "quit.notSaved.title" : {
+      "comment" : "The title of what the app shows, before it quits, when the engine couldn't write every document.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some changes couldn’t be saved"
+          }
+        }
+      }
+    },
+    "quit.quit" : {
+      "comment" : "The quit dialog's button that stops the engine and the outputs, then quits.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit"
+          }
+        }
+      }
+    },
+    "quit.stopping" : {
+      "comment" : "Shown while the app waits, up to ten seconds, for the engine to stop.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopping the engine…"
+          }
+        }
+      }
+    },
+    "quit.title" : {
+      "comment" : "The question ⌘Q asks.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Project O? The outputs will stop."
+          }
+        }
+      }
+    },
+    "quit.unsaved" : {
+      "comment" : "Added under the quit question while changes are waiting to be saved.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change isn’t saved yet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes aren’t saved yet"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "unavailable.engineAway" : {
+      "comment" : "The reason shown on a disabled control while the engine isn't connected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine is away."
+          }
+        }
+      }
+    },
+    "unavailable.locked" : {
+      "comment" : "The reason shown on a disabled control while the operator lock is on.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The station is locked."
+          }
+        }
+      }
+    },
+    "unavailable.readOnlyMasters" : {
+      "comment" : "The reason shown on a disabled edit of the library on a machine that may not edit it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masters are read-only on this Mac."
           }
         }
       }
