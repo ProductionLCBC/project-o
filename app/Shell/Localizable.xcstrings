@@ -97,6 +97,90 @@
         }
       }
     },
+    "cannot.alreadyLive" : {
+      "comment" : "The reason Make Live is disabled on the playlist that is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s already live."
+          }
+        }
+      }
+    },
+    "cannot.archived" : {
+      "comment" : "The reason on a disabled edit of an archived playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived playlists can’t be changed."
+          }
+        }
+      }
+    },
+    "cannot.folderNotEmpty" : {
+      "comment" : "The reason Delete Folder is disabled.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder isn’t empty."
+          }
+        }
+      }
+    },
+    "cannot.liveNow" : {
+      "comment" : "The reason Archive is disabled on the live playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s live. Archive a Copy works while it is."
+          }
+        }
+      }
+    },
+    "cannot.localCopy" : {
+      "comment" : "The reason on a disabled edit of a local copy of a list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s own copy can’t be edited in this version."
+          }
+        }
+      }
+    },
+    "cannot.missing" : {
+      "comment" : "The reason an action on a missing or deleted media item is disabled.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is missing."
+          }
+        }
+      }
+    },
+    "cannot.renumberToEdit" : {
+      "comment" : "The reason on a disabled edit of a list whose number another list shares.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renumber to edit"
+          }
+        }
+      }
+    },
     "chip.attributes" : {
       "comment" : "A channel chip that also writes attributes. %1$@ is the chip's text, %2$@ a list of attributes.",
       "extractionState" : "manual",
@@ -1069,6 +1153,258 @@
         }
       }
     },
+    "confirm.delete" : {
+      "comment" : "A confirmation's button that deletes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "confirm.deleteList.linked" : {
+      "comment" : "Under the question. %lld is how many playlists; %@ lists their titles.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld playlist links it and will show it missing: %@."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld playlists link it and will show it missing: %@."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "confirm.deleteList.title" : {
+      "comment" : "Asked before a list is deleted. %@ is its title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@”?"
+          }
+        }
+      }
+    },
+    "confirm.deleteList.unlinked" : {
+      "comment" : "Under the question, when nothing links the list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No playlist links it. Undo puts it back."
+          }
+        }
+      }
+    },
+    "confirm.deleteMedia.title" : {
+      "comment" : "Asked before a media item is deleted. %@ is its file's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@”?"
+          }
+        }
+      }
+    },
+    "confirm.deleteMedia.unused" : {
+      "comment" : "Under the question, when nothing uses the item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing uses it. Its file goes to the Trash."
+          }
+        }
+      }
+    },
+    "confirm.deleteMedia.used" : {
+      "comment" : "Under the question. %@ lists what uses it, such as 12 cues, 1 macro and 2 keys.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s used by %@; they’ll show it missing."
+          }
+        }
+      }
+    },
+    "confirm.deletePlaylist.body" : {
+      "comment" : "Under the question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo puts it back."
+          }
+        }
+      }
+    },
+    "confirm.deletePlaylist.live" : {
+      "comment" : "Under the question, when the playlist is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s live: the service keeps running from the engine’s copy. Undo puts it back."
+          }
+        }
+      }
+    },
+    "confirm.deletePlaylist.title" : {
+      "comment" : "Asked before a playlist is deleted. %@ is its title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete the playlist “%@”?"
+          }
+        }
+      }
+    },
+    "confirm.remove" : {
+      "comment" : "A confirmation's button that removes an item from a playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        }
+      }
+    },
+    "confirm.removeLiveItem.body" : {
+      "comment" : "Under the question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s live: the song finishes first."
+          }
+        }
+      }
+    },
+    "confirm.removeLiveItem.title" : {
+      "comment" : "Asked before the live item is removed. %@ is the song's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove “%@” from the playlist?"
+          }
+        }
+      }
+    },
+    "confirm.restore" : {
+      "comment" : "A confirmation's button that restores a version or a snapshot.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        }
+      }
+    },
+    "confirm.restoreSnapshot.body" : {
+      "comment" : "Under the question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outputs, stacks and settings stay as they are. A snapshot of now is taken first, and Undo puts it back."
+          }
+        }
+      }
+    },
+    "confirm.restoreSnapshot.title" : {
+      "comment" : "Asked before a snapshot is restored. %@ is when it was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace the library, and this machine’s playlists, key bindings and macros, with the copies from %@?"
+          }
+        }
+      }
+    },
+    "confirm.restoreSnapshot.title.machine" : {
+      "comment" : "Asked before a snapshot is restored on a machine that may not change the library. %@ is when it was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace this machine’s playlists, key bindings and macros with the copies from %@?"
+          }
+        }
+      }
+    },
+    "confirm.restoreVersion.body" : {
+      "comment" : "Under the question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current version is kept, and Undo puts it back."
+          }
+        }
+      }
+    },
+    "confirm.restoreVersion.onAir" : {
+      "comment" : "Under the question, when the list is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s on air: each cue takes the restored version at its next fire."
+          }
+        }
+      }
+    },
+    "confirm.restoreVersion.title" : {
+      "comment" : "Asked before a list's kept version is restored. %1$lld is the version, %2$@ the list's title, %3$@ when it was kept, %4$@ how many cues, such as 14 cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore version %1$lld of “%2$@”, kept %3$@, with %4$@?"
+          }
+        }
+      }
+    },
     "divider.left" : {
       "comment" : "VoiceOver: the divider between the left column and the grid.",
       "extractionState" : "manual",
@@ -1933,6 +2269,510 @@
         }
       }
     },
+    "history.changes" : {
+      "comment" : "How many edits an undo step holds, inside the Edit menu's Undo or Redo.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "history.kind.add" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "history.kind.change" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change"
+          }
+        }
+      }
+    },
+    "history.kind.deleteMedia" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Media"
+          }
+        }
+      }
+    },
+    "history.kind.duplicate" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate"
+          }
+        }
+      }
+    },
+    "history.kind.move" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move"
+          }
+        }
+      }
+    },
+    "history.kind.remove" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        }
+      }
+    },
+    "history.kind.rename" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "history.kind.restore" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore"
+          }
+        }
+      }
+    },
+    "history.kind.typing" : {
+      "comment" : "After Undo or Redo in the Edit menu: what the step did.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Typing"
+          }
+        }
+      }
+    },
+    "history.object.cue" : {
+      "comment" : "What an undo changed: a cue of a list, by the list's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a cue of %@"
+          }
+        }
+      }
+    },
+    "history.object.folder" : {
+      "comment" : "What an undo changed: a library folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the folder %@"
+          }
+        }
+      }
+    },
+    "history.object.item" : {
+      "comment" : "What an undo changed: an item of a playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "an item of the playlist %@"
+          }
+        }
+      }
+    },
+    "history.object.library" : {
+      "comment" : "What an undo changed, when it was a snapshot's restore or can't be named.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the library"
+          }
+        }
+      }
+    },
+    "history.object.list" : {
+      "comment" : "What an undo changed: a list, by its title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the list %@"
+          }
+        }
+      }
+    },
+    "history.object.media" : {
+      "comment" : "What an undo changed: a media item, by its file's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the media file %@"
+          }
+        }
+      }
+    },
+    "history.object.playlist" : {
+      "comment" : "What an undo changed: a playlist, by its title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "the playlist %@"
+          }
+        }
+      }
+    },
+    "history.redid.add" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the adding of %@"
+          }
+        }
+      }
+    },
+    "history.redid.change" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the change to %@"
+          }
+        }
+      }
+    },
+    "history.redid.deleteMedia" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the delete of %@"
+          }
+        }
+      }
+    },
+    "history.redid.duplicate" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the copy of %@"
+          }
+        }
+      }
+    },
+    "history.redid.move" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the move of %@"
+          }
+        }
+      }
+    },
+    "history.redid.remove" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the removal of %@"
+          }
+        }
+      }
+    },
+    "history.redid.rename" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the rename of %@"
+          }
+        }
+      }
+    },
+    "history.redid.restore" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the restore of %@"
+          }
+        }
+      }
+    },
+    "history.redid.typing" : {
+      "comment" : "Shown for three seconds after Redo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redid the typing in %@"
+          }
+        }
+      }
+    },
+    "history.redo" : {
+      "comment" : "Edit menu. %@ is what the step did, such as Rename.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo %@"
+          }
+        }
+      }
+    },
+    "history.redo.detail" : {
+      "comment" : "Edit menu, for a step of several edits or one another source made. %1$@ is what it did; %2$@ is 3 changes, or where it came from, such as from OSC.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "history.redo.details" : {
+      "comment" : "Edit menu, for a step of several edits another source made. %1$@ is what it did, %2$@ how many changes, %3$@ where it came from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo %1$@ (%2$@, %3$@)"
+          }
+        }
+      }
+    },
+    "history.undid.add" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the adding of %@"
+          }
+        }
+      }
+    },
+    "history.undid.change" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the change to %@"
+          }
+        }
+      }
+    },
+    "history.undid.deleteMedia" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the delete of %@"
+          }
+        }
+      }
+    },
+    "history.undid.duplicate" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the copy of %@"
+          }
+        }
+      }
+    },
+    "history.undid.move" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the move of %@"
+          }
+        }
+      }
+    },
+    "history.undid.remove" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the removal of %@"
+          }
+        }
+      }
+    },
+    "history.undid.rename" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed, such as the playlist Sunday.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the rename of %@"
+          }
+        }
+      }
+    },
+    "history.undid.restore" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the restore of %@"
+          }
+        }
+      }
+    },
+    "history.undid.typing" : {
+      "comment" : "Shown for three seconds after Undo. %@ names what was changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undid the typing in %@"
+          }
+        }
+      }
+    },
+    "history.undo" : {
+      "comment" : "Edit menu. %@ is what the step did, such as Rename.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo %@"
+          }
+        }
+      }
+    },
+    "history.undo.detail" : {
+      "comment" : "Edit menu, for a step of several edits or one another source made. %1$@ is what it did; %2$@ is 3 changes, or where it came from, such as from OSC.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "history.undo.details" : {
+      "comment" : "Edit menu, for a step of several edits another source made. %1$@ is what it did, %2$@ how many changes, %3$@ where it came from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo %1$@ (%2$@, %3$@)"
+          }
+        }
+      }
+    },
     "key.alt" : {
       "comment" : "The sign for the Option key, before a key's name.",
       "extractionState" : "manual",
@@ -2629,6 +3469,54 @@
         }
       }
     },
+    "menu.addHeaderAbove" : {
+      "comment" : "A playlist item's menu: opens a field for a new header's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Header Above"
+          }
+        }
+      }
+    },
+    "menu.addToPlaylist" : {
+      "comment" : "A list's menu: a submenu of the playlists.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Playlist"
+          }
+        }
+      }
+    },
+    "menu.archive" : {
+      "comment" : "A playlist's menu: moves it to the archive.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive"
+          }
+        }
+      }
+    },
+    "menu.archiveCopy" : {
+      "comment" : "A playlist's menu: files a dated, read-only copy and leaves the playlist as it is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive a Copy"
+          }
+        }
+      }
+    },
     "menu.backToLive" : {
       "comment" : "Go menu, and a button in the top bar: shows what is live in the grid again.",
       "extractionState" : "manual",
@@ -2701,6 +3589,90 @@
         }
       }
     },
+    "menu.dateAndTime" : {
+      "comment" : "A playlist's menu: sets its service date and time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date and Time…"
+          }
+        }
+      }
+    },
+    "menu.defaults" : {
+      "comment" : "A media tile's menu: opens the item's trim, loop, gain, grade and channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defaults…"
+          }
+        }
+      }
+    },
+    "menu.delete" : {
+      "comment" : "A context menu: deletes a playlist, a list or a media item, after asking.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete…"
+          }
+        }
+      }
+    },
+    "menu.deleteFolder" : {
+      "comment" : "A folder's menu; only an empty folder can be deleted.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Folder"
+          }
+        }
+      }
+    },
+    "menu.duplicate" : {
+      "comment" : "A list's menu: copies it to a free number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate"
+          }
+        }
+      }
+    },
+    "menu.duplicateAs" : {
+      "comment" : "A playlist's menu: copies it under a title that is asked for.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate…"
+          }
+        }
+      }
+    },
+    "menu.duplicateSection" : {
+      "comment" : "A cue's menu: copies the cue's whole section to just after itself.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Section"
+          }
+        }
+      }
+    },
     "menu.edit" : {
       "comment" : "A menu's title.",
       "extractionState" : "manual",
@@ -2713,6 +3685,18 @@
         }
       }
     },
+    "menu.editCue" : {
+      "comment" : "A cue's menu: opens the cue in edit mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Cue"
+          }
+        }
+      }
+    },
     "menu.editMode" : {
       "comment" : "Mode menu, and a button in the top bar: the mode for building cues.",
       "extractionState" : "manual",
@@ -2721,6 +3705,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Edit"
+          }
+        }
+      }
+    },
+    "menu.editText" : {
+      "comment" : "A cue's menu: edits the cue's words in place, without firing it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Text"
           }
         }
       }
@@ -2745,6 +3741,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Find in List"
+          }
+        }
+      }
+    },
+    "menu.fire" : {
+      "comment" : "A cue's menu: fires the cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire"
+          }
+        }
+      }
+    },
+    "menu.fireTo" : {
+      "comment" : "A media tile's menu: puts the item live on that channel. %1$lld is the channel's number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire to Channel %1$lld %2$@"
+          }
+        }
+      }
+    },
+    "menu.fireToAsk" : {
+      "comment" : "A media tile's menu: a submenu of channels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire to…"
           }
         }
       }
@@ -2781,6 +3813,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Go to Cue…"
+          }
+        }
+      }
+    },
+    "menu.gradeFor" : {
+      "comment" : "A list header's menu: a submenu of grades. %1$lld is the channel's number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade for Channel %1$lld %2$@"
           }
         }
       }
@@ -2881,6 +3925,18 @@
         }
       }
     },
+    "menu.newFolder" : {
+      "comment" : "A folder's menu, and the library's: opens a field for the new folder's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Folder"
+          }
+        }
+      }
+    },
     "menu.newList" : {
       "comment" : "File menu.",
       "extractionState" : "manual",
@@ -2893,6 +3949,18 @@
         }
       }
     },
+    "menu.newListHere" : {
+      "comment" : "A list's or a folder's menu: makes an empty list in that folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New List Here"
+          }
+        }
+      }
+    },
     "menu.newPlaylist" : {
       "comment" : "File menu.",
       "extractionState" : "manual",
@@ -2901,6 +3969,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New Playlist"
+          }
+        }
+      }
+    },
+    "menu.note" : {
+      "comment" : "A cue's menu: opens the cue's note.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note…"
+          }
+        }
+      }
+    },
+    "menu.openInTextEditor" : {
+      "comment" : "A list's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Text Editor"
           }
         }
       }
@@ -2953,6 +4045,42 @@
         }
       }
     },
+    "menu.removeFromPlaylist" : {
+      "comment" : "A playlist item's menu, and a list header's.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Playlist"
+          }
+        }
+      }
+    },
+    "menu.rename" : {
+      "comment" : "A context menu: renames a playlist, a header, a list or a folder in place.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "menu.replace" : {
+      "comment" : "A media tile's menu: chooses a file to take this item's place everywhere.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace with…"
+          }
+        }
+      }
+    },
     "menu.resetLayout" : {
       "comment" : "View menu: puts the window's layout back to its defaults.",
       "extractionState" : "manual",
@@ -2965,6 +4093,18 @@
         }
       }
     },
+    "menu.restoreFromArchive" : {
+      "comment" : "An archived playlist's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore from Archive"
+          }
+        }
+      }
+    },
     "menu.restoreSnapshot" : {
       "comment" : "File menu.",
       "extractionState" : "manual",
@@ -2973,6 +4113,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restore a Snapshot…"
+          }
+        }
+      }
+    },
+    "menu.restoreVersion" : {
+      "comment" : "A list's menu: opens its kept versions.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore a Version…"
+          }
+        }
+      }
+    },
+    "menu.reveal" : {
+      "comment" : "A media tile's or a folder's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal in Finder"
           }
         }
       }
@@ -3045,6 +4209,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Take Snapshot"
+          }
+        }
+      }
+    },
+    "menu.trigger" : {
+      "comment" : "A cue's menu: a submenu of how the cue is fired.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trigger"
+          }
+        }
+      }
+    },
+    "menu.trigger.advance" : {
+      "comment" : "A cue's menu: the next cue fires by itself some seconds after this one.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advance After…"
+          }
+        }
+      }
+    },
+    "menu.trigger.go" : {
+      "comment" : "A cue's trigger: the operator fires it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        }
+      }
+    },
+    "menu.trigger.time" : {
+      "comment" : "A cue's trigger: it fires by itself some seconds after the cue before it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time after Previous…"
           }
         }
       }
@@ -3129,6 +4341,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Next"
+          }
+        }
+      }
+    },
+    "notice.notSent" : {
+      "comment" : "A short message where an edit was tried and couldn't be sent. %@ is the reason, a sentence of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent. %@"
           }
         }
       }
@@ -3753,6 +4977,306 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "rejected.archived" : {
+      "comment" : "The engine refused an edit of an archived playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archived playlists can’t be changed."
+          }
+        }
+      }
+    },
+    "rejected.badValue" : {
+      "comment" : "The engine refused an edit: a wrong or out-of-range value.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That value isn’t allowed."
+          }
+        }
+      }
+    },
+    "rejected.changed" : {
+      "comment" : "The engine refused to import a file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file changed while it was being copied. Drop it again."
+          }
+        }
+      }
+    },
+    "rejected.conflict" : {
+      "comment" : "The engine refused an undo or a restore.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It has changed since, so that can’t be put back."
+          }
+        }
+      }
+    },
+    "rejected.cycle" : {
+      "comment" : "The engine refused a macro edit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That would make a macro run itself."
+          }
+        }
+      }
+    },
+    "rejected.danglingReferences" : {
+      "comment" : "The engine refused a renumber.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other things still name that number."
+          }
+        }
+      }
+    },
+    "rejected.diskFull" : {
+      "comment" : "The engine refused for lack of disk space.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The disk is full."
+          }
+        }
+      }
+    },
+    "rejected.duplicate" : {
+      "comment" : "The engine refused an edit: a title, number, file or folder that must be the only one.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That name is taken."
+          }
+        }
+      }
+    },
+    "rejected.keychain" : {
+      "comment" : "The engine refused because a Keychain item can't be read.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Keychain can’t be read."
+          }
+        }
+      }
+    },
+    "rejected.noPasscode" : {
+      "comment" : "The engine refused a lock request.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No passcode is set."
+          }
+        }
+      }
+    },
+    "rejected.noTrash" : {
+      "comment" : "The engine refused to delete a media file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This disk has no Trash to move the file to."
+          }
+        }
+      }
+    },
+    "rejected.notEmpty" : {
+      "comment" : "The engine refused to delete a folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The folder isn’t empty."
+          }
+        }
+      }
+    },
+    "rejected.notInV1" : {
+      "comment" : "The engine refused something a later version will do.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not in this version."
+          }
+        }
+      }
+    },
+    "rejected.notListed" : {
+      "comment" : "The engine refused to import a file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file is in the media folder, but the library doesn’t list it."
+          }
+        }
+      }
+    },
+    "rejected.onAir" : {
+      "comment" : "The engine refused to change something that is on an output.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It’s on air: clear it or switch away first."
+          }
+        }
+      }
+    },
+    "rejected.operatorLock" : {
+      "comment" : "The engine refused an edit while the operator lock is on.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The station is locked."
+          }
+        }
+      }
+    },
+    "rejected.other" : {
+      "comment" : "The engine refused something for a reason the app has no sentence for. %@ is the engine's code.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine refused it (%@)."
+          }
+        }
+      }
+    },
+    "rejected.protected" : {
+      "comment" : "The engine refused to delete or renumber a built-in object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This one is built in and stays."
+          }
+        }
+      }
+    },
+    "rejected.readOnlyField" : {
+      "comment" : "The engine refused an edit of a field that is never edited.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That can’t be changed."
+          }
+        }
+      }
+    },
+    "rejected.readOnlyLibrary" : {
+      "comment" : "The engine refused an edit of a library object on a machine that may not edit it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The library is read-only on this Mac."
+          }
+        }
+      }
+    },
+    "rejected.unknownObject" : {
+      "comment" : "The engine refused an edit: what it names is gone.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It isn’t there any more."
+          }
+        }
+      }
+    },
+    "rejected.unknownPath" : {
+      "comment" : "The engine refused an edit: no such field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That part of it doesn’t exist."
+          }
+        }
+      }
+    },
+    "rejected.unknownReference" : {
+      "comment" : "The engine refused an edit: a number that doesn't exist here.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It names something this Mac doesn’t have."
+          }
+        }
+      }
+    },
+    "rejected.unreadable" : {
+      "comment" : "The engine refused a media file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file can’t be read."
+          }
+        }
+      }
+    },
+    "rejected.unsupported" : {
+      "comment" : "The engine refused to import a file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project O can’t play this kind of file."
           }
         }
       }
@@ -4905,6 +6429,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Masters are read-only on this Mac."
+          }
+        }
+      }
+    },
+    "use.cues" : {
+      "comment" : "A count of cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cue"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cues"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "use.keys" : {
+      "comment" : "A count of key bindings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld key"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld keys"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "use.macros" : {
+      "comment" : "A count of macros.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld macro"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld macros"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "use.presets" : {
+      "comment" : "A count of presets.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld preset"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld presets"
+                }
+              }
+            }
           }
         }
       }

@@ -65,6 +65,9 @@ public final class ShowModel {
     public var follow = FollowLive()
     private var gate = CuePressGate()
     private var removed: (index: Int, section: GridSection)?
+    /// Spec 10 §10 — the short messages standing now, each beside what was tried, and when each goes.
+    public internal(set) var notices: [NoticePlace: Notice] = [:]
+    var noticeTasks: [NoticePlace: any ClockTask] = [:]
 
     /// The grid as it stands; rebuilt when what it shows changes.
     public private(set) var grid = GridModel()
@@ -76,12 +79,18 @@ public final class ShowModel {
         store.observeMoments { [weak self] moment in self?.happened(moment) }
     }
 
-    private func changed(_ changes: Set<Change>) {
+    func changed(_ changes: Set<Change>) {
         onChange?(changes)
     }
 
     /// The app's clock, for a view that times something of its own.
     public var now: TimeInterval { clock.now }
+
+    /// Runs `work` on the app's clock, `seconds` from now.
+    @discardableResult
+    func later(_ seconds: TimeInterval, _ work: @escaping @MainActor () -> Void) -> any ClockTask {
+        clock.after(seconds, work)
+    }
 
     /// A channel's label, for a chip's words.
     public func channelLabel(_ number: Int) -> String {
