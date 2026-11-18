@@ -28,8 +28,8 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | brief waiting for approval | Brief written 2026-11-18, the final message of the Area 13 session; code on `area/show` (a506438, pushed), `swift test` green there, and the app builds and signs under `xcodebuild` with the release engine inside it. Built in stages with the stops its block names, each of which Adam saw and answered on 2026-11-17: the engine connection with the first-run sheet (Spec 10 §2, §3, §13); the window and its regions (§4 to §8), approved as drawn and tried by him against a real engine; the keys (§9); and then, with no further stop, the edits of §10 with Undo and Redo, the drags, the drops of pool tiles and of the Finder's files (U-8), the pool's imports and tile menu, `view.json`, the notes, §14's tags, banner and sheets, and §15's announcements, keyboard focus, contrast and motion. Spec 10 §2, §4, §5 and §6 are corrected on the branch from his answers at the stops. His answers with the plan stand: Area 13 builds §13's app side, the first-run sheet and the first window's line (its block and Spec 10 §16 say so); the app's code is targets of the root package under `app/`, with the Xcode project a thin shell, so `swift test` stays the one gate; three changes outside `app/` are allowed, none changing what the engine does (the Mach client moved into a small module, `OMach`; the cue-view fold with the chip states in OCore, which the thumbnail job then calls; the key-name grammar in OCore); the look is proposed, clean, modern and dark, since the clickable demo isn't in the repository; the restart rule counts a sliding two minutes, with exit status 4 retried and status 2 stopping at the first-run sheet; a list whose number another shares has its edits disabled as well as its firing; and the drags get no menu items, since their commands exist for a key binding. The last stage was built on his word of 2026-11-18 that nothing run on a screen that day, so it is proved offscreen only, and the system's accessibility audit is not built (Needs Adam). Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. The bench-run gate was lifted for this area alone (Spec 4 §15 says so since 2026-11-17); the DeckLink and capture lines, and the late-text and memory lines the soak of 2026-11-16 failed, are still owed before Area 7 and the pilot. |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | merged | Adam's `approved` on 2026-11-18 as built, with every reading in the brief and its recommended answers; the Spec 10 §14, §15 and §18 corrections applied on the branch (51abfca), `area/show` merged into `main` with `--no-ff` (02bff6f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. He went over the app himself that day and found it generally ok, with problems pausing and seeking to track down later (Needs Adam, Decisions). The last stage's checks on a screen and the system's accessibility audit are still owed: display tests are paused on his word. Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after the bench run, now that Area 13 is merged. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
@@ -40,89 +40,66 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 13, show-mode UI, is built and its brief waits for Adam's `approved`** (the final
-message of the Area 13 session, 2026-11-18). The code is on `area/show` (a506438, pushed);
-`swift test` is green there, the hosted runner passed the commits before it, and the app
-builds and signs under `xcodebuild` on this Mac with the release engine inside it. Nothing
-of it is on `main` but the status documents and the gate's record.
+**Area 13, show-mode UI, shipped on 2026-11-18**, on Adam's `approved`: as built, with
+every reading in the brief and its recommended answers, and with the Spec 10 §14, §15 and
+§18 corrections applied on the branch first (51abfca). `area/show` is merged into `main`
+with `--no-ff` (02bff6f) and `swift test` is green on the merged tree. Project O now has
+its app: targets of the root package under `app/` behind a thin Xcode shell that embeds
+the engine, with show mode as Spec 10 §1 to §10, §14 and §15 have it. No area is in
+progress, and nothing is in review.
 
-It was built in four stages. The first three each ended at a stop Adam saw and answered
-on 2026-11-17: the engine connection with the first-run sheet (Spec 10 §2, §3, §13); the
-window and its regions (§4 to §8), which he approved as drawn and then tried himself
-against a real engine under `/tmp/o-try`, twice, the second time writing "looking good
-overall now"; and the keys (§9), where he took the readings as chosen and answered that a
-press made while the engine isn't responding is dropped and the controls show disabled
-with the reason. Spec 10 §2, §4, §5 and §6 are corrected on the branch from those answers.
+Adam went over the app himself before approving, on his try-out roots, and found it
+generally ok. He reported problems pausing and seeking, to be tracked down later. Seeking
+is not in v1: the transport's bar shows position only (Spec 10 §7, choice U-5). Pausing
+should work, and the engine's log of his try has every pause, play and stop he pressed
+answered `ok`, so what went wrong came after the command and is not in the logs (Needs
+Adam, Decisions).
 
-The fourth stage ran without a stop, as the block has it, on 2026-11-18: the edits of §5,
-§6 and §10 with their menus, fields in place, small panels, questions before a delete or
-a restore, rejection sentences, and Undo and Redo named from the history; the drags of
-the trees and the grid; a pool tile on a cue through the list of channels, and on a strip
-cell after its 0.3 seconds; the Finder's files on a cue, a cell and the pool, staged,
-imported and only then written (U-8), with what isn't sent said on the cell; the pool's
-header with its imports, tile size and details, and a tile's menu; `machine/view.json`,
-read at launch and written a second after the last change; the notes `browse` and
-`backToLive`; §14's saving tag, engine tag, last-state banner and snapshots sheet beside
-the versions sheet; and §15's announcements, keyboard focus in the trees, the grid, the
-pool and the strip, Increase Contrast and Reduce Motion. One fault of the stage's own
-early work was found and fixed on the way: a small panel the system closed by itself was
-never forgotten, so the keys stayed with it.
+Two things of Area 13's are still owed, and both wait on his word, since display tests
+are paused ("still no display tests at this time", 2026-11-18). The last stage was never
+checked on a screen by a session: the drags and drops, the panels and sheets, the file
+dialog, the tags' lists, the banner, and the keyboard's focus are proved by `swift test`
+with the views laid out offscreen. And the system's accessibility audit of Spec 10 §18 is
+not built: it is a UI test under `xcodebuild`, which takes the keyboard and the screen.
 
-Adam's word that day was that nothing run on a screen or an output, so all of the fourth
-stage is proved by `swift test` alone, with the views laid out offscreen: no drag was made
-with a pointer, no popover, sheet or file dialog was seen, VoiceOver was not listened to,
-and Tab was not pressed in a real window. The system's accessibility audit, which the plan
-put under `xcodebuild`, is not built: it needs a UI-test run, which takes the keyboard and
-the screen and two commands only Adam can give. Both are in the brief as his to decide.
-
-Everything else is on `main`. Area 19, engine API and first run, shipped on 2026-11-16
-(73ab889). A display-only soak then ran on Adam's word and failed three lines: three hours
-of `scripts/soak.sh` on `main`, both screens, no DeckLink, the first soak since 2026-11-02
-and so the first of Areas 5, 6, 8, 9, 11, 12, 15, 16 and 19. It held every display line,
-the GPU and CPU budgets, audio with no underrun and the watchdog with no recovery, and
-failed late text and the two memory lines, each with a known cause: the confidence stack's
-clock draws nothing for one frame as each minute changes, and the engine's in-memory
-command log is still filling at three hours. Both want an engine fix or a spec answer from
-Adam (Needs Adam, Decisions), and both are still owed, with the bench run's DeckLink and
-capture lines, before Area 7 and the pilot. The bench run stays deferred to a window Adam
-sets aside; it still gates Areas 14, 10, 17 and 18 and Area 7's bench verification.
+Area 14, edit mode, is next and waits for the bench run with the card, which Adam has
+deferred to a window he sets aside; the gate was lifted for Area 13 alone. Still owed
+from before, with that run's DeckLink and capture lines, are the two failures of the
+display-only soak of 2026-11-16: the confidence stack's clock draws nothing for one frame
+as each minute changes, and the engine's in-memory command log is still filling at three
+hours (Needs Adam, Decisions). Both are owed before Area 7 and the pilot. The bench run
+still gates Areas 14, 10, 17 and 18 and Area 7's bench verification.
 
 ## Needs Adam
 
 ### Briefs waiting for approval
 
-- **Area 13, show-mode UI.** The brief is the final message of the Area 13 session
-  (2026-11-18); the code is on `area/show` (a506438). It asks for:
-  - *`approved`, or changes.* Recommended: try the last stage by hand first (next item),
-    then approve as built with the readings marked "new" below.
-  - *A hands-on try of the last stage.* Nothing of it has been on a screen: the drags and
-    drops, the list of channels, the panels and sheets, Import… and Replace with… with
-    their file dialog, Reveal in Finder, the tags' lists, the banner, and the keyboard's
-    focus with Tab, ⌥ and the arrows, ⌥Return and ⌃Return. The app is rebuilt at a506438
-    with the release engine (`.claude/worktrees/area-show/.build/xcode/Build/Products/Debug/Project O.app`);
-    the try-out roots under `/tmp/o-try` are gone if the Mac restarted since, and are a
-    few commands to make again. Recommended: before `approved`.
-  - *The system's accessibility audit* (Spec 10 §18). Not built: it is a UI test under
-    `xcodebuild`, which takes the keyboard, the mouse and the screen, and this Mac needs
-    `sudo DevToolsSecurity -enable` and
-    `sudo automationmodetool enable-automationmode-without-authentication` once.
-    Recommended: a short session of its own after the merge, on his go; the labels, the
-    spoken states, the focus and the clipping are held by `swift test` meanwhile.
-  - *Drags that have no menu entry.* Reordering a playlist's items, moving a list or a
-    folder, and a pool tile onto a cue are reached without the mouse only through the
-    command bar, since his answer with the plan gave the drags no menu items. Spec 10 §15
-    says every action is reachable without the mouse. Recommended: keep it so for v1 and
-    say so in §15 (corrections, below); the alternative is Move Up, Move Down, Move to
-    Folder ▸ and Write into Cue… in the menus.
-  - *The spec corrections proposed below*, to be applied on the branch before the merge,
-    as Area 19's were. Recommended: each of them.
-  - *A soak before the merge.* The branch changes nothing in what the engine draws: the
-    Mach client moved into its own module, the thumbnail job calls the cue-view fold that
-    now lives in OCore, and the key-name grammar is new there. Recommended: none for the
-    merge; the next soak he sets aside is the first of this code.
-  - *Pushing `main`.* The status commit of this wrap-up is not pushed.
+None. The Area 13 brief (the final message of the Area 13 session, 2026-11-18) was answered
+the same day: approved as built, with its recommended answers, merged (02bff6f).
 
 ### Decisions
+
+- **Pausing and seeking in the app** (Adam's try of 2026-11-18, on `/tmp/o-try`). He had
+  problems with both and said they can be tracked down later.
+  - *Seeking* is not in v1: the Transport tab's bar shows position only, and
+    `channel N seek` waits for v1.5 (Spec 10 §7, choice U-5). If the bar reads as
+    something to drag, that is a look to fix; if seeking is wanted sooner, it is new
+    vocabulary with projection and engine work, and a spec change first.
+  - *Pausing* should work. The engine's command log of that try has his pause, play and
+    stop presses on channel 1, each answered `ok`, so the app sent them and the engine
+    took them; what he saw go wrong is after that and not in the logs. Tracking it down
+    wants the screen: a session on his word, with him saying what he pressed and what he
+    saw.
+
+- **What Area 13 still owes on a screen.** Display tests are paused on Adam's word, so
+  neither has run. Each wants a session of its own, on his go.
+  - *The last stage by hand:* a real drag onto a cue, a strip cell and the pool; the list
+    of channels, the small panels and the sheets; Import… and Replace with… with their
+    file dialog; Reveal in Finder; the tags' lists and the banner; Tab, ⌥ with the arrows,
+    ⌥Return and ⌃Return; VoiceOver listened to.
+  - *The system's accessibility audit* (Spec 10 §18): a UI test under `xcodebuild`, not
+    built. It takes the keyboard, the mouse and the screen, and this Mac needs his two
+    commands once (Housekeeping).
 
 - **The display-only soak's failures** (2026-11-16 into 2026-11-17; the record is
   `tests/soak-output/2026-11-16-225637/`, with the engine's own logs kept, uncommitted, in
@@ -253,8 +230,10 @@ sets aside; it still gates Areas 14, 10, 17 and 18 and Area 7's bench verificati
   every client waited its five seconds for a client that never connected, once, in one run
   of the app's tests on 2026-11-17. It passed in twelve reruns of its suites and in every
   full run since. Nothing was changed for it.
-- **Adam's try-out of the app.** He launches it himself: the Xcode-built app in the Area 13
-  worktree's `.build/xcode`, on roots under `/tmp/o-try`, a copy of the fixture library
+- **Adam's try-out of the app.** He launches it himself: the Xcode-built app in the main
+  checkout's `.build/xcode` (`Build/Products/Debug/Project O.app`, built with
+  `xcodebuild -project app/ProjectO.xcodeproj -scheme "Project O" -configuration Debug -derivedDataPath .build/xcode build`),
+  on roots under `/tmp/o-try`, a copy of the fixture library
   with its output on the external screen, its second output's rate changed, and his own
   motion backgrounds, which are licensed and never in the repository. `/tmp` is emptied
   when the Mac restarts. A debug engine misses frames under his 1080p backgrounds, so the
@@ -284,9 +263,8 @@ sets aside; it still gates Areas 14, 10, 17 and 18 and Area 7's bench verificati
   the installed set, so they run alike everywhere.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
-  dependencies from the block's "Starts after" line. Area 12's and Area 19's tasks are
-  `shipped`, Area 13's is `in review`, and Area 14's carries its block as changed on
-  2026-11-15.
+  dependencies from the block's "Starts after" line. Area 12's, Area 13's and Area 19's
+  tasks are `shipped`, and Area 14's carries its block as changed on 2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -314,16 +292,17 @@ sets aside; it still gates Areas 14, 10, 17 and 18 and Area 7's bench verificati
 
 ### Spec interpretations made so far
 
-Area 13's readings, below, wait for the brief's answer. "With the plan" marks a reading
-Adam approved with the plan on 2026-11-17; "at stop 1", "at stop 2" and "at stop 3" one he
-saw in that stop's report that day and took as chosen; and "new" one from the last stage,
-first named in the brief. His own answers with the plan and at the stops are in row 13 and
-in Now. Earlier areas' readings were approved with their briefs and are in the specs'
-text, the briefs, or this page as it stood before: Area 19's at 8a82ec6, approved on
-2026-11-16; Area 12's at f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on
-2026-11-14; Area 11's at 4096ede, approved on 2026-11-11; Area 6's at a77bf69; Area 9's at
-f4b43ac; Area 15's on 2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and
-Area 4's in 7032182.
+None outstanding. Area 13's readings, below, were approved as built on 2026-11-18, with
+the brief's recommended answers, and are recorded here and in its brief. "With the plan"
+marks a reading Adam approved with the plan on 2026-11-17; "at stop 1", "at stop 2" and
+"at stop 3" one he saw in that stop's report that day and took as chosen; and "new" one
+from the last stage, first named in the brief. His own answers with the plan and at the
+stops are in the brief and in `CHANGELOG.md`. Earlier areas' readings were approved with
+their briefs and are in the specs' text, the briefs, or this page as it stood before:
+Area 19's at 8a82ec6, approved on 2026-11-16; Area 12's at f60a952, approved on
+2026-11-15; Area 8's at a8e741b, approved on 2026-11-14; Area 11's at 4096ede, approved
+on 2026-11-11; Area 6's at a77bf69; Area 9's at f4b43ac; Area 15's on 2026-11-10, Area
+16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
@@ -414,33 +393,19 @@ Area 4's in 7032182.
 
 ### Spec corrections proposed
 
-From Area 13's brief, none applied yet: a spec changes only on Adam's word. (Spec 10 §2,
-§4, §5 and §6 were corrected on the branch from his answers at the stops, 70ce361, 8fa5340,
-a73e9ce and dc2859e, and reach `main` with the merge.)
-
-- **Spec 10 §15, the live cue.** §15 still says "the live cue has a border and a "Live"
-  tag"; §5 and §6 say, since his answer at stop 1, a red outline with no tag, and that is
-  what is built. Fix: §15 says "the live cue has an outline of a weight nothing else in
-  the grid has".
-- **Spec 10 §14, the saving tag.** It says "A click lists what is waiting"; the `saving`
-  topic counts the documents and names none (Spec 9 §7), so the click lists how many
-  wait, how the disk stands and where the log goes, with Reveal in Finder. Fix: §14 says
-  that; the alternative is engine work, the topic naming each document.
-- **Spec 10 §15, keyboard navigation.** It says "Every action is reachable without the
-  mouse"; reordering a playlist's items, moving a list or a folder and a pool tile onto a
-  cue have no menu entry (Adam's answer with the plan), so without the mouse they are
-  typed in the command bar. Fix: §15 names them as reached through their commands.
-- **Spec 10 §18, accessibility and strings.** It asks for "the accented pseudolanguage and
-  one 40% longer" and for the system's audit on every region. Xcode has no 40% one and
-  macOS's audit has no clipping check, so both pseudolanguages are transforms of the
-  app's own at the string lookup, under `swift test`; the audit is a UI test under
-  `xcodebuild`, not built yet. Fix: §18 says where each runs.
+None. Area 13's proposals were accepted and applied on the branch before the merge (51abfca):
+Spec 10 §14 says a click on the saving tag lists how many documents wait, how the disk
+stands and whether the log is in memory; §15 says the drags with no menu entry are reached
+through their commands, and that the live cue is told by its outline; §18 says the two
+pseudolanguages are the app's own transforms under `swift test` and the system's audit a UI
+test under `xcodebuild`. Spec 10 §2, §4, §5 and §6 were corrected earlier on the branch from
+his answers at the stops (70ce361, 8fa5340, a73e9ce, dc2859e).
 
 ## Next
 
-**Area 14 — Edit mode** (branch `area/edit`) is next. It starts after Area 13 is merged,
-and so after the bench run with the card, which Adam has deferred to a window he sets
-aside; the gate was lifted for Area 13 alone. It runs in its own session from the common
+**Area 14 — Edit mode** (branch `area/edit`) is next. Area 13, which it follows, is merged;
+it still waits for the bench run with the card, which Adam has deferred to a window he
+sets aside, since the gate was lifted for Area 13 alone. It runs in its own session from the common
 preamble in `docs/build-order.md` and its own block there, verbatim:
 
 ```
@@ -489,7 +454,7 @@ frame and the Cues page, and after the preset editor.
 
 **Area 14 and after:**
 
-- **What Area 13 hands the next areas**, on `area/show` until the merge: the app as
+- **What Area 13 hands the next areas**, on `main`: the app as
   targets of the root package (`OApp` with no AppKit, `OAppUI`, `OAppScripted`) behind the
   Xcode shell in `app/`; the store and the models fed by Spec 10 §3's topics and queries;
   the one mapper from actions and edits to commands; the scripted engine the tests drive;
