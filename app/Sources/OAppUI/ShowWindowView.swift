@@ -42,9 +42,18 @@ final class ShowWindowView: Surface {
             pool.machineRoot = machineRoot
         }
     }
+    /// Spec 10 §9 — the keys' model, the command bar "across the top of the center when on", and the keys overlay while it is up.
+    let keys: KeysModel
+    let commandBar: CommandBarView
+    private(set) var keysOverlay: KeysOverlayView?
+    /// Whether the system gave the app ⌃⌥⌘⎋ as a system-wide key; the overlay says so when it didn't.
+    var releaseKeyRegistered = true
+    /// What a keyboard layout prints on a key, for the overlay, where a test gives a layout of its own; nil is the Mac's current one.
+    var layoutLabel: ((UInt16) -> String?)?
 
-    init(model: ShowModel, mach: MachLink?, banner: BannerView) {
+    init(model: ShowModel, keys: KeysModel, mach: MachLink?, banner: BannerView) {
         self.model = model
+        self.keys = keys
         self.mach = mach
         self.banner = banner
         topBar = TopBarView(model: model)
@@ -52,12 +61,19 @@ final class ShowWindowView: Surface {
         grid = GridView(model: model)
         pool = PoolView(model: model)
         preview = PreviewView(model: model, mach: mach)
-        nextRow = NextRowView(model: model)
+        nextRow = NextRowView(model: model, keys: keys)
         tabs = TabsView(model: model)
         strip = StripView(model: model, mach: mach)
+        commandBar = CommandBarView(keys: keys)
         super.init(frame: .zero)
         fill = Palette.window
-        for view in [grid, pool, left, preview, nextRow, tabs, strip, topBar, banner, leftDivider, rightDivider, poolDivider] as [NSView] { addSubview(view) }
+        for view in [grid, commandBar, pool, left, preview, nextRow, tabs, strip, topBar, banner, leftDivider, rightDivider, poolDivider] as [NSView] {
+            addSubview(view)
+        }
+        commandBar.isHidden = !keys.showsCommandBar
+        // The digits waiting, the command bar's lines and the table the overlay lists.
+        keys.onChange = { [weak self] in self?.keysChanged() }
+        topBar.onKeys = { [weak self] in self?.toggleKeys() }
         leftDivider.onBegin = { [weak self] in self?.dragStart = self?.model.settings.leftColumnWidth ?? 0 }
         leftDivider.onDrag = { [weak self] delta in
             guard let self else { return }
@@ -107,6 +123,74 @@ final class ShowWindowView: Surface {
     /// whenever no field does, so the window never hands them to a field by
     /// itself; the show keys of §9 are read from here.
     override var acceptsFirstResponder: Bool { true }
+
+    /// A key nothing took ends here, quietly: the Mac's alert sound has no
+    /// place in a show. Tab and ⇧Tab go on to the window, which moves the
+    /// focus with them (Spec 10 §15).
+    override func keyDown(with event: NSEvent) {
+        let stroke = KeyTap.stroke(event)
+        if !stroke.command, let name = stroke.name, name.key == "tab", name.isReserved { super.keyDown(with: event) }
+    }
+
+    // MARK: - The keys (Spec 10 §9)
+
+    private func keysChanged() {
+        nextRow.refresh()
+        commandBar.refresh()
+        if commandBar.isHidden == keys.showsCommandBar {
+            commandBar.isHidden = !keys.showsCommandBar
+            needsLayout = true
+        }
+        if let keysOverlay { keysOverlay.show(overlayModel) }
+    }
+
+    private var overlayModel: KeysOverlay {
+        let given = layoutLabel
+        return KeysOverlay.make(table: keys.table, releaseKeyRegistered: releaseKeyRegistered) { code in
+            given.map { $0(code) } ?? KeyboardLayout.label(code: code)
+        }
+    }
+
+    var isShowingKeys: Bool { keysOverlay != nil }
+
+    /// Whether a popover of the window's is open (Spec 10 §9, "When bindings fire", 6).
+    var hasPopover: Bool { outputPopover?.isShown ?? false }
+
+    /// "The keys overlay (Help ▸ Keys, ⌘/, or ? in the top bar)".
+    func showKeys() {
+        guard keysOverlay == nil else { return }
+        // Digits that were waiting are no longer seen: they don't wait under the overlay.
+        keys.clearDigits()
+        let overlay = KeysOverlayView(overlayModel)
+        overlay.onClose = { [weak self] in self?.hideKeys() }
+        overlay.frame = bounds
+        overlay.autoresizingMask = [.width, .height]
+        addSubview(overlay)
+        keysOverlay = overlay
+        (window as? MainWindow)?.handKeysBack()
+        NSAccessibility.post(element: overlay, notification: .layoutChanged)
+    }
+
+    /// "Escape or a click closes it."
+    func hideKeys() {
+        keysOverlay?.removeFromSuperview()
+        keysOverlay = nil
+    }
+
+    func toggleKeys() {
+        if isShowingKeys { hideKeys() } else { showKeys() }
+    }
+
+    /// ⌘K: "The command bar ... ⌘K focuses it."
+    func focusCommandBar() {
+        guard keys.showsCommandBar else { return }
+        window?.makeFirstResponder(commandBar.field)
+    }
+
+    /// The focus moved: the top bar says what a focused field's keys do (Spec 10 §8).
+    func focusChanged() {
+        topBar.fieldHint = KeyTap.fieldKind(window?.firstResponder).map { KeyWording.hint($0.hint) }
+    }
 
     /// Redraws the regions a change touches.
     func refresh(_ changes: Set<ShowModel.Change>) {
@@ -183,8 +267,11 @@ final class ShowWindowView: Surface {
         let centerWidth = max(200, w - leftWidth - rightWidth)
         // "The grid keeps at least its header and one row of cues".
         let wanted = poolDragHeight ?? CGFloat(PoolDivider.height(model.settings.panel, center: Double(height), collapsed: Double(PoolView.collapsedHeight)))
-        let poolHeight = min(wanted, max(PoolView.headerHeight, height - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
-        grid.frame = NSRect(x: leftWidth, y: top, width: centerWidth, height: height - poolHeight)
+        // "The command bar ... is a field across the top of the center when on."
+        let barHeight = commandBar.isHidden ? 0 : CommandBarView.height
+        commandBar.frame = NSRect(x: leftWidth, y: top, width: centerWidth, height: barHeight)
+        let poolHeight = min(wanted, max(PoolView.headerHeight, height - barHeight - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
+        grid.frame = NSRect(x: leftWidth, y: top + barHeight, width: centerWidth, height: height - barHeight - poolHeight)
         pool.frame = NSRect(x: leftWidth, y: top + height - poolHeight, width: centerWidth, height: poolHeight)
 
         let half = DividerView.thickness / 2
@@ -207,6 +294,7 @@ final class ShowWindowView: Surface {
         tabs.frame = NSRect(x: rx, y: y, width: rw, height: tabsHeight)
         y += tabsHeight + 10
         strip.frame = NSRect(x: rx, y: y, width: rw, height: max(0, bounds.height - y - 10))
+        keysOverlay?.frame = bounds
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -348,15 +436,18 @@ final class MenuBar: NSObject, NSMenuDelegate {
                 row.window?.makeFirstResponder(row.goTo)
             },
             item(.menuHoldAutoAdvance, enabled: { [weak self] in self?.model?.nextRow.showsHold ?? false }) { [weak self] in self?.model?.send(Actions.hold()) },
-            later(.menuCommandBar, key: "k"),
+            // "The command bar, off by default (`commandBar`) ... ⌘K focuses it."
+            item(.menuCommandBar, key: "k", enabled: { [weak self] in self?.view?.keys.showsCommandBar ?? false }) { [weak self] in self?.view?.focusCommandBar() },
         ])
         add(.menuMode, to: [
             item(.menuShow, key: "1", state: { true }) {},
             later(.menuEditMode, key: "2"),
         ])
         add(.menuHelp, to: [
-            later(.menuKeys, key: "/"),
-            later(.menuReleaseOutput, key: "\u{1B}", modifiers: [.control, .option, .command]),
+            // "The keys overlay (Help ▸ Keys, ⌘/, or ? in the top bar)".
+            item(.menuKeys, key: "/", state: { [weak self] in self?.view?.isShowingKeys ?? false }) { [weak self] in self?.view?.toggleKeys() },
+            // Spec 10 §9, "Fixed keys" — ⌃⌥⌘⎋, here too, so it is there when the system didn't give the app the key.
+            item(.menuReleaseOutput, key: "\u{1B}", modifiers: [.control, .option, .command]) { [weak self] in self?.controller?.releaseThisScreen() },
         ])
         refresh()
     }

@@ -29,7 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menuBar = MenuBar(controller: controller)
         self.menuBar = menuBar
         NSApplication.shared.mainMenu = menuBar.menu
-        if show { controller.start() }
+        if show {
+            controller.start()
+            // Spec 10 §9 — the keys are read from now on, and ⌃⌥⌘⎋ is the app's on the whole Mac.
+            controller.startKeys()
+        }
     }
 
     /// Spec 10 §4 — "Closing it is ⌘Q": the close button asks what Quit asks, and the window stays unless the app quits.

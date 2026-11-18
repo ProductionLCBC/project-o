@@ -33,6 +33,16 @@ final class TopBarView: Surface {
     /// Opens an output's details, with its Stack ▸ menu.
     var onOutput: ((OutputDot, NSView) -> Void)?
     var onPopupTag: (() -> Void)?
+    /// "?, which opens the keys overlay (§9)".
+    var onKeys: (() -> Void)?
+    /// Spec 10 §8 — "while a text field has the focus, what its keys do (§9)"; nil while none has it.
+    let hint = Kit.label(size: 12, weight: .medium)
+    var fieldHint: String? {
+        didSet {
+            guard fieldHint != oldValue else { return }
+            refresh()
+        }
+    }
 
     init(model: ShowModel) {
         self.model = model
@@ -56,12 +66,12 @@ final class TopBarView: Surface {
         time.textColor = Palette.dimText
         keys.title = "?"
         keys.setAccessibilityLabel(Strings.text(.menuKeys))
-        // The keys overlay comes with the keys' stage.
-        keys.isEnabled = false
-        keys.reason = Strings.text(.unavailableLater)
+        keys.onPress = { [weak self] in self?.onKeys?() }
+        hint.textColor = Palette.selection
+        hint.alignment = .center
         notActive.alignment = .center
         notActive.textColor = Palette.browsing
-        for view in [show, edit, liveDot, position, backToLive, countdown, note, remote, time, keys, notActive] as [NSView] { addSubview(view) }
+        for view in [show, edit, liveDot, position, backToLive, countdown, hint, note, remote, time, keys, notActive] as [NSView] { addSubview(view) }
         refresh()
     }
 
@@ -93,6 +103,8 @@ final class TopBarView: Surface {
             countdown.stringValue = ""
             countdown.isHidden = true
         }
+        hint.stringValue = fieldHint ?? ""
+        hint.isHidden = fieldHint == nil || inactive
         time.stringValue = Self.clockText()
         remote.isHollow = !model.isRemoteLit
         remote.setAccessibilityLabel(Strings.text(.topRemote))
@@ -206,9 +218,14 @@ final class TopBarView: Surface {
             backToLive.frame = NSRect(x: x, y: (h - 24) / 2, width: size.width, height: 24)
             x += size.width + 12
         }
-        let countdownWidth = Kit.width(of: countdown)
-        let centred = (bounds.width - countdownWidth) / 2
-        countdown.frame = NSRect(x: max(x, min(centred, right - countdownWidth - 8)), y: (h - 17) / 2, width: countdownWidth, height: 17)
+        // "Center: the armed countdown ...; and, while a text field has the focus, what its keys do": side by side, centred together.
+        let countdownWidth = countdown.isHidden ? 0 : Kit.width(of: countdown)
+        let hintWidth = hint.isHidden ? 0 : Kit.width(of: hint)
+        let gap: CGFloat = countdownWidth > 0 && hintWidth > 0 ? 18 : 0
+        let middle = countdownWidth + gap + hintWidth
+        let start = max(x, min((bounds.width - middle) / 2, right - middle - 8))
+        countdown.frame = NSRect(x: start, y: (h - 17) / 2, width: countdownWidth, height: 17)
+        hint.frame = NSRect(x: start + countdownWidth + gap, y: (h - 16) / 2, width: hintWidth, height: 16)
     }
 
     override func draw(_ dirtyRect: NSRect) {

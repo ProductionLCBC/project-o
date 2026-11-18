@@ -518,5 +518,26 @@ final class ShowWindowTests: XCTestCase {
         let tall = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: tall)
         try XCTUnwrap(tall.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("show-window-browsing.png"))
+        // The keys: the command bar on, digits waiting in the go-to field, and the overlay over it all (Spec 10 §9).
+        let keys = try Rig()
+        var catalog = try Rig.load("catalog")
+        var machine = try XCTUnwrap(catalog["machine"]?.objectValue)
+        var settings = try XCTUnwrap(machine["settings"]?.objectValue)
+        settings["commandBar"] = .bool(true)
+        machine["settings"] = .object(settings)
+        catalog["machine"] = .object(machine)
+        keys.store.apply(catalog: catalog)
+        keys.window.keys.typeInBar("Stack 1 Blackout TOGGLE")
+        for digit in ["1", "4"] { keys.window.keys.press(try XCTUnwrap(KeyStroke(digit))) }
+        func draw(_ rig: Rig, _ name: String) throws {
+            rig.view.layoutSubtreeIfNeeded()
+            let picture = try XCTUnwrap(rig.view.bitmapImageRepForCachingDisplay(in: rig.view.bounds))
+            rig.view.cacheDisplay(in: rig.view.bounds, to: picture)
+            try XCTUnwrap(picture.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent(name))
+        }
+        try draw(keys, "show-window-command-bar.png")
+        keys.view.layoutLabel = { _ in nil }
+        keys.view.showKeys()
+        try draw(keys, "show-window-keys.png")
     }
 }

@@ -35,7 +35,23 @@ final class MainWindow: NSWindow {
     /// was typed stays in the field.
     func handKeysBack(ifClickedOutsideAFieldAt point: NSPoint) {
         guard let editor = firstResponder as? NSText, editor.isFieldEditor, let field = editor.delegate as? NSView else { return }
-        if !field.bounds.contains(field.convert(point, from: nil)) { makeFirstResponder(nil) }
+        if !field.bounds.contains(field.convert(point, from: nil)) { handKeysBack() }
+    }
+
+    /// Spec 10 §9 — "hands the focus back to the window ..., so the next
+    /// Space sends `next`": the regions, which take no typing, have the keys.
+    func handKeysBack() {
+        makeFirstResponder(initialFirstResponder)
+    }
+
+    /// Called whenever the focus moves, so the top bar can say what a focused field's keys do (Spec 10 §8).
+    var onFocusChange: (() -> Void)?
+
+    @discardableResult
+    override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+        let made = super.makeFirstResponder(responder)
+        onFocusChange?()
+        return made
     }
 
     /// Spec 10 §4 — "It can't be hidden or minimized".
@@ -50,13 +66,16 @@ final class MainWindowController {
     let banner = BannerView()
     /// The window's regions (Spec 10 §4).
     let regions: ShowWindowView
+    /// Spec 10 §9 — the keys' model, and what reads every key the app is given.
+    let keys: KeysModel
+    let keyTap: KeyTap
 
     /// A window over a store of its own, with no engine: what a test lays out.
     convenience init() {
         self.init(model: ShowModel(store: ShowStore(), clock: SystemAppClock()), mach: nil)
     }
 
-    init(model: ShowModel, mach: MachLink?) {
+    init(model: ShowModel, mach: MachLink?, clock: any AppClock = SystemAppClock()) {
         // "The window is at least 1440 by 900 points, or the screen's visible area where that is smaller".
         let visible = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
         let size = NSSize(width: min(1440, visible.width), height: min(900, visible.height))
@@ -71,13 +90,16 @@ final class MainWindowController {
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
 
-        regions = ShowWindowView(model: model, mach: mach, banner: banner)
+        keys = KeysModel(model: model, clock: clock)
+        regions = ShowWindowView(model: model, keys: keys, mach: mach, banner: banner)
         regions.frame = NSRect(origin: .zero, size: size)
         regions.autoresizingMask = [.width, .height]
         window.contentView = regions
         // Spec 10 §4, "Focus" — the window opens with the keys on its regions, which take no typing, and not on the
         // first field AppKit finds (the library's search), where a show key would be typed as a letter.
         window.initialFirstResponder = regions
+        keyTap = KeyTap(keys: keys, window: window, regions: regions)
+        window.onFocusChange = { [weak regions] in regions?.focusChanged() }
         regions.refreshAll()
     }
 

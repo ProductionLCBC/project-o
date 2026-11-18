@@ -422,6 +422,15 @@ public final class EngineSupervisor {
         var arrived = false
     }
 
+    /// Spec 10 §9 — "If the engine doesn't answer within two seconds, the
+    /// window stays raised with the not-responding banner (§2)": a request
+    /// the engine answers at once, `releaseScreen`, has gone unanswered. The
+    /// next pong clears it, as it does after a missed ping.
+    public func engineIsSilent() {
+        guard phase == .connected else { return }
+        phase = .notResponding
+    }
+
     // MARK: - Restart the engine (Spec 10 §2)
 
     /// Spec 10 §2 — "Restart the engine": "It ends the engine by its `pid`

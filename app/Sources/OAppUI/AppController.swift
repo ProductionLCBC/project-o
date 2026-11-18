@@ -27,22 +27,34 @@ final class AppController {
     private var coveredBy: Int?
     /// The first-run sheet's model while the sheet is up (Spec 10 §13).
     private(set) var firstRun: FirstRunModel?
-    /// Spec 10 §9 — the screens the app released while it runs; the fixed key fills it (stage 3).
-    var releasedScreens: [String] = []
+    /// Spec 10 §9, "Fixed keys" — ⌃⌥⌘⎋: what it does, and how the system is asked for the key.
+    let releaser: ScreenReleaser
+    private let releaseKey: any ReleaseKey
+    /// "The app remembers the screens it released while it runs".
+    var releasedScreens: [String] { releaser.released }
+    /// Which engine the window drives (Spec 10 §2).
+    private let wiring: SessionWiring
 
     init(rootsStore: any RootsStore = DefaultsRootsStore(), launcher: any EngineLauncher = PosixEngineLauncher(),
          connector: any EngineConnector = UnixEngineConnector(), clock: any AppClock = SystemAppClock(),
-         executable: URL = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/oengine")) {
+         executable: URL = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/oengine"),
+         releaseKey: any ReleaseKey = SystemReleaseKey()) {
         self.rootsStore = rootsStore
         self.launcher = launcher
         self.connector = connector
         self.clock = clock
         self.executable = executable
+        self.releaseKey = releaseKey
         model = ShowModel(store: store, clock: clock)
         mach = MachLink(clock: clock)
-        windowController = MainWindowController(model: model, mach: mach)
+        releaser = ScreenReleaser(clock: clock)
+        wiring = SessionWiring(model: model, mach: mach, releaser: releaser)
+        windowController = MainWindowController(model: model, mach: mach, clock: clock)
         model.doubleClickInterval = { NSEvent.doubleClickInterval }
         windowController.banner.onRestart = { [weak self] in self?.askToRestart() }
+        releaser.onRaised = { [weak self] raised in self?.raiseWindow(raised) }
+        // "If the engine doesn't answer within two seconds, the window stays raised with the not-responding banner (§2)".
+        releaser.onSilent = { [weak self] in self?.supervisor?.engineIsSilent() }
         store.observe { [weak self] changes in
             if !changes.isDisjoint(with: [.catalog, .outputs, .devices, .connection]) { self?.screensChanged() }
         }
@@ -97,20 +109,12 @@ final class AppController {
     /// through it, it holds the lists the grid shows, and the Mach channel
     /// its `hello` names carries the pictures.
     private func connected(_ session: EngineSession) {
-        model.transmit = { [weak session] request, answer in
-            guard let session else { return answer(nil) }
-            session.send(request, completion: answer)
-        }
-        model.hold = { [weak session] lists in session?.hold(lists: lists) }
-        mach.connect(name: session.hello.mach)
+        wiring.connected(session)
     }
 
     private func phaseChanged(_ phase: EngineSupervisor.Phase) {
-        if phase != .connected {
-            // Spec 10 §2 — nothing is sent while the engine is away, and nothing kept for later.
-            model.transmit = nil
-            mach.disconnect()
-        }
+        // Spec 10 §2 — nothing is sent while the engine is away, and nothing kept for later.
+        wiring.phaseChanged(phase)
         windowController.show(phase, anotherBuild: supervisor?.anotherBuild)
         screensChanged()
         // Adam's answer, 2026-11-17 — a refused first run stops and shows the sheet again.
@@ -201,7 +205,7 @@ final class AppController {
     /// main window": the question is a sheet there, over any sheet that is
     /// already up, and the app's answer to the system waits for it.
     func shouldTerminate(systemAsked: Bool) -> NSApplication.TerminateReply {
-        guard let supervisor, !systemAsked else {
+        guard supervisor != nil, !systemAsked else {
             supervisor?.leaveEngineRunning()
             return .terminateNow
         }
@@ -331,8 +335,48 @@ final class AppController {
         window.setFrame(NSRect(x: room.midX - size.width / 2, y: room.midY - size.height / 2, width: size.width, height: size.height), display: true)
     }
 
-    /// Spec 10 §9 — whether the main window is raised one level above the outputs; the fixed key raises it (stage 3).
-    var isRaised: Bool { windowController.window.level == OutputLevels.aboveOutputs }
+    // MARK: - ⌃⌥⌘⎋ (Spec 10 §9, "Fixed keys")
+
+    /// Spec 10 §9 — whether the main window is raised one level above the outputs.
+    var isRaised: Bool { releaser.isRaised }
+
+    /// Starts reading the app's keys and asks the system for ⌃⌥⌘⎋. Done
+    /// once, when the app has launched; a test's window never does it, so
+    /// no test takes a key from the whole Mac.
+    func startKeys() {
+        windowController.keyTap.install()
+        let registered = releaseKey.register { [weak self] in self?.releaseThisScreen() }
+        // "the overlay says so" when the system didn't give the key: then it works only while the app is active, from Help's entry.
+        windowController.regions.releaseKeyRegistered = registered
+    }
+
+    /// ⌃⌥⌘⎋, or Help ▸ Release Output from This Screen: "takes every output
+    /// off the screen that holds the app's window, lock or not."
+    func releaseThisScreen() {
+        guard let screen = windowScreenName() else { return }
+        releaser.release(screen: screen)
+    }
+
+    /// The screen that holds the app's window, as the engine names it; a seam, since a test's window is on no screen.
+    lazy var windowScreenName: @MainActor () -> String? = { [weak self] in
+        (self?.windowController.window.screen ?? NSScreen.main)?.deviceName
+    }
+
+    /// How the window is put in front of everything on its screen; a seam, since a test's window is on no screen.
+    var bringForward: @MainActor (NSWindow) -> Void = { window in
+        window.orderFrontRegardless()
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    /// "the app raises its main window one level above the outputs on that
+    /// screen ... and the window drops back to its level."
+    private func raiseWindow(_ raised: Bool) {
+        let window = windowController.window
+        window.level = raised ? OutputLevels.aboveOutputs : .normal
+        if raised { bringForward(window) }
+        // Raised, the window takes clicks; and a released screen has no curtain and no output to move away from.
+        screensChanged()
+    }
 
     /// "a black, borderless curtain, on every Space ... one level below the
     /// outputs ... takes any click that lands on it so the desktop never

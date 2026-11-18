@@ -183,16 +183,19 @@ final class PreviewView: Surface {
 @MainActor
 final class NextRowView: Surface, NSTextFieldDelegate {
     private let model: ShowModel
+    private let keys: KeysModel
     let last = FlatButton(Strings.text(.nextLast), style: .plain)
     let next = FlatButton(Strings.text(.nextNext), style: .primary)
     let hold = FlatButton(Strings.text(.nextHold), style: .amber)
-    let goTo = NSTextField()
+    let goTo = ShowField(kind: .goTo)
     let line = Kit.content(Kit.label(size: 11.5))
     static let height: CGFloat = 92
 
-    init(model: ShowModel) {
+    init(model: ShowModel, keys: KeysModel) {
         self.model = model
+        self.keys = keys
         super.init(frame: .zero)
+        goTo.onEscape = { [weak self] in self?.refresh() }
         next.fontSize = 17
         next.fontWeight = .semibold
         last.onPress = { [weak model] in model?.send(Actions.previous()) }
@@ -226,6 +229,12 @@ final class NextRowView: Surface, NSTextFieldDelegate {
         last.reason = reason
         goTo.isEnabled = row.goToEnabled
         goTo.toolTip = row.goToEnabled ? nil : reason
+        // Spec 10 §9, "Digit entry" — "an unbound digit key ... goes into the go-to field": the digits waiting
+        // show there while the cursor is elsewhere, and leave it when they fire, time out or are cleared.
+        if goTo.currentEditor() == nil, goTo.stringValue != keys.digits.digits, showsWaitingDigits || keys.digits.isWaiting {
+            goTo.stringValue = keys.digits.digits
+        }
+        showsWaitingDigits = goTo.currentEditor() == nil && keys.digits.isWaiting
         hold.isHidden = !row.showsHold
         // "the row says why for three seconds"; else, "while digits wait, it shows the live list's title".
         if let why = model.why {
@@ -247,20 +256,22 @@ final class NextRowView: Surface, NSTextFieldDelegate {
         refresh()
     }
 
+    /// Whether the field is showing digits typed with no field focused, which the keys' model holds.
+    private var showsWaitingDigits = false
+
     @objc private func went() {
         // "fires `cue N` in the live list on Return"; Return on an empty field does nothing.
         if let number = Int(goTo.stringValue), number > 0 { model.send(Actions.goTo(cue: number)) }
         goTo.stringValue = ""
-        window?.makeFirstResponder(nil)
+        // "A single-line field that acts on Return ... hands the focus back to the window when it acts".
+        goTo.handKeysBack()
         refresh()
     }
 
+    /// Escape, should the field be given it: what the key tap does first for every field of the window's (Spec 10 §9).
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
-        // Escape empties it and hands the keys back.
-        goTo.stringValue = ""
-        window?.makeFirstResponder(nil)
-        refresh()
+        goTo.escape()
         return true
     }
 
@@ -508,7 +519,7 @@ final class TabsView: Surface {
                 // "Send empties the draft and hands the focus back to the window (§9)."
                 self.drafts[slot] = ""
                 field.stringValue = ""
-                self.window?.makeFirstResponder(nil)
+                field.handKeysBack()
                 return Actions.popupSend(slot: slot, text: draft, clearAfterSeconds: self.clearAfter[slot] ?? nil)
             }
             field.onReturn = { [weak send] in send?.press() }
@@ -532,10 +543,14 @@ final class TabsView: Surface {
             }
             direction.isEnabled = true
             // "Set (`timer N set DURATION [up]`)": the grammar's spellings (Area 13 reading).
-            _ = button(Strings.text(.timerSet), frame: NSRect(x: direction.frame.maxX + 4, y: y, width: 40, height: 26)) { [weak self] in
+            let set = button(Strings.text(.timerSet), frame: NSRect(x: direction.frame.maxX + 4, y: y, width: 40, height: 26)) { [weak self] in
                 guard let self, let ms = DurationText.ms(self.durations[slot] ?? "") else { return nil }
+                // Spec 10 §9 — "A single-line field that acts on Return (... a popup or timer row ...) hands the focus back".
+                field.handKeysBack()
                 return Actions.timerSet(slot: slot, ms: ms, up: up)
             }
+            // Return in the duration field is Set (Area 13 reading: the row's field acts as its first button does).
+            field.onReturn = { [weak set] in set?.press() }
             let running = status?.isRunning ?? false
             let start = button(Strings.text(running ? .transportPause : .timerStart), frame: NSRect(x: direction.frame.maxX + 48, y: y, width: 52, height: 26)) {
                 running ? Actions.timerPause(slot: slot) : Actions.timerStart(slot: slot)
@@ -588,13 +603,14 @@ final class ProgressBar: NSView {
 
 /// A text field that holds the operator's draft: "a text field that no event changes" (Spec 10 §7).
 @MainActor
-final class DraftField: NSTextField, NSTextFieldDelegate {
+final class DraftField: ShowField, NSTextFieldDelegate {
     private let changed: (String) -> Void
     var onReturn: (() -> Void)?
 
     init(text: String, label: String, changed: @escaping (String) -> Void) {
         self.changed = changed
-        super.init(frame: .zero)
+        // Spec 10 §9 — a popup or timer row's field: Return acts, and Escape "leaves the field and keeps the text".
+        super.init(kind: .row)
         stringValue = text
         font = .systemFont(ofSize: 12)
         bezelStyle = .roundedBezel

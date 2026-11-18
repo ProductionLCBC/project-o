@@ -27,16 +27,16 @@ public final class KeysModel {
         self.model = model
         self.clock = clock
         model.store.observe { [weak self] changes in
-            if !changes.isDisjoint(with: [.catalog, .connection]) { self?.readTable() }
+            // The catalog holds the bindings and the machine's `commandBar` setting.
+            guard let self, !changes.isDisjoint(with: [.catalog, .connection]) else { return }
+            self.readTable()
+            self.onChange?()
         }
         readTable()
     }
 
     private func readTable() {
-        let next = BindingTable(model.store.catalog?.keys ?? [])
-        guard next != table else { return }
-        table = next
-        onChange?()
+        table = BindingTable(model.store.catalog?.keys ?? [])
     }
 
     // MARK: - A key (Spec 10 §9, "When bindings fire")

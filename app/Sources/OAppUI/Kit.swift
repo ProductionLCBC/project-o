@@ -89,9 +89,9 @@ enum Kit {
         field.stringValue.isEmpty || field.frame.width >= width(of: field) - 0.5
     }
 
-    /// A search field in the window's look.
+    /// A search field in the window's look, which says it is one (Spec 10 §9, "A text field").
     static func search(placeholder: String) -> NSSearchField {
-        let field = NSSearchField()
+        let field = ShowSearchField(frame: .zero)
         field.placeholderString = placeholder
         field.font = .systemFont(ofSize: 12)
         field.focusRingType = .default

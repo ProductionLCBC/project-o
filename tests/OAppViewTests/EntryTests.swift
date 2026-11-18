@@ -121,14 +121,17 @@ final class EntryTests: XCTestCase {
         XCTAssertEqual(entries("Go"), ["Back to Live l", "Go to Cue… j", "Hold Auto-Advance", "Command Bar k"])
         XCTAssertEqual(entries("Mode"), ["Show 1", "Edit 2"])
         XCTAssertEqual(entries("Help"), ["Keys /", "Release Output from This Screen \u{1B}"])
-        let later = ["Settings…", "Lock Station", "New Playlist", "New List", "Import Media…", "Take Snapshot", "Restore a Snapshot…", "Undo", "Redo", "Command Bar",
-                     "Edit", "Keys", "Release Output from This Screen"]
+        let later = ["Settings…", "Lock Station", "New Playlist", "New List", "Import Media…", "Take Snapshot", "Restore a Snapshot…", "Undo", "Redo", "Edit"]
         for menu in bar.titles {
             for item in bar.entries(of: menu) where later.contains(item.title) && item.submenu == nil {
                 XCTAssertFalse(item.isEnabled, "\(item.title) waits for its area")
                 XCTAssertEqual(item.toolTip, "Not in this build yet.")
             }
         }
+        // Spec 10 §9 — the keys overlay and ⌃⌥⌘⎋ are there from the keys' build; the command bar's entry follows the machine's setting.
+        for item in bar.entries(of: "Help") { XCTAssertTrue(item.isEnabled, item.title) }
+        XCTAssertEqual(bar.entries(of: "Help").last?.keyEquivalentModifierMask, [.control, .option, .command], "⌃⌥⌘⎋")
+        XCTAssertEqual(bar.entries(of: "Go").last?.isEnabled, false, "the command bar is off by default (`commandBar`)")
         let mods = bar.entries(of: "View").first?.keyEquivalentModifierMask
         XCTAssertEqual(mods, [.option, .command], "Multiviewer ⌥⌘M")
     }
