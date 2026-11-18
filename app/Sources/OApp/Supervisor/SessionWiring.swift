@@ -9,11 +9,13 @@ import OCore
 /// engine (the supervisor's phase) says which of those are live.
 ///
 /// - **Connected:** all of them.
-/// - **Not responding:** the session is open and the engine silent. A press
-///   made now is dropped, like one made while the engine is away, never left
-///   in the socket to land in a burst when the engine wakes (Area 13
-///   reading). ⌃⌥⌘⎋ still asks: its request is the one that must wait
-///   (Spec 10 §9). When the engine answers again, the window drives it again.
+/// - **Not responding:** the session is open and the engine silent. "every
+///   control that sends something is disabled with the reason, and a press
+///   or a key is dropped", never left in the socket to land in a burst when
+///   the engine wakes (Spec 10 §2, "When it doesn't answer", as Adam
+///   answered at Area 13's third stop). ⌃⌥⌘⎋ still asks: its request is the
+///   one that must wait (Spec 10 §9). When the engine answers again, the
+///   window drives it again.
 /// - **Anything else:** the engine is away. "every control that sends
 ///   something is disabled, and a key that would send a command is dropped,
 ///   never queued."
@@ -57,8 +59,11 @@ public final class SessionWiring {
         case .connected:
             // The engine answers again after a silence. (At a new connection the session comes a moment after the
             // phase, and `connected` does this.)
+            model.store.silent(false)
             if model.transmit == nil, let session, session.isOpen { drive(session) }
         case .notResponding:
+            // The store says so, and with it every control that sends shows disabled with the reason (Spec 10 §2).
+            model.store.silent(true)
             model.transmit = nil
             mach.disconnect()
         default:

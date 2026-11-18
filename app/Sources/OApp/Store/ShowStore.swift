@@ -152,6 +152,7 @@ public final class ShowStore {
     public func connected(_ hello: Hello) {
         self.hello = hello
         isConnected = true
+        isSilent = false
         hasState = false
         hasMedia = false
         changed([.connection])
@@ -162,6 +163,7 @@ public final class ShowStore {
     public func disconnected() {
         guard isConnected else { return }
         isConnected = false
+        isSilent = false
         hasState = false
         hasMedia = false
         changed([.connection])
@@ -354,7 +356,22 @@ public final class ShowStore {
     /// away, the lock is on or the library is read-only, shows disabled with
     /// the reason." Why nothing can be sent, or nil when it can.
     public var cannotSend: Unavailable? {
-        isConnected && hasState ? nil : .engineAway
+        guard isConnected && hasState else { return .engineAway }
+        return isSilent ? .engineSilent : nil
+    }
+
+    /// Spec 10 §2, "When it doesn't answer" — the engine is connected and
+    /// has stopped answering. While it is, "every control that sends
+    /// something is disabled with the reason, and a press or a key is
+    /// dropped", so nothing lands in a burst when it answers again (Adam's
+    /// answer at Area 13's third stop, 2026-11-17).
+    public private(set) var isSilent = false
+
+    /// The supervisor's word that the engine has stopped answering, or answers again.
+    public func silent(_ silent: Bool) {
+        guard silent != isSilent else { return }
+        isSilent = silent
+        changed([.connection])
     }
 
     /// Why the library can't be edited, or nil when it can (Spec 10 §10):
@@ -372,6 +389,8 @@ public final class ShowStore {
 /// Spec 10 §1 — why a control is disabled; each has one sentence in the string catalog.
 public enum Unavailable: String, Equatable, Sendable {
     case engineAway
+    /// Connected, and not answering (Spec 10 §2, "When it doesn't answer").
+    case engineSilent
     case locked
     case readOnlyMasters
 }

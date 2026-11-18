@@ -70,6 +70,7 @@ public enum StringKey: String, CaseIterable, Sendable {
 
     // Why something can't be done now (Spec 10 §1)
     case unavailableEngineAway = "unavailable.engineAway"
+    case unavailableEngineSilent = "unavailable.engineSilent"
     case unavailableLocked = "unavailable.locked"
     case unavailableReadOnlyMasters = "unavailable.readOnlyMasters"
 

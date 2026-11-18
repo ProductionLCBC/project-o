@@ -51,6 +51,10 @@ final class SessionWiringTests: XCTestCase {
         }
     }
 
+    override func setUp() async throws {
+        try await MainActor.run { try CatalogFile.install() }
+    }
+
     private func rig() throws -> Rig {
         let rig = try Rig()
         addTeardownBlock { @MainActor in rig.engine.remove() }
@@ -79,12 +83,21 @@ final class SessionWiringTests: XCTestCase {
         let ping = transport.id(of: "ping")
         rig.engine.clock.advance(by: 5.1)
         XCTAssertEqual(rig.engine.supervisor.phase, .notResponding)
+        // Spec 10 §2 — "every control that sends something is disabled with the reason".
+        XCTAssertEqual(rig.model.store.cannotSend, .engineSilent)
+        XCTAssertEqual(rig.model.store.cannotEdit(master: false), .engineSilent)
+        XCTAssertFalse(rig.model.nextRow.nextEnabled)
+        XCTAssertEqual(ShowWording.unavailable(rig.model.nextRow.unavailable), "The engine isn’t responding.")
+        XCTAssertEqual(rig.model.clearsTiles.filter(\.isEnabled).count, 0)
         for _ in 0..<5 { rig.press("space") }
+        XCTAssertFalse(rig.model.send(Actions.clearAll()), "a press is dropped like a key")
         XCTAssertEqual(transport.sent("command").count, 0, "nothing waits in the socket for a stuck engine")
         XCTAssertFalse(rig.mach.isConnected)
         // The engine wakes: a pong, however late.
         transport.engineAnswers(ping, [:], type: "pong")
         XCTAssertEqual(rig.engine.supervisor.phase, .connected)
+        XCTAssertNil(rig.model.store.cannotSend, "the controls come back")
+        XCTAssertTrue(rig.model.nextRow.nextEnabled)
         XCTAssertEqual(transport.sent("command").count, 0, "and nothing pressed meanwhile goes now")
         rig.press("space")
         XCTAssertEqual(transport.sent("command").count, 1, "the window drives the engine again")

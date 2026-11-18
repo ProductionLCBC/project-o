@@ -85,6 +85,7 @@ ENTRIES = [
 
     # Why something can't be done now (Spec 10 §1)
     ("unavailable.engineAway", "The engine is away.", "The reason shown on a disabled control while the engine isn't connected."),
+    ("unavailable.engineSilent", "The engine isn’t responding.", "The reason shown on a disabled control while the engine is connected and has stopped answering."),
     ("unavailable.locked", "The station is locked.", "The reason shown on a disabled control while the operator lock is on."),
     ("unavailable.readOnlyMasters", "Masters are read-only on this Mac.", "The reason shown on a disabled edit of the library on a machine that may not edit it."),
 

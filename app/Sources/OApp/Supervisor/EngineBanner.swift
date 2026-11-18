@@ -152,6 +152,7 @@ public enum UnavailableWording {
     public static func sentence(for reason: Unavailable) -> String {
         switch reason {
         case .engineAway: return Strings.text(.unavailableEngineAway)
+        case .engineSilent: return Strings.text(.unavailableEngineSilent)
         case .locked: return Strings.text(.unavailableLocked)
         case .readOnlyMasters: return Strings.text(.unavailableReadOnlyMasters)
         }

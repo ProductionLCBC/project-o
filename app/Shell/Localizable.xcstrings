@@ -4861,6 +4861,18 @@
         }
       }
     },
+    "unavailable.engineSilent" : {
+      "comment" : "The reason shown on a disabled control while the engine is connected and has stopped answering.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine isn’t responding."
+          }
+        }
+      }
+    },
     "unavailable.later" : {
       "comment" : "The reason shown on a control that a later build of the app will switch on.",
       "extractionState" : "manual",
