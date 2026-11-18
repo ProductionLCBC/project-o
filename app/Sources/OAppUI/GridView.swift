@@ -352,6 +352,7 @@ final class ListHeaderView: Surface {
         setAccessibilityRole(.staticText)
         setAccessibilityLabel(([title.stringValue] + (section.isLive ? [Strings.text(.tagLive)] : []) + tags.map(\.text) + [detail.stringValue])
             .filter { !$0.isEmpty }.joined(separator: ", "))
+        registerForDraggedTypes(Dragging.own)
     }
 
     @available(*, unavailable)
@@ -377,6 +378,49 @@ final class ListHeaderView: Surface {
 
     var shownTags: [String] { tags.map(\.text) }
 
+    // MARK: Drops (Spec 10 §6, "Drops on the grid")
+
+    /// "A list dragged from the Library window onto a playlist's list header
+    /// is inserted above it": what a drag let go here would do, and doing it.
+    var planDrop: ((DragPayload) -> DropPlan)?
+    var performDrop: ((DropPlan) -> Void)?
+    private(set) var isMarked = false { didSet { needsDisplay = true } }
+
+    /// Lands a drag here, as letting go of it would. Says whether the header took it.
+    @discardableResult
+    func accept(_ payload: DragPayload) -> Bool {
+        guard let plan = planDrop?(payload), plan != .none else { return false }
+        performDrop?(plan)
+        return true
+    }
+
+    private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let payload = Dragging.payload(from: info.draggingPasteboard), let plan = planDrop?(payload) else { return [] }
+        isMarked = plan.isAccepted
+        if case .refused = plan { return .generic }
+        return plan.isAccepted ? .copy : []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { isMarked = false }
+    override func draggingEnded(_ sender: NSDraggingInfo) { isMarked = false }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        isMarked = false
+        guard let payload = Dragging.payload(from: sender.draggingPasteboard) else { return false }
+        return accept(payload)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        // The line the list would be inserted on: above this header.
+        if isMarked {
+            Palette.selection.setFill()
+            NSRect(x: 0, y: 0, width: bounds.width, height: 2).fill()
+        }
+    }
+
     /// The header's menu as it stands now, for a test and for ⌃Return (Spec 10 §15).
     var menuNow: NSMenu? { makeMenu?() }
 
@@ -398,9 +442,41 @@ final class GridDocument: Surface {
     private weak var model: ShowModel?
     private var tracking: NSTrackingArea?
 
+    /// "and below the last list when dropped past it": where the last list ends, and what a drag let go under it does.
+    private var contentBottom: CGFloat = 0
+    private var planPastEnd: ((DragPayload) -> DropPlan)?
+    private var performDrop: ((DropPlan) -> Void)?
+
+    /// Lands a drag on the space past the last list. Says whether it was taken.
+    @discardableResult
+    func acceptPastEnd(_ payload: DragPayload) -> Bool {
+        guard let plan = planPastEnd?(payload), plan != .none else { return false }
+        performDrop?(plan)
+        return true
+    }
+
+    private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard convert(info.draggingLocation, from: nil).y > contentBottom, let payload = Dragging.payload(from: info.draggingPasteboard),
+              let plan = planPastEnd?(payload) else { return [] }
+        if case .refused = plan { return .generic }
+        return plan.isAccepted ? .copy : []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard convert(sender.draggingLocation, from: nil).y > contentBottom, let payload = Dragging.payload(from: sender.draggingPasteboard) else { return false }
+        return acceptPastEnd(payload)
+    }
+
     func set(_ grid: GridModel, model: ShowModel, machineRoot: URL?, onMenu: @escaping (CueCellView, NSEvent) -> Void,
-             onDoubleClick: @escaping (CueCellView) -> Void, headerMenu: @escaping (ListHeaderView) -> NSMenu?) {
+             onDoubleClick: @escaping (CueCellView) -> Void, headerMenu: @escaping (ListHeaderView) -> NSMenu?,
+             headerDrop: @escaping (DragPayload, _ item: String?) -> DropPlan, performDrop: @escaping (DropPlan) -> Void) {
         self.model = model
+        planPastEnd = { headerDrop($0, nil) }
+        self.performDrop = performDrop
+        registerForDraggedTypes(Dragging.own)
         settings = model.settings
         for (view, _) in headers { view.removeFromSuperview() }
         for cell in cells { cell.removeFromSuperview() }
@@ -416,6 +492,11 @@ final class GridDocument: Surface {
                 let header = ListHeaderView(section)
                 // Spec 10 §6, "A list header" — its menu.
                 header.makeMenu = { [weak header] in header.flatMap(headerMenu) }
+                // A list from the Library lands above the header it is let go on.
+                if let item = section.itemUuid, !section.isRemoved {
+                    header.planDrop = { headerDrop($0, item) }
+                    header.performDrop = performDrop
+                }
                 addSubview(header)
                 headers.append((header, section))
                 for cell in section.cells {
@@ -459,6 +540,7 @@ final class GridDocument: Surface {
             }
             y += (placed ? cellHeight : 0) + 18
         }
+        contentBottom = y - 18
         frame = NSRect(x: 0, y: 0, width: width, height: max(y + 8, superview?.bounds.height ?? 0))
     }
 
@@ -591,7 +673,13 @@ final class GridView: Surface {
         document.set(grid, model: model, machineRoot: machineRoot,
                      onMenu: { [weak self] cell, event in self?.showCueMenu(cell, event) },
                      onDoubleClick: { [weak self] cell in self?.doubleClicked(cell) },
-                     headerMenu: { [weak self] header in self?.headerMenu(for: header) })
+                     headerMenu: { [weak self] header in self?.headerMenu(for: header) },
+                     headerDrop: { [weak model] payload, item in
+                         // Only a playlist takes a list among its items.
+                         guard let model, case .playlist(let playlist)? = model.grid.context else { return .none }
+                         return model.plan(payload, onto: .listHeader(playlist: playlist, item: item))
+                     },
+                     performDrop: { [weak model] plan in model?.perform(plan, at: .grid) })
         needsLayout = true
     }
 

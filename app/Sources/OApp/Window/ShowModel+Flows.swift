@@ -256,6 +256,22 @@ extension ShowModel {
         return !catalog.lists.contains { !$0.local && ($0.folder == path || $0.folder.hasPrefix(under)) } && !catalog.folders.contains { $0.hasPrefix(under) }
     }
 
+    // MARK: - Drags (Spec 10 §5, §6)
+
+    /// What landing a drag there would do, as the machine stands now.
+    public func plan(_ payload: DragPayload, onto target: DropTarget) -> DropPlan {
+        Drops.plan(payload, onto: target, catalog: store.catalog, cannotEditMachine: cannotEditMachine, cannotEditMasters: cannotEditMasters)
+    }
+
+    /// Does what a drop came to: sends its edit, or says beside the target why nothing happened.
+    public func perform(_ plan: DropPlan, at place: NoticePlace) {
+        switch plan {
+        case .none: break
+        case .refused(let reason): say(.notSent(reason), at: place)
+        case .edit(let sending, _): edit(sending, at: place)
+        }
+    }
+
     // MARK: - Restores (Spec 10 §14)
 
     /// "Restore a Version… on a list opens a sheet of its kept versions from

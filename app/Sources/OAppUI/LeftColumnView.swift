@@ -26,8 +26,90 @@ struct RowContent {
 
 /// One row of a tree: a button, to VoiceOver and to the keyboard as to the mouse.
 @MainActor
-final class RowView: Surface {
+final class RowView: Surface, NSDraggingSource {
     static let height: CGFloat = 26
+
+    // MARK: Drags (Spec 10 §5, "Dragging")
+
+    /// What dragging this row carries; nil for a row that isn't dragged.
+    var dragPayload: DragPayload?
+    /// What landing a drag on this row would do: on it, or below its middle.
+    var planDrop: ((DragPayload, _ below: Bool) -> DropPlan)?
+    /// Does it, or says why it can't be done.
+    var performDrop: ((DropPlan) -> Void)?
+    /// Whether a drop goes between rows (an item among items) or onto the row (a playlist, a folder).
+    var dropsBetween = false
+    private var pressedAt: NSPoint?
+    private(set) var dropMark = DropMark.none { didSet { needsDisplay = true } }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        context == .withinApplication ? [.move, .copy, .generic] : []
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let dragPayload, let pressedAt else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        guard abs(point.x - pressedAt.x) + abs(point.y - pressedAt.y) > 5 else { return }
+        self.pressedAt = nil
+        Dragging.begin(dragPayload, from: self, event: event)
+    }
+
+    /// What a drag carrying `payload` would do at a point of the row.
+    func plan(for payload: DragPayload, at point: NSPoint) -> DropPlan {
+        planDrop?(payload, point.y > bounds.midY) ?? .none
+    }
+
+    /// Lands a drag here, as letting go of it would. Says whether the row took it.
+    @discardableResult
+    func accept(_ payload: DragPayload, at point: NSPoint) -> Bool {
+        let plan = plan(for: payload, at: point)
+        guard plan != .none else { return false }
+        performDrop?(plan)
+        return true
+    }
+
+    private func mark(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let payload = Dragging.payload(from: info.draggingPasteboard) else { return [] }
+        let point = convert(info.draggingLocation, from: nil)
+        switch plan(for: payload, at: point) {
+        case .none:
+            dropMark = .none
+            return []
+        case .refused:
+            // It may be let go here, and the column then says why nothing happened.
+            dropMark = .none
+            return .generic
+        case .edit:
+            dropMark = dropsBetween ? (point.y > bounds.midY ? .below : .above) : .onto
+            return .move
+        }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { mark(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { mark(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { dropMark = .none }
+    override func draggingEnded(_ sender: NSDraggingInfo) { dropMark = .none }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        dropMark = .none
+        guard let payload = Dragging.payload(from: sender.draggingPasteboard) else { return false }
+        return accept(payload, at: convert(sender.draggingLocation, from: nil))
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        Palette.selection.setFill()
+        switch dropMark {
+        case .none: break
+        case .onto:
+            Palette.selection.setStroke()
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
+            path.lineWidth = 2
+            path.stroke()
+        case .above: NSRect(x: 4, y: 0, width: bounds.width - 8, height: 2).fill()
+        case .below: NSRect(x: 4, y: bounds.height - 2, width: bounds.width - 8, height: 2).fill()
+        }
+    }
 
     private let triangle = Kit.label(size: 9)
     private let dot = DotView()
@@ -68,6 +150,7 @@ final class RowView: Surface {
         setAccessibilityRole(content.isHeading ? .staticText : .button)
         setAccessibilityLabel(content.spoken.isEmpty ? content.title : content.spoken)
         if content.disclosure != nil { setAccessibilityExpanded(content.disclosure ?? false) }
+        registerForDraggedTypes(Dragging.own)
     }
 
     @available(*, unavailable)
@@ -100,9 +183,12 @@ final class RowView: Surface {
         } else if event.clickCount == 2, let onDoubleClick {
             onDoubleClick()
         } else {
+            pressedAt = convert(event.locationInWindow, from: nil)
             onClick?(event.modifierFlags.contains(.option))
         }
     }
+
+    override func mouseUp(with event: NSEvent) { pressedAt = nil }
 
     override func rightMouseDown(with event: NSEvent) { showMenu(event) }
 
@@ -128,6 +214,27 @@ final class RowList: NSScrollView {
     /// The rows' ground, which has a menu of its own where no row is: the Library's New Folder and New List Here.
     private final class Ground: Surface {
         var makeMenu: (() -> NSMenu?)?
+        /// What a drag let go where no row is would do, and doing it: the Library's top.
+        var planDrop: ((DragPayload) -> DropPlan)?
+        var performDrop: ((DropPlan) -> Void)?
+
+        private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+            guard let payload = Dragging.payload(from: info.draggingPasteboard), let plan = planDrop?(payload) else { return [] }
+            switch plan {
+            case .none: return []
+            case .refused: return .generic
+            case .edit: return .move
+            }
+        }
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+        override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            guard let payload = Dragging.payload(from: sender.draggingPasteboard), let plan = planDrop?(payload), plan != .none else { return false }
+            performDrop?(plan)
+            return true
+        }
 
         override func rightMouseDown(with event: NSEvent) {
             if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
@@ -146,6 +253,17 @@ final class RowList: NSScrollView {
         set { document.makeMenu = newValue }
     }
 
+    /// What a drag let go on the empty space would do, and doing it.
+    var planDrop: ((DragPayload) -> DropPlan)? {
+        get { document.planDrop }
+        set { document.planDrop = newValue }
+    }
+
+    var performDrop: ((DropPlan) -> Void)? {
+        get { document.performDrop }
+        set { document.performDrop = newValue }
+    }
+
     init() {
         super.init(frame: .zero)
         drawsBackground = false
@@ -153,6 +271,7 @@ final class RowList: NSScrollView {
         autohidesScrollers = true
         scrollerStyle = .overlay
         documentView = document
+        document.registerForDraggedTypes(Dragging.own)
     }
 
     @available(*, unavailable)
@@ -221,6 +340,9 @@ final class LeftColumnView: Surface {
             guard let self else { return nil }
             return MenuBuilder.menu(Menus.libraryTop(cannotEditMasters: self.model.cannotEditMasters)) { [weak self] entry in self?.perform(entry, folder: "", over: nil) }
         }
+        // "onto the tree's empty space moves it to the top".
+        library.planDrop = { [weak model] payload in model?.plan(payload, onto: .libraryTop) ?? .none }
+        library.performDrop = { [weak model] plan in model?.perform(plan, at: .left) }
         split.onBegin = { [weak self] in self?.splitStart = self?.model.settings.leftSplit ?? 0.5 }
         split.onDrag = { [weak self] delta in
             guard let self, self.bounds.height > 0 else { return }
@@ -272,10 +394,13 @@ final class LeftColumnView: Surface {
             spoken.append(contentsOf: content.tags.map(\.text))
             content.spoken = spoken.joined(separator: ", ")
             let view = RowView(content)
+            view.performDrop = { [weak model] plan in model?.perform(plan, at: .left) }
             switch row.kind {
             case .playlist:
                 view.onClick = { [weak model] option in model?.choose(playlist: row.playlist, option: option) }
                 view.makeMenu = { [weak self, weak view] in self?.playlistMenu(row, over: view) }
+                // "onto a playlist in the Playlists window inserts it there".
+                view.planDrop = { [weak model] payload, _ in model?.plan(payload, onto: .playlist(row.playlist)) ?? .none }
             case .item, .header:
                 if row.kind == .item {
                     view.onClick = { [weak self] _ in
@@ -284,6 +409,12 @@ final class LeftColumnView: Surface {
                     }
                 }
                 view.makeMenu = { [weak self, weak view] in self?.itemMenu(row, over: view) }
+                // "Items drag to reorder ... A list dragged from the Library window ... is inserted where it lands".
+                if let item = row.itemUuid {
+                    view.dragPayload = .item(playlist: row.playlist, item: item)
+                    view.dropsBetween = true
+                    view.planDrop = { [weak model] payload, below in model?.plan(payload, onto: .item(playlist: row.playlist, item: item, below: below)) ?? .none }
+                }
             }
             return view
         })
@@ -307,6 +438,16 @@ final class LeftColumnView: Surface {
                 content.spoken = [row.title, number].joined(separator: ", ")
             }
             let view = RowView(content)
+            view.performDrop = { [weak model] plan in model?.perform(plan, at: .left) }
+            // "Dragging a list onto a folder moves it ..., and onto a playlist in the Playlists window inserts it
+            // there. A folder dragged onto another moves into it".
+            switch row.kind {
+            case .folder:
+                view.dragPayload = .folder(row.path)
+                view.planDrop = { [weak model] payload, _ in model?.plan(payload, onto: .folder(row.path)) ?? .none }
+            case .list:
+                view.dragPayload = row.uuid.map(DragPayload.list)
+            }
             switch row.kind {
             case .folder:
                 view.onClick = { [weak model] _ in model?.toggle(folder: row.path) }
