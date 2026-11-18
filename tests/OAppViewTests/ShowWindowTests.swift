@@ -26,6 +26,15 @@ enum Audit {
         return found
     }
 
+    /// Whether AppKit would draw this label cut short with an ellipsis in
+    /// the frame it has. The answer is AppKit's own (the frame its cell says
+    /// it would need to show everything), not the measure the layout used,
+    /// so a layout that measures wrongly can't pass itself.
+    static func isCutOff(_ label: NSTextField) -> Bool {
+        guard !label.stringValue.isEmpty, let cell = label.cell else { return false }
+        return !cell.expansionFrame(withFrame: label.bounds, in: label).isEmpty
+    }
+
     /// Every visible view of a type under `view`.
     static func all<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
         var found: [T] = []
@@ -343,7 +352,7 @@ final class ShowWindowTests: XCTestCase {
                 }
                 for label in Audit.all(NSTextField.self, in: rig.view)
                 where !label.isEditable && label.tag != Kit.mayTruncate && label.maximumNumberOfLines == 1 && label.frame.width > 0 {
-                    XCTAssertTrue(Kit.fits(label), "\"\(label.stringValue)\" is clipped: \(label.frame.width) of \(Kit.width(of: label)) points (\(what))")
+                    XCTAssertFalse(Audit.isCutOff(label), "\"\(label.stringValue)\" is clipped: \(label.frame.width) of \(Kit.width(of: label)) points (\(what))")
                 }
             }
             for tab in TabsView.Tab.allCases {
@@ -359,6 +368,62 @@ final class ShowWindowTests: XCTestCase {
             check("browsing a library list, with the multiviewer")
         }
         try ViewStrings.install()
+    }
+
+    /// Seen on Adam's first run against a real engine, 2026-11-17: the top
+    /// bar's countdown read "…" at points. Spec 10 §8 — "the armed
+    /// countdown, "Auto in 0:08", in amber": whole, at every second.
+    func test_theArmedCountdownShowsWholeAtEverySecond() throws {
+        let rig = try Rig()
+        var live = try XCTUnwrap(try Rig.load("state").items("events")?.compactMap(\.objectValue).first { $0.text("topic") == "live" })
+        var cut: [String] = []
+        for seconds in Array(0...75) + [111, 600, 671, 3599, 3671] {
+            live["armed"] = .object(["item": live["item"] ?? .null, "cue": .string("33cc0000-0000-4000-8000-000000000003"),
+                                     "position": .object(["item": .number(2), "cue": .number(3)]), "inMs": .number(Double(seconds * 1000 + 600))])
+            rig.store.apply(event: "live", live, now: rig.model.now)
+            rig.view.topBar.refresh()
+            rig.view.layoutSubtreeIfNeeded()
+            let label = rig.view.topBar.countdown
+            XCTAssertFalse(label.isHidden)
+            if Audit.isCutOff(label) { cut.append(label.stringValue) }
+            // The armed cue's own cell counts down too.
+            for cell in rig.view.grid.document.cells where cell.cell.isArmed {
+                cell.refreshTrigger()
+                rig.view.layoutSubtreeIfNeeded()
+                if Audit.isCutOff(cell.trigger) { cut.append("cell: " + cell.trigger.stringValue) }
+            }
+        }
+        XCTAssertEqual(cut, [], "cut short with an ellipsis")
+    }
+
+    /// Seen on the same run: the window opened with the cursor in the
+    /// library's search field, so no key could reach the show. Spec 10 §4,
+    /// "Focus" — "The grid, the pool, the right column and the top bar never
+    /// take typing; text fields do": a field has the keys only once the
+    /// operator puts the cursor in it.
+    func test_noFieldHasTheKeysWhenTheWindowOpens() throws {
+        let rig = try Rig()
+        let window = rig.window.window
+        XCTAssertTrue(window.initialFirstResponder === rig.view, "the window opens with the keys on the window's regions, not on a field")
+        XCTAssertTrue(rig.view.acceptsFirstResponder)
+        XCTAssertTrue(window.makeFirstResponder(window.initialFirstResponder))
+        XCTAssertFalse(window.firstResponder is NSText, "no field is being typed in")
+    }
+
+    /// Spec 10 §9, "A text field" — "Search fields and the command bar keep
+    /// the focus until Escape or a click elsewhere."
+    func test_aClickOutsideAFieldHandsTheKeysBack() throws {
+        let rig = try Rig()
+        let window = rig.window.window
+        let search = rig.view.left.search
+        XCTAssertTrue(window.makeFirstResponder(search))
+        XCTAssertTrue(window.firstResponder is NSText, "the cursor is in the search field")
+        let inside = search.convert(NSPoint(x: search.bounds.midX, y: search.bounds.midY), to: nil)
+        window.handKeysBack(ifClickedOutsideAFieldAt: inside)
+        XCTAssertTrue(window.firstResponder is NSText, "a click in the field itself leaves the cursor there")
+        let elsewhere = rig.view.grid.convert(NSPoint(x: rig.view.grid.bounds.midX, y: rig.view.grid.bounds.midY), to: nil)
+        window.handKeysBack(ifClickedOutsideAFieldAt: elsewhere)
+        XCTAssertFalse(window.firstResponder is NSText, "a click elsewhere takes it out")
     }
 
     /// Draws the window into a picture, with no screen: what the stops' reports show Adam.

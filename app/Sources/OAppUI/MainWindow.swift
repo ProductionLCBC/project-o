@@ -24,7 +24,18 @@ final class MainWindow: NSWindow {
 
     override func sendEvent(_ event: NSEvent) {
         if !takesClicks, Self.isPointerEvent(event.type) { return }
+        if event.type == .leftMouseDown || event.type == .rightMouseDown { handKeysBack(ifClickedOutsideAFieldAt: event.locationInWindow) }
         super.sendEvent(event)
+    }
+
+    /// Spec 10 §9, "A text field" — "Search fields and the command bar keep
+    /// the focus until Escape or a click elsewhere." A press outside the
+    /// field being typed in takes the cursor out of it, so the keys go back
+    /// to the show; a press inside it leaves the cursor where it is. What
+    /// was typed stays in the field.
+    func handKeysBack(ifClickedOutsideAFieldAt point: NSPoint) {
+        guard let editor = firstResponder as? NSText, editor.isFieldEditor, let field = editor.delegate as? NSView else { return }
+        if !field.bounds.contains(field.convert(point, from: nil)) { makeFirstResponder(nil) }
     }
 
     /// Spec 10 §4 — "It can't be hidden or minimized".
@@ -64,6 +75,9 @@ final class MainWindowController {
         regions.frame = NSRect(origin: .zero, size: size)
         regions.autoresizingMask = [.width, .height]
         window.contentView = regions
+        // Spec 10 §4, "Focus" — the window opens with the keys on its regions, which take no typing, and not on the
+        // first field AppKit finds (the library's search), where a show key would be typed as a letter.
+        window.initialFirstResponder = regions
         regions.refreshAll()
     }
 

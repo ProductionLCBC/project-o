@@ -67,6 +67,12 @@ final class ShowWindowView: Surface {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    /// Spec 10 §4, "Focus" — "The grid, the pool, the right column and the
+    /// top bar never take typing; text fields do". The regions hold the keys
+    /// whenever no field does, so the window never hands them to a field by
+    /// itself; the show keys of §9 are read from here.
+    override var acceptsFirstResponder: Bool { true }
+
     /// Redraws the regions a change touches.
     func refresh(_ changes: Set<ShowModel.Change>) {
         if changes.contains(.top) { topBar.refresh() }

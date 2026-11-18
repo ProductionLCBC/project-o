@@ -59,6 +59,8 @@ final class AppController {
         if showWindow {
             windowController.window.center()
             windowController.window.makeKeyAndOrderFront(nil)
+            // Spec 10 §4, "Focus" — no field has the keys until the operator puts the cursor in one.
+            windowController.window.makeFirstResponder(windowController.regions)
         }
         if let roots = rootsStore.roots {
             startEngine(roots)

@@ -61,11 +61,15 @@ enum Kit {
         field.setAccessibilityLabel(text)
     }
 
-    /// The width a single line of this field's text needs: the text as it
-    /// will be drawn, and the cell's own margins.
+    /// The width a single line of this field's text needs, as the cell that
+    /// draws it measures it now. (Not `intrinsicContentSize`, which AppKit
+    /// keeps from before the text last changed; and not the attributed
+    /// string's own size, which comes out narrower than the cell draws a
+    /// centred line: the countdown read "…" on a real run for that.)
     static func width(of field: NSTextField) -> CGFloat {
-        guard !field.stringValue.isEmpty else { return 0 }
-        return ceil(field.attributedStringValue.size().width) + 6
+        guard !field.stringValue.isEmpty, let cell = field.cell else { return 0 }
+        let measured = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10_000, height: 200)).width
+        return ceil(max(measured, field.attributedStringValue.size().width + 4)) + 2
     }
 
     /// Marks a label that holds what the operator or the library wrote (a
