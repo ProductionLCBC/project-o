@@ -12,7 +12,7 @@ import OCore
 /// edit bar under the top bar (Spec 11 §2): each region is its own view,
 /// placed here and nowhere else.
 @MainActor
-final class ShowWindowView: Surface {
+final class ShowWindowView: Surface, NSPopoverDelegate {
     let model: ShowModel
     let mach: MachLink?
     let banner: BannerView
@@ -54,6 +54,14 @@ final class ShowWindowView: Surface {
     private(set) var inlineEditor: InlineEditor?
     private(set) var prompt: PromptView?
     private var promptPopover: NSPopover?
+    /// Spec 10 §10 — the list of channels a drop on a cue opened, while it is open.
+    private(set) var picker: ChannelPickerView?
+    /// Spec 10 §4 — "every confirmation and file dialog is a sheet on the
+    /// main window": how files are chosen, as a seam the app fills with the
+    /// system's dialog and a test with its own answer.
+    var chooseFiles: ((FileChoice, @escaping @MainActor ([String]) -> Void) -> Void)?
+    /// Reveal in Finder, as a seam: a test shows nothing in the Finder.
+    var reveal: ((URL) -> Void)?
     /// Spec 10 §14 — the sheet of versions or snapshots up now, if one is.
     private(set) var sheetView: PickerSheetView?
     private var sheetWindow: NSWindow?
@@ -81,6 +89,7 @@ final class ShowWindowView: Surface {
         // The window opens the fields in place and the panels the regions' edits ask for (Spec 10 §10).
         left.host = self
         grid.host = self
+        pool.host = self
         // The digits waiting, the command bar's lines and the table the overlay lists.
         keys.onChange = { [weak self] in self?.keysChanged() }
         topBar.onKeys = { [weak self] in self?.toggleKeys() }
@@ -164,7 +173,7 @@ final class ShowWindowView: Surface {
     var isShowingKeys: Bool { keysOverlay != nil }
 
     /// Whether a popover of the window's is open (Spec 10 §9, "When bindings fire", 6).
-    var hasPopover: Bool { (outputPopover?.isShown ?? false) || prompt != nil }
+    var hasPopover: Bool { (outputPopover?.isShown ?? false) || prompt != nil || picker != nil }
 
     // MARK: - Fields in place and small panels (Spec 10 §10)
 
@@ -200,8 +209,16 @@ final class ShowWindowView: Surface {
         panel.finish()
         panel.onClose = { [weak self] in self?.closePrompt() }
         prompt = panel
-        // A window that is on no screen shows no popover; the panel is the same either way.
-        guard let anchor, anchor.window?.isVisible == true else { return }
+        popUp(panel, at: anchor, focus: panel.firstField)
+    }
+
+    /// A window that is on no screen shows no popover; the panel is the same
+    /// either way. The popover points at where `anchor` is now and hangs
+    /// from the window's own view: a cell or a tile is made again whenever
+    /// the engine says something changed, and a panel hung from one would
+    /// close under the operator's hands.
+    private func popUp(_ panel: NSView, at anchor: NSView?, focus: NSView?) {
+        guard let anchor, anchor.window === window, window?.isVisible == true else { return }
         let controller = NSViewController()
         controller.view = panel
         let popover = NSPopover()
@@ -209,15 +226,98 @@ final class ShowWindowView: Surface {
         popover.contentSize = panel.frame.size
         popover.behavior = .semitransient
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
+        popover.delegate = self
+        popover.show(relativeTo: convert(anchor.bounds, from: anchor), of: self, preferredEdge: .maxX)
         promptPopover = popover
-        if let first = panel.firstField { panel.window?.makeFirstResponder(first) }
+        if let focus { panel.window?.makeFirstResponder(focus) }
     }
 
     func closePrompt() {
-        promptPopover?.close()
+        let open = promptPopover
         promptPopover = nil
         prompt = nil
+        picker = nil
+        defaultsPanel = nil
+        open?.close()
+    }
+
+    /// A popover the system closed by itself, on a click elsewhere: the
+    /// panel is forgotten, so the keys are the window's again (Spec 10 §9,
+    /// "When bindings fire", 6, holds only while one is open).
+    func popoverDidClose(_ notification: Notification) {
+        guard let closed = notification.object as? NSPopover, closed === promptPopover else { return }
+        promptPopoverClosed()
+    }
+
+    func promptPopoverClosed() {
+        promptPopover = nil
+        prompt = nil
+        picker = nil
+        defaultsPanel = nil
+    }
+
+    // MARK: - Drops on a cue, and the pool's dialogs (Spec 10 §6, §10)
+
+    /// "The channel popover opens at the drop, with the drop channel ...
+    /// picked ... Return or a click sends". The list has the keys while it
+    /// is open, so the arrows move its pick and fire nothing (§9).
+    func chooseChannel(for drop: CueDrop, cue view: CueCellView) {
+        closePrompt()
+        let (cell, section) = (view.cell, view.section)
+        let heading: String
+        switch drop.source {
+        case .media(let id):
+            let name = model.store.media.first { $0.id == id }.map { MediaPool.name(of: $0.entry) } ?? ""
+            heading = Strings.text(.channelsMedia, name, cell.number)
+        case .file(let path):
+            heading = Strings.text(.channelsFile, (path as NSString).lastPathComponent, cell.number)
+        }
+        let list = ChannelPickerView(heading: heading, channels: model.store.catalog?.channels ?? [], picked: drop.picked)
+        list.finish()
+        list.onChoose = { [weak self] channel in self?.model.write(drop, into: cell, in: section, channel: channel) }
+        list.onClose = { [weak self] in self?.closePrompt() }
+        picker = list
+        popUp(list, at: view, focus: list)
+    }
+
+    /// Import… (⌘I): "a file dialog", then the files are imported as files dropped on the pool are.
+    func importMedia() {
+        if let cannot = model.cannotImport { return model.say(.notSent(cannot), at: .pool) }
+        chooseFiles?(.importMedia) { [weak self] paths in
+            guard let self, !paths.isEmpty else { return }
+            self.model.landOnPool(self.model.planOnPool(.files(paths)))
+        }
+    }
+
+    /// "Replace with… (a file dialog: the app imports the file and sends
+    /// `media replace OLD NEW` when the import's `done` names the new id, Spec 8 §6)".
+    func replace(media id: String) {
+        guard let item = model.store.media.first(where: { $0.id == id }) else { return }
+        if let cannot = model.cannotEdit(media: id) { return model.say(.notSent(cannot), at: .pool) }
+        chooseFiles?(.replace(name: MediaPool.name(of: item.entry))) { [weak self] paths in
+            guard let self, let path = paths.first else { return }
+            if let cannot = self.model.imports.importFile(path, replacing: id) { self.model.say(.notSent(cannot), at: .pool) }
+        }
+    }
+
+    /// "Defaults… (a popover editing its trim in and out, loop, gain, grade, sync offset and default channel ...)".
+    private(set) var defaultsPanel: DefaultsPanel?
+
+    func showDefaults(of id: String, at anchor: NSView?) {
+        guard let item = model.store.media.first(where: { $0.id == id }) else { return }
+        let made = Prompts.mediaDefaults(item, model: model)
+        present(made.panel, at: anchor)
+        defaultsPanel = made
+    }
+
+    /// Reveal in Finder, for a media item's file.
+    func reveal(media id: String) {
+        if let url = model.location(ofMedia: id, machineRoot: machineRoot) { reveal?(url) }
+    }
+
+    /// Reveal in Finder, for one of the media root's folders.
+    func reveal(mediaFolder folder: String) {
+        if let root = model.mediaRoot(machineRoot: machineRoot) { reveal?(folder.isEmpty ? root : root.appendingPathComponent(folder)) }
     }
 
     // MARK: - Sheets to choose from (Spec 10 §14)
@@ -310,6 +410,11 @@ final class ShowWindowView: Surface {
             tabs.isCollapsed = PanelCollapseRule.isCollapsed(windowHeight: Double(bounds.height), setting: model.settings.tabbedPanelCollapsed)
         }
         if changes.contains(.strip) { strip.refresh() }
+        // A cell's word about a drop: the cells stay as they are, and say it.
+        if changes.contains(.dropNotes) {
+            if !changes.contains(.grid) { grid.refreshNotes() }
+            if !changes.contains(.strip) { strip.refreshNotes() }
+        }
         if changes.contains(.layout) {
             // A divider moved: the regions are placed again and the lines between them redrawn.
             left.needsLayout = true
@@ -538,7 +643,8 @@ final class MenuBar: NSObject, NSMenuDelegate {
             item(.menuNewList, key: "n", modifiers: [.shift, .command], enabled: { [weak self] in self?.model?.cannotEditMasters == nil }) { [weak self] in
                 self?.view?.left.newList()
             },
-            later(.menuImportMedia, key: "i"),
+            // Spec 10 §6, "The header" — "Import… (⌘I, a file dialog)".
+            item(.menuImportMedia, key: "i", enabled: { [weak self] in self?.model?.cannotImport == nil }) { [weak self] in self?.view?.importMedia() },
             .separator(), later(.menuTakeSnapshot), later(.menuRestoreSnapshot),
         ])
         let edit: [NSMenuItem] = [
@@ -607,4 +713,12 @@ final class MenuBar: NSObject, NSMenuDelegate {
     func entries(of title: String) -> [NSMenuItem] {
         menu.items.first { $0.submenu?.title == title }?.submenu?.items.filter { !$0.isSeparatorItem } ?? []
     }
+}
+
+/// What a file dialog is asked for (Spec 10 §6).
+enum FileChoice: Equatable {
+    /// Import…: any number of files and folders.
+    case importMedia
+    /// Replace with…: one file, to take the place of the item named.
+    case replace(name: String)
 }

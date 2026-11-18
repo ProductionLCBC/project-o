@@ -82,6 +82,10 @@ final class RowView: Surface, NSDraggingSource {
         case .edit:
             dropMark = dropsBetween ? (point.y > bounds.midY ? .below : .above) : .onto
             return .move
+        default:
+            // A row takes edits only; the pool's and the cells' drops are theirs.
+            dropMark = .none
+            return []
         }
     }
 
@@ -221,9 +225,9 @@ final class RowList: NSScrollView {
         private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
             guard let payload = Dragging.payload(from: info.draggingPasteboard), let plan = planDrop?(payload) else { return [] }
             switch plan {
-            case .none: return []
             case .refused: return .generic
             case .edit: return .move
+            default: return []
             }
         }
 

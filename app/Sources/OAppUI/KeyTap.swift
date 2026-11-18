@@ -66,7 +66,7 @@ final class KeyTap {
     }
 
     private static func isList(_ responder: NSResponder?) -> Bool {
-        responder is NSTableView || responder is NSCollectionView || responder is NSBrowser
+        responder is NSTableView || responder is NSCollectionView || responder is NSBrowser || responder is any KeyList
     }
 
     /// What is open or has the focus now.

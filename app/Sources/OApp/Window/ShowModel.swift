@@ -17,6 +17,8 @@ public final class ShowModel {
         case grid, left, right, strip, top, pool
         /// Only where the regions sit: a divider moved.
         case layout
+        /// Only what a cue's cell or a strip's cell says about a drop: an import's progress, or why nothing was sent.
+        case dropNotes
     }
 
     public let store: ShowStore
@@ -72,6 +74,8 @@ public final class ShowModel {
     /// Spec 10 §10 — the short messages standing now, each beside what was tried, and when each goes.
     public internal(set) var notices: [NoticePlace: Notice] = [:]
     var noticeTasks: [NoticePlace: any ClockTask] = [:]
+    /// Spec 10 §6, "Importing" — the files on their way in, and what waits on each.
+    public private(set) lazy var imports = MediaImports(model: self)
 
     /// The grid as it stands; rebuilt when what it shows changes.
     public private(set) var grid = GridModel()
@@ -105,7 +109,11 @@ public final class ShowModel {
 
     private func storeChanged(_ changes: Set<StoreChange>) {
         var out: Set<Change> = []
-        if changes.contains(.connection) { out.formUnion([.grid, .left, .right, .strip, .top, .pool]) }
+        if changes.contains(.connection) {
+            out.formUnion([.grid, .left, .right, .strip, .top, .pool])
+            // "the engine ending drops it too and may lose the import" (Spec 10 §6).
+            if !store.isConnected { imports.engineEnded() }
+        }
         if changes.contains(.live) {
             if store.hasState { browse.connected(live: store.live, lastBrowsed: nil) }
             // "until the list is next fired": the list the pointer is in has been fired.
@@ -160,7 +168,10 @@ public final class ShowModel {
             for change in event.changed where change.object == "list" || change.object == "cue" {
                 if let uuid = change.address.text("listUuid") { updated.insert(uuid) }
             }
-        case .media, .command:
+        case .media(let event):
+            // Spec 8 §7 — an import's progress and its outcome, by its job.
+            imports.event(event)
+        case .command:
             break
         }
     }
@@ -457,6 +468,17 @@ public final class ShowModel {
             changed([.pool])
         }
         return true
+    }
+
+    /// A file dropped on a strip cell has come in: "sends the live write when the job's `done` names the item" (Spec 10 §7).
+    func goLive(imported id: String, on channel: Int, defaultGrade: Int?) {
+        if send(Actions.liveWrite(media: id, channel: channel, defaultGrade: defaultGrade)) { used(media: id) }
+    }
+
+    /// The item was used: it leads the collapsed pool's "twenty most recently used items" (Spec 10 §6, "The divider").
+    func used(media id: String) {
+        settings.used(media: id)
+        changed([.pool])
     }
 
     // MARK: - The view (Spec 10 §4, §7)

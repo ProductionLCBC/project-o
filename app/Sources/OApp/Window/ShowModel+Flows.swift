@@ -266,9 +266,10 @@ extension ShowModel {
     /// Does what a drop came to: sends its edit, or says beside the target why nothing happened.
     public func perform(_ plan: DropPlan, at place: NoticePlace) {
         switch plan {
-        case .none: break
         case .refused(let reason): say(.notSent(reason), at: place)
         case .edit(let sending, _): edit(sending, at: place)
+        // A cue's, a strip cell's and the pool's drops land through their own functions (ShowModel+Pool).
+        default: break
         }
     }
 

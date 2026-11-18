@@ -321,7 +321,7 @@ final class ShowWindowTests: XCTestCase {
         rig.view.pool.tiles[2].onClick?(2, NSEvent())
         XCTAssertEqual(rig.commands.count, 1)
         XCTAssertEqual(rig.commands.first?.first?.hasPrefix("channel 1 write media sha256:55c8"), true)
-        XCTAssertFalse(pool.importMedia.isEnabled, "importing comes with the drops")
+        XCTAssertTrue(pool.importMedia.isEnabled, "Import… (⌘I, a file dialog)")
     }
 
     // MARK: - Dividers, an output's details, Show in Library (Spec 10 §4, §5, §6, §8)

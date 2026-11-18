@@ -54,6 +54,27 @@ public enum DropTarget: Equatable, Sendable {
     case libraryTop
 }
 
+/// What was let go on a cue, waiting for its channel (Spec 10 §6, "Drops on
+/// the grid"; §10): "opens a popover of channels with the item's drop
+/// channel picked".
+public struct CueDrop: Equatable, Sendable {
+    public enum Source: Equatable, Sendable {
+        /// A pool tile, by the item's id.
+        case media(String)
+        /// A file from the Finder, by its path.
+        case file(String)
+    }
+
+    public var source: Source
+    /// The channel the popover opens on; nil when the drop channel is "Ask", or the file's type suggests none.
+    public var picked: Int?
+
+    public init(source: Source, picked: Int?) {
+        self.source = source
+        self.picked = picked
+    }
+}
+
 /// What landing there does.
 public enum DropPlan: Equatable, Sendable {
     /// Nothing: the target takes no such thing, or it is already where it would go.
@@ -62,6 +83,14 @@ public enum DropPlan: Equatable, Sendable {
     case refused(CannotEdit)
     /// One edit.
     case edit(Sending, master: Bool)
+    /// On a cue: the channel popover opens, and its answer writes the item into the cue, or imports the file first.
+    case chooseChannel(CueDrop)
+    /// On a strip cell: "A pool tile dropped on a cell goes live at once" (Spec 10 §7).
+    case live(media: String, channel: Int)
+    /// On a strip cell: "A file from the Finder is taken the same way ... and sends the live write when the job's `done` names the item".
+    case importLive(path: String, channel: Int)
+    /// On the pool: "Files dropped on the pool from outside ... are copied into the staging folder and imported".
+    case importFiles([String])
 
     public var sending: Sending? {
         if case .edit(let sending, _) = self { return sending }
@@ -70,8 +99,10 @@ public enum DropPlan: Equatable, Sendable {
 
     /// Whether the target should show it would take the drop.
     public var isAccepted: Bool {
-        if case .edit = self { return true }
-        return false
+        switch self {
+        case .none, .refused: return false
+        default: return true
+        }
     }
 }
 
@@ -122,6 +153,74 @@ public enum Drops {
         case .libraryTop:
             return move(payload, into: "", catalog: catalog, cannot: cannotEditMasters)
         }
+    }
+
+    // MARK: - Cues, strip cells and the pool (Spec 10 §6, §7; choice U-8)
+
+    /// "The grid and the strip take one file at a time: several files, or a
+    /// folder, are refused there, and the cell says to drop them on the pool."
+    private static func oneFile(_ paths: [String], isFolder: (String) -> Bool) -> String? {
+        guard paths.count == 1, let path = paths.first, !isFolder(path) else { return nil }
+        return path
+    }
+
+    /// An item that can be put somewhere: one whose file is there (Area 13
+    /// reading: a missing or deleted item is refused on a cue and a cell, as
+    /// its Fire to is disabled).
+    private static func usable(_ id: String, in media: [MediaItem]) -> (item: MediaItem, gone: CannotEdit?)? {
+        guard let item = media.first(where: { $0.id == id }) else { return nil }
+        return (item, item.isMissing || item.isDeleted ? .missing : nil)
+    }
+
+    /// "A pool tile dropped on a cue writes it into that cue (§10)"; "A file
+    /// dragged from the Finder onto a cue is imported, then written into it
+    /// ... The channel popover opens at the drop, with the drop channel for
+    /// the kind the file's type suggests". `cannotEdit` is why the cue takes
+    /// no edit now, the lock included (Spec 10 §12).
+    public static func plan(_ payload: DragPayload, ontoCue cannotEdit: CannotEdit?, media: [MediaItem], settings: MachineSettings?,
+                            isFolder: (String) -> Bool) -> DropPlan {
+        switch payload {
+        case .media(let id):
+            guard let found = usable(id, in: media) else { return .none }
+            if let cannot = cannotEdit ?? found.gone { return .refused(cannot) }
+            return .chooseChannel(CueDrop(source: .media(id), picked: MediaPool.dropChannel(for: found.item.entry, settings: settings)))
+        case .files(let paths):
+            guard !paths.isEmpty else { return .none }
+            if let cannotEdit { return .refused(cannotEdit) }
+            guard let path = oneFile(paths, isFolder: isFolder) else { return .refused(.dropOnThePool) }
+            return .chooseChannel(CueDrop(source: .file(path), picked: FileKind.dropChannel(forPath: path, settings: settings)))
+        default:
+            return .none
+        }
+    }
+
+    /// Spec 10 §7, "Drops" — a pool tile "goes live at once, as a live write
+    /// from the pool", which the lock leaves working (§12: "drops of pool
+    /// tiles on the strip ... all work"); a file is imported first, which the
+    /// lock refuses ("any file under the lock").
+    public static func plan(_ payload: DragPayload, ontoChannel channel: Int, media: [MediaItem], cannotSend: Unavailable?, cannotImport: Unavailable?,
+                            isFolder: (String) -> Bool) -> DropPlan {
+        switch payload {
+        case .media(let id):
+            guard let found = usable(id, in: media) else { return .none }
+            if let cannot = cannotSend.map(CannotEdit.unavailable) ?? found.gone { return .refused(cannot) }
+            return .live(media: id, channel: channel)
+        case .files(let paths):
+            guard !paths.isEmpty else { return .none }
+            if let cannotImport { return .refused(.unavailable(cannotImport)) }
+            guard let path = oneFile(paths, isFolder: isFolder) else { return .refused(.dropOnThePool) }
+            return .importLive(path: path, channel: channel)
+        default:
+            return .none
+        }
+    }
+
+    /// Spec 10 §6, "Importing" — "Files dropped on the pool from outside":
+    /// any number, folders too (Spec 8 §3).
+    public static func planOnPool(_ payload: DragPayload, cannotImport: Unavailable?) -> DropPlan {
+        guard case .files(let paths) = payload, !paths.isEmpty else { return .none }
+        if let cannotImport { return .refused(.unavailable(cannotImport)) }
+        return .importFiles(paths)
     }
 
     private static func position(of item: String, in playlist: Playlist) -> Int? {

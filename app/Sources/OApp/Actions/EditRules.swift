@@ -30,6 +30,8 @@ public enum CannotEdit: Equatable, Sendable {
     case removed
     /// A fire the title or the number doesn't name (Spec 10 §6).
     case fire(FireRefusal)
+    /// Spec 10 §6 — "several files, or a folder, are refused there, and the cell says to drop them on the pool."
+    case dropOnThePool
     /// Another area builds it (Spec 10 §16).
     case later
 }

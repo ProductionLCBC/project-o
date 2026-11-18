@@ -142,6 +142,12 @@ final class CueCellView: Surface {
     var onMenu: ((CueCellView, NSEvent) -> Void)?
     /// Spec 10 §6, "Double-click" — the second press of a double-click, which fired nothing.
     var onDoubleClick: ((CueCellView) -> Void)?
+    /// Spec 10 §6, "Drops on the grid" — what the cell says about a drop: an import's progress with Cancel, or why nothing was written.
+    let dropNote = DropNoteView()
+    /// What a drag let go here would do, and doing it.
+    var planDrop: ((CueCellView, DragPayload) -> DropPlan)?
+    var performDrop: ((CueCellView, DropPlan) -> Void)?
+    private(set) var isMarked = false { didSet { needsDisplay = true } }
 
     /// Where a field over the cell goes when its words are edited in place:
     /// over the picture, or over the whole cell when the grid is compact.
@@ -213,6 +219,10 @@ final class CueCellView: Surface {
         if cell.missingMedia { tags.append(TagView(Strings.text(.tagMissing), style: .dashedRed)) }
         if cell.keptUnknown { tags.append(TagView(Strings.text(.tagUnknownCommand), style: .amber)) }
         for tag in tags { addSubview(tag) }
+        dropNote.onCancel = { [weak model] row in model?.imports.cancel(row: row) }
+        addSubview(dropNote)
+        refreshNote()
+        registerForDraggedTypes(Dragging.withFiles)
 
         var help: [String] = []
         if let refusal = section.refusal { help.append(ShowWording.refusal(refusal)) }
@@ -227,6 +237,42 @@ final class CueCellView: Surface {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    /// What the cell says about a drop on it, from the model: nothing, most of the time.
+    func refreshNote() {
+        let note = section.listUuid.flatMap { model.imports.cueNotes[MediaImports.key(list: $0, cue: cell.uuid)] }
+        let name = note?.row.flatMap { row in model.imports.rows.first { $0.id == row }?.name } ?? ""
+        dropNote.show(note.map { ImportWording.note($0) }, row: note?.row, name: name)
+    }
+
+    // MARK: Drops (Spec 10 §6, "Drops on the grid")
+
+    /// Lands a drag here, as letting go of it would. Says whether the cell took it.
+    @discardableResult
+    func accept(_ payload: DragPayload) -> Bool {
+        guard let plan = planDrop?(self, payload), plan != .none else { return false }
+        performDrop?(self, plan)
+        return true
+    }
+
+    private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let payload = Dragging.payload(from: info.draggingPasteboard), let plan = planDrop?(self, payload) else { return [] }
+        isMarked = plan.isAccepted
+        // A drop the cell refuses may be let go here, and the cell then says why nothing happened.
+        if case .refused = plan { return .generic }
+        return plan.isAccepted ? .copy : []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { isMarked = false }
+    override func draggingEnded(_ sender: NSDraggingInfo) { isMarked = false }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        isMarked = false
+        guard let payload = Dragging.payload(from: sender.draggingPasteboard) else { return false }
+        return accept(payload)
+    }
 
     /// The trigger's words; the armed cue's count down (Spec 10 §6: "Auto 0:08" in amber).
     func refreshTrigger() {
@@ -272,6 +318,9 @@ final class CueCellView: Surface {
         trigger.frame = NSRect(x: bounds.width - inset - triggerWidth, y: y + 2, width: triggerWidth, height: 15)
         label.frame = NSRect(x: inset + 3, y: y, width: bounds.width - inset * 2 - 3 - triggerWidth - (triggerWidth > 0 ? 6 : 0), height: 17)
         note.frame = NSRect(x: inset + 3, y: y + 18, width: bounds.width - inset * 2 - 3, height: 14)
+        // The drop's word lies along the foot of the picture, or along the top of a compact cell, over the chips.
+        dropNote.frame = settings.showsThumbnails ? NSRect(x: picture.frame.minX + 3, y: picture.frame.maxY - 25, width: picture.frame.width - 6, height: 22)
+                                                  : NSRect(x: inset, y: 2, width: bounds.width - inset * 2, height: 22)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -280,6 +329,13 @@ final class CueCellView: Surface {
         if let hue = Palette.section(cell.hue) {
             hue.setFill()
             NSBezierPath(roundedRect: NSRect(x: 3, y: 8, width: 3, height: bounds.height - 16), xRadius: 1.5, yRadius: 1.5).fill()
+        }
+        // A drag the cell would take: the selection's blue, inside the live cue's red when it is that one.
+        if isMarked {
+            Palette.selection.setStroke()
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 4), xRadius: 6, yRadius: 6)
+            path.lineWidth = 2
+            path.stroke()
         }
     }
 
@@ -472,7 +528,8 @@ final class GridDocument: Surface {
 
     func set(_ grid: GridModel, model: ShowModel, machineRoot: URL?, onMenu: @escaping (CueCellView, NSEvent) -> Void,
              onDoubleClick: @escaping (CueCellView) -> Void, headerMenu: @escaping (ListHeaderView) -> NSMenu?,
-             headerDrop: @escaping (DragPayload, _ item: String?) -> DropPlan, performDrop: @escaping (DropPlan) -> Void) {
+             headerDrop: @escaping (DragPayload, _ item: String?) -> DropPlan, performDrop: @escaping (DropPlan) -> Void,
+             cueDrop: @escaping (CueCellView, DragPayload) -> DropPlan, landOnCue: @escaping (CueCellView, DropPlan) -> Void) {
         self.model = model
         planPastEnd = { headerDrop($0, nil) }
         self.performDrop = performDrop
@@ -503,6 +560,8 @@ final class GridDocument: Surface {
                     let view = CueCellView(cell: cell, section: section, model: model, machineRoot: machineRoot)
                     view.onMenu = onMenu
                     view.onDoubleClick = onDoubleClick
+                    view.planDrop = cueDrop
+                    view.performDrop = landOnCue
                     addSubview(view)
                     cells.append(view)
                 }
@@ -679,8 +738,22 @@ final class GridView: Surface {
                          guard let model, case .playlist(let playlist)? = model.grid.context else { return .none }
                          return model.plan(payload, onto: .listHeader(playlist: playlist, item: item))
                      },
-                     performDrop: { [weak model] plan in model?.perform(plan, at: .grid) })
+                     performDrop: { [weak model] plan in model?.perform(plan, at: .grid) },
+                     cueDrop: { [weak model] cell, payload in model?.plan(payload, ontoCue: cell.cell, in: cell.section) ?? .none },
+                     landOnCue: { [weak self] cell, plan in self?.landed(plan, on: cell) })
         needsLayout = true
+    }
+
+    /// The cells' words about drops changed; nothing else did.
+    func refreshNotes() {
+        for cell in document.cells { cell.refreshNote() }
+    }
+
+    /// Spec 10 §6, "Drops on the grid" — a drag was let go on a cue: "The
+    /// channel popover opens at the drop", or the cell says why it took nothing.
+    func landed(_ plan: DropPlan, on cell: CueCellView) {
+        guard let drop = model.land(plan, onCue: cell.cell, in: cell.section) else { return }
+        host?.chooseChannel(for: drop, cue: cell)
     }
 
     /// Once a second: the armed cue's countdown.

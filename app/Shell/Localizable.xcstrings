@@ -121,6 +121,18 @@
         }
       }
     },
+    "cannot.dropOnThePool" : {
+      "comment" : "Said on a cue or a channel's cell when more than one file, or a folder, was dropped on it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop several files, or a folder, on the pool."
+          }
+        }
+      }
+    },
     "cannot.folderNotEmpty" : {
       "comment" : "The reason Delete Folder is disabled.",
       "extractionState" : "manual",
@@ -189,6 +201,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renumber to edit"
+          }
+        }
+      }
+    },
+    "channels.file" : {
+      "comment" : "The heading of the list of channels after a file was dropped on a cue. %1$@ is the file's name, %2$lld the cue's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import “%1$@” and write it into cue %2$lld on"
+          }
+        }
+      }
+    },
+    "channels.media" : {
+      "comment" : "The heading of the list of channels after a media tile was dropped on a cue. %1$@ is the item's name, %2$lld the cue's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write “%1$@” into cue %2$lld on"
+          }
+        }
+      }
+    },
+    "channels.row" : {
+      "comment" : "A channel in a list of channels: %1$lld is its number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld %2$@"
           }
         }
       }
@@ -1417,6 +1465,138 @@
         }
       }
     },
+    "defaults.bad" : {
+      "comment" : "Shown when a field of the defaults panel doesn't hold a number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type a number, or leave it empty."
+          }
+        }
+      }
+    },
+    "defaults.channel" : {
+      "comment" : "A media item's default: the channel a double-click or a drop puts it on.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop channel"
+          }
+        }
+      }
+    },
+    "defaults.gain" : {
+      "comment" : "A media item's default: how much louder or quieter it plays.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain (dB)"
+          }
+        }
+      }
+    },
+    "defaults.grade" : {
+      "comment" : "A media item's default: the colour grade it is shown with.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
+    "defaults.heading" : {
+      "comment" : "The heading of the panel that edits a media item's defaults. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defaults of “%@”"
+          }
+        }
+      }
+    },
+    "defaults.loop" : {
+      "comment" : "A media item's default: whether it plays again when it ends.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loop"
+          }
+        }
+      }
+    },
+    "defaults.machine" : {
+      "comment" : "In the drop channel's list: no channel of the item's own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The machine’s setting"
+          }
+        }
+      }
+    },
+    "defaults.on" : {
+      "comment" : "The checkbox beside Loop.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        }
+      }
+    },
+    "defaults.syncOffset" : {
+      "comment" : "A media item's default: how much later its sound plays than its picture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sound offset (ms)"
+          }
+        }
+      }
+    },
+    "defaults.trimIn" : {
+      "comment" : "A media item's default: where it starts playing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start at (seconds)"
+          }
+        }
+      }
+    },
+    "defaults.trimOut" : {
+      "comment" : "A media item's default: where it stops playing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End at (seconds)"
+          }
+        }
+      }
+    },
     "divider.left" : {
       "comment" : "VoiceOver: the divider between the left column and the grid.",
       "extractionState" : "manual",
@@ -1461,6 +1641,150 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Split between the playlists and the library"
+          }
+        }
+      }
+    },
+    "drop.cancel" : {
+      "comment" : "VoiceOver: the Cancel button on a cue or a channel's cell while a dropped file is imported. %@ is the file's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel the drop of %@"
+          }
+        }
+      }
+    },
+    "drop.channelChanged" : {
+      "comment" : "On a channel's cell: a file was imported, and the channel's content had changed meanwhile.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent: channel %lld changed while importing"
+          }
+        }
+      }
+    },
+    "drop.copyFailed" : {
+      "comment" : "On a cue or a channel's cell: the file couldn't be copied. %@ is the system's reason.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not copied. %@"
+          }
+        }
+      }
+    },
+    "drop.copying" : {
+      "comment" : "On a cue or a channel's cell: the dropped file is being copied.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copying…"
+          }
+        }
+      }
+    },
+    "drop.cueChanged" : {
+      "comment" : "On a cue: a file was imported, and the cue's write on that channel had changed meanwhile.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not written: channel %lld changed in this cue while importing"
+          }
+        }
+      }
+    },
+    "drop.cueGone" : {
+      "comment" : "In the pool's header: a file was imported for a cue that was removed meanwhile.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not written: the cue is gone."
+          }
+        }
+      }
+    },
+    "drop.engineEnded" : {
+      "comment" : "On a cue or a channel's cell: the engine ended while a dropped file was being imported.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine ended. Drop the file again."
+          }
+        }
+      }
+    },
+    "drop.goesLive" : {
+      "comment" : "On a channel's cell while a media tile is held over it. %1$lld is the channel's number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Goes live on %1$lld %2$@"
+          }
+        }
+      }
+    },
+    "drop.goesLiveImported" : {
+      "comment" : "On a channel's cell while a file from the Finder is held over it. %1$lld is the channel's number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Goes live on %1$lld %2$@ when imported"
+          }
+        }
+      }
+    },
+    "drop.importing" : {
+      "comment" : "On a cue or a channel's cell: the dropped file is being imported.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importing…"
+          }
+        }
+      }
+    },
+    "drop.importingPart" : {
+      "comment" : "On a cue or a channel's cell. %@ is how far the import is, such as 42%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importing… %@"
+          }
+        }
+      }
+    },
+    "drop.refused" : {
+      "comment" : "On a cue or a channel's cell: the engine refused the file. %@ is the reason, a sentence of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not imported. %@"
           }
         }
       }
@@ -2853,6 +3177,186 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Undo %1$@ (%2$@, %3$@)"
+          }
+        }
+      }
+    },
+    "import.choose" : {
+      "comment" : "The button of the file dialog that chooses media to import.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import"
+          }
+        }
+      }
+    },
+    "import.copyFailed" : {
+      "comment" : "A file that couldn't be copied. %1$@ is its name, %2$@ the system's reason.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: not copied. %2$@"
+          }
+        }
+      }
+    },
+    "import.copying" : {
+      "comment" : "A file on its way into the pool. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: copying…"
+          }
+        }
+      }
+    },
+    "import.dismiss" : {
+      "comment" : "A button beside a finished import in the pool's header.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        }
+      }
+    },
+    "import.dismiss.label" : {
+      "comment" : "VoiceOver: the Dismiss button beside a finished import. %@ is the file's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss %@"
+          }
+        }
+      }
+    },
+    "import.dismissAll" : {
+      "comment" : "A button in the pool's header: clears every finished import.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss All"
+          }
+        }
+      }
+    },
+    "import.engineAway" : {
+      "comment" : "A file whose import the engine's end cut short. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: the engine ended first. Import it again."
+          }
+        }
+      }
+    },
+    "import.imported" : {
+      "comment" : "A file that came into the pool. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: imported"
+          }
+        }
+      }
+    },
+    "import.importing" : {
+      "comment" : "A file on its way into the pool. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: importing…"
+          }
+        }
+      }
+    },
+    "import.importingPart" : {
+      "comment" : "A file on its way into the pool. %1$@ is its name, %2$@ how far it is, such as 42%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: importing… %2$@"
+          }
+        }
+      }
+    },
+    "import.known" : {
+      "comment" : "A file whose content the pool already had. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: already in the pool"
+          }
+        }
+      }
+    },
+    "import.more" : {
+      "comment" : "In the pool's header when more imports are listed than fit. %lld is how many more.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "import.notSent" : {
+      "comment" : "A file that came in, when what waited on it wasn't sent. %1$@ is its name, %2$@ what wasn't sent, a sentence of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: imported. %2$@"
+          }
+        }
+      }
+    },
+    "import.refused" : {
+      "comment" : "A file the engine refused. %1$@ is its name, %2$@ the reason, a sentence of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: not imported. %2$@"
           }
         }
       }
@@ -4669,6 +5173,126 @@
         }
       }
     },
+    "pool.details" : {
+      "comment" : "VoiceOver: the line in the pool's header about the selected media item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details of the selected item"
+          }
+        }
+      }
+    },
+    "pool.details.alpha" : {
+      "comment" : "In a media item's details: it has transparency.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "alpha"
+          }
+        }
+      }
+    },
+    "pool.details.channel" : {
+      "comment" : "In a media item's details: its own drop channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "channel %lld"
+          }
+        }
+      }
+    },
+    "pool.details.gain" : {
+      "comment" : "In a media item's details: its default gain. %@ is the number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gain %@ dB"
+          }
+        }
+      }
+    },
+    "pool.details.grade" : {
+      "comment" : "In a media item's details: its default grade's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "grade %lld"
+          }
+        }
+      }
+    },
+    "pool.details.loop" : {
+      "comment" : "In a media item's details: its default is to loop.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "loops"
+          }
+        }
+      }
+    },
+    "pool.details.size" : {
+      "comment" : "A media item's width and height in pixels, each a whole number written without separators.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$@"
+          }
+        }
+      }
+    },
+    "pool.details.sound" : {
+      "comment" : "In a media item's details: it has sound.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sound"
+          }
+        }
+      }
+    },
+    "pool.details.sync" : {
+      "comment" : "In a media item's details: its default sync offset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sound offset %lld ms"
+          }
+        }
+      }
+    },
+    "pool.details.trim" : {
+      "comment" : "In a media item's details: it has a default start or end.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "trimmed"
+          }
+        }
+      }
+    },
     "pool.import" : {
       "comment" : "A button in the pool's header.",
       "extractionState" : "manual",
@@ -5529,6 +6153,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Project O can’t play this kind of file."
+          }
+        }
+      }
+    },
+    "replace.choose" : {
+      "comment" : "The button of the file dialog that chooses a file to replace a media item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace"
+          }
+        }
+      }
+    },
+    "replace.message" : {
+      "comment" : "The file dialog of Replace with…. %@ is the media item's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the file that takes the place of “%@”."
           }
         }
       }

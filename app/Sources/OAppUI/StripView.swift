@@ -25,6 +25,10 @@ final class StripCellView: Surface {
     private let meter = MeterView()
     private let transition = ProgressBar(frame: .zero)
     private var showsOriginUntil: TimeInterval = 0
+    /// Spec 10 §7, "Drops" — what the cell says about a drop: "Goes live on
+    /// 2 Foreground" while one is held over it, an import's progress with
+    /// Cancel, or why nothing was sent.
+    let dropNote = DropNoteView()
 
     init(_ cell: StripCell, model: ShowModel, showsOriginUntil: TimeInterval = 0) {
         self.cell = cell
@@ -112,6 +116,8 @@ final class StripCellView: Surface {
         transition.isHidden = true
         transition.setAccessibilityElement(false)
         for view in [picture, text, badge, label, kind, detail, remaining, meter, transition] as [NSView] + tags + buttons + dots { addSubview(view) }
+        dropNote.onCancel = { [weak model] row in model?.imports.cancel(row: row) }
+        addSubview(dropNote)
         tick()
         setAccessibilityElement(false)
         setAccessibilityLabel(Strings.text(.stripChannel, cell.number, cell.label))
@@ -119,6 +125,24 @@ final class StripCellView: Surface {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    /// Shows what a drag held over the cell would do, in "the live red", or
+    /// what the model says of a drop that landed here.
+    func show(note: DropNote?, hover: String?) {
+        if let hover {
+            dropNote.show(hover, live: true)
+        } else {
+            let name = note?.row.flatMap { row in model.imports.rows.first { $0.id == row }?.name } ?? ""
+            dropNote.show(note.map { ImportWording.note($0) }, row: note?.row, name: name)
+        }
+        if hover != nil {
+            outline = Palette.live
+            outlineWidth = 2
+        } else {
+            outline = cell.isSelected ? Palette.selection : nil
+            outlineWidth = 1.5
+        }
+    }
 
     /// What moves between events: the remaining time, the transition's bar, the provenance line.
     func tick() {
@@ -189,6 +213,8 @@ final class StripCellView: Surface {
         }
         meter.frame = NSRect(x: w - 14, y: 8, width: 6, height: 60)
         transition.frame = NSRect(x: 8, y: bounds.height - 6, width: w - 16, height: 3)
+        // Over the line that says what the channel holds; the transport's buttons stay in reach.
+        dropNote.frame = NSRect(x: x - 4, y: 28, width: max(20, right - x + 4), height: 20)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -318,6 +344,9 @@ final class StripView: Surface {
     private let document = Surface()
     private(set) var cells: [StripCellView] = []
     static let headerHeight: CGFloat = 72
+    /// Spec 10 §7, "Drops" — how long a drag has been over which cell, and what that cell says meanwhile.
+    private var hover = DropHover()
+    private(set) var hovering: (channel: Int, text: String)?
 
     init(model: ShowModel, mach: MachLink?) {
         self.model = model
@@ -347,6 +376,9 @@ final class StripView: Surface {
         scroll.scrollerStyle = .overlay
         scroll.documentView = document
         for sub in [clearAll, clearPopups, clearSelected, all, none, view, scroll] as [NSView] { addSubview(sub) }
+        // The strip takes the drags, not its cells: the cells are made again whenever a channel changes, and the
+        // 0.3 seconds must outlast that.
+        registerForDraggedTypes(Dragging.withFiles)
         refresh()
     }
 
@@ -391,8 +423,92 @@ final class StripView: Surface {
             return view
         }
         for cell in cells { document.addSubview(cell) }
+        refreshNotes()
         needsLayout = true
         draw()
+    }
+
+    // MARK: - Drops (Spec 10 §7)
+
+    /// The cells' words about drops, and the hover's, without making the cells again.
+    func refreshNotes() {
+        for cell in cells {
+            let number = cell.cell.number
+            cell.show(note: model.imports.stripNotes[number], hover: hovering?.channel == number ? hovering?.text : nil)
+        }
+    }
+
+    /// The channel whose cell is under a point of the strip.
+    func channel(at point: NSPoint) -> Int? {
+        guard scroll.frame.contains(point) else { return nil }
+        let inside = document.convert(point, from: self)
+        return cells.first { $0.frame.contains(inside) }?.cell.number
+    }
+
+    /// A drag is over `channel`'s cell, or over none. "a cell takes the tile
+    /// only once it has hovered there for 0.3 seconds, showing the live red
+    /// and "Goes live on 2 Foreground" meanwhile".
+    @discardableResult
+    func dragOver(_ payload: DragPayload, channel: Int?) -> DropPlan {
+        let plan = channel.map { model.plan(payload, ontoChannel: $0) } ?? .none
+        let held = plan.isAccepted ? channel : nil
+        hover.over(held, at: model.now)
+        let words = held.flatMap { number in ImportWording.hover(plan, label: model.channelLabel(number)).map { (number, $0) } }
+        if words?.0 != hovering?.channel || words?.1 != hovering?.text {
+            hovering = words.map { (channel: $0.0, text: $0.1) }
+            refreshNotes()
+        }
+        return plan
+    }
+
+    /// The drag left the strip, or ended.
+    func dragLeft() {
+        hover.over(nil, at: model.now)
+        guard hovering != nil else { return }
+        hovering = nil
+        refreshNotes()
+    }
+
+    /// The drag was let go over `channel`'s cell. Says whether the cell took
+    /// it: one that hasn't held it for its 0.3 seconds takes nothing, "so a
+    /// drag that overshoots a cue doesn't go to air." A drop the cell
+    /// refuses is taken at once, since all it does is say why.
+    @discardableResult
+    func drop(_ payload: DragPayload, channel: Int) -> Bool {
+        let plan = model.plan(payload, ontoChannel: channel)
+        defer { dragLeft() }
+        switch plan {
+        case .none:
+            return false
+        case .refused:
+            model.land(plan, onChannel: channel)
+            return true
+        default:
+            guard hover.takes(channel, at: model.now) else { return false }
+            model.land(plan, onChannel: channel)
+            return true
+        }
+    }
+
+    private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let payload = Dragging.payload(from: info.draggingPasteboard) else { return [] }
+        let plan = dragOver(payload, channel: channel(at: convert(info.draggingLocation, from: nil)))
+        if case .refused = plan { return .generic }
+        return plan.isAccepted ? .copy : []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { dragLeft() }
+    override func draggingEnded(_ sender: NSDraggingInfo) { dragLeft() }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let payload = Dragging.payload(from: sender.draggingPasteboard),
+              let channel = channel(at: convert(sender.draggingLocation, from: nil)) else {
+            dragLeft()
+            return false
+        }
+        return drop(payload, channel: channel)
     }
 
     /// The channel whose provenance shows, and until when on the app's clock.
@@ -437,8 +553,11 @@ final class StripView: Surface {
 
 /// Spec 10 §6, "Tiles" — one item of the pool.
 @MainActor
-final class PoolTileView: Surface {
+final class PoolTileView: Surface, NSDraggingSource {
     static let size = NSSize(width: 140, height: 98)
+    /// Spec 10 §6, "A tile's menu".
+    var makeMenu: (() -> NSMenu?)?
+    private var pressedAt: NSPoint?
     let tile: PoolTile
     private let picture = NSImageView()
     private let glyph = Kit.label(size: 18)
@@ -513,8 +632,35 @@ final class PoolTileView: Surface {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) { return showMenu(event) }
+        pressedAt = convert(event.locationInWindow, from: nil)
         onClick?(event.clickCount, event)
     }
+
+    override func rightMouseDown(with event: NSEvent) { showMenu(event) }
+
+    private func showMenu(_ event: NSEvent) {
+        if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
+    }
+
+    /// The tile's menu as it stands now, for a test and for ⌃Return (Spec 10 §15).
+    var menuNow: NSMenu? { makeMenu?() }
+
+    // A tile is dragged onto a cue, or onto a channel's cell (Spec 10 §6, §7).
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        context == .withinApplication ? [.copy, .generic] : []
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let pressedAt else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        guard abs(point.x - pressedAt.x) + abs(point.y - pressedAt.y) > 5 else { return }
+        self.pressedAt = nil
+        Dragging.begin(dragPayload, from: self, event: event)
+    }
+
+    /// What a drag of the tile carries.
+    var dragPayload: DragPayload { .media(tile.id) }
 
     override func accessibilityPerformPress() -> Bool {
         onClick?(1, NSEvent())
@@ -539,6 +685,18 @@ final class PoolView: Surface {
     private let scroll = NSScrollView()
     private let document = Surface()
     private(set) var tiles: [PoolTileView] = []
+    /// The window, which opens the file dialogs and the Defaults… panel.
+    weak var host: ShowWindowView?
+    /// What the pool says for a few seconds about something tried there (Spec 10 §10).
+    let notice = NoticeLabel()
+    /// "the selected item's details", under the header's controls.
+    let details = Kit.content(Kit.label(size: 11))
+    /// "The header shows the jobs as the `media` topic reports them, each
+    /// file's progress and outcome, and keeps refusals, with their reasons,
+    /// until dismissed."
+    private(set) var jobs: [ImportRowView] = []
+    let moreJobs = Kit.label(size: 11)
+    let dismissAll = FlatButton(Strings.text(.importDismissAll), style: .bare)
     static let headerHeight: CGFloat = 40
     /// Spec 10 §6, "The divider" — collapsed, the panel "shows the pool's header and one strip of the twenty most
     /// recently used items": this height.
@@ -564,16 +722,83 @@ final class PoolView: Surface {
         replaced.fontSize = 11
         usedInList.onPress = { [weak self] in self?.toggleUsed() }
         replaced.onPress = { [weak model] in model?.setPool { $0.replacedOnly.toggle() } }
-        // Importing comes with the drops' stage.
-        importMedia.isEnabled = false
-        importMedia.reason = Strings.text(.unavailableLater)
+        // "Import… (⌘I, a file dialog)".
+        importMedia.onPress = { [weak self] in self?.host?.importMedia() }
+        details.textColor = Palette.dimText
+        details.setAccessibilityLabel(Strings.text(.poolDetails))
+        notice.maximumNumberOfLines = 1
+        notice.lineBreakMode = .byTruncatingTail
+        moreJobs.textColor = Palette.faintText
+        dismissAll.fontSize = 11
+        dismissAll.onPress = { [weak model] in model?.imports.dismissAll() }
+        // "Files dropped on the pool from outside".
+        registerForDraggedTypes([.fileURL])
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.scrollerStyle = .overlay
         scroll.documentView = document
-        for view in [title, search, kind, sort, usedInList, replaced, importMedia, rail, scroll] as [NSView] { addSubview(view) }
+        for view in [title, search, kind, sort, usedInList, replaced, importMedia, notice, details, moreJobs, dismissAll, rail, scroll] as [NSView] { addSubview(view) }
         refresh()
+    }
+
+    // MARK: Files from the Finder (Spec 10 §6, "Importing")
+
+    /// Lands a drag on the pool, as letting go of it would. Says whether the pool took it.
+    @discardableResult
+    func accept(_ payload: DragPayload) -> Bool {
+        let plan = model.planOnPool(payload)
+        guard plan != .none else { return false }
+        model.landOnPool(plan)
+        return true
+    }
+
+    private func operation(_ info: NSDraggingInfo) -> NSDragOperation {
+        guard let payload = Dragging.payload(from: info.draggingPasteboard) else { return [] }
+        let plan = model.planOnPool(payload)
+        isMarked = plan.isAccepted
+        // Under the lock the files may be let go here, and the pool then says why nothing is imported.
+        if case .refused = plan { return .generic }
+        return plan.isAccepted ? .copy : []
+    }
+
+    private var isMarked = false { didSet { if isMarked != oldValue { needsDisplay = true } } }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { operation(sender) }
+    override func draggingExited(_ sender: NSDraggingInfo?) { isMarked = false }
+    override func draggingEnded(_ sender: NSDraggingInfo) { isMarked = false }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        isMarked = false
+        guard let payload = Dragging.payload(from: sender.draggingPasteboard) else { return false }
+        return accept(payload)
+    }
+
+    // MARK: A tile's menu (Spec 10 §6)
+
+    /// "A tile's menu: Fire to Channel N (its drop channel); Fire to… (a
+    /// channel); Defaults… ...; Replace with… ...; Reveal in Finder; Delete… (§10)."
+    func tileMenu(for id: String, at anchor: NSView?) -> NSMenu {
+        MenuBuilder.menu(model.tileMenu(for: id)) { [weak self, weak anchor] entry in
+            guard let self else { return }
+            switch entry.kind {
+            case .fireTo(let channel): self.model.goLive(media: id, on: channel)
+            case .defaults: self.host?.showDefaults(of: id, at: anchor ?? self)
+            case .replace: self.host?.replace(media: id)
+            case .reveal: self.host?.reveal(media: id)
+            case .deleteMedia: self.model.deleteMedia(id)
+            default: break
+            }
+        }
+    }
+
+    /// The imports the header has room for: what must be read first, then
+    /// what is under way, then what ended well.
+    private func shownJobs(limit: Int) -> [ImportRow] {
+        let rows = model.imports.rows
+        let ordered = rows.filter(\.staysUntilDismissed) + rows.filter { !$0.isOver } + rows.filter { $0.isOver && !$0.staysUntilDismissed }
+        return Array(ordered.prefix(limit))
     }
 
     @available(*, unavailable)
@@ -612,6 +837,23 @@ final class PoolView: Surface {
         kind.selectItem(at: [ViewSettings.PoolKind.all, .video, .image, .audio].firstIndex(of: filter.kind) ?? 0)
         sort.selectItem(at: filter.sort == .dateAdded ? 1 : 0)
         let collapsed = model.settings.panel == .collapsed
+        let cannotImport = model.cannotImport
+        importMedia.isEnabled = cannotImport == nil
+        importMedia.reason = cannotImport.map(EditWording.reason)
+        notice.show(model.notices[.pool])
+        // "Single click selects and shows the item's size, duration, codec, sound and alpha, and its defaults, in the header."
+        let selected = model.selectedMedia.flatMap { id in model.store.media.first { $0.id == id } }
+        details.stringValue = selected.map { ImportWording.details($0) } ?? ""
+        details.toolTip = details.stringValue
+        details.isHidden = selected == nil || collapsed || !notice.isHidden
+        for job in jobs { job.removeFromSuperview() }
+        let limit = collapsed ? 1 : 3
+        jobs = shownJobs(limit: limit).map { ImportRowView($0, model: model) }
+        for job in jobs { addSubview(job) }
+        let hidden = model.imports.rows.count - jobs.count
+        moreJobs.isHidden = hidden <= 0
+        moreJobs.stringValue = hidden > 0 ? Strings.counted(.importMore, hidden) : ""
+        dismissAll.isHidden = hidden <= 0 || !model.imports.rows.contains(where: \.isOver)
         // "The folder rail shows the default import folder pinned at the top, then the media root's folders as a tree."
         var rows: [RowView] = []
         var all = RowContent(title: Strings.text(.poolAllMedia), isSelected: filter.folder == nil)
@@ -624,7 +866,18 @@ final class PoolView: Surface {
             content.spoken = folder
             let row = RowView(content)
             row.onClick = { [weak model] _ in model?.setPool { $0.folder = folder } }
+            // "Folders are the user's ...: the pool makes, renames and moves none, and the rail's menu offers Reveal in Finder."
+            row.makeMenu = { [weak self] in
+                let menu = NSMenu()
+                menu.addItem(ClosureMenuItem(title: Strings.text(.menuReveal)) { self?.host?.reveal(mediaFolder: folder) })
+                return menu
+            }
             rows.append(row)
+        }
+        allRow.makeMenu = { [weak self] in
+            let menu = NSMenu()
+            menu.addItem(ClosureMenuItem(title: Strings.text(.menuReveal)) { self?.host?.reveal(mediaFolder: "") })
+            return menu
         }
         rail.set(rows)
         rail.isHidden = collapsed
@@ -643,6 +896,7 @@ final class PoolView: Surface {
                     self.model.select(media: tile.id)
                 }
             }
+            view.makeMenu = { [weak self, weak view] in self?.tileMenu(for: tile.id, at: view) }
             return view
         }
         for tile in tiles { document.addSubview(tile) }
@@ -675,9 +929,28 @@ final class PoolView: Surface {
         sort.frame = NSRect(x: right - 104, y: 7, width: 104, height: 26)
         kind.frame = NSRect(x: sort.frame.minX - 72, y: 7, width: 72, height: 26)
         search.frame = NSRect(x: 104, y: 8, width: max(60, min(220, kind.frame.minX - 116)), height: 24)
+        // Under the controls: what was tried and couldn't be, or the selected item's details; then the imports.
+        var top = Self.headerHeight
+        if !notice.isHidden {
+            notice.frame = NSRect(x: 16, y: top - 2, width: w - 32, height: 16)
+            top += 18
+        } else if !details.isHidden {
+            details.frame = NSRect(x: 16, y: top - 2, width: w - 32, height: 15)
+            top += 18
+        }
+        for job in jobs {
+            job.frame = NSRect(x: 16, y: top, width: w - 30, height: ImportRowView.height)
+            top += ImportRowView.height
+        }
+        if !moreJobs.isHidden {
+            let allWidth = dismissAll.isHidden ? 0 : dismissAll.fitting.width
+            dismissAll.frame = NSRect(x: w - 14 - allWidth, y: top + 1, width: allWidth, height: 20)
+            moreJobs.frame = NSRect(x: 16, y: top + 3, width: max(0, w - 46 - allWidth), height: 15)
+            top += ImportRowView.height
+        }
         let railWidth: CGFloat = rail.isHidden ? 0 : 150
-        rail.frame = NSRect(x: 0, y: Self.headerHeight, width: railWidth, height: max(0, bounds.height - Self.headerHeight))
-        scroll.frame = NSRect(x: railWidth, y: Self.headerHeight, width: w - railWidth, height: max(0, bounds.height - Self.headerHeight))
+        rail.frame = NSRect(x: 0, y: top, width: railWidth, height: max(0, bounds.height - top))
+        scroll.frame = NSRect(x: railWidth, y: top, width: w - railWidth, height: max(0, bounds.height - top))
         let width = scroll.contentSize.width
         let gap: CGFloat = 10
         var x: CGFloat = 12
@@ -697,6 +970,13 @@ final class PoolView: Surface {
         super.draw(dirtyRect)
         Palette.hairline.setFill()
         NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+        // Files held over the pool that it would take.
+        if isMarked {
+            Palette.selection.setStroke()
+            let path = NSBezierPath(rect: bounds.insetBy(dx: 1.5, dy: 1.5))
+            path.lineWidth = 2
+            path.stroke()
+        }
     }
 
     // "Double-click toggles collapsed and default."

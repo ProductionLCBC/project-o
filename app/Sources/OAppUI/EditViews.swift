@@ -272,7 +272,7 @@ final class PromptView: Surface {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    private func add(_ label: String, _ control: NSView, none: NSButton? = nil) {
+    func addRow(_ label: String, _ control: NSView, none: NSButton? = nil) {
         let name = Kit.label(label, size: 11.5, color: Palette.dimText)
         rows.append((name, control, none))
         addSubview(name)
@@ -294,7 +294,7 @@ final class PromptView: Surface {
         field.action = #selector(ClosureTarget.fire)
         targets.append(returned)
         field.onEscape = { [weak self] in self?.onClose?() }
-        add(label, field)
+        addRow(label, field)
         return field
     }
 
@@ -327,7 +327,7 @@ final class PromptView: Surface {
         picker.calendar = Calendar(identifier: .gregorian)
         picker.timeZone = TimeZone(identifier: "UTC")
         picker.font = .systemFont(ofSize: 12.5)
-        add(label, picker)
+        addRow(label, picker)
         return picker
     }
 

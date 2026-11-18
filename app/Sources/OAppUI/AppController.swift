@@ -2,6 +2,7 @@
 
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import OApp
 import OCore
 
@@ -54,6 +55,8 @@ final class AppController {
         windowController.banner.onRestart = { [weak self] in self?.askToRestart() }
         // Spec 10 §4 — "every confirmation and file dialog is a sheet on the main window".
         model.confirm = { [weak self] confirmation, answer in self?.ask(confirmation, answer) }
+        windowController.regions.chooseFiles = { [weak self] choice, answer in self?.chooseFiles(choice, answer) }
+        windowController.regions.reveal = { url in NSWorkspace.shared.activateFileViewerSelecting([url]) }
         releaser.onRaised = { [weak self] raised in self?.raiseWindow(raised) }
         // "If the engine doesn't answer within two seconds, the window stays raised with the not-responding banner (§2)".
         releaser.onSilent = { [weak self] in self?.supervisor?.engineIsSilent() }
@@ -98,6 +101,12 @@ final class AppController {
         // Spec 10 §13 — the app starts a first run when the machine root has no `machine.json` yet.
         model.isFirstRun = roots.isFirstRun
         windowController.regions.machineRoot = roots.machine
+        // Spec 8 §3, "Staged" — a file from outside the folders the engine reads is copied into the staging folder first.
+        if let staging = FileStager.standardFolder {
+            model.imports.stager = FileStager(staging: staging) { [weak self] in
+                [roots.library, roots.machine] + (self?.model.mediaRoot(machineRoot: roots.machine).map { [$0] } ?? [])
+            }
+        }
         self.supervisor = supervisor
         supervisor.start()
         phaseChanged(supervisor.phase)
@@ -163,6 +172,38 @@ final class AppController {
     /// The window a new sheet goes on: the main window, or the sheet already on it.
     private var sheetParent: NSWindow {
         windowController.window.attachedSheet ?? windowController.window
+    }
+
+    // MARK: - File dialogs (Spec 10 §4, §6)
+
+    /// How a file dialog is put up, as a seam, as `presentAlert` is: "every
+    /// confirmation and file dialog is a sheet on the main window".
+    var presentOpenPanel: @MainActor (NSOpenPanel, NSWindow, @escaping @MainActor ([URL]) -> Void) -> Void = { panel, window, answer in
+        panel.beginSheetModal(for: window) { response in
+            MainActor.assumeIsolated { answer(response == .OK ? panel.urls : []) }
+        }
+    }
+
+    /// Spec 10 §6 — Import… "(⌘I, a file dialog)" takes any number of files
+    /// and folders (Spec 8 §3, "A dropped folder"); Replace with… takes one
+    /// file. The dialog offers what the pool can hold: video, stills and
+    /// sound. What the engine can't play it still refuses, with its reason.
+    func chooseFiles(_ choice: FileChoice, _ answer: @escaping @MainActor ([String]) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.movie, .image, .audio]
+        switch choice {
+        case .importMedia:
+            panel.canChooseDirectories = true
+            panel.allowsMultipleSelection = true
+            panel.prompt = Strings.text(.importChoose)
+        case .replace(let name):
+            panel.canChooseDirectories = false
+            panel.allowsMultipleSelection = false
+            panel.prompt = Strings.text(.replaceChoose)
+            panel.message = Strings.text(.replaceMessage, name)
+        }
+        presentOpenPanel(panel, sheetParent) { urls in answer(urls.map(\.path)) }
     }
 
     // MARK: - First run (Spec 10 §13)

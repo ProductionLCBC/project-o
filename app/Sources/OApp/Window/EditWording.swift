@@ -74,6 +74,7 @@ public enum EditWording {
         case .missing: return Strings.text(.cannotMissing)
         case .removed: return Strings.text(.cannotRemoved)
         case .fire(let refusal): return ShowWording.refusal(refusal)
+        case .dropOnThePool: return Strings.text(.cannotDropOnThePool)
         case .later: return Strings.text(.unavailableLater)
         }
     }
