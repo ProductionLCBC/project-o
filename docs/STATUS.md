@@ -28,7 +28,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | in progress | In progress on `area/show` since 2026-11-17: Adam approved the plan that day and lifted the bench-run gate for this area alone (Spec 4 §15 says so since that day; the DeckLink and capture lines, and the late-text and memory lines the soak of 2026-11-16 failed, are still owed before Area 7 and the pilot). His answers with the plan: Area 13 builds §13's app side, the first-run sheet and the first window's line (its block and Spec 10 §16 say so); the app's code is targets of the root package under `app/`, with the Xcode project a thin shell, so `swift test` stays the one gate; three changes outside `app/` are allowed, none changing what the engine does (the Mach client moved into a small module, `OMach`; the cue-view fold with the chip states in OCore, which the thumbnail job then calls; the key-name grammar in OCore); the look is proposed as a mockup at the first stop, clean, modern and dark, since the clickable demo isn't in the repository; the restart rule counts a sliding two minutes, with exit status 4 retried and status 2 stopping at the first-run sheet; a list whose number another shares has its edits disabled as well as its firing; and the drags get no menu items, since their commands exist for a key binding. It stops for review after the engine connection, after the grid and the strip, and after the keys, and has been at the second of those stops since 2026-11-17, with the engine connection and the window's regions built (288ba5a, `swift test` green) and the drawn look, what of stage 2 is still to build and stage 3's readings waiting on Adam (Now, below). The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `main` since Area 19: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | in progress | In progress on `area/show` since 2026-11-17: Adam approved the plan that day and lifted the bench-run gate for this area alone (Spec 4 §15 says so since that day; the DeckLink and capture lines, and the late-text and memory lines the soak of 2026-11-16 failed, are still owed before Area 7 and the pilot). His answers with the plan: Area 13 builds §13's app side, the first-run sheet and the first window's line (its block and Spec 10 §16 say so); the app's code is targets of the root package under `app/`, with the Xcode project a thin shell, so `swift test` stays the one gate; three changes outside `app/` are allowed, none changing what the engine does (the Mach client moved into a small module, `OMach`; the cue-view fold with the chip states in OCore, which the thumbnail job then calls; the key-name grammar in OCore); the look is proposed as a mockup at the first stop, clean, modern and dark, since the clickable demo isn't in the repository; the restart rule counts a sliding two minutes, with exit status 4 retried and status 2 stopping at the first-run sheet; a list whose number another shares has its edits disabled as well as its firing; and the drags get no menu items, since their commands exist for a key binding. It stops for review after the engine connection, after the grid and the strip, and after the keys, and has been at the third of those stops since 2026-11-17, with the engine connection, the window's regions and the keys built (19b5317, `swift test` green) and the keys' readings, a question about presses made while the engine is silent, and a try of the keys on his roots waiting on Adam (Now, below). The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `main` since Area 19: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
@@ -40,15 +40,16 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 13, show-mode UI, is at its second stop for review on `area/show`** (288ba5a,
-pushed; `swift test` green there on 2026-11-17, 1722 tests with 2 skipped; the hosted
-runner passed 9a78501, three commits earlier, which holds every region; and the app builds
-and signs under `xcodebuild` on this Mac since Adam ran Xcode's first launch). Adam
-approved its plan on 2026-11-17 and lifted the bench-run gate for this area alone, on his
-word and with the date, in each place the gate is written (Spec 4 §15,
-`docs/build-order.md`, Spec 10 §16, `app/README.md`).
+**Area 13, show-mode UI, is at its third stop for review on `area/show`, after the keys**
+(19b5317, pushed; `swift test` green there on 2026-11-17, 1844 tests with 2 skipped; the
+hosted runner passed that commit, its macOS job and the Linux job that holds OCore to no
+Apple framework; and the app builds and signs under `xcodebuild` on this Mac, with the
+release engine inside it). Adam approved its
+plan on 2026-11-17 and lifted the bench-run gate for this area alone, on his word and with
+the date, in each place the gate is written (Spec 4 §15, `docs/build-order.md`, Spec 10
+§16, `app/README.md`).
 
-Two of its four stages are built. The engine connection (Spec 10 §2, §3 and §13's sheet)
+Three of its four stages are built. The engine connection (Spec 10 §2, §3 and §13's sheet)
 passed its stop the same day, with Adam's answers there applied: the banner counts the
 engine's ends of the last two minutes; an engine of another build is offered its restart
 in the banner and never in a sheet; the live cue is a red outline with no "Live" tag; the
@@ -60,9 +61,9 @@ tests hold to the spec: the cue-view fold and the chips in OCore, which the engi
 thumbnail job now calls too; the one mapper from actions to commands, tested as §18's
 table; browsing against live, following the live cue, the press rules; both trees, the
 grid, the pool, the preview, the next row with its why-line, the four tabs, the strip, the
-top bar and the whole menu bar; the Mach link for the pictures and the meters; 267 strings
-in the catalog; every control labelled for VoiceOver, and nothing of the app's own wording
-clipped at 1440 by 900 in English or under either pseudolanguage.
+top bar and the whole menu bar; the Mach link for the pictures and the meters; the string
+catalog (405 strings with the keys'); every control labelled for VoiceOver, and nothing of
+the app's own wording clipped at 1440 by 900 in English or under either pseudolanguage.
 
 Adam answered the stop's report the same day, from two pictures of the drawn window: the
 look is approved as drawn, so Spec 10 §4's "the demo's palette" is to be corrected on the
@@ -82,9 +83,33 @@ load-and-fire group for a playlist that wasn't loaded among them. He reported tw
 both fixed on the branch with a test that reproduced each (288ba5a): the top bar's
 countdown cut to an ellipsis, and the window opening with the cursor in the library's
 search field. His own motion backgrounds are in that copy for the next try, and nowhere
-in the repository. The session is waiting on his word to go on; stage 2's unbuilt pieces
-and the §4 correction are still to do. His eight answers with the plan are in row 13
-above. Nothing is in review for a merge.
+in the repository. He tried it again and wrote "looking good overall now. Continue", so
+stage 2's unbuilt pieces and the §4 correction went in (8fa5340: the dividers, the window
+keeping off an output's screen, an output's details, Show in Library, Hold on the armed
+cue, and Spec 10 §4 naming the app's colours), and then the keys.
+
+The keys (Spec 10 §9) are the third stage, built the same day in two commits (afd5a1f,
+19b5317). Key names are a grammar in OCore, the one change to `core/` the plan allowed for
+this stage: the spec's 98 names, the modifiers in the order `ctrl`, `alt`, `shift`, and
+the ten reserved chords. The app reads every key before a window does and sends it where
+§9's order says: a binding's command with source `key` on the first press only; digits
+into the go-to field and `cue N` on Return; Escape by the rule of the field it is in; and
+everything else left to the field, the sheet, the file dialog or the menus. With it came
+the keys overlay (?, Help ▸ Keys, ⌘/), with each binding drawn as the keyboard layout
+prints it beside its command's plain name, the fixed keys and the two safeguards; the top
+bar's line over a focused field; the command bar, shown when `commandBar` is on; and
+⌃⌥⌘⎋ as a system-wide key and as Help's entry, which raises the window at once and keeps
+it raised until an engine answers. One fault of stage 2's was found and fixed on the way:
+after an engine went silent and then answered again, the window never sent to it again;
+which engine the window drives is now a tested rule of its own. What waits on Adam at
+this stop: the readings the keys took where §9 left room (his form has them, the plain
+names of the commands among them); whether a press made while the engine isn't
+responding is dropped, as built, or left to wait for it; and a try of the keys on his own
+roots, for which the app is rebuilt with the release engine, since his second run's debug
+engine missed frames under his 1080p backgrounds. The last stage is still to build: the
+edits of §10, drops from the Finder and a pool tile onto a strip cell, §14's sheets and
+tags, the notes, `view.json`, and §15's pass. His eight answers with the plan are in row
+13 above. Nothing is in review for a merge.
 
 Everything else is on `main`. Area 19, engine API and first run, shipped on 2026-11-16
 (73ab889). A display-only soak then ran on Adam's word and failed three lines: three hours
