@@ -21,14 +21,14 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | shipped |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | shipped |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | shipped |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | shipped |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | shipped |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started |
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started |
 | 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | shipped |
 
-Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15. Lifted for Area 13 on Adam's word, 2026-11-17 (Spec 4 §15); Areas 14, 10, 17 and 18, and Area 7's bench verification, still wait for the bench run.
+Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15. Lifted for Area 13 on Adam's word, 2026-11-17, and for Area 14 on his word, 2026-11-18 (Spec 4 §15); Areas 10, 17 and 18, and Area 7's bench verification, still wait for the bench run.
 
 ## v1.5 — after the pilot
 
@@ -333,8 +333,9 @@ Area: 14, edit mode. Spec: docs/specs/11-edit-mode.md §1–§4 and §6–§11, 
 and feel where the spec is silent, asking before guessing; Spec 5 §2 and §4–§6 for the
 edits, when they show, their checks and inverses, Spec 6 §2–§4 for stacks, presets and
 text styles, Spec 4 §10 for the thumbnail job, and Spec 10 §2–§4, §9, §10 and §15 for
-the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged, and so
-after the bench run. On main: Spec 5's edit path with the list, cue, folder and playlist
+the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged; the
+bench-run gate (Spec 4 §15) was lifted for this area on Adam's word, 2026-11-18. On
+main: Spec 5's edit path with the list, cue, folder and playlist
 edits and the move by position (Area 9), the thumbnail job that draws a cue's projected
 state with the normal stack pass (Area 5), the API's queries with their answer shape
 (Area 19), and the app's window, models and scripted engine (Area 13). Build the engine

@@ -29,7 +29,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | merged | Adam's `approved` on 2026-11-18 as built, with every reading in the brief and its recommended answers; the Spec 10 §14, §15 and §18 corrections applied on the branch (51abfca), `area/show` merged into `main` with `--no-ff` (02bff6f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. He went over the app himself that day and found it generally ok, with problems pausing and seeking to track down later (Needs Adam, Decisions). The last stage's checks on a screen and the system's accessibility audit are still owed: display tests are paused on his word. Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after the bench run, now that Area 13 is merged. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress | In progress on `area/edit` since 2026-11-18: Adam approved the plan that day and lifted the bench-run gate for this area (cabc1ab; Spec 4 §15, Spec 11 §11, `docs/build-order.md` and `app/README.md` say so since that day, and Areas 10, 17 and 18 and Area 7's bench verification still wait). His four answers with the plan: the gate; a stack is drawn at the size of the output showing it, at a live switch too, so the engine is brought to Spec 4 §5 and a stack switched onto an output of another size is rebuilt on that tick (the larger of the choices offered, and not the one recommended); a box keeps its previous lines until the new raster is ready, for a look edit and for a variable's new value alike, counting nothing late, which also answers the soak's once-a-minute blank clock; and a channel sounding on an audio output is on air, so it can't be deleted, renumbered or swapped until it is cleared. With the plan he approved the spec corrections those take, to go on the branch first (Spec 5 §1 and §2, a channel or stack that is made or deleted gains or loses its ShowState entry; Spec 9 §6, the channel-list bullet goes; Spec 4 §5, §8 and §9; Spec 5 §6, check 7), and the plan's readings: the engine refuses a transition's `create` and `duplicate` and keeps its `type` and `color` read-only; a macro that would leave the machine root on a `readOnlyMasters` machine is `readOnlyLibrary`; a stack's mute of a channel goes with that channel's slot; Edit in Stack Editor's menu entry comes with Area 17's Settings, its way in built here; the Text page shows disabled until Area 10. The order: the engine side first (the `core/` fix of a machine-level renumber, wider than Housekeeping recorded; the edits with their checks, warnings and inverses; resources rebuilt between ticks; `render` and `uses`), then a stop for review with a mockup of the edit bar and the Cues page; the frame and the Cues page, and a stop; the stack editor, the channel sheet and the preset editor, and a stop; then the small editors and the brief. It changes the frame path, so a green soak is owed before its merge, in a window Adam sets. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
@@ -40,20 +40,21 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 13, show-mode UI, shipped on 2026-11-18**, on Adam's `approved`: as built, with
-every reading in the brief and its recommended answers, and with the Spec 10 §14, §15 and
-§18 corrections applied on the branch first (51abfca). `area/show` is merged into `main`
-with `--no-ff` (02bff6f) and `swift test` is green on the merged tree. Project O now has
-its app: targets of the root package under `app/` behind a thin Xcode shell that embeds
-the engine, with show mode as Spec 10 §1 to §10, §14 and §15 have it. No area is in
-progress, and nothing is in review.
+**Area 14, edit mode, is in progress on `area/edit`.** Adam approved its plan on
+2026-11-18 and lifted the bench-run gate for this area, on his word and with the date, in
+each place the gate is written (Spec 4 §15, Spec 11 §11, `docs/build-order.md`,
+`app/README.md`; cabc1ab). The session has started on its first stage, the engine side,
+which opens with the spec corrections the plan names and the `core/` fix of a
+machine-level renumber; no code is on the branch yet. His four answers with the plan are
+in row 14 above. Nothing is in review.
 
-Adam went over the app himself before approving, on his try-out roots, and found it
-generally ok. He reported problems pausing and seeking, to be tracked down later. Seeking
-is not in v1: the transport's bar shows position only (Spec 10 §7, choice U-5). Pausing
-should work, and the engine's log of his try has every pause, play and stop he pressed
-answered `ok`, so what went wrong came after the command and is not in the logs (Needs
-Adam, Decisions).
+Everything else is on `main`. Area 13, show-mode UI, shipped on 2026-11-18 (02bff6f), on
+Adam's `approved`. He went over the app himself before approving, on his try-out roots,
+and found it generally ok. He reported problems pausing and seeking, to be tracked down
+later. Seeking is not in v1: the transport's bar shows position only (Spec 10 §7, choice
+U-5). Pausing should work, and the engine's log of his try has every pause, play and stop
+he pressed answered `ok`, so what went wrong came after the command and is not in the logs
+(Needs Adam, Decisions).
 
 Two things of Area 13's are still owed, and both wait on his word, since display tests
 are paused ("still no display tests at this time", 2026-11-18). The last stage was never
@@ -62,13 +63,13 @@ dialog, the tags' lists, the banner, and the keyboard's focus are proved by `swi
 with the views laid out offscreen. And the system's accessibility audit of Spec 10 §18 is
 not built: it is a UI test under `xcodebuild`, which takes the keyboard and the screen.
 
-Area 14, edit mode, is next and waits for the bench run with the card, which Adam has
-deferred to a window he sets aside; the gate was lifted for Area 13 alone. Still owed
-from before, with that run's DeckLink and capture lines, are the two failures of the
-display-only soak of 2026-11-16: the confidence stack's clock draws nothing for one frame
-as each minute changes, and the engine's in-memory command log is still filling at three
-hours (Needs Adam, Decisions). Both are owed before Area 7 and the pilot. The bench run
-still gates Areas 14, 10, 17 and 18 and Area 7's bench verification.
+The bench run with the card stays deferred to a window Adam sets aside; it still gates
+Areas 10, 17 and 18 and Area 7's bench verification. Still owed from before, with that
+run's DeckLink and capture lines, are the two failures of the display-only soak of
+2026-11-16: the confidence stack's clock draws nothing for one frame as each minute
+changes, which Area 14 now fixes on Adam's answer of 2026-11-18, and the engine's
+in-memory command log is still filling at three hours (Needs Adam, Decisions). Both are
+owed before Area 7 and the pilot.
 
 ## Needs Adam
 
@@ -113,11 +114,12 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
     says of any missing cache entry). On a screen that is the clock missing for one frame a
     minute; read from the code and the count, not seen on a capture. A timer's box changes
     each second by the same path. Spec 4 §8 says a variable's new raster replaces the old
-    and that late text should read zero, and not how the two meet. Recommended: the box
-    keeps drawing its previous lines until the new raster is ready, the rule §9 already has
-    for an edit, and such a change counts nothing late; the alternative is to rasterize a
-    clock's next value a second ahead. Which change since 2026-11-02 brought it in was not
-    found.
+    and that late text should read zero, and not how the two meet. Answered by Adam on
+    2026-11-18, with the Area 14 plan: the box keeps drawing its previous lines until the
+    new raster is ready, for a variable's new value as for a look edit, and such a change
+    counts nothing late. Area 14 builds it and corrects Spec 4 §8 and §9 on its branch; it
+    stays owed until a soak counts no late text. Which change since 2026-11-02 brought it
+    in was not found.
   - *Memory, both lines.* The heap's live bytes rose slowly all run, from 78 MB to 86 MB by
     the five-minute medians, and the footprint less graphics from 316 MB to 334 MB, each
     past §13's limit. The heap's rise is the command log the engine keeps in memory, its
@@ -254,9 +256,11 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
   root goes. To fix in a tooling session, as Adam's answer to the Area 9 brief took.
 - **A bug outside Area 6:** renumbering a stack (`Identity` in `core/`) also moves every
   preset's layout for that stack number, where Spec 1 §4 says only machine-root references
-  follow a stack and the edit warns about portable ones. Stack edits are `notInV1`, so
-  nothing reaches it yet; it wants a fix in `core/` before Area 14 opens them, or a
-  renumbered stack 2 carries Preset 1's confidence layout with it.
+  follow a stack and the edit warns about portable ones. Stack edits are `notInV1` on
+  `main`, so nothing reaches it yet. Area 14 fixes it first on its branch, and it is wider
+  than this: for a stack, output, audio output or input the same code also rewrites list
+  cues, library macros and channels' `audioOutputs`, where Spec 5 §4 has only the machine
+  root follow.
 - **DM Sans on the dev and bench Mac.** It is installed there, as a variable font and as
   LCBC's static faces, so the engine uses the installed copy and logs the clash once at
   launch (T-7); the bundled copy draws where DM Sans isn't installed. The font tests inject
@@ -264,7 +268,8 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
   dependencies from the block's "Starts after" line. Area 12's, Area 13's and Area 19's
-  tasks are `shipped`, and Area 14's carries its block as changed on 2026-11-15.
+  tasks are `shipped`, and Area 14's is `in progress` and carries its block as changed on
+  2026-11-18, when its gate was lifted.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -403,10 +408,10 @@ his answers at the stops (70ce361, 8fa5340, a73e9ce, dc2859e).
 
 ## Next
 
-**Area 14 — Edit mode** (branch `area/edit`) is next. Area 13, which it follows, is merged;
-it still waits for the bench run with the card, which Adam has deferred to a window he
-sets aside, since the gate was lifted for Area 13 alone. It runs in its own session from the common
-preamble in `docs/build-order.md` and its own block there, verbatim:
+**Area 14 — Edit mode** (branch `area/edit`) is in progress; the bench-run gate was
+lifted for it on Adam's word, 2026-11-18, and Area 13, which it follows, is merged. It
+runs in its own session from the common preamble in `docs/build-order.md` and its own
+block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -428,8 +433,9 @@ Area: 14, edit mode. Spec: docs/specs/11-edit-mode.md §1–§4 and §6–§11, 
 and feel where the spec is silent, asking before guessing; Spec 5 §2 and §4–§6 for the
 edits, when they show, their checks and inverses, Spec 6 §2–§4 for stacks, presets and
 text styles, Spec 4 §10 for the thumbnail job, and Spec 10 §2–§4, §9, §10 and §15 for
-the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged, and so
-after the bench run. On main: Spec 5's edit path with the list, cue, folder and playlist
+the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged; the
+bench-run gate (Spec 4 §15) was lifted for this area on Adam's word, 2026-11-18. On
+main: Spec 5's edit path with the list, cue, folder and playlist
 edits and the move by position (Area 9), the thumbnail job that draws a cue's projected
 state with the normal stack pass (Area 5), the API's queries with their answer shape
 (Area 19), and the app's window, models and scripted engine (Area 13). Build the engine
@@ -461,11 +467,12 @@ frame and the Cues page, and after the preset editor.
   the string catalog and its script; and the ways into the later areas, each there and
   disabled until its area turns it on: Edit and Edit Cue (Area 14), Open in Text Editor
   (Area 10), Settings… and Bind a Key… (Area 17), Lock Station and the lock tag (Area 18).
-- **The app's areas.** 14 follows 13, 10 follows 14, 17 follows 13 and 14, and 18 follows
-  17, each still after the bench run as its block says.
+- **The app's areas.** 14 follows 13 and is in progress, its gate lifted; 10 follows 14,
+  17 follows 13 and 14, and 18 follows 17, each still after the bench run as its block
+  says.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
-  machine root copied again from the spike fixtures first. It must pass before Areas 14,
-  10, 17 and 18 start and before Area 7's bench verification, and its DeckLink and capture
+  machine root copied again from the spike fixtures first. It must pass before Areas 10,
+  17 and 18 start and before Area 7's bench verification, and its DeckLink and capture
   lines are owed before the pilot.
 - **Spec 5 has no area of its own.** Its engine side landed with Area 9 (the edit path, the
   writer and changes on disk), Area 8 (the media edits and the defaults edits) and Area 12
