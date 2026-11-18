@@ -42,7 +42,7 @@ final class StateViewTests: XCTestCase {
     // MARK: - The tags (Spec 10 §8, §14)
 
     /// "amber "Unsaved (3)" when documents have waited more than five
-    /// seconds to be written ... A click lists what is waiting, with Reveal
+    /// seconds to be written ... A click lists how many documents are waiting ..., with Reveal
     /// in Finder for the machine folder."
     func test_theSavingTagShowsAfterItsWaitAndAClickListsWhatWaits() throws {
         let rig = try Rig()

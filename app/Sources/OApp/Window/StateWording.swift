@@ -17,7 +17,8 @@ public enum StateWording {
         }
     }
 
-    /// "A click lists what is waiting": a line for the documents, one for
+    /// "A click lists how many documents are waiting, how the disk stands and
+    /// whether the log is in memory": a line for the documents, one for
     /// the disk when it isn't well, one for the log when it is in memory.
     public static func saving(_ details: SavingDetails) -> [String] {
         var lines = [details.waiting > 0 ? Strings.counted(.topTagSaving, details.waiting) : Strings.text(.savingWritten)]

@@ -99,7 +99,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             if self.model.settings.tabbedPanelCollapsed { self.model.change { $0.tabbedPanelCollapsed = false } }
             self.tabs.show(.popups)
         }
-        // "A click lists what is waiting, with Reveal in Finder for the machine folder" (Spec 10 §14).
+        // "A click lists how many documents are waiting ..., with Reveal in Finder for the machine folder" (Spec 10 §14).
         topBar.onRevealMachine = { [weak self] in
             if let root = self?.machineRoot { self?.reveal?(root) }
         }

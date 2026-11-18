@@ -300,7 +300,8 @@ final class TopBarView: Surface {
         return menu
     }
 
-    /// "A click lists what is waiting, with Reveal in Finder for the machine folder."
+    /// "A click lists how many documents are waiting, how the disk stands and whether the log is in memory, with
+    /// Reveal in Finder for the machine folder".
     var savingMenu: NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false

@@ -28,7 +28,8 @@ public enum SavingTag: Equatable, Sendable {
     public var isRed: Bool { self == .diskFull }
 }
 
-/// Spec 10 §14 — "A click lists what is waiting": the engine's `saving`
+/// Spec 10 §14 — "A click lists how many documents are waiting, how the
+/// disk stands and whether the log is in memory": the engine's `saving`
 /// topic counts the documents and doesn't name them (Spec 9 §7), so the list
 /// says how many wait, how the disk stands and where the log goes.
 public struct SavingDetails: Equatable, Sendable {
