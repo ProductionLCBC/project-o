@@ -28,7 +28,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
-| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | in progress | In progress on `area/show` since 2026-11-17: Adam approved the plan that day and lifted the bench-run gate for this area alone (Spec 4 §15 says so since that day; the DeckLink and capture lines, and the late-text and memory lines the soak of 2026-11-16 failed, are still owed before Area 7 and the pilot). His answers with the plan: Area 13 builds §13's app side, the first-run sheet and the first window's line (its block and Spec 10 §16 say so); the app's code is targets of the root package under `app/`, with the Xcode project a thin shell, so `swift test` stays the one gate; three changes outside `app/` are allowed, none changing what the engine does (the Mach client moved into a small module, `OMach`; the cue-view fold with the chip states in OCore, which the thumbnail job then calls; the key-name grammar in OCore); the look is proposed as a mockup at the first stop, clean, modern and dark, since the clickable demo isn't in the repository; the restart rule counts a sliding two minutes, with exit status 4 retried and status 2 stopping at the first-run sheet; a list whose number another shares has its edits disabled as well as its firing; and the drags get no menu items, since their commands exist for a key binding. It stops for review after the engine connection, after the grid and the strip, and after the keys, and passed the third of those stops on 2026-11-17, with the engine connection, the window's regions and the keys built (19b5317, `swift test` green) and Adam's answers there taken (Now, below); its last stage, the edits, the drops, the restores and §15's pass, is under way. The clears tab's tiles send the commands Area 15's tests prove (Spec 10 §7), the app maps keys to commands sent with source `key` (§9), the pool tab and the staging copy for drops build on Area 8's import, topic and queries, and the restore sheets, Undo and Redo and the saving badge read what Area 12 publishes (the two queries, the `history` and `saving` topics). The engine side it talks to is on `main` since Area 19: the local socket, §3's topics, queries and requests, the Mach channel with the previews, the channel pictures and the meters, first run, and the relaunch rule. |
+| 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | brief waiting for approval | Brief written 2026-11-18, the final message of the Area 13 session; code on `area/show` (a506438, pushed), `swift test` green there, and the app builds and signs under `xcodebuild` with the release engine inside it. Built in stages with the stops its block names, each of which Adam saw and answered on 2026-11-17: the engine connection with the first-run sheet (Spec 10 §2, §3, §13); the window and its regions (§4 to §8), approved as drawn and tried by him against a real engine; the keys (§9); and then, with no further stop, the edits of §10 with Undo and Redo, the drags, the drops of pool tiles and of the Finder's files (U-8), the pool's imports and tile menu, `view.json`, the notes, §14's tags, banner and sheets, and §15's announcements, keyboard focus, contrast and motion. Spec 10 §2, §4, §5 and §6 are corrected on the branch from his answers at the stops. His answers with the plan stand: Area 13 builds §13's app side, the first-run sheet and the first window's line (its block and Spec 10 §16 say so); the app's code is targets of the root package under `app/`, with the Xcode project a thin shell, so `swift test` stays the one gate; three changes outside `app/` are allowed, none changing what the engine does (the Mach client moved into a small module, `OMach`; the cue-view fold with the chip states in OCore, which the thumbnail job then calls; the key-name grammar in OCore); the look is proposed, clean, modern and dark, since the clickable demo isn't in the repository; the restart rule counts a sliding two minutes, with exit status 4 retried and status 2 stopping at the first-run sheet; a list whose number another shares has its edits disabled as well as its firing; and the drags get no menu items, since their commands exist for a key binding. The last stage was built on his word of 2026-11-18 that nothing run on a screen that day, so it is proved offscreen only, and the system's accessibility audit is not built (Needs Adam). Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. The bench-run gate was lifted for this area alone (Spec 4 §15 says so since 2026-11-17); the DeckLink and capture lines, and the late-text and memory lines the soak of 2026-11-16 failed, are still owed before Area 7 and the pilot. |
 | 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 13, and so after the bench run. Its macro edits refuse a cycle or a nest past the cap with the one check Area 15 built (`MacroCalls`, on `main`); its edits extend the editor Area 9 built, and its slot and preset edits (Spec 5 §3 and §6, `notInV1` until then) meet Area 6's rules: one slot per channel, and the warning that counts boxes at offset 0. Since 2026-11-15 its block also has it rebuild the channel list between ticks, which lifts the `notInV1` Area 12's snapshot restore answers for a snapshot with another channel list. Area 19's Mach channel has the entry points it calls when it rebuilds the channel list: the surfaces sent again, and a removed channel named. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
@@ -40,77 +40,40 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 
 ## Now
 
-**Area 13, show-mode UI, is past its third stop for review on `area/show`, the keys, and on
-its last stage** (19b5317, pushed; `swift test` green there on 2026-11-17, 1844 tests with 2 skipped; the
-hosted runner passed that commit, its macOS job and the Linux job that holds OCore to no
-Apple framework; and the app builds and signs under `xcodebuild` on this Mac, with the
-release engine inside it). Adam approved its
-plan on 2026-11-17 and lifted the bench-run gate for this area alone, on his word and with
-the date, in each place the gate is written (Spec 4 §15, `docs/build-order.md`, Spec 10
-§16, `app/README.md`).
+**Area 13, show-mode UI, is built and its brief waits for Adam's `approved`** (the final
+message of the Area 13 session, 2026-11-18). The code is on `area/show` (a506438, pushed);
+`swift test` is green there, the hosted runner passed the commits before it, and the app
+builds and signs under `xcodebuild` on this Mac with the release engine inside it. Nothing
+of it is on `main` but the status documents and the gate's record.
 
-Three of its four stages are built. The engine connection (Spec 10 §2, §3 and §13's sheet)
-passed its stop the same day, with Adam's answers there applied: the banner counts the
-engine's ends of the last two minutes; an engine of another build is offered its restart
-in the banner and never in a sheet; the live cue is a red outline with no "Live" tag; the
-look is the mockup's layout, drawn cleaner (Spec 10 §2, §5 and §6 corrected on the branch).
-The last of stage 1's three proofs ran on his go: three seconds of the engine embedded in
-the Xcode-built app, with the build folder's shaders and fonts moved away. The window and
-its regions (Spec 10 §4 to §8, §13's first-window line) are drawn over models that the
-tests hold to the spec: the cue-view fold and the chips in OCore, which the engine's
-thumbnail job now calls too; the one mapper from actions to commands, tested as §18's
-table; browsing against live, following the live cue, the press rules; both trees, the
-grid, the pool, the preview, the next row with its why-line, the four tabs, the strip, the
-top bar and the whole menu bar; the Mach link for the pictures and the meters; the string
-catalog (405 strings with the keys'); every control labelled for VoiceOver, and nothing of
-the app's own wording clipped at 1440 by 900 in English or under either pseudolanguage.
+It was built in four stages. The first three each ended at a stop Adam saw and answered
+on 2026-11-17: the engine connection with the first-run sheet (Spec 10 §2, §3, §13); the
+window and its regions (§4 to §8), which he approved as drawn and then tried himself
+against a real engine under `/tmp/o-try`, twice, the second time writing "looking good
+overall now"; and the keys (§9), where he took the readings as chosen and answered that a
+press made while the engine isn't responding is dropped and the controls show disabled
+with the reason. Spec 10 §2, §4, §5 and §6 are corrected on the branch from those answers.
 
-Adam answered the stop's report the same day, from two pictures of the drawn window: the
-look is approved as drawn, so Spec 10 §4's "the demo's palette" is to be corrected on the
-branch to name the app's colours; what of stage 2's list is not built yet goes before the
-keys (dragging the column dividers and the pool's divider, the window moving off an
-output's screen, an output's full details, the items' own menus), with a pool tile onto a
-strip cell left for the drops' stage; and the readings of stage 2 and of stage 3 are taken
-as chosen. He did not tick pushing `main`, so it is not pushed.
+The fourth stage ran without a stop, as the block has it, on 2026-11-18: the edits of §5,
+§6 and §10 with their menus, fields in place, small panels, questions before a delete or
+a restore, rejection sentences, and Undo and Redo named from the history; the drags of
+the trees and the grid; a pool tile on a cue through the list of channels, and on a strip
+cell after its 0.3 seconds; the Finder's files on a cue, a cell and the pool, staged,
+imported and only then written (U-8), with what isn't sent said on the cell; the pool's
+header with its imports, tile size and details, and a tile's menu; `machine/view.json`,
+read at launch and written a second after the last change; the notes `browse` and
+`backToLive`; §14's saving tag, engine tag, last-state banner and snapshots sheet beside
+the versions sheet; and §15's announcements, keyboard focus in the trees, the grid, the
+pool and the strip, Increase Contrast and Reduce Motion. One fault of the stage's own
+early work was found and fixed on the way: a small panel the system closed by itself was
+never forgotten, so the keys stayed with it.
 
-He then ran the app himself against a real engine, the first time it has: on a copy of
-the fixture library under `/tmp/o-try`, its output moved to the second screen. The engine
-refused the copy eleven times first, since the fixture's two outputs are in different rate
-families (Spec 4 §2), which the headless engine of the tests never meets; the app
-restarted it by the rule and showed the banner each time, and with the second output's
-rate changed in the copy it ran. Every command the app sent came back `ok`, the
-load-and-fire group for a playlist that wasn't loaded among them. He reported two faults,
-both fixed on the branch with a test that reproduced each (288ba5a): the top bar's
-countdown cut to an ellipsis, and the window opening with the cursor in the library's
-search field. His own motion backgrounds are in that copy for the next try, and nowhere
-in the repository. He tried it again and wrote "looking good overall now. Continue", so
-stage 2's unbuilt pieces and the §4 correction went in (8fa5340: the dividers, the window
-keeping off an output's screen, an output's details, Show in Library, Hold on the armed
-cue, and Spec 10 §4 naming the app's colours), and then the keys.
-
-The keys (Spec 10 §9) are the third stage, built the same day in two commits (afd5a1f,
-19b5317). Key names are a grammar in OCore, the one change to `core/` the plan allowed for
-this stage: the spec's 98 names, the modifiers in the order `ctrl`, `alt`, `shift`, and
-the ten reserved chords. The app reads every key before a window does and sends it where
-§9's order says: a binding's command with source `key` on the first press only; digits
-into the go-to field and `cue N` on Return; Escape by the rule of the field it is in; and
-everything else left to the field, the sheet, the file dialog or the menus. With it came
-the keys overlay (?, Help ▸ Keys, ⌘/), with each binding drawn as the keyboard layout
-prints it beside its command's plain name, the fixed keys and the two safeguards; the top
-bar's line over a focused field; the command bar, shown when `commandBar` is on; and
-⌃⌥⌘⎋ as a system-wide key and as Help's entry, which raises the window at once and keeps
-it raised until an engine answers. One fault of stage 2's was found and fixed on the way:
-after an engine went silent and then answered again, the window never sent to it again;
-which engine the window drives is now a tested rule of its own. Adam answered the stop's
-report the same day: the keys' fourteen readings are taken as chosen and the commands'
-plain names are good as written; a press made while the engine isn't responding is
-dropped, as built, and the controls are to show disabled with the reason, which goes into
-Spec 10 §2 and the last stage; `main` is pushed on his word; and the session goes on to
-the last stage. The app is rebuilt with the release engine for his next try, since his
-second run's debug engine missed frames under his 1080p backgrounds. Still to build: the
-edits of §10, drops from the Finder and a pool tile onto a strip cell, §14's sheets and
-tags, the notes, `view.json`, and §15's pass; then `/wrap-up` and the brief. His eight
-answers with the plan are in row 13 above. Nothing is in review for a merge.
+Adam's word that day was that nothing run on a screen or an output, so all of the fourth
+stage is proved by `swift test` alone, with the views laid out offscreen: no drag was made
+with a pointer, no popover, sheet or file dialog was seen, VoiceOver was not listened to,
+and Tab was not pressed in a real window. The system's accessibility audit, which the plan
+put under `xcodebuild`, is not built: it needs a UI-test run, which takes the keyboard and
+the screen and two commands only Adam can give. Both are in the brief as his to decide.
 
 Everything else is on `main`. Area 19, engine API and first run, shipped on 2026-11-16
 (73ab889). A display-only soak then ran on Adam's word and failed three lines: three hours
@@ -128,8 +91,36 @@ sets aside; it still gates Areas 14, 10, 17 and 18 and Area 7's bench verificati
 
 ### Briefs waiting for approval
 
-None. The Area 19 brief (the final message of the Area 19 session, 2026-11-16) was answered
-the same day: approved as built, with its recommended answers, merged (73ab889).
+- **Area 13, show-mode UI.** The brief is the final message of the Area 13 session
+  (2026-11-18); the code is on `area/show` (a506438). It asks for:
+  - *`approved`, or changes.* Recommended: try the last stage by hand first (next item),
+    then approve as built with the readings marked "new" below.
+  - *A hands-on try of the last stage.* Nothing of it has been on a screen: the drags and
+    drops, the list of channels, the panels and sheets, Import… and Replace with… with
+    their file dialog, Reveal in Finder, the tags' lists, the banner, and the keyboard's
+    focus with Tab, ⌥ and the arrows, ⌥Return and ⌃Return. The app is rebuilt at a506438
+    with the release engine (`.claude/worktrees/area-show/.build/xcode/Build/Products/Debug/Project O.app`);
+    the try-out roots under `/tmp/o-try` are gone if the Mac restarted since, and are a
+    few commands to make again. Recommended: before `approved`.
+  - *The system's accessibility audit* (Spec 10 §18). Not built: it is a UI test under
+    `xcodebuild`, which takes the keyboard, the mouse and the screen, and this Mac needs
+    `sudo DevToolsSecurity -enable` and
+    `sudo automationmodetool enable-automationmode-without-authentication` once.
+    Recommended: a short session of its own after the merge, on his go; the labels, the
+    spoken states, the focus and the clipping are held by `swift test` meanwhile.
+  - *Drags that have no menu entry.* Reordering a playlist's items, moving a list or a
+    folder, and a pool tile onto a cue are reached without the mouse only through the
+    command bar, since his answer with the plan gave the drags no menu items. Spec 10 §15
+    says every action is reachable without the mouse. Recommended: keep it so for v1 and
+    say so in §15 (corrections, below); the alternative is Move Up, Move Down, Move to
+    Folder ▸ and Write into Cue… in the menus.
+  - *The spec corrections proposed below*, to be applied on the branch before the merge,
+    as Area 19's were. Recommended: each of them.
+  - *A soak before the merge.* The branch changes nothing in what the engine draws: the
+    Mach client moved into its own module, the thumbnail job calls the cue-view fold that
+    now lives in OCore, and the key-name grammar is new there. Recommended: none for the
+    merge; the next soak he sets aside is the first of this code.
+  - *Pushing `main`.* The status commit of this wrap-up is not pushed.
 
 ### Decisions
 
@@ -258,6 +249,20 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
   silent; both outputs at the fixture's 1920 by 1080, not the LED wall's format. The script
   removes its clone of the roots at the end, and the engine's own logs with it, so a copy
   of `machine/logs` was taken every two minutes while it ran.
+- **An app test that timed out once.** `ScriptedEngineTests`' test that sends events to
+  every client waited its five seconds for a client that never connected, once, in one run
+  of the app's tests on 2026-11-17. It passed in twelve reruns of its suites and in every
+  full run since. Nothing was changed for it.
+- **Adam's try-out of the app.** He launches it himself: the Xcode-built app in the Area 13
+  worktree's `.build/xcode`, on roots under `/tmp/o-try`, a copy of the fixture library
+  with its output on the external screen, its second output's rate changed, and his own
+  motion backgrounds, which are licensed and never in the repository. `/tmp` is emptied
+  when the Mac restarts. A debug engine misses frames under his 1080p backgrounds, so the
+  app carries the release engine and no performance reading is taken from a debug one.
+- **UI tests on this Mac** need two commands only Adam can give, once:
+  `sudo DevToolsSecurity -enable` and
+  `sudo automationmodetool enable-automationmode-without-authentication`. They take the
+  keyboard, the mouse and the screen, so they run only on his go.
 - **A thumbnail test that timed out once.** `ThumbnailTests`' warm-the-live-list test waits
   for the thumbnail job on a real GPU; in one full local run during Area 12 it gave up
   before the job finished, and it passed on the next full run and alone. It didn't recur
@@ -280,7 +285,8 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
   dependencies from the block's "Starts after" line. Area 12's and Area 19's tasks are
-  `shipped`, and Area 14's carries its block as changed on 2026-11-15.
+  `shipped`, Area 13's is `in review`, and Area 14's carries its block as changed on
+  2026-11-15.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -308,115 +314,134 @@ the same day: approved as built, with its recommended answers, merged (73ab889).
 
 ### Spec interpretations made so far
 
-None outstanding. Area 19's readings, below, were approved as built on 2026-11-16, with the
-recommended answers, and are recorded here and in its brief. "Adam's answer" marks a
-choice he made on 2026-11-15 before he approved the plan, or on 2026-11-16 at the third stop
-where the row says so; "with the plan" a reading he approved with it; "at stop 1", "at stop
-2" and "at stop 3" one he saw in the report at that stop and let the session go on from; and
-"new" one first named in the brief. Earlier areas' readings were approved with their briefs
-and are in the specs' text, the briefs, or this page as it stood before: Area 12's at
-f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on 2026-11-14; Area 11's at
-4096ede, approved on 2026-11-11; Area 6's at a77bf69; Area 9's at f4b43ac; Area 15's on
-2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and Area 4's in 7032182.
+Area 13's readings, below, wait for the brief's answer. "With the plan" marks a reading
+Adam approved with the plan on 2026-11-17; "at stop 1", "at stop 2" and "at stop 3" one he
+saw in that stop's report that day and took as chosen; and "new" one from the last stage,
+first named in the brief. His own answers with the plan and at the stops are in row 13 and
+in Now. Earlier areas' readings were approved with their briefs and are in the specs'
+text, the briefs, or this page as it stood before: Area 19's at 8a82ec6, approved on
+2026-11-16; Area 12's at f60a952, approved on 2026-11-15; Area 8's at a8e741b, approved on
+2026-11-14; Area 11's at 4096ede, approved on 2026-11-11; Area 6's at a77bf69; Area 9's at
+f4b43ac; Area 15's on 2026-11-10, Area 16's on 2026-11-04, Area 5's on 2026-11-03, and
+Area 4's in 7032182.
 
 | Spec | Left open | Chosen | Alternative |
 | --- | --- | --- | --- |
-| Spec 10 §13, channel 2 | Its render size at first run, where "the fixture library's values" gives a fixed 1920 by 1080 | `largest`, as Spec 1 §9 shows it; Spec 10 §13 corrected on the branch (5e63a20), and the fixture keeps its fixed size (Adam's answer) | The fixture's fixed size |
-| Spec 10 §13, the library | What the first-run library is called | "<campus> Library", from `--campus`, or from the machine's own campus when only the library side is missing; "Library" with no campus (Adam's answer) | A fixed name |
-| Spec 10 §13, a hand launch | A root with no `machine.json`, launched without `--campus` and `--operator-screen` | Refused with a line and nothing written; writing only a missing library side needs neither option (Adam's answer; Spec 10 §13 says so since 6554d0c) | Write with defaults |
-| Spec 4 §11, §12 and Spec 10 §2, audio at launch | Whether the first frame waits for the audio devices | No: they open on a thread of their own, and until a device has opened its outputs are silent on the stand-in that keeps the channels' clocks moving, as for a device that is absent (Adam's answer at stop 3; Spec 4 §12 says so since 6554d0c) | Open them first, as Area 16 built |
-| Spec 10 §3, order | Where a request is answered | At a build boundary; in each build a connection gets its results, then the build's events, then its answers (with the plan) | On the asking thread, which can double an event |
-| Spec 10 §2, `ping` | Who answers | The control side, so a control thread that has stopped shows as not responding (with the plan) | The socket's thread |
-| Spec 2 §9, `commands` | The result of several commands; `group` absent or false | One result, `ok` with the last line's `seq` and `results`, one per command; absent means one group; `false` runs each as its own group (with the plan) | A result per command |
-| Spec 10 §2, `source` | Absent, or not one of the three | Absent is `ui`; anything else is `badValue` (with the plan) | Always `ui` |
-| Spec 10 §3, a slow client | What happens to it | Closed once 4 MB wait for it; it connects again and asks again (with the plan) | Drop its events |
-| Spec 10 §3, `render` and `uses` | Before Area 14 | `notInV1` on the local socket, `localOnly` for `render` on the LAN (with the plan) | `badValue` |
-| Spec 10 §12, the lock's requests | Area 18's requests before Area 18; the `engine` topic's `passcode` | `notInV1` locally and `localOnly` on the LAN; `passcode` false; Area 19 keeps only the token's item (with the plan) | Build them now |
-| Spec 10 §9, `releaseScreen` | Its fields | `screen` in, `outputs` out, and the note carries both (with the plan) | — |
-| Spec 10 §3, `preview` | Its event, and who may subscribe | `stack`, `width`, `height` and `jpeg` as base64; any connection, the local socket included (with the plan) | A binary frame; the LAN only |
-| Spec 10 §2, the Mach channel | Who may connect, and how many | The engine's own user, by the message's audit token; up to four clients (with the plan) | Anyone in the session; one |
-| Spec 10 §2, the Mach channel | The message layouts | Fixed layouts of 32-bit words, each with a version (with the plan) | — |
-| Spec 10 §18, "skipped first" | Among the aux work | The pictures are aux work, which is what is skipped first; there is no order within it (with the plan) | Pictures before previews |
-| Spec 10 §2, a GPU reset | What "made again" means today | The recovery keeps the textures, so the same surfaces are sent again (with the plan) | — |
-| Spec 10 §2, channels added, renumbered or removed | What drives it before Area 14 | One entry point for each, tested directly; Area 14 calls them when it rebuilds the channel list (with the plan) | — |
-| Spec 10 §2, the meters | Silence; a channel on several devices; no sound anywhere | A floor of −120 dBFS; measured on the channel's clock device; one empty frame, then none (with the plan) | — |
-| Spec 4 §10, the output window | Its level | The screen-saver level (with the plan) | As it was |
-| Spec 10 §11, a screen's mode | What follows a change now | The window; the output's render size and rate stay its `format` until Area 17 rebuilds outputs (with the plan) | Rebuild here |
-| Spec 10 §2, exit statuses | Roots that don't load, which exited 3 like a held root | They exit 4 (with the plan) | — |
-| Spec 10 §13, uuids | Which are fixed | The built-ins keep the fixtures': Preset 1, transitions 1 to 3 and audio transitions 1 to 3; everything else is new (with the plan) | All new |
-| Spec 10 §13, the rate family | Screens of both families | The ports take the family of the first screen output (with the plan) | — |
-| Spec 10 §2, the OSC retry | What is sent again | The newest message per address for that target (with the plan) | Nothing |
-| CLAUDE.md, dependencies | Apple frameworks, and a C shim | Network, Security and IOKit without an ADR, as Compression and CryptoKit were taken; no C target was needed (with the plan) | An ADR each |
-| Spec 10 §2, the Mach call | Which call registers the service | `bootstrap_check_in` first, the deprecated `bootstrap_register` behind the seam when it is refused; both work on the dev Mac, from an app LaunchServices started too, so no launchd agent (at stop 1) | A per-user agent |
-| Spec 10 §2, the deprecated call | How Swift reaches it | Looked up by name when it is needed, with no C target (at stop 1) | A C shim |
-| Spec 10 §2, the service's name | Its form | `org.lcbc.projecto.engine.` and the run's uuid (at stop 1) | — |
-| Spec 10 §18, the proof | What becomes of its tools | `oengine mach-proof` and `scripts/mach-proof.sh` are kept as tooling, with `oengine devices` and, later, `oengine mach-watch` (at stop 1) | Removed after the proof |
-| Spec 10 §2, the lock file | After the engine exits | The file stays, with the last engine's process id; only the kernel's lock on it says an engine runs (at stop 2) | Removed at exit |
-| Spec 10 §2, the socket | A path over 103 bytes; another failure to open it | The launch stops with a line; any other failure is logged and the engine runs on without its socket (at stop 2) | — |
-| Spec 10 §3, `outputs` | `absent` beside `paused` | `absent` is an output whose device hasn't been there this run, `paused` one that presented and lost it; a screen that goes hides the window, and it opens again when the screen returns (at stop 2) | One state |
-| Spec 4 §2, the master clock | When it is chosen | At launch: the card's, else the first display output with a screen, else the timer; it isn't chosen again when screens change (at stop 2) | Chosen again |
-| Spec 10 §2, the accessory process | Launching without becoming the active app | It launches as a process that can't be activated and becomes an accessory process once launched, since macOS made an accessory process the active app at launch (at stop 2, found by hand) | An accessory from the start |
-| Spec 10 §3, order | When each kind of request is taken | A command goes to the engine's queue as it arrives; every other request is taken when the next build starts and answered when it ends; `auth` is checked as it arrives (at stop 2) | All at the boundary |
-| Spec 2 §9, `auth` | A command sent on a LAN connection before it | The connection is closed and the command never runs; a test caught one reaching the engine (at stop 2) | — |
-| Spec 10 §3, the events' own keys | Names the spec doesn't give | `audioOutput` on the `audio` topic, `clearInMs` on `popups`, null when nothing counts, and `named` in the catalog for the list or playlist its number or title names (at stop 2) | — |
-| Spec 10 §3, `state` | Its shape | `state`, `timers` and `events`, with `seq` and `rev` (at stop 2) | — |
-| Spec 10 §3, `thumbnails` | A stack other than the thumbnail stack | `notInV1` (at stop 2) | Draw on any stack |
-| Spec 10 §3, files on the API | How a tile or a thumbnail is named | By its path relative to the machine root when it is inside it (at stop 2) | Absolute |
-| Spec 10 §3, `fonts` | Which faces | Installed and bundled, without the system's hidden faces, whose names begin with a dot (at stop 2) | Every face |
-| Spec 4 §13, `metrics` | When it is worked out | Once a second while someone is subscribed, off the control thread (at stop 2) | Always |
-| Spec 10 §3, `remote` | Whether a rejected command counts | Yes: its source is activity too (at stop 2) | Only commands that ran |
-| Spec 10 §3, a result | Which lines it speaks for | Those under the group's id from its sender's source, and an edit folded into a typing run (at stop 2) | — |
-| Spec 10 §2, a frame message | When a preview or picture frame is named | Only when that tick's GPU work has finished; a frame still unfinished after a second is dropped, and nothing is named for a tick that failed (at stop 3) | Named as it is planned |
-| Spec 10 §2, a client that doesn't read | What the engine does | That message is dropped for it; the engine never waits for a client (at stop 3) | Close the client |
-| Spec 10 §2, the meters | "Its loudest audio channel" | The highest peak among the content's channels, and the RMS of the one with the most energy (at stop 3) | One channel for both |
-| Spec 10 §2, the meters | A paused channel that has sound | It reads the floor (at stop 3) | No reading |
-| Spec 10 §12, the token's item | Its name and what it holds | Account `api-token.` and the machine's uuid; whatever text it holds is the token; an item that isn't text is unreadable and is not replaced (at stop 3) | Replace it |
-| Spec 10 §2, the Keychain | How often it is read | Once, at launch; a refusal stands until the next launch (at stop 3) | Ask again |
-| Spec 10 §2, the retry | "Every few seconds"; a refusal the system doesn't report | Five; a listener that opens and isn't advertised within five seconds counts as refused (at stop 3) | — |
-| Spec 10 §2, the listener | A failure that isn't a refusal, such as a port something else holds | Shown as `closed` and retried the same way (at stop 3) | Give up |
-| Spec 2 §9, a silent client | A LAN connection that sends nothing | Closed after ten seconds (at stop 3) | Left open |
-| Spec 2 §9, "Nothing listens beyond the local network" | Whether connections are limited to the same link | No relay, and no limit to the same link, since a campus may route between the engine's network and a remote's; the token admits a client (at stop 3) | Same link only |
-| Spec 10 §3, `preview` | How fresh, and under pressure | The stack's preview from two previews back, so never a frame half drawn; none while the previews are being skipped (at stop 3) | The newest |
-| Spec 10 §13, the app's screen | It isn't among the Mac's screens | No screen becomes an output; the card's ports still do (at stop 3) | Every screen does |
-| Spec 10 §13, audio output 1 | A Mac with no default output device | No audio output 1 is written, and the embedded ones still number from 2, so the channels feed none of them (at stop 3) | Embedded from 1 |
-| Spec 10 §13, a refused launch | Its exit, and what it leaves | Status 2, and the lock takes back the file and the folders it made (at stop 3) | Status 1 |
-| Spec 10 §13, where the roots may live | Who checks the place | The app's sheet; the engine checks only that the socket's path fits (at stop 3) | The engine refuses too |
-| Spec 4 §4, a reused plan | Its previews and pictures | Skipped, as under pressure, so no surface is drawn twice from one plan (new) | Drawn again |
-| Spec 10 §2, the picture | How it is filtered, and a missing channel's | Each picture pixel is the mean of the block it covers, up to 32 samples a side; opaque over black; a missing channel's is cleared without reading its texture (new) | — |
-| Spec 10 §18, sound alone | A channel whose media is audio with no picture | No picture, and no channel pass is run for one (new) | — |
-| Spec 10 §2, the meters | How the level leaves the audio callback; mute and delay | With atomics and memory the instance holds from the start, where the plan said a ring; after the channel's gain and its transition, before the output's mute and delay (new) | A ring; after mute |
-| Spec 10 §2, a client leaving | How the engine learns of it | Its next send to that client fails, within a thirtieth of a second while previews flow (new) | A death notice |
-| Spec 10 §3, `engine` | The client count; the LAN's state while an OSC send is refused | Connections that have signed in; `waiting` though the listener is open (new) | Every open connection; `open` |
-| Spec 10 §2, the OSC retry | Which failures count as refused | The errors a send gets while the system holds local traffic back or the target can't be reached; a message the socket can't carry is not kept (new) | Every failure |
-| Spec 2 §9, a WebSocket frame | What one carries | One JSON object in a text frame; a binary frame or a message over 1 MB closes the connection (new) | — |
-| Spec 2 §9, Bonjour's name | A machine with no campus name; a campus edited while it runs | "Project O"; a changed name or port takes effect at the next launch until Area 17 (new) | — |
-| Spec 10 §12, a new token | One that can't be written to the Keychain | Not used: the listener stays closed with the `keychain` badge, since the next launch would make another (new) | Used for this run |
-| Spec 10 §2, a run without the LAN | Whether there is one | `--no-lan` opens no listener and never touches the Keychain (new) | Always on |
-| Spec 10 §13, labels and channels | Audio output 1's label; an embedded output's; a one-channel device | The device's name; the port's name with "embedded"; channel 0 alone (new) | "System default" |
-| Spec 10 §13, a root half written | Documents there but no `library.json` or `machine.json` | The missing ones are written and those there are kept; the side's own document goes last, so a launch cut short is finished by the next (new) | Refuse |
-| Spec 10 §13, the first window's line | The engine's part of it | It prints "output N is NAME" for each new output in its console log (new) | — |
-| Spec 10 §2, the launch's first checks | Their order | The lock, then the socket's path, then first run's options; a launch that stops at either check leaves nothing behind (new) | — |
-| Spec 10 §2, the relaunch rule | A file without `clean` or `writtenAt`; a boot time that isn't known | Without `clean` it counts as not clean, as for the restore; without `writtenAt` it isn't of this boot; with no boot time only the flag makes a relaunch (new) | — |
-| Spec 10 §2, "after the Mac started" | Where the boot time comes from | The kernel's, a wall-clock stamp like the file's (new) | Uptime |
-| Spec 10 §2, `--released` | Its form | Given once for each screen (new) | One list |
-| Spec 10 §18, the soak | Its screens, and what its client must be sent | Its display outputs take the screens `--screens` names, or every screen of the Mac left to right, and one past the last screen stays absent; the run fails when the client was sent no surfaces or no preview frame for a stack (new) | — |
-| Spec 4 §12, a stop while a device opens | Whether the stop waits | No; a device that opens after the stop is stopped again (new) | Wait for it |
+| Spec 10 §10, Quit with a field open | A field whose text can't be saved | It stays open with its reason and the quit waits (with the plan) | Quit and lose it |
+| Spec 10 §2, the console log | How many of its last lines the app shows | Twenty, read from the file's tail (at stop 1) | — |
+| Spec 10 §1, the roots | What the app makes at first run | `machine/` and `machine/logs/`, so the console log can be opened, and nothing else (at stop 1) | The engine makes them |
+| Spec 10 §2, the lock file's process id | Whether it is trusted before a kill | The app first checks the id still names an `oengine`, since the file outlives its engine (at stop 1) | Kill by the id |
+| Spec 10 §2, "no `hello`" | How long a socket that is there may stay silent | Five seconds, as for a ping (at stop 1) | Fifteen |
+| Spec 10 §2, a late pong | Whether it clears "isn't responding" | Yes (at stop 1) | Only a restart does |
+| Spec 10 §2, another build | What is compared | The two versions, since `hello` names a version only (at stop 1) | A build number |
+| Spec 10 §3, lists held whole | Which | Those of what the grid browses and of what is live (at stop 1) | Every list |
+| Spec 10 §2, the Mach channel | When it counts as failed | When the lookup or the connect fails, tried again every five seconds; no staleness timer, since under pressure the engine stops sending frames by design (at stop 1) | A timer |
+| Spec 10 §2, the curtains | Which screens | One per display output whose screen is there and isn't the window's; none on a screen released with ⌃⌥⌘⎋ (at stop 1) | Every output screen |
+| Spec 3 §7 and Spec 10 §6, the chips | A channel the cue doesn't touch; a clear of a channel this list hasn't written | Held; a clear, since content holds across lists (at stop 2) | No chip; redundant |
+| Spec 10 §6, section names | How a name finds its hue | Without case, spaces, hyphens or a number after it: "Verse 2" and "verse" are one section (at stop 2) | Exact names |
+| Spec 10 §6 and §8, the countdown | Its rounding and form | Up, so it never reads 0:00 before it is over; under a minute a sentence says seconds, from a minute on a clock (at stop 2) | Down |
+| Spec 10 §5 and §6, the searches | What matches | Case and accents ignored, anywhere in the text; a CCLI number from its first digit (at stop 2) | Whole words |
+| Spec 10 §4, at a connection | What the grid shows | What is live, else the last thing browsed when the catalog still has it; a grid that shows something stays (at stop 2; read from `view.json` since the last stage) | Nothing |
+| Spec 10 §7, the why-line | `previous` before the first cue | "Start of the playlist" (at stop 2) | Nothing said |
+| Spec 10 §7, the clears tiles | A tile with no targets; a tile that only fires | Unlit and disabled; never lit (at stop 2) | — |
+| Spec 10 §7, the strip's selection | A channel the view no longer shows | It drops out, so Clear Selected never clears what can't be seen (at stop 2) | Kept |
+| Spec 10 §7, the 0.3 seconds | Entering another cell | The wait starts again (at stop 2) | One wait for the strip |
+| Spec 1 §3 and Spec 10 §5, order | "By title" | As the Finder orders: case ignored, numbers by value; playlists of one date by time, then title (at stop 2) | Byte order |
+| Spec 10 §6, the trigger | A cue with a time and an advance | Shows both (at stop 2) | The time alone |
+| Spec 10 §4, the window off an output's screen | Several free screens | The largest (at stop 2) | The first |
+| Spec 10 §8, "Audio lost" | Which outputs | One a channel routes to that has gone silent; an embedded output nothing feeds says nothing (at stop 2) | Any silent output |
+| Spec 10 §8, the remote dot | How long it is lit | Two seconds after each arrival (at stop 2) | One |
+| Spec 10 §6, the pool's folders | What a folder shows; the search | What is in it and below it; the search sets the folder aside (at stop 2) | The folder alone |
+| Spec 10 §8, the time of day | Its format | The system's short one (at stop 2) | 24-hour |
+| Spec 10 §5 and §6, Show in Library | Whether it browses | No: it opens the folders on the way and marks the row (at stop 2) | Browse the list |
+| Spec 10 §7, the go-to and timer fields | What they take; Return in a duration | Digits only; the grammar's durations; Return is Set (at stop 2) | — |
+| Spec 10 §9, a key's name | Its spelling | One: lower case, the modifiers in the spec's order, each once (at stop 3) | Any order |
+| Spec 10 §9, reserved keys | Which chords | The ten and no others; the same key under another modifier can be bound (at stop 3) | The keys under any modifier |
+| Spec 10 §9, digits then Return | The source of `cue N` | `key` (at stop 3) | `ui` |
+| Spec 10 §9, the digits' three seconds | Another key in between | It fires its binding and leaves the digits and their time as they were (at stop 3) | It clears them |
+| Spec 10 §9 and §15, plain names | A command the table has no sentence for | Its canonical text: forms with a duration, a rider or a guard, edits and media commands (at stop 3; the names good as written, Adam's answer) | A shorter sentence |
+| Spec 10 §9, ⌃⌥⌘⎋ the system didn't give | What is said | The overlay says it works only while the app is active (at stop 3) | Nothing |
+| Spec 10 §9, the window raised | Until when | Until a `releaseScreen` is answered `ok`, by this engine or the next (at stop 3) | Two seconds |
+| Spec 10 §9, the command bar | Its history; a refusal | Fifty lines in memory, gone at quit; the engine's own sentence as it came (at stop 3) | On disk; the app's sentence |
+| Spec 10 §9, keys with no name | The ISO key beside left Shift, a JIS keyboard's own, the keypad's Clear | They can't be bound (at stop 3) | More names |
+| Spec 10 §9, Caps Lock and Fn; a first press | Whether they count | Left out of a key's name; the first press is the one the system doesn't mark a repeat (at stop 3) | — |
+| Spec 10 §9, the keys overlay | The show keys under it | They keep firing (at stop 3) | Held |
+| Spec 10 §9, the keypad's Enter | What it is | Return, for a sheet's default button and for digits (at stop 3) | A key of its own |
+| Spec 10 §10, a rename's click outside | Commit or discard | It commits, as in-place text does; an empty or unchanged name sends nothing and closes (new) | Discards |
+| Spec 10 §5, Duplicate… and Date and Time… | The panels | An empty title field; a date and a time picker, each with a "None" tick (new) | The old title; text fields |
+| Spec 10 §5, ⇧⌘N's "selected folder" | Which | The folder of the library list the grid browses, since the tree has no selection (new) | Always the top |
+| Spec 10 §5, Make Live on the live playlist | Once a cue has fired | Disabled, since it would put the pointer back before cue 1 (new) | Allowed |
+| Spec 10 §5, dragging an item | Into another playlist | No: it moves within its own (new) | Moves across |
+| Spec 10 §5 and §6, a drop that can't be done | Whether it may be let go | Yes, and the region says why nothing happened (new) | The pointer refuses it |
+| Spec 10 §10, what a cue says on a channel | Two content commands on one channel; "writes content" | The last is read; a `channel.write` (new) | The first |
+| Spec 10 §10, Undo's title and the messages | Several changes; how long a message stands | "Undo Rename (3 changes, from OSC)"; three seconds for an undo's, five for a refusal's, in the top bar's centre or the region tried (new) | Three for all |
+| Spec 10 §15, lists in sentences | The formatter's region | The Mac's (new) | English |
+| Spec 10 §14, the versions sheet | During the question | It closes first; the question names the version whole (new) | It stays up |
+| Spec 10 §14, Set Timers Again | "Its last value" | The last one received, not carried forward by the time since; offered once (new) | Counted on |
+| Spec 10 §6, a dropped file's kind | Before the engine has opened it | By its name's extension; one that suggests nothing asks for a channel (new) | Always ask |
+| Spec 10 §7, "a write or a clear has reached the channel" | How the app tells | The channel's kind of content, or what put it there, differs; a refire of the same cue isn't told apart (new) | A count from the engine |
+| Spec 10 §6, the copy's progress | What shows | "Copying…" with no fraction, since a clone is instant; then the import's fraction (new) | A fraction |
+| Spec 10 §6, the header's imports | How many show, and for how long | Three, one when collapsed, refusals first, with how many more; one that ended well leaves after five seconds, a refusal stays until dismissed (new) | All of them |
+| Spec 10 §6 and §7, a missing or deleted item | On a cue or a cell | Refused, as its Fire to is disabled (new) | Written, and shows missing |
+| Spec 10 §6, several files under the lock | Which reason is said | The lock, not "drop them on the pool" (new) | The pool |
+| Spec 10 §6, Defaults… | "Each an edit" | The fields that changed go as one group, so one Undo takes the Save back (new) | A request each |
+| Spec 8 §3, the staging copy | Two files of one name; a file inside a root | Each drop in a folder of its own under Staging; a file inside the roots or the media root is imported where it lies (new) | One flat folder |
+| Spec 10 §6, the file dialog | What it offers | Video, stills and sound, and folders for Import… (new) | Any file |
+| Spec 10 §10, Delete… with no `mediaUse` answer | What happens | Nothing is asked and nothing deleted (new) | Ask without the counts |
+| Spec 10 §7, "showing the live red ... meanwhile" | From when | From the moment the drag is over the cell; let go before 0.3 seconds, nothing is sent; a refused drop is taken at once, since all it does is say why (new) | Red only once it would take |
+| Spec 10 §10, the popover of channels | Its form | A list: a click chooses, the arrows move the pick, Return takes the picked one and waits when none is (new) | A menu |
+| Spec 10 §6, the header's second line | Details and messages | The selected item's details under the controls, hidden while collapsed; a message takes the line while it stands (new) | In the controls' row |
+| Spec 10 §6, tile size | The sizes; the collapsed strip | Three; the strip stays at the middle one (new) | A slider |
+| Spec 10 §4, `view.json` | A key that doesn't read; the panel's "state and height" | That key keeps its default and the rest are taken; the state is the height, since the divider snaps (new) | The whole file dropped; a height |
+| Spec 10 §4 and §13, `view.json` at first run | Whether it is written | Not until `machine.json` is there (new) | At once |
+| Spec 10 §4, the window's frame | When the saved one is taken | When the middle of its title bar is on a screen the Mac has now, and never smaller than the window may be (new) | Always |
+| Spec 10 §4, Reset Layout | What stays | The window's frame, recent media, the last thing browsed and the dismissed run (new) | Everything resets |
+| Spec 10 §3, the notes | When; their text | `browse` when the grid shows another thing, `backToLive` when it was browsing; a line of English for the log (new) | Every click |
+| Spec 10 §14, the saving tag | Several states; the five seconds | One tag, the worst first: full, then waiting, then low; counted on the app's clock from when the count rose (new) | A tag each |
+| Spec 10 §14, the banner's timers | What it says | Nothing when the app saw the engine end with none set; "came back unset" alone when it didn't see it end; the button when it saw some (new) | Always the sentence |
+| Spec 10 §14, Fire … again | When it is offered | Whenever nothing was put back and the app saw a cue live before the engine ended; once (new) | Only after a relaunch |
+| Spec 10 §14, a snapshot's refusal | Its words | The app's sentence for the code, then the engine's own, which name the objects (new) | The app's alone |
+| Spec 10 §14, after a snapshot restore; Take Snapshot | What is said | The sheet stays and says "Restored. Undo puts it back."; "Snapshot taken." for three seconds (new) | The sheet closes |
+| Spec 10 §8, the tags | Which are buttons | Popup, engine and saving, drawn as tags; the audio tags are words; the popup tag opens the panel when it was folded (new) | All of them |
+| Spec 10 §15, a live change's source | Where it comes from | The pointer command the `commands` topic sends ahead of the `live` event of the same tick (new) | A field on `live`, which is engine work |
+| Spec 10 §15, the sources' words | Each | The app's keys and command bar say the cue alone; `scheduler`, `cue`, `timeline` and `engine` say "Auto"; the rest "From …" (new) | — |
+| Spec 10 §15, at a connection | Whether what is live is announced | No (new) | Yes |
+| Spec 10 §15, the keyboard's focus | Where it lives; ⌥↑ and ⌥↓ | In the region, by what the item is, since cells are drawn again on every event; to the nearest item in the row above or below (new) | In each cell |
+| Spec 10 §15, ⌥Return | On a tile, a channel's cell, a list header | Selects the tile; selects that channel alone; nothing, since a header has only its menu (new) | Fires the tile |
+| Spec 10 §15, Increase Contrast and Reduce Motion | How much; what else moves | Outlines half as heavy again; the flashes and the remote dot were steady already, so only the transition bar changes (new) | — |
+| Spec 10 §15, the strip's meters | Left out how | They are no accessibility elements at all (new) | Unlabelled elements |
+| Spec 10 §9 and §10, a panel the system closes | The keys afterwards | The panel is forgotten and the keys are the window's again; panels hang from the window, not from a cell (new; a fault of the stage's own, fixed) | — |
 
 ### Spec corrections proposed
 
-None. Area 19's proposals were accepted and applied (6554d0c): Spec 4 §12 now says the
-engine opens its audio devices beside its first frames, an output being silent until its
-device has opened, as for a device that is absent; Spec 10 §13 now says a launch on a
-machine root with no `machine.json` and without `--campus` and `--operator-screen` writes
-nothing and exits with status 2. Spec 10 §13's sentence on channel 2's render size was
-applied earlier (5e63a20, on Adam's answer of 2026-11-15).
+From Area 13's brief, none applied yet: a spec changes only on Adam's word. (Spec 10 §2,
+§4, §5 and §6 were corrected on the branch from his answers at the stops, 70ce361, 8fa5340,
+a73e9ce and dc2859e, and reach `main` with the merge.)
+
+- **Spec 10 §15, the live cue.** §15 still says "the live cue has a border and a "Live"
+  tag"; §5 and §6 say, since his answer at stop 1, a red outline with no tag, and that is
+  what is built. Fix: §15 says "the live cue has an outline of a weight nothing else in
+  the grid has".
+- **Spec 10 §14, the saving tag.** It says "A click lists what is waiting"; the `saving`
+  topic counts the documents and names none (Spec 9 §7), so the click lists how many
+  wait, how the disk stands and where the log goes, with Reveal in Finder. Fix: §14 says
+  that; the alternative is engine work, the topic naming each document.
+- **Spec 10 §15, keyboard navigation.** It says "Every action is reachable without the
+  mouse"; reordering a playlist's items, moving a list or a folder and a pool tile onto a
+  cue have no menu entry (Adam's answer with the plan), so without the mouse they are
+  typed in the command bar. Fix: §15 names them as reached through their commands.
+- **Spec 10 §18, accessibility and strings.** It asks for "the accented pseudolanguage and
+  one 40% longer" and for the system's audit on every region. Xcode has no 40% one and
+  macOS's audit has no clipping check, so both pseudolanguages are transforms of the
+  app's own at the string lookup, under `swift test`; the audit is a UI test under
+  `xcodebuild`, not built yet. Fix: §18 says where each runs.
 
 ## Next
 
-**Area 13 — Show-mode UI** (branch `area/show`) is in progress; the bench-run gate was
-lifted for it on Adam's word, 2026-11-17, and Area 19, which it also waited for, is merged.
-It runs in its own session from the common preamble in `docs/build-order.md` and its own
-block there, verbatim:
+**Area 14 — Edit mode** (branch `area/edit`) is next. It starts after Area 13 is merged,
+and so after the bench run with the card, which Adam has deferred to a window he sets
+aside; the gate was lifted for Area 13 alone. It runs in its own session from the common
+preamble in `docs/build-order.md` and its own block there, verbatim:
 
 ```
 Read docs/STATUS.md, then CLAUDE.md. Work on exactly one area from
@@ -433,37 +458,46 @@ message under the four headings in CLAUDE.md. Then stop. Merge only when I write
 ```
 
 ```
-Area: 13, show-mode UI. Spec: docs/specs/10-show-mode-ui.md §1–§10, §14 and §15, and
-§13's app side (the first-run sheet and the first window's line), with §18's Area 13
-tests; the UX spec (docs/ux-spec.md) and the clickable demo for look and feel where the
-spec is silent, asking before guessing. Starts after Area 19 is merged; the bench-run
-gate (Spec 4 §15) was lifted for this area on Adam's word, 2026-11-17. The app is new: an
-Xcode project in app/ that depends on the package at the root, with AppKit and SwiftUI as
-CLAUDE.md divides them. Build the engine connection first: the roots in the app's
-preferences, with the first-run sheet that sets them (§13); finding, starting and
-restarting the engine with the curtains and the restart rule (§2, choice U-7); Quit; the
-scripted engine on a local socket that the tests drive; and the models fed by §3's topics
-and queries. Then the window and its regions (§4–§8), with the previews, the channel
-pictures and the meters from the Mach channel; the keys with their precedence and the
-fixed keys (§9); the edits of §10 with undo and redo; drops from the Finder that import
-and then write (choice U-8); the restore sheets and the tags (§14); the notes and
-view.json; and VoiceOver labels and the string catalog from the first build (§15). Edit
-mode is Area 14's, Bind a Key… waits for Area 17, and Lock Station and the lock tag for
-Area 18: their entries stay disabled until then. Tests first from §18. Stop for review
-after the engine connection, after the grid and the strip, and after the keys.
+Area: 14, edit mode. Spec: docs/specs/11-edit-mode.md §1–§4 and §6–§11, with §13's Area
+14 tests; the UX spec (docs/ux-spec.md) and the clickable demo's cue inspector for look
+and feel where the spec is silent, asking before guessing; Spec 5 §2 and §4–§6 for the
+edits, when they show, their checks and inverses, Spec 6 §2–§4 for stacks, presets and
+text styles, Spec 4 §10 for the thumbnail job, and Spec 10 §2–§4, §9, §10 and §15 for
+the app it joins, all as Spec 11 corrected them. Starts after Area 13 is merged, and so
+after the bench run. On main: Spec 5's edit path with the list, cue, folder and playlist
+edits and the move by position (Area 9), the thumbnail job that draws a cue's projected
+state with the normal stack pass (Area 5), the API's queries with their answer shape
+(Area 19), and the app's window, models and scripted engine (Area 13). Build the engine
+side first: the edits Spec 7 §7 gives this area (channels, stacks, presets, text styles,
+grades, transitions and macros), with those of audio transitions and of an output's
+default stack and transitions, their checks, warnings and inverses, a macro's move
+between the roots, stack edits between ticks, a box's move by position, and the channel
+list rebuilt between ticks when a channel is added, removed or resized, which lifts the
+notInV1 Area 12's snapshot restore answers for a snapshot with another channel list
+(Spec 9 §6, Adam's answer of 2026-11-14); then the
+render query on the thumbnail job's queue, with its canvases, files and errors, on the
+local socket only, and the uses query over both roots (§3). Then the app: the frame with
+the edit bar, the ways in and out, the lock and the keys (§2), turning on the ways in
+that Area 13 left disabled (Spec 10 §16); the Cues page with the filmstrip, Fire, the
+canvas, the channel rows and their chips, the inspector, the palette, commands as text
+and multi-cue editing (§4); the stack editor (§6); the channel sheet (§7); the preset
+editor with its canvas, sample, boxes and text styles (§8); and the small editors (§9),
+with VoiceOver and the string catalog as §10 says. Open in Text Editor stays disabled
+until Area 10. Tests first from §13. Stop for review after the engine side, after the
+frame and the Cues page, and after the preset editor.
 ```
 
-**Area 13 and after:**
+**Area 14 and after:**
 
-- **What Area 19 hands Area 13.** On `main`: the local socket in the machine root with
-  `hello`, the topics, queries and requests of Spec 10 §3, the Mach channel with the
-  previews, the channel pictures and the meters (`MachClient` is its other end, and
-  `oengine mach-watch` shows what it carries), first run with `--campus` and
-  `--operator-screen`, `--relaunch` and `--released`, and the exit statuses the app tells
-  apart: 3 for a held root, 4 for roots that don't load, 2 for a first run asked wrongly.
-- **The app's areas.** Area 13 is under way, the gate lifted for it alone. 14 follows 13,
-  10 follows 14, 17 follows 13 and 14, and 18 follows 17, each still after the bench run
-  as its block says.
+- **What Area 13 hands the next areas**, on `area/show` until the merge: the app as
+  targets of the root package (`OApp` with no AppKit, `OAppUI`, `OAppScripted`) behind the
+  Xcode shell in `app/`; the store and the models fed by Spec 10 §3's topics and queries;
+  the one mapper from actions and edits to commands; the scripted engine the tests drive;
+  the string catalog and its script; and the ways into the later areas, each there and
+  disabled until its area turns it on: Edit and Edit Cue (Area 14), Open in Text Editor
+  (Area 10), Settings… and Bind a Key… (Area 17), Lock Station and the lock tag (Area 18).
+- **The app's areas.** 14 follows 13, 10 follows 14, 17 follows 13 and 14, and 18 follows
+  17, each still after the bench run as its block says.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
   machine root copied again from the spike fixtures first. It must pass before Areas 14,
   10, 17 and 18 start and before Area 7's bench verification, and its DeckLink and capture
