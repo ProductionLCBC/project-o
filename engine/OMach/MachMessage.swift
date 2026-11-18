@@ -1,4 +1,4 @@
-// OEngine — Spec 10 §2, one message on the Mach channel, laid out by hand.
+// OMach — Spec 10 §2, one message on the Mach channel, laid out by hand.
 
 @preconcurrency import Darwin
 import Foundation
@@ -8,28 +8,32 @@ import Foundation
 /// a count and one descriptor per port, then the message's own bytes. The
 /// layout is written and read at fixed offsets in a raw buffer, never through
 /// a Swift struct, so it is the kernel's layout whatever the compiler does.
-enum MachMessage {
-    static let headerSize = MemoryLayout<mach_msg_header_t>.size
-    static let countSize = MemoryLayout<mach_msg_body_t>.size
-    static let descriptorSize = MemoryLayout<mach_msg_port_descriptor_t>.size
-    static let trailerSize = MemoryLayout<mach_msg_audit_trailer_t>.size
+///
+/// Visible to this package's targets and to nothing outside it: the engine's
+/// end of the channel (`MachChannel`, in OEngine) and the client's (here)
+/// write and read the same layout through this one type.
+package enum MachMessage {
+    package static let headerSize = MemoryLayout<mach_msg_header_t>.size
+    package static let countSize = MemoryLayout<mach_msg_body_t>.size
+    package static let descriptorSize = MemoryLayout<mach_msg_port_descriptor_t>.size
+    package static let trailerSize = MemoryLayout<mach_msg_audit_trailer_t>.size
     /// `MACH_MSGH_BITS_COMPLEX`: the message carries port descriptors.
-    static let complexBit: mach_msg_bits_t = 0x8000_0000
+    package static let complexBit: mach_msg_bits_t = 0x8000_0000
     /// `MACH_RCV_TRAILER_ELEMENTS(MACH_RCV_TRAILER_AUDIT)`: the kernel appends who sent the message.
-    static let auditTrailer: mach_msg_option_t = 3 << 24
+    package static let auditTrailer: mach_msg_option_t = 3 << 24
 
     /// A message as it arrived: its id, the port to answer on, the ports it
     /// carried, its bytes, and the sender's process and user from the
     /// kernel's audit token, which a sender cannot forge.
-    struct Received {
-        var id: mach_msg_id_t
+    package struct Received {
+        package var id: mach_msg_id_t
         /// A send right to the sender's reply port, or null; the receiver releases it.
-        var reply: mach_port_t
+        package var reply: mach_port_t
         /// The rights the message carried, in order; the receiver releases them.
-        var ports: [mach_port_t]
-        var payload: [UInt8]
-        var senderPID: pid_t
-        var senderUID: uid_t
+        package var ports: [mach_port_t]
+        package var payload: [UInt8]
+        package var senderPID: pid_t
+        package var senderUID: uid_t
     }
 
     /// Sends one message to `remote`: `id`, a reply port of the sender's own
@@ -37,7 +41,7 @@ enum MachMessage {
     /// (handed over; given back here if the message doesn't go) and `payload`.
     /// It never waits longer than `timeoutMs` for room in the receiver's
     /// queue; zero means not at all. The kernel's code.
-    static func send(to remote: mach_port_t, id: mach_msg_id_t, reply: mach_port_t = MachPorts.null, moving ports: [mach_port_t] = [],
+    package static func send(to remote: mach_port_t, id: mach_msg_id_t, reply: mach_port_t = MachPorts.null, moving ports: [mach_port_t] = [],
                      payload: [UInt8] = [], timeoutMs: mach_msg_timeout_t) -> kern_return_t {
         let descriptors = ports.isEmpty ? 0 : countSize + descriptorSize * ports.count
         let size = (headerSize + descriptors + payload.count + 3) & ~3
@@ -82,7 +86,7 @@ enum MachMessage {
 
     /// Receives one message on `port`, waiting at most `timeoutMs`; a message
     /// larger than `maxSize` is an error. The kernel's code on failure.
-    static func receive(on port: mach_port_t, timeoutMs: mach_msg_timeout_t, maxSize: Int = 1024) -> Result<Received, MachReceiveFailure> {
+    package static func receive(on port: mach_port_t, timeoutMs: mach_msg_timeout_t, maxSize: Int = 1024) -> Result<Received, MachReceiveFailure> {
         let capacity = ((maxSize + 3) & ~3) + trailerSize
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 8)
         defer { buffer.deallocate() }
@@ -114,12 +118,12 @@ enum MachMessage {
     }
 
     /// Little-endian 32-bit words, as every message's own bytes are written.
-    static func words(_ values: [UInt32]) -> [UInt8] {
+    package static func words(_ values: [UInt32]) -> [UInt8] {
         values.flatMap { value in (0..<4).map { UInt8(truncatingIfNeeded: value >> (8 * UInt32($0))) } }
     }
 
     /// The 32-bit word at `index` of a message's bytes, or nil past its end.
-    static func word(_ payload: [UInt8], _ index: Int) -> UInt32? {
+    package static func word(_ payload: [UInt8], _ index: Int) -> UInt32? {
         let start = index * 4
         guard start >= 0, payload.count >= start + 4 else { return nil }
         return (0..<4).reduce(UInt32(0)) { $0 | UInt32(payload[start + $1]) << (8 * UInt32($1)) }
@@ -128,10 +132,10 @@ enum MachMessage {
 
 /// A receive that didn't produce a message: the kernel's code, such as
 /// `MACH_RCV_TIMED_OUT`.
-struct MachReceiveFailure: Error, Equatable, CustomStringConvertible {
-    var code: kern_return_t
+package struct MachReceiveFailure: Error, Equatable, CustomStringConvertible {
+    package var code: kern_return_t
 
-    var timedOut: Bool { code == MACH_RCV_TIMED_OUT }
+    package var timedOut: Bool { code == MACH_RCV_TIMED_OUT }
 
-    var description: String { "mach_msg receive failed (\(code))" }
+    package var description: String { "mach_msg receive failed (\(code))" }
 }

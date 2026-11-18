@@ -3,6 +3,7 @@
 import AppKit
 import Foundation
 import OCore
+import OMach
 import Synchronization
 
 /// Spec 4 §15 — the argument dispatcher the executable calls. `run` is the

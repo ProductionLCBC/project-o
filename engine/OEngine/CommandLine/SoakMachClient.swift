@@ -2,6 +2,7 @@
 
 import Foundation
 import OCore
+import OMach
 
 /// Spec 10 §18, Area 19, the soak — "The soak scenario gains a client holding
 /// the Mach channel, so the previews and the channel pictures count in its

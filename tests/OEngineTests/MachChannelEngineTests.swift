@@ -3,6 +3,7 @@ import IOSurface
 import XCTest
 import OCore
 @testable import OEngine
+@testable import OMach
 
 /// Spec 10 §2, "The Mach channel" — previews: "each stack's preview as three
 /// IOSurfaces, sent as Mach ports with the stack's number and size, at

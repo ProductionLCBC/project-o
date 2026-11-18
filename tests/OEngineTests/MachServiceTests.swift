@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 @testable import OEngine
+@testable import OMach
 
 /// Spec 10 §2, "The Mach channel" — "The engine registers a Mach service in
 /// the user's bootstrap namespace under the name `hello` gives, with

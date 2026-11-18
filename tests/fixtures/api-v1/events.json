@@ -1,0 +1,254 @@
+{
+  "audio.muted": { "audioOutput": 1, "muted": true, "seq": 0, "state": "silent", "topic": "audio", "type": "event" },
+  "channels.empty": {
+    "attributes": {
+      "audioTransition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      },
+      "chase": { "origin": "default", "value": false },
+      "gain": { "origin": "default", "value": 0 },
+      "grade": { "origin": "default", "value": 0 },
+      "transition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      }
+    },
+    "channel": 2,
+    "content": null,
+    "lock": false,
+    "provenance": { "kind": "source", "source": "ui" },
+    "seq": 0,
+    "state": "empty",
+    "topic": "channels",
+    "transition": { "audioMs": 0, "audioOffsetMs": 0, "ms": 0 },
+    "type": "event"
+  },
+  "channels.locked": {
+    "attributes": {
+      "audioTransition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      },
+      "chase": { "origin": "default", "value": false },
+      "gain": { "origin": "default", "value": 0 },
+      "grade": { "origin": "default", "value": 0 },
+      "transition": {
+        "origin": "once",
+        "value": { "ms": 1000, "ref": 2 }
+      }
+    },
+    "channel": 1,
+    "content": { "durationMs": 2000, "endBehavior": "loop", "hasAudio": false, "hasPicture": true, "kind": "media", "label": "dawn.mp4", "loop": true, "missing": false, "positionMs": 0, "ref": "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527" },
+    "lock": true,
+    "provenance": { "cue": "11aa0000-0000-4000-8000-000000000001", "kind": "cue", "list": "a9f00000-0000-4000-8000-00000000002a" },
+    "seq": 0,
+    "state": "playing",
+    "topic": "channels",
+    "type": "event"
+  },
+  "channels.media": {
+    "attributes": {
+      "audioTransition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      },
+      "chase": { "origin": "default", "value": false },
+      "gain": { "origin": "default", "value": 0 },
+      "grade": { "origin": "default", "value": 0 },
+      "transition": {
+        "origin": "once",
+        "value": { "ms": 1000, "ref": 2 }
+      }
+    },
+    "channel": 1,
+    "content": { "durationMs": 2000, "endBehavior": "loop", "hasAudio": false, "hasPicture": true, "kind": "media", "label": "dawn.mp4", "loop": true, "missing": false, "positionMs": 0, "ref": "sha256:55c84469c37e1e6a72a9b8938422cd6536b302b583a5c127241c8304246f3527" },
+    "lock": false,
+    "provenance": { "cue": "11aa0000-0000-4000-8000-000000000001", "kind": "cue", "list": "a9f00000-0000-4000-8000-00000000002a" },
+    "seq": 0,
+    "state": "playing",
+    "topic": "channels",
+    "transition": { "audioMs": 0, "audioOffsetMs": 0, "ms": 1000 },
+    "type": "event"
+  },
+  "channels.text": {
+    "attributes": {
+      "audioTransition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      },
+      "chase": { "origin": "default", "value": false },
+      "gain": { "origin": "default", "value": 0 },
+      "grade": { "origin": "default", "value": 0 },
+      "transition": {
+        "origin": "default",
+        "value": { "ref": 1 }
+      }
+    },
+    "channel": 2,
+    "content": {
+      "fields": { "body": "Great is Thy faithfulness,\nO God my Father" },
+      "kind": "text",
+      "label": "Great is Thy faithfulness,"
+    },
+    "lock": false,
+    "provenance": { "cue": "11aa0000-0000-4000-8000-000000000001", "kind": "cue", "list": "a9f00000-0000-4000-8000-00000000002a" },
+    "seq": 0,
+    "state": "held",
+    "topic": "channels",
+    "transition": { "audioMs": 0, "audioOffsetMs": 0, "ms": 0 },
+    "type": "event"
+  },
+  "commands.navigation": {
+    "command": { "cmd": "playlist.goto", "cue": 1, "item": 2 },
+    "group": "…",
+    "kind": "runtime",
+    "result": "ok",
+    "seq": 0,
+    "source": { "kind": "ui" },
+    "text": "item 2 cue 1",
+    "topic": "commands",
+    "ts": "…",
+    "type": "event",
+    "undo": "runtime"
+  },
+  "engine": {
+    "badges": [],
+    "lan": { "clients": 0, "state": "closed" },
+    "lastState": null,
+    "lock": false,
+    "passcode": false,
+    "run": "…",
+    "seq": 0,
+    "topic": "engine",
+    "type": "event"
+  },
+  "history.empty": { "redo": null, "seq": 0, "topic": "history", "type": "event", "undo": null },
+  "history.redo": {
+    "redo": {
+      "commands": 1,
+      "group": "…",
+      "source": { "kind": "ui" },
+      "text": "edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""
+    },
+    "seq": 0,
+    "topic": "history",
+    "type": "event",
+    "undo": null
+  },
+  "history.undo": {
+    "redo": null,
+    "seq": 0,
+    "topic": "history",
+    "type": "event",
+    "undo": {
+      "commands": 1,
+      "group": "…",
+      "source": { "kind": "ui" },
+      "text": "edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""
+    }
+  },
+  "library.edit": {
+    "cause": "edit",
+    "changed": [
+      {
+        "list": 42,
+        "listUuid": "a9f00000-0000-4000-8000-00000000002a",
+        "object": "list",
+        "paths": ["title"]
+      }
+    ],
+    "group": "…",
+    "rev": 2,
+    "seq": 0,
+    "source": { "kind": "ui" },
+    "topic": "library",
+    "type": "event"
+  },
+  "library.undo": {
+    "cause": "undo",
+    "changed": [
+      {
+        "list": 42,
+        "listUuid": "a9f00000-0000-4000-8000-00000000002a",
+        "object": "list",
+        "paths": ["title"]
+      }
+    ],
+    "group": "…",
+    "rev": 3,
+    "seq": 0,
+    "source": { "kind": "restore" },
+    "topic": "library",
+    "type": "event"
+  },
+  "live.armed": {
+    "armed": {
+      "cue": "44dd0000-0000-4000-8000-000000000004",
+      "inMs": 0,
+      "item": "ae3aafe3-4744-5aa5-ab4a-37d19b07310e",
+      "position": { "cue": 4, "item": 2 }
+    },
+    "cue": "33cc0000-0000-4000-8000-000000000003",
+    "gone": [],
+    "item": "ae3aafe3-4744-5aa5-ab4a-37d19b07310e",
+    "label": "Verse 1",
+    "list": 42,
+    "listTitle": "Great Is Thy Faithfulness",
+    "listUuid": "a9f00000-0000-4000-8000-00000000002a",
+    "playlist": "b1a70000-0000-4000-8000-000000000001",
+    "playlistTitle": "Sunday",
+    "position": { "cue": 3, "item": 2 },
+    "seq": 0,
+    "topic": "live",
+    "type": "event"
+  },
+  "live.fired": {
+    "armed": null,
+    "boundary": { "reset": true },
+    "cue": "11aa0000-0000-4000-8000-000000000001",
+    "gone": [],
+    "item": "ae3aafe3-4744-5aa5-ab4a-37d19b07310e",
+    "label": "Verse 1",
+    "list": 42,
+    "listTitle": "Great Is Thy Faithfulness",
+    "listUuid": "a9f00000-0000-4000-8000-00000000002a",
+    "playlist": "b1a70000-0000-4000-8000-000000000001",
+    "playlistTitle": "Sunday",
+    "position": { "cue": 1, "item": 2 },
+    "seq": 0,
+    "topic": "live",
+    "type": "event"
+  },
+  "live.loaded": {
+    "armed": null,
+    "cue": null,
+    "gone": [],
+    "item": null,
+    "label": "",
+    "list": null,
+    "listTitle": "",
+    "listUuid": null,
+    "playlist": "b1a70000-0000-4000-8000-000000000001",
+    "playlistTitle": "Sunday",
+    "position": { "cue": 0, "item": 0 },
+    "seq": 0,
+    "topic": "live",
+    "type": "event"
+  },
+  "outputs.muted": {
+    "blackout": false,
+    "muted": [2],
+    "seq": 0,
+    "stack": 1,
+    "topic": "outputs",
+    "type": "event"
+  },
+  "outputs.output": { "output": 1, "reference": null, "seq": 0, "stack": 2, "state": "presenting", "topic": "outputs", "type": "event" },
+  "outputs.stack": { "blackout": true, "muted": [], "seq": 0, "stack": 2, "topic": "outputs", "type": "event" },
+  "popups.cleared": { "clearInMs": null, "popup": 1, "seq": 0, "text": "", "topic": "popups", "type": "event" },
+  "popups.set": { "clearInMs": 0, "popup": 1, "seq": 0, "text": "Nursery 14", "topic": "popups", "type": "event" },
+  "saving": { "disk": "ok", "lastSnapshot": "2026-10-30-100000", "log": "file", "seq": 0, "topic": "saving", "type": "event", "unsaved": 0 },
+  "timers.set": { "direction": "down", "seq": 0, "setMs": 300000, "state": "stopped", "text": "5:00", "timer": 1, "topic": "timers", "type": "event", "valueMs": 300000 },
+  "timers.up": { "direction": "up", "seq": 0, "setMs": 30000, "state": "stopped", "text": "0:30", "timer": 2, "topic": "timers", "type": "event", "valueMs": 30000 }
+}

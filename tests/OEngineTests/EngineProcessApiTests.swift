@@ -3,6 +3,7 @@ import XCTest
 import OCore
 import OFormats
 @testable import OEngine
+@testable import OMach
 
 /// Spec 10 §2, "When the engine is ready" — "It ... opens its local socket
 /// and its LAN listener at that list's step 5, when it takes commands, so

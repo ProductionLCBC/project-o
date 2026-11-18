@@ -6,6 +6,7 @@
 import AppKit
 import Foundation
 import OCore
+import OMach
 import OFormats
 import Synchronization
 

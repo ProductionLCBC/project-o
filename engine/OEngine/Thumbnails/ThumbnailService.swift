@@ -302,25 +302,19 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// "A projected state has no playlist": each state read names the cue
     /// drawn and its list, with no playlist. The fold itself runs as before,
     /// from no pointer.
+    ///
+    /// The fold is OCore's (`CueView`, Spec 3 §7), the one the app's cue grid
+    /// reads its chips from (Spec 10 §6), so a thumbnail and its chips can't
+    /// disagree.
     func projectedStates(of list: List, through index: Int, roots: (library: Library, machine: Machine)) -> [ShowState] {
         let (library, machine) = roots
         lock.lock()
         let missing = self.missing
         lock.unlock()
-        var state = ShowState.fresh(library: library, machine: machine)
-        var out: [ShowState] = []
-        for (i, cue) in list.cues.enumerated() where i <= index {
-            let current = state
-            let variables = self.variables
-            let context = ProjectionContext(frame: 0, library: library, machine: machine, missing: missing,
-                                            source: CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid),
-                                            variables: { name in variables.value(name, state: current) })
-            state = project(state, cue.commands.map(\.command), context: context).0
-            var drawn = state
-            drawn.pointer = LivePointer(listUuid: list.uuid, cueUuid: cue.uuid)
-            out.append(drawn)
+        let variables = self.variables
+        return CueView.states(of: list, through: index, library: library, machine: machine, missing: missing) { name, before in
+            variables.value(name, state: before)
         }
-        return out
     }
 
     /// Spec 4 §10 — "the normal stack pass against poster frames and

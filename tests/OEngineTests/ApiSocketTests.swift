@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 import OCore
 @testable import OEngine
+@testable import OMach
 
 /// Spec 10 §2, "The local socket" (R2) — "A Unix domain socket that only its
 /// owner can open (mode 0600), and the engine closes any connection whose

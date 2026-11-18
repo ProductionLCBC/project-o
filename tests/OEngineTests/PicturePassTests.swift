@@ -3,6 +3,7 @@ import IOSurface
 import Metal
 import OCore
 @testable import OEngine
+@testable import OMach
 
 /// Spec 4 §10 and Spec 10 §2 (choice U-3) — the channel picture: "Another aux
 /// pass, at most 30 times a second like the previews, makes a live picture of
