@@ -97,6 +97,24 @@ final class ShowWordingTests: XCTestCase {
         XCTAssertEqual(PopupClearAfter.choices.map(ShowWording.clearAfter), ["Stays", "15 s", "30 s", "1 min", "2 min", "5 min"])
     }
 
+    func test_anOutputsDetailsReadAsAVideoEngineerNamesThem() {
+        let sixty = VideoFormat(width: 1920, height: 1080, rate: FrameRate(num: 60), interlaced: false)
+        let interlaced = VideoFormat(width: 1920, height: 1080, rate: FrameRate(num: 30000, den: 1001), interlaced: true)
+        XCTAssertEqual(ShowWording.format(sixty, locale: english), "1920 × 1080 · 60p")
+        XCTAssertEqual(ShowWording.format(interlaced, locale: english), "1920 × 1080 · 59.94i", "an interlaced format by its fields a second")
+        XCTAssertEqual(ShowWording.format(VideoFormat(width: 3840, height: 2160, rate: FrameRate(num: 30), interlaced: false), locale: english), "3840 × 2160 · 30p")
+        let sdi = OutputDetails(number: 2, label: "Program SDI", device: "DeckLink Duo (1)", format: interlaced, reference: "locked", state: .presenting,
+                                stack: 1, isBlackedOut: true, presented: 12_601, late: 3, dropped: 0)
+        XCTAssertEqual(ShowWording.rows(sdi, locale: english).map { "\($0.name): \($0.value)" },
+                       ["Device: DeckLink Duo (1)", "Format: 1920 × 1080 · 59.94i", "Reference: locked", "State: presenting · Blackout", "Presented: 12,601",
+                        "Late: 3", "Dropped: 0"])
+        let display = OutputDetails(number: 1, label: "Main", device: "V247Y E", format: sixty, reference: nil, state: .lost, stack: 1, isBlackedOut: false)
+        XCTAssertEqual(ShowWording.rows(display, locale: english).map { "\($0.name): \($0.value)" },
+                       ["Device: V247Y E", "Format: 1920 × 1080 · 60p", "State: lost", "Presented: not yet", "Late: not yet", "Dropped: not yet"],
+                       "a display has no reference, and the counts wait for the engine's first metrics")
+        XCTAssertEqual(ShowWording.reference("freeRun"), "free-running")
+    }
+
     func test_aStripCellsWords() {
         XCTAssertEqual(ShowWording.remaining(.loops), "loops")
         XCTAssertEqual(ShowWording.remaining(.paused(ms: 83_000)), "paused 1:23")

@@ -314,6 +314,8 @@ final class ListHeaderView: Surface {
     let detail = Kit.label(size: 11.5)
     private var tags: [TagView] = []
     let section: GridSection
+    /// Spec 10 §6, "A list header" — its menu.
+    var makeMenu: (() -> NSMenu?)?
 
     init(_ section: GridSection) {
         self.section = section
@@ -361,6 +363,14 @@ final class ListHeaderView: Surface {
     }
 
     var shownTags: [String] { tags.map(\.text) }
+
+    override func rightMouseDown(with event: NSEvent) {
+        if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control), let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
+    }
 }
 
 /// The grid's scrolling content: each section's header and its cells, wrapped to the width.
@@ -387,6 +397,14 @@ final class GridDocument: Surface {
                 headers.append((heading, section))
             case .list:
                 let header = ListHeaderView(section)
+                // "Its menu: ... Show in Library"; its edits come with §10's stage.
+                if !section.isLocal, !section.isMissing, let list = section.listUuid {
+                    header.makeMenu = { [weak model] in
+                        let menu = NSMenu()
+                        menu.addItem(ClosureMenuItem(title: Strings.text(.menuShowInLibrary)) { model?.showInLibrary(list: list) })
+                        return menu
+                    }
+                }
                 addSubview(header)
                 headers.append((header, section))
                 for cell in section.cells {
@@ -621,6 +639,12 @@ final class GridView: Surface {
             fire.toolTip = UnavailableWording.sentence(for: away)
         }
         menu.addItem(fire)
+        // "and Hold, on the armed cue (`disarm`)".
+        if cell.cell.isArmed {
+            let hold = ClosureMenuItem(title: Strings.text(.nextHold)) { [weak model] in model?.send(Actions.hold()) }
+            hold.isEnabled = model.store.cannotSend == nil
+            menu.addItem(hold)
+        }
         NSMenu.popUpContextMenu(menu, with: event, for: cell)
     }
 

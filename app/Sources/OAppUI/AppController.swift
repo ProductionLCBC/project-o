@@ -49,6 +49,10 @@ final class AppController {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.screensChanged() }
         }
+        // "moved by hand": the window landed on another screen.
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeScreenNotification, object: windowController.window, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.screensChanged() }
+        }
     }
 
     // MARK: - Starting
@@ -297,6 +301,34 @@ final class AppController {
         windowController.window.takesClicks = CoveredWindow.takesClicks(in: situation, connected: store.isConnected, raised: isRaised)
         if let covering, covering != coveredBy { showBehindNote(output: covering) }
         coveredBy = covering
+        placeWindowSoon()
+    }
+
+    // MARK: - Where the window stands (Spec 10 §4)
+
+    private var placeTask: (any ClockTask)?
+
+    /// Spec 10 §4, "One main window" — "The app opens it on a screen no
+    /// output uses, and moves it to one when it ends up on an output's
+    /// screen, moved by hand or by a change of screens, if such a screen
+    /// exists." A window being dragged is left alone until it is let go.
+    func placeWindowSoon() {
+        placeTask?.cancel()
+        guard NSEvent.pressedMouseButtons == 0 else {
+            placeTask = clock.after(0.25) { [weak self] in self?.placeWindowSoon() }
+            return
+        }
+        let window = windowController.window
+        guard window.isVisible, !window.styleMask.contains(.fullScreen) else { return }
+        let screens = NSScreen.screens.compactMap { screen in
+            screen.deviceName.map { WindowPlacement.Screen(name: $0, area: Double(screen.frame.width * screen.frame.height)) }
+        }
+        let outputs = WindowPlacement.outputScreens(store.catalog?.outputs ?? [], released: Set(releasedScreens))
+        guard let name = WindowPlacement.target(window: window.screen?.deviceName, screens: screens, outputs: outputs),
+              let screen = NSScreen.named(name) else { return }
+        let room = screen.visibleFrame
+        let size = NSSize(width: min(window.frame.width, room.width), height: min(window.frame.height, room.height))
+        window.setFrame(NSRect(x: room.midX - size.width / 2, y: room.midY - size.height / 2, width: size.width, height: size.height), display: true)
     }
 
     /// Spec 10 §9 — whether the main window is raised one level above the outputs; the fixed key raises it (stage 3).

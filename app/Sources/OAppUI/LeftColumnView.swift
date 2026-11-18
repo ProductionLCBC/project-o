@@ -18,6 +18,8 @@ struct RowContent {
     var trailing: String?
     var tags: [(text: String, style: TagView.Style)] = []
     var isSelected = false
+    /// Pointed at by "Show in Library": outlined, until something else is chosen.
+    var isRevealed = false
     /// What VoiceOver reads: the title with its states in words.
     var spoken = ""
 }
@@ -41,6 +43,10 @@ final class RowView: Surface {
         super.init(frame: .zero)
         radius = 6
         fill = content.isSelected ? Palette.selection.withAlphaComponent(0.22) : nil
+        if content.isRevealed {
+            outline = Palette.selection
+            outlineWidth = 1.5
+        }
         if content.isHeading {
             Kit.setHeading(title, content.title)
         } else {
@@ -147,6 +153,13 @@ final class RowList: NSScrollView {
         super.layout()
         layoutRows()
     }
+
+    /// Scrolls so the row at this place shows.
+    func show(row index: Int) {
+        guard rows.indices.contains(index) else { return }
+        layoutRows()
+        rows[index].scrollToVisible(rows[index].bounds)
+    }
 }
 
 /// Spec 10 §5 — "Playlists window over Library window".
@@ -159,6 +172,9 @@ final class LeftColumnView: Surface {
     private let libraryTitle = Kit.heading(Strings.text(.leftLibrary))
     let search = Kit.search(placeholder: Strings.text(.leftSearch))
     let library = RowList()
+    /// The divider between the two windows of the column.
+    let split = DividerView(axis: .rows, label: Strings.text(.dividerSplit))
+    private var splitStart = 0.5
     /// Called when an item is clicked, so the grid scrolls to its list (Spec 10 §5).
     var onShowItem: ((String) -> Void)?
 
@@ -172,7 +188,14 @@ final class LeftColumnView: Surface {
         newPlaylist.reason = Strings.text(.unavailableLater)
         search.target = self
         search.action = #selector(searched)
-        for view in [playlistsTitle, newPlaylist, playlists, libraryTitle, search, library] as [NSView] { addSubview(view) }
+        for view in [playlistsTitle, newPlaylist, playlists, libraryTitle, search, library, split] as [NSView] { addSubview(view) }
+        split.onBegin = { [weak self] in self?.splitStart = self?.model.settings.leftSplit ?? 0.5 }
+        split.onDrag = { [weak self] delta in
+            guard let self, self.bounds.height > 0 else { return }
+            let start = self.splitStart
+            let share = Double(delta / self.bounds.height)
+            self.model.resize { $0.leftSplit = start + share }
+        }
         refresh()
     }
 
@@ -222,6 +245,14 @@ final class LeftColumnView: Surface {
                     self?.model.browse(.playlist(row.playlist))
                     if let item = row.itemUuid { self?.onShowItem?(item) }
                 }
+                // Spec 10 §5, "An item's menu" — "Show in Library, for a linked item"; its edits come with §10's stage.
+                if !row.isLocal, !row.isMissing, let list = row.listUuid {
+                    view.makeMenu = { [weak model] in
+                        let menu = NSMenu()
+                        menu.addItem(ClosureMenuItem(title: Strings.text(.menuShowInLibrary)) { model?.showInLibrary(list: list) })
+                        return menu
+                    }
+                }
             case .header:
                 break
             }
@@ -243,6 +274,7 @@ final class LeftColumnView: Surface {
                 // "the matches as a flat list with their folders".
                 content.trailing = searching && !row.path.isEmpty ? "\(row.path) · \(number)" : number
                 content.isSelected = row.uuid.map { model.browse.shown == .list($0) } ?? false
+                content.isRevealed = row.uuid != nil && row.uuid == model.revealedList
                 content.spoken = [row.title, number].joined(separator: ", ")
             }
             let view = RowView(content)
@@ -252,6 +284,10 @@ final class LeftColumnView: Surface {
             }
             return view
         })
+        // "Show in Library" brings the list's row into view.
+        if let revealed = model.revealedList, let index = model.libraryRows.firstIndex(where: { $0.uuid == revealed }) {
+            library.show(row: index)
+        }
     }
 
     /// Spec 10 §5, "A playlist's menu" — Make Live now; its edits come with §10's stage.
@@ -283,6 +319,7 @@ final class LeftColumnView: Surface {
         libraryTitle.frame = NSRect(x: 14, y: split + 12, width: w - 28, height: 14)
         search.frame = NSRect(x: 10, y: split + 34, width: w - 20, height: 24)
         library.frame = NSRect(x: 0, y: split + 64, width: w, height: max(0, bounds.height - split - 64))
+        self.split.frame = NSRect(x: 0, y: split - DividerView.thickness / 2, width: w, height: DividerView.thickness)
     }
 
     override func draw(_ dirtyRect: NSRect) {

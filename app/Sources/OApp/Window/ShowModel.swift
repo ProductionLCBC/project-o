@@ -15,6 +15,8 @@ public final class ShowModel {
     /// What changed, so a region redraws only for its own.
     public enum Change: Hashable, Sendable {
         case grid, left, right, strip, top, pool
+        /// Only where the regions sit: a divider moved.
+        case layout
     }
 
     public let store: ShowStore
@@ -203,6 +205,7 @@ public final class ShowModel {
     /// "Click a playlist to browse it"; "Click a list to browse it in the grid".
     public func browse(_ context: GridContext) {
         browse.browse(context)
+        if case .list = context { revealedList = nil }
         holdLists()
         rebuildGrid()
         changed([.grid, .left, .top])
@@ -240,6 +243,7 @@ public final class ShowModel {
 
     public func search(library text: String) {
         librarySearch = text
+        if !text.isEmpty { revealedList = nil }
         changed([.left])
     }
 
@@ -447,6 +451,37 @@ public final class ShowModel {
         rebuildGrid()
         changed([.grid, .left, .right, .strip, .top, .pool])
     }
+
+    /// A divider moved: the settings change and the regions are placed again, with nothing redrawn.
+    public func resize(_ edit: (inout ViewSettings) -> Void) {
+        edit(&settings)
+        settings.leftColumnWidth = ViewSettings.clampedLeft(settings.leftColumnWidth)
+        settings.rightColumnWidth = ViewSettings.clampedRight(settings.rightColumnWidth)
+        settings.leftSplit = min(0.8, max(0.2, settings.leftSplit))
+        changed([.layout])
+    }
+
+    /// Spec 10 §5 and §6, "Show in Library" — the list is shown in the
+    /// Library tree: every folder on its way is opened and its row marked,
+    /// until the operator next chooses something there. The grid stays on
+    /// what it shows (Area 13 reading: showing where a list lives isn't
+    /// browsing it).
+    public func showInLibrary(list uuid: String) {
+        guard let summary = store.catalog?.list(uuid: uuid), !summary.local else { return }
+        var open = Set(settings.openFolders)
+        var parts: [String] = []
+        for part in summary.folder.split(separator: "/") {
+            parts.append(String(part))
+            open.insert(parts.joined(separator: "/"))
+        }
+        settings.openFolders = open.sorted()
+        librarySearch = ""
+        revealedList = uuid
+        changed([.left])
+    }
+
+    /// The list "Show in Library" last pointed at, marked in the tree.
+    public private(set) var revealedList: String?
 
     /// "View ▸ Reset Layout puts the defaults back; it's a UI action, not a command."
     public func resetLayout() {

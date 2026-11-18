@@ -24,6 +24,15 @@ final class ShowWindowView: Surface {
     let nextRow: NextRowView
     let tabs: TabsView
     let strip: StripView
+    /// Spec 10 §4 — the columns' widths, "200 to 360" and "340 to 480"; Spec 10 §6 — the pool's divider.
+    let leftDivider = DividerView(axis: .columns, label: Strings.text(.dividerLeft))
+    let rightDivider = DividerView(axis: .columns, label: Strings.text(.dividerRight))
+    let poolDivider = DividerView(axis: .rows, label: Strings.text(.dividerPool))
+    /// What a divider's column or panel measured when its drag began.
+    private var dragStart = 0.0
+    /// The pool's height while its divider is being dragged; it snaps to a state when the drag ends.
+    private var poolDragHeight: CGFloat?
+    private var outputPopover: NSPopover?
     private var slow: Timer?
     private var fast: Timer?
     private var observers: [NSObjectProtocol] = []
@@ -48,7 +57,33 @@ final class ShowWindowView: Surface {
         strip = StripView(model: model, mach: mach)
         super.init(frame: .zero)
         fill = Palette.window
-        for view in [grid, pool, left, preview, nextRow, tabs, strip, topBar, banner] as [NSView] { addSubview(view) }
+        for view in [grid, pool, left, preview, nextRow, tabs, strip, topBar, banner, leftDivider, rightDivider, poolDivider] as [NSView] { addSubview(view) }
+        leftDivider.onBegin = { [weak self] in self?.dragStart = self?.model.settings.leftColumnWidth ?? 0 }
+        leftDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            let start = self.dragStart
+            self.model.resize { $0.leftColumnWidth = start + Double(delta) }
+        }
+        rightDivider.onBegin = { [weak self] in self?.dragStart = self?.model.settings.rightColumnWidth ?? 0 }
+        rightDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            let start = self.dragStart
+            self.model.resize { $0.rightColumnWidth = start - Double(delta) }
+        }
+        // "The divider snaps to three states": it follows the pointer while it is dragged and snaps when it is let go.
+        poolDivider.onBegin = { [weak self] in self?.dragStart = Double(self?.pool.frame.height ?? 0) }
+        poolDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            self.poolDragHeight = max(PoolView.collapsedHeight, CGFloat(self.dragStart) - delta)
+            self.needsLayout = true
+        }
+        poolDivider.onEnd = { [weak self] in
+            guard let self, let height = self.poolDragHeight else { return }
+            self.poolDragHeight = nil
+            let center = Double(self.grid.frame.height + self.pool.frame.height)
+            self.model.change { $0.panel = PoolDivider.snap(height: Double(height), center: center, collapsed: Double(PoolView.collapsedHeight)) }
+        }
+        poolDivider.onDoubleClick = { [weak self] in self?.model.change { $0.panel = PoolDivider.toggled($0.panel) } }
         left.onShowItem = { [weak self] item in self?.grid.scrollTo(item: item) }
         topBar.onOutput = { [weak self] dot, anchor in self?.showOutput(dot, at: anchor) }
         model.onChange = { [weak self] changes in self?.refresh(changes) }
@@ -88,6 +123,12 @@ final class ShowWindowView: Surface {
             tabs.isCollapsed = PanelCollapseRule.isCollapsed(windowHeight: Double(bounds.height), setting: model.settings.tabbedPanelCollapsed)
         }
         if changes.contains(.strip) { strip.refresh() }
+        if changes.contains(.layout) {
+            // A divider moved: the regions are placed again and the lines between them redrawn.
+            left.needsLayout = true
+            left.needsDisplay = true
+            needsDisplay = true
+        }
         needsLayout = true
     }
 
@@ -141,10 +182,15 @@ final class ShowWindowView: Surface {
         left.frame = NSRect(x: 0, y: top, width: leftWidth, height: height)
         let centerWidth = max(200, w - leftWidth - rightWidth)
         // "The grid keeps at least its header and one row of cues".
-        let poolHeight = min(PoolView.height(model.settings.panel, center: height),
-                             max(PoolView.headerHeight, height - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
+        let wanted = poolDragHeight ?? CGFloat(PoolDivider.height(model.settings.panel, center: Double(height), collapsed: Double(PoolView.collapsedHeight)))
+        let poolHeight = min(wanted, max(PoolView.headerHeight, height - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
         grid.frame = NSRect(x: leftWidth, y: top, width: centerWidth, height: height - poolHeight)
         pool.frame = NSRect(x: leftWidth, y: top + height - poolHeight, width: centerWidth, height: poolHeight)
+
+        let half = DividerView.thickness / 2
+        leftDivider.frame = NSRect(x: leftWidth - half, y: top, width: DividerView.thickness, height: height)
+        rightDivider.frame = NSRect(x: leftWidth + centerWidth - half, y: top, width: DividerView.thickness, height: height)
+        poolDivider.frame = NSRect(x: leftWidth + half, y: pool.frame.minY - half, width: centerWidth - DividerView.thickness, height: DividerView.thickness)
 
         let rx = leftWidth + centerWidth + 12
         let rw = rightWidth - 24
@@ -175,26 +221,31 @@ final class ShowWindowView: Surface {
 
     // MARK: - An output's details (Spec 10 §8)
 
-    /// "A click opens the output's details ... with a Stack ▸ menu that
-    /// switches its live stack (`output N stack M`)." The stacks now; the
-    /// device, format and counts come with the settings they are read beside.
-    private func showOutput(_ dot: OutputDot, at anchor: NSView) {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        let title = NSMenuItem(title: ShowWording.output(dot), action: nil, keyEquivalent: "")
-        title.isEnabled = false
-        menu.addItem(title)
-        menu.addItem(.separator())
-        let away = model.store.cannotSend
-        for stack in (model.store.catalog?.stacks ?? []).sorted(by: { $0.number < $1.number }) {
-            let item = ClosureMenuItem(title: Strings.text(.previewStack, stack.number, stack.label)) { [weak model] in
-                model?.send(Actions.outputStack(output: dot.number, stack: stack.number))
-            }
-            item.state = stack.number == dot.stack ? .on : .off
-            item.isEnabled = away == nil
-            menu.addItem(item)
+    /// "A click opens the output's details (its device, format, reference,
+    /// state, and its presented, late and dropped counts from `metrics`)
+    /// with a Stack ▸ menu that switches its live stack (`output N stack M`)."
+    func outputDetails(for dot: OutputDot) -> OutputDetailsView? {
+        guard let output = model.store.catalog?.outputs.first(where: { $0.number == dot.number }) else { return nil }
+        let details = OutputDetails.make(output: output, dot: dot, status: model.store.outputs[dot.number], devices: model.store.devices,
+                                         metrics: model.store.metrics)
+        return OutputDetailsView(details, stacks: model.store.catalog?.stacks ?? [], cannotSend: model.store.cannotSend) { [weak self] stack in
+            self?.model.send(Actions.outputStack(output: dot.number, stack: stack))
+            self?.outputPopover?.close()
         }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.height + 4), in: anchor)
+    }
+
+    private func showOutput(_ dot: OutputDot, at anchor: NSView) {
+        guard let view = outputDetails(for: dot) else { return }
+        outputPopover?.close()
+        let controller = NSViewController()
+        controller.view = view
+        let popover = NSPopover()
+        popover.contentViewController = controller
+        popover.contentSize = view.frame.size
+        popover.behavior = .transient
+        popover.appearance = NSAppearance(named: .darkAqua)
+        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+        outputPopover = popover
     }
 }
 

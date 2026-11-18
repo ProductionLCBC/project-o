@@ -253,6 +253,54 @@
         }
       }
     },
+    "divider.left" : {
+      "comment" : "VoiceOver: the divider between the left column and the grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width of the left column"
+          }
+        }
+      }
+    },
+    "divider.pool" : {
+      "comment" : "VoiceOver: the divider between the grid and the media panel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Height of the media panel"
+          }
+        }
+      }
+    },
+    "divider.right" : {
+      "comment" : "VoiceOver: the divider between the grid and the right column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width of the right column"
+          }
+        }
+      }
+    },
+    "divider.split" : {
+      "comment" : "VoiceOver: the divider in the left column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split between the playlists and the library"
+          }
+        }
+      }
+    },
     "engine.anotherBuild" : {
       "comment" : "A banner, with the Restart the engine button, for as long as the engine running is from another build than the app. %1$@ is the engine's version, %2$@ the app's.",
       "extractionState" : "manual",
@@ -1689,6 +1737,222 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Next"
+          }
+        }
+      }
+    },
+    "output.device" : {
+      "comment" : "A row of an output's details: the screen or port it uses.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device"
+          }
+        }
+      }
+    },
+    "output.dropped" : {
+      "comment" : "A row of an output's details: frames dropped.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dropped"
+          }
+        }
+      }
+    },
+    "output.format" : {
+      "comment" : "A row of an output's details.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format"
+          }
+        }
+      }
+    },
+    "output.format.value" : {
+      "comment" : "A video format: width, height (pixel counts, never grouped), and the rate with p or i, as in \"1920 × 1080 · 60p\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ × %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "output.late" : {
+      "comment" : "A row of an output's details: frames shown late.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Late"
+          }
+        }
+      }
+    },
+    "output.noCount" : {
+      "comment" : "In an output's details before the engine has sent a count.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "not yet"
+          }
+        }
+      }
+    },
+    "output.presented" : {
+      "comment" : "A row of an output's details: frames shown since the engine started.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presented"
+          }
+        }
+      }
+    },
+    "output.reference" : {
+      "comment" : "A row of an output's details: its sync reference.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reference"
+          }
+        }
+      }
+    },
+    "output.reference.freeRun" : {
+      "comment" : "An SDI output running on its own clock.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "free-running"
+          }
+        }
+      }
+    },
+    "output.reference.locked" : {
+      "comment" : "An SDI output locked to its reference.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "locked"
+          }
+        }
+      }
+    },
+    "output.reference.none" : {
+      "comment" : "An SDI output with no reference.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "none"
+          }
+        }
+      }
+    },
+    "output.stack" : {
+      "comment" : "A row of an output's details: the stack it shows, with a menu to switch it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack"
+          }
+        }
+      }
+    },
+    "output.state" : {
+      "comment" : "A row of an output's details.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "State"
+          }
+        }
+      }
+    },
+    "output.state.absent" : {
+      "comment" : "An output whose device isn't connected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "absent"
+          }
+        }
+      }
+    },
+    "output.state.lost" : {
+      "comment" : "An output whose device stopped taking frames.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "lost"
+          }
+        }
+      }
+    },
+    "output.state.presenting" : {
+      "comment" : "An output that is showing frames.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "presenting"
+          }
+        }
+      }
+    },
+    "output.state.released" : {
+      "comment" : "An output taken off its screen on purpose.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "released"
+          }
+        }
+      }
+    },
+    "output.title" : {
+      "comment" : "The title of an output's details: its number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output %1$lld %2$@"
           }
         }
       }

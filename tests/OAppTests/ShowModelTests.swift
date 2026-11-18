@@ -251,6 +251,33 @@ final class ShowModelTests: XCTestCase {
         XCTAssertEqual(rig.model.grid.sections.last?.isUpdated, false, "until the list is next fired")
     }
 
+    /// Spec 10 §5 and §6, "Show in Library".
+    func test_showInLibraryOpensTheListsFoldersAndMarksItWithoutMovingTheGrid() throws {
+        let rig = try Rig()
+        rig.model.showInLibrary(list: Recorded.list42)
+        XCTAssertEqual(rig.model.settings.openFolders, ["Hymns"], "every folder on its way is opened")
+        XCTAssertEqual(rig.model.revealedList, Recorded.list42)
+        XCTAssertTrue(rig.model.libraryRows.contains { $0.uuid == Recorded.list42 })
+        XCTAssertEqual(rig.model.browse.shown, .playlist(Recorded.sunday), "showing where a list lives isn't browsing it")
+        XCTAssertEqual(rig.sent.count, 0)
+        rig.model.browse(.list(Recorded.list7))
+        XCTAssertNil(rig.model.revealedList, "until the operator next chooses something there")
+        rig.model.showInLibrary(list: Recorded.localCopy)
+        XCTAssertNil(rig.model.revealedList, "a local copy isn't in the library")
+    }
+
+    /// Spec 10 §4 — "Left column ... 200 to 360"; "Right column ... 340 to 480".
+    func test_aDividerMovesInsideItsLimitsAndRedrawsNothing() throws {
+        let rig = try Rig()
+        rig.changes = []
+        rig.model.resize { $0.leftColumnWidth = 500 }
+        XCTAssertEqual(rig.model.settings.leftColumnWidth, 360)
+        rig.model.resize { $0.rightColumnWidth = 100; $0.leftSplit = 0.95 }
+        XCTAssertEqual(rig.model.settings.rightColumnWidth, 340)
+        XCTAssertEqual(rig.model.settings.leftSplit, 0.8)
+        XCTAssertEqual(rig.changes, [[.layout], [.layout]], "the regions are placed again; nothing in them is rebuilt")
+    }
+
     func test_resetLayoutPutsTheDefaultsBack() throws {
         let rig = try Rig()
         rig.model.change { $0.showsNotes = true; $0.leftColumnWidth = 300; $0.stripStack = 2 }

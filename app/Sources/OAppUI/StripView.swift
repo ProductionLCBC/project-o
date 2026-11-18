@@ -540,14 +540,9 @@ final class PoolView: Surface {
     private let document = Surface()
     private(set) var tiles: [PoolTileView] = []
     static let headerHeight: CGFloat = 40
-    /// The panel's height for each state of its divider (Spec 10 §6, "The divider").
-    static func height(_ state: ViewSettings.PanelState, center: CGFloat) -> CGFloat {
-        switch state {
-        case .collapsed: return headerHeight + PoolTileView.size.height + 14
-        case .default: return max(180, floor(center / 3))
-        case .expanded: return max(240, floor(center * 0.6))
-        }
-    }
+    /// Spec 10 §6, "The divider" — collapsed, the panel "shows the pool's header and one strip of the twenty most
+    /// recently used items": this height.
+    static let collapsedHeight: CGFloat = headerHeight + PoolTileView.size.height + 14
 
     init(model: ShowModel) {
         self.model = model
@@ -707,7 +702,7 @@ final class PoolView: Surface {
     // "Double-click toggles collapsed and default."
     override func mouseDown(with event: NSEvent) {
         guard event.clickCount == 2, convert(event.locationInWindow, from: nil).y < Self.headerHeight else { return }
-        model.change { $0.panel = $0.panel == .collapsed ? .default : .collapsed }
+        model.change { $0.panel = PoolDivider.toggled($0.panel) }
     }
 }
 

@@ -322,6 +322,77 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertFalse(pool.importMedia.isEnabled, "importing comes with the drops")
     }
 
+    // MARK: - Dividers, an output's details, Show in Library (Spec 10 §4, §5, §6, §8)
+
+    func test_theDividersResizeTheColumnsInsideTheirLimits() throws {
+        let rig = try Rig()
+        let view = rig.view
+        view.leftDivider.drag(by: 60)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.left.frame.width, 308)
+        view.leftDivider.drag(by: 400)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.left.frame.width, 360, "Left column: 200 to 360")
+        view.rightDivider.drag(by: 30)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 350, "dragged right, the right column narrows")
+        view.rightDivider.drag(by: 500)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 340, "Right column: 340 to 480")
+        let before = rig.model.settings.leftSplit
+        view.left.split.drag(by: 80)
+        XCTAssertGreaterThan(rig.model.settings.leftSplit, before, "dragged down, the Playlists window grows")
+        XCTAssertEqual(rig.sent.count, 0)
+    }
+
+    func test_thePoolsDividerSnapsToItsThreeStatesAndADoubleClickToggles() throws {
+        let rig = try Rig()
+        let view = rig.view
+        XCTAssertEqual(rig.model.settings.panel, .default)
+        let standard = view.pool.frame.height
+        view.poolDivider.drag(by: 300)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(rig.model.settings.panel, .collapsed, "dragged most of the way down, it snaps shut")
+        XCTAssertEqual(view.pool.frame.height, PoolView.collapsedHeight, "its header and one strip of tiles")
+        XCTAssertTrue(view.pool.rail.isHidden)
+        view.poolDivider.onDoubleClick?()
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(rig.model.settings.panel, .default, "Double-click toggles collapsed and default")
+        XCTAssertEqual(view.pool.frame.height, standard)
+        view.poolDivider.drag(by: -20)
+        XCTAssertEqual(rig.model.settings.panel, .default, "a small drag snaps back")
+        view.poolDivider.drag(by: -260)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(rig.model.settings.panel, .expanded)
+        XCTAssertGreaterThan(view.grid.frame.height, GridView.headerHeight + 100, "the grid keeps at least its header and one row of cues")
+    }
+
+    func test_anOutputsDetailsShowItsDeviceItsFormatItsStateAndItsCountsWithAStackMenu() throws {
+        let rig = try Rig()
+        let dot = try XCTUnwrap(rig.model.outputDots.first)
+        let details = try XCTUnwrap(rig.view.outputDetails(for: dot))
+        details.layoutSubtreeIfNeeded()
+        XCTAssertEqual(details.title.stringValue, "Output 1 Main")
+        XCTAssertEqual(details.rows.map(\.name.stringValue), ["Device", "Format", "State", "Presented", "Late", "Dropped"])
+        XCTAssertEqual(details.rows[2].value.stringValue, "presenting")
+        XCTAssertEqual(details.rows[3].value.stringValue, "not yet", "no metrics event has come in this test")
+        XCTAssertEqual(details.stack.selectedItem?.title, "Stack 1 Main")
+        details.choose(stack: 2)
+        XCTAssertEqual(rig.commands, [["output 1 stack 2"]])
+        XCTAssertEqual(Audit.unlabelled(in: details), [])
+        for row in details.rows { XCTAssertFalse(Audit.isCutOff(row.name), row.name.stringValue) }
+    }
+
+    func test_showInLibraryOpensTheFolderAndMarksTheListsRow() throws {
+        let rig = try Rig()
+        rig.model.showInLibrary(list: "a9f00000-0000-4000-8000-00000000002a")
+        let rows = rig.view.left.library.rows
+        XCTAssertEqual(rows.map(\.title.stringValue), ["Christmas", "Hymns", "Great Is Thy Faithfulness", "Doxology"])
+        XCTAssertNotNil(rows[2].outline, "its row is marked")
+        XCTAssertNil(rows[3].outline)
+        XCTAssertEqual(rig.view.grid.title.stringValue, "Sunday", "and the grid stays where it was")
+    }
+
     // MARK: - Accessibility and strings (Spec 10 §15, §18)
 
     func test_everyControlInEveryRegionHasALabel() throws {

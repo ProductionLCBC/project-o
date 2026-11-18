@@ -228,4 +228,61 @@ public enum ShowWording {
     public static func unavailable(_ reason: Unavailable?) -> String? {
         reason.map(UnavailableWording.sentence)
     }
+
+    // MARK: An output's details (Spec 10 §8)
+
+    /// A video format: "1920 × 1080 · 60p", or "· 59.94i" for an interlaced
+    /// one, named by its fields a second as a video engineer names it.
+    public static func format(_ format: VideoFormat, locale: Locale = .current) -> String {
+        let frames = Double(format.rate.num) / Double(max(1, format.rate.den))
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.maximumFractionDigits = 2
+        let rate = formatter.string(from: NSNumber(value: format.interlaced ? frames * 2 : frames)) ?? ""
+        // A pixel size is a name, not a quantity: "1920", never "1,920".
+        return Strings.text(.outputFormatValue, String(format.width), String(format.height), rate + (format.interlaced ? "i" : "p"))
+    }
+
+    /// An SDI output's reference in a word; nil for an output with none to speak of.
+    public static func reference(_ reference: String?) -> String? {
+        switch reference {
+        case "locked": return Strings.text(.outputReferenceLocked)
+        case "freeRun": return Strings.text(.outputReferenceFreeRun)
+        case "none": return Strings.text(.outputReferenceNone)
+        default: return nil
+        }
+    }
+
+    public static func state(_ state: OutputDot.State) -> String {
+        switch state {
+        case .presenting: return Strings.text(.outputStatePresenting)
+        case .lost: return Strings.text(.outputStateLost)
+        case .released: return Strings.text(.outputStateReleased)
+        case .absent: return Strings.text(.outputStateAbsent)
+        }
+    }
+
+    /// A count of frames, grouped as the system does; "not yet" before the engine has sent one.
+    public static func frames(_ count: Int?, locale: Locale = .current) -> String {
+        guard let count else { return Strings.text(.outputNoCount) }
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
+    }
+
+    /// The rows of an output's details, each a name and its value, in the spec's order.
+    public static func rows(_ details: OutputDetails, locale: Locale = .current) -> [(name: String, value: String)] {
+        var rows: [(String, String)] = [(Strings.text(.outputDevice), details.device), (Strings.text(.outputFormat), format(details.format, locale: locale))]
+        if let reference = reference(details.reference) { rows.append((Strings.text(.outputReference), reference)) }
+        var state = self.state(details.state)
+        if details.isBlackedOut { state = Strings.text(.topOutputBlackout, state) }
+        rows.append((Strings.text(.outputState), state))
+        rows.append((Strings.text(.outputPresented), frames(details.presented, locale: locale)))
+        rows.append((Strings.text(.outputLate), frames(details.late, locale: locale)))
+        rows.append((Strings.text(.outputDropped), frames(details.dropped, locale: locale)))
+        return rows
+    }
 }
