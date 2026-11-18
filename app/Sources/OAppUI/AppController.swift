@@ -35,6 +35,8 @@ final class AppController {
     var releasedScreens: [String] { releaser.released }
     /// Which engine the window drives (Spec 10 §2).
     private let wiring: SessionWiring
+    /// Spec 10 §4 — what writes `machine/view.json` "a second after the last change".
+    private var saver: ViewSettingsSaver?
 
     init(rootsStore: any RootsStore = DefaultsRootsStore(), launcher: any EngineLauncher = PosixEngineLauncher(),
          connector: any EngineConnector = UnixEngineConnector(), clock: any AppClock = SystemAppClock(),
@@ -101,6 +103,7 @@ final class AppController {
         // Spec 10 §13 — the app starts a first run when the machine root has no `machine.json` yet.
         model.isFirstRun = roots.isFirstRun
         windowController.regions.machineRoot = roots.machine
+        startViewSettings(roots)
         // Spec 8 §3, "Staged" — a file from outside the folders the engine reads is copied into the staging folder first.
         if let staging = FileStager.standardFolder {
             model.imports.stager = FileStager(staging: staging) { [weak self] in
@@ -172,6 +175,47 @@ final class AppController {
     /// The window a new sheet goes on: the main window, or the sheet already on it.
     private var sheetParent: NSWindow {
         windowController.window.attachedSheet ?? windowController.window
+    }
+
+    // MARK: - View settings (Spec 10 §4)
+
+    /// Spec 10 §4, "View settings" — reads `machine/view.json`, puts the
+    /// window where it was, and from then on writes the file "a second
+    /// after the last change". It is the one file the app writes in the
+    /// roots, and not before the engine's first run has made the machine's
+    /// documents (§13).
+    private func startViewSettings(_ roots: EngineRoots) {
+        let loaded = ViewSettingsFile.read(machineRoot: roots.machine)
+        model.load(settings: loaded)
+        let window = windowController.window
+        let screens = NSScreen.screens.map { WindowPlacement.Rect(x: Double($0.frame.minX), y: Double($0.frame.minY), width: Double($0.frame.width), height: Double($0.frame.height)) }
+        if let frame = WindowPlacement.restored(loaded.windowFrame, screens: screens, minimum: (Double(window.minSize.width), Double(window.minSize.height))) {
+            window.setFrame(NSRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height), display: true)
+        }
+        let saver = ViewSettingsSaver(clock: clock) { settings in
+            guard !roots.isFirstRun else { return false }
+            return ViewSettingsFile.write(settings, machineRoot: roots.machine)
+        }
+        self.saver = saver
+        model.onSettings = { [weak saver] settings in saver?.changed(settings) }
+        for name in [NSWindow.didMoveNotification, NSWindow.didEndLiveResizeNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.windowMoved() }
+            }
+        }
+    }
+
+    /// "the window's frame": kept as the window is moved or sized, but not while it is full screen.
+    private func windowMoved() {
+        let window = windowController.window
+        guard window.isVisible, !window.styleMask.contains(.fullScreen) else { return }
+        let frame = window.frame
+        model.windowMoved(to: [Double(frame.minX), Double(frame.minY), Double(frame.width), Double(frame.height)])
+    }
+
+    /// Writes what is waiting, as the app does before it quits.
+    func saveViewSettingsNow() {
+        saver?.flush()
     }
 
     // MARK: - File dialogs (Spec 10 §4, §6)

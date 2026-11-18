@@ -38,7 +38,7 @@ public enum ShowWording {
         case .audioLost: return Strings.text(.topTagAudioLost)
         case .popup(let slot): return Strings.text(.topTagPopup, slot)
         case .engine(let badges): return Strings.counted(.topTagEngine, badges)
-        case .saving(let unsaved): return Strings.counted(.topTagSaving, unsaved)
+        case .saving(let tag): return StateWording.tag(tag)
         }
     }
 

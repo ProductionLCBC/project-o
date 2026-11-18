@@ -111,6 +111,7 @@ public enum EditWording {
         case .rejected(let rejection): return self.rejection(rejection)
         case .done(let undo, let kind, let object): return done(undo: undo, kind: kind, object: object)
         case .notSent(let reason): return Strings.text(.noticeNotSent, self.reason(reason))
+        case .snapshotTaken: return Strings.text(.noticeSnapshotTaken)
         }
     }
 

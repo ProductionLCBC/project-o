@@ -21,7 +21,11 @@ final class TopBarView: Surface {
     let backToLive = FlatButton(style: .amber)
     let countdown = Kit.label(size: 13, weight: .semibold, mono: true)
     private var outputs: [(button: FlatButton, dot: DotView)] = []
-    private var tags: [TagView] = []
+    /// The tags: a word alone, or a button drawn as one where the tag opens something.
+    private var tags: [NSView] = []
+    private(set) var tagButtons: [FlatButton] = []
+    /// Reveal in Finder, for the machine folder (Spec 10 §14, "The saving tag").
+    var onRevealMachine: (() -> Void)?
     let note = Kit.label(size: 12)
     private let remote = DotView()
     let time = Kit.label(size: 12, mono: true)
@@ -163,14 +167,18 @@ final class TopBarView: Surface {
         }
 
         tags.forEach { $0.removeFromSuperview() }
+        tagButtons = []
         tags = model.tags.map { tag in
-            let style: TagView.Style
+            let words = ShowWording.tag(tag)
+            let view: NSView
             switch tag {
-            case .audioLost: style = .red
-            case .audioMuted, .saving, .engine: style = .amber
-            case .popup: style = .quiet
+            case .audioLost: view = TagView(words, style: .red)
+            case .audioMuted: view = TagView(words, style: .amber)
+            // "the tags, ... each opening or doing what it says": these three are buttons.
+            case .popup: view = tagButton(words, .quiet) { [weak self] _ in self?.onPopupTag?() }
+            case .engine: view = tagButton(words, .amber) { [weak self] button in self?.popUp(self?.engineMenu, at: button) }
+            case .saving(let saving): view = tagButton(words, saving.isRed ? .red : .amber) { [weak self] button in self?.popUp(self?.savingMenu, at: button) }
             }
-            let view = TagView(ShowWording.tag(tag), style: style)
             view.isHidden = inactive
             addSubview(view)
             return view
@@ -211,7 +219,7 @@ final class TopBarView: Surface {
         remote.frame = NSRect(x: right - 9, y: (h - 9) / 2, width: 9, height: 9)
         right -= 21
         for tag in tags.reversed() {
-            let size = tag.fitting
+            let size = (tag as? TagView)?.fitting ?? (tag as? FlatButton)?.fitting ?? .zero
             tag.frame = NSRect(x: right - size.width, y: (h - size.height) / 2, width: size.width, height: size.height)
             right -= size.width + 6
         }
@@ -256,7 +264,48 @@ final class TopBarView: Surface {
         if activeElsewhere != nil { NSApplication.shared.activate(ignoringOtherApps: true) } else { super.mouseDown(with: event) }
     }
 
+    // MARK: Tags that open something (Spec 10 §8, §14)
+
+    private func tagButton(_ words: String, _ style: TagView.Style, _ press: @escaping (FlatButton) -> Void) -> FlatButton {
+        let button = FlatButton(words, style: .bare)
+        button.fontSize = 10
+        button.tagStyle = style
+        button.onPress = { [weak button] in
+            if let button { press(button) }
+        }
+        tagButtons.append(button)
+        return button
+    }
+
+    private func popUp(_ menu: NSMenu?, at button: NSView) {
+        menu?.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+
+    private func line(_ words: String) -> NSMenuItem {
+        let item = NSMenuItem(title: words, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    /// "The engine tag lists the standing badges in plain words".
+    var engineMenu: NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for badge in model.store.engine.badges { menu.addItem(line(StateWording.badge(badge))) }
+        return menu
+    }
+
+    /// "A click lists what is waiting, with Reveal in Finder for the machine folder."
+    var savingMenu: NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for words in StateWording.saving(model.savingDetails) { menu.addItem(line(words)) }
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(title: Strings.text(.savingReveal)) { [weak self] in self?.onRevealMachine?() })
+        return menu
+    }
+
     /// What the bar shows, for a test.
     var shownOutputs: [String] { outputs.map { $0.button.accessibilityLabel() ?? "" } }
-    var shownTags: [String] { tags.map(\.text) }
+    var shownTags: [String] { tags.map { ($0 as? TagView)?.text ?? ($0 as? FlatButton)?.title ?? "" } }
 }

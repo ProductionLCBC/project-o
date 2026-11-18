@@ -50,6 +50,8 @@ public final class SessionWiring {
             session.send(request, completion: answer)
         }
         model.hold = { [weak session] lists in session?.hold(lists: lists) }
+        // Spec 10 §3, "Notes" — the UI-only moments the app notes in the command log.
+        model.note = { [weak session] fields, text in session?.send(.note(fields, text: text)) }
         mach.connect(name: session.hello.mach)
     }
 
@@ -65,9 +67,11 @@ public final class SessionWiring {
             // The store says so, and with it every control that sends shows disabled with the reason (Spec 10 §2).
             model.store.silent(true)
             model.transmit = nil
+            model.note = nil
             mach.disconnect()
         default:
             model.transmit = nil
+            model.note = nil
             mach.disconnect()
             releaser.transmit = nil
             session = nil

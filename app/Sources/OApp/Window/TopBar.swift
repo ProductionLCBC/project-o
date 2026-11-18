@@ -77,14 +77,14 @@ public enum TopBarTag: Equatable, Sendable {
     /// "the engine tag while a badge stands, which lists them (§14)".
     case engine(badges: Int)
     /// "the saving tag (§14)".
-    case saving(unsaved: Int)
+    case saving(SavingTag)
 
     /// The tags that apply, in the spec's order.
     ///
     /// Area 13 reading — "Audio lost" is for an audio output a channel
     /// routes to that has gone silent; an embedded output nothing feeds is
     /// always silent and says nothing.
-    public static func all(channels: [Channel], audio: [Int: AudioStatus], popups: [Int: PopupStatus], engine: EngineStatus, saving: SavingStatus) -> [TopBarTag] {
+    public static func all(channels: [Channel], audio: [Int: AudioStatus], popups: [Int: PopupStatus], engine: EngineStatus, saving: SavingTag?) -> [TopBarTag] {
         var tags: [TopBarTag] = []
         let routed = Set(channels.flatMap(\.audioOutputs))
         if audio.values.contains(where: { routed.contains($0.number) && $0.state == "silent" }) {
@@ -94,7 +94,7 @@ public enum TopBarTag: Equatable, Sendable {
         }
         for slot in popups.keys.sorted() where popups[slot]?.isSet == true { tags.append(.popup(slot)) }
         if !engine.badges.isEmpty { tags.append(.engine(badges: engine.badges.count)) }
-        if saving.unsaved > 0 { tags.append(.saving(unsaved: saving.unsaved)) }
+        if let saving { tags.append(.saving(saving)) }
         return tags
     }
 }
@@ -197,8 +197,78 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var showsArchivedPlaylists = false
     public var openFolders: [String] = []
     public var recentMedia: [String] = []
+    /// "the window's frame": x, y, width and height on the Mac's screens; nil until the window has been moved or sized.
+    public var windowFrame: [Double]?
+    /// "the last thing browsed": a playlist's uuid or a list's, whichever the grid last showed.
+    public var lastBrowsedPlaylist: String?
+    public var lastBrowsedList: String?
+    /// "the run whose restore banner was dismissed (§14)".
+    public var dismissedRestoreRun: String?
 
     public init() {}
+
+    /// Spec 10 §4 — "It isn't a document of Spec 1 §5: it carries no header
+    /// and no schema promises, unknown keys are ignored, a file that doesn't
+    /// read means defaults". Each key that reads is taken and each that
+    /// doesn't keeps its default (Area 13 reading), so a file from an older
+    /// build, or one with a value this build doesn't know, still gives back
+    /// what it can.
+    public init(from decoder: Decoder) throws {
+        self.init()
+        guard let c = try? decoder.container(keyedBy: CodingKeys.self) else { return }
+        func read<T: Decodable>(_ key: CodingKeys, into value: inout T) {
+            if let found = try? c.decodeIfPresent(T.self, forKey: key) { value = found }
+        }
+        func read<T: Decodable>(_ key: CodingKeys, into value: inout T?) {
+            if let found = try? c.decodeIfPresent(T.self, forKey: key) { value = found }
+        }
+        read(.leftColumnWidth, into: &leftColumnWidth)
+        read(.rightColumnWidth, into: &rightColumnWidth)
+        read(.leftSplit, into: &leftSplit)
+        read(.panel, into: &panel)
+        read(.tabbedPanelCollapsed, into: &tabbedPanelCollapsed)
+        read(.previewStack, into: &previewStack)
+        read(.multiviewer, into: &multiviewer)
+        read(.showsThumbnails, into: &showsThumbnails)
+        read(.showsChips, into: &showsChips)
+        read(.showsTriggers, into: &showsTriggers)
+        read(.showsNotes, into: &showsNotes)
+        read(.poolFolder, into: &poolFolder)
+        read(.poolSort, into: &poolSort)
+        read(.poolKind, into: &poolKind)
+        read(.poolTileSize, into: &poolTileSize)
+        read(.stripStack, into: &stripStack)
+        read(.showsArchivedPlaylists, into: &showsArchivedPlaylists)
+        read(.openFolders, into: &openFolders)
+        read(.recentMedia, into: &recentMedia)
+        read(.windowFrame, into: &windowFrame)
+        read(.lastBrowsedPlaylist, into: &lastBrowsedPlaylist)
+        read(.lastBrowsedList, into: &lastBrowsedList)
+        read(.dismissedRestoreRun, into: &dismissedRestoreRun)
+        // What was read is held to what the window allows.
+        leftColumnWidth = Self.clampedLeft(leftColumnWidth)
+        rightColumnWidth = Self.clampedRight(rightColumnWidth)
+        leftSplit = min(0.8, max(0.2, leftSplit))
+        if recentMedia.count > 20 { recentMedia.removeLast(recentMedia.count - 20) }
+        if let frame = windowFrame, frame.count != 4 || frame.contains(where: { !$0.isFinite }) || frame[2] <= 0 || frame[3] <= 0 { windowFrame = nil }
+    }
+
+    /// "the last thing browsed", as the grid names what it shows.
+    public var lastBrowsed: GridContext? {
+        get {
+            if let playlist = lastBrowsedPlaylist { return .playlist(playlist) }
+            return lastBrowsedList.map(GridContext.list)
+        }
+        set {
+            lastBrowsedPlaylist = nil
+            lastBrowsedList = nil
+            switch newValue {
+            case .playlist(let uuid)?: lastBrowsedPlaylist = uuid
+            case .list(let uuid)?: lastBrowsedList = uuid
+            case nil: break
+            }
+        }
+    }
 
     /// "Compact, which drops the thumbnails" (Spec 10 §6).
     public var isCompact: Bool { !showsThumbnails }

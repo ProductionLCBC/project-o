@@ -26,13 +26,17 @@ public enum Notice: Equatable, Sendable {
     case done(undo: Bool, kind: HistoryKind, object: EditedObject)
     /// Something that couldn't be sent, with why.
     case notSent(CannotEdit)
+    /// File ▸ Take Snapshot was done (Spec 10 §14).
+    case snapshotTaken
 
     /// How long it stands: three seconds for what an undo changed, as the
-    /// spec says; five for a refusal, which is read rather than glanced at
-    /// (Area 13 reading).
+    /// spec says, and for a snapshot taken; five for a refusal, which is
+    /// read rather than glanced at (Area 13 reading).
     public var seconds: TimeInterval {
-        if case .done = self { return 3 }
-        return 5
+        switch self {
+        case .done, .snapshotTaken: return 3
+        default: return 5
+        }
     }
 }
 

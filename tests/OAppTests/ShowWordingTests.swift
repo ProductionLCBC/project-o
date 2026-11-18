@@ -34,9 +34,10 @@ final class ShowWordingTests: XCTestCase {
     }
 
     func test_theTagsAndTheOutputsNote() {
-        XCTAssertEqual([TopBarTag.audioMuted, .audioLost, .popup(1), .engine(badges: 1), .engine(badges: 2), .saving(unsaved: 1), .saving(unsaved: 3)]
-            .map(ShowWording.tag),
-                       ["Audio muted", "Audio lost", "Popup 1", "1 engine notice", "2 engine notices", "1 change not saved yet", "3 changes not saved yet"])
+        // Spec 10 §14 — "amber "Unsaved (3)" ..., amber "Disk low", and red "Disk full: changes not saved"".
+        XCTAssertEqual([TopBarTag.audioMuted, .audioLost, .popup(1), .engine(badges: 1), .engine(badges: 2), .saving(.unsaved(3)), .saving(.diskLow),
+                        .saving(.diskFull)].map(ShowWording.tag),
+                       ["Audio muted", "Audio lost", "Popup 1", "1 engine notice", "2 engine notices", "Unsaved (3)", "Disk low", "Disk full: changes not saved"])
         XCTAssertEqual(ShowWording.note(.noOutputs), "No outputs")
         XCTAssertEqual(ShowWording.note(.mirrored), "Screens are mirrored: the room sees this window")
     }

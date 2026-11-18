@@ -73,6 +73,26 @@ final class SessionWiringTests: XCTestCase {
         XCTAssertEqual(rig.source.connects, ["org.lcbc.projecto.engine.51e2"], "the Mach channel `hello` named")
     }
 
+    /// Spec 10 §3, "Notes" — `browse` and `backToLive` go to the engine the
+    /// window drives, as `note` requests with source `ui`; while it is
+    /// silent nothing is noted, and nothing kept to note later.
+    func test_theWindowsNotesGoToTheEngineItDrives() throws {
+        let rig = try rig()
+        let transport = try rig.comeUp()
+        let before = transport.sent("note").count
+        rig.model.browse(.playlist(Recorded.sundayNight))
+        let notes = transport.sent("note")
+        XCTAssertEqual(notes.count, before + 1)
+        XCTAssertEqual(notes.last?["note"]?.objectValue?["event"], .string("browse"))
+        XCTAssertEqual(notes.last?["note"]?.objectValue?["playlist"], .string(Recorded.sundayNight))
+        XCTAssertEqual(notes.last?["source"], .string("ui"))
+        rig.engine.clock.advance(by: 2)
+        rig.engine.clock.advance(by: 5.1)
+        XCTAssertEqual(rig.engine.supervisor.phase, .notResponding)
+        rig.model.browse(.list(Recorded.list42))
+        XCTAssertEqual(transport.sent("note").count, before + 1)
+    }
+
     /// Area 13 reading — a press made while the engine is silent is dropped,
     /// never left to land in a burst when it wakes; and when the engine
     /// answers again the window drives it again.

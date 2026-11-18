@@ -178,6 +178,9 @@ final class FlatButton: NSControl {
     }
 
     var style = Style.plain { didSet { needsDisplay = true } }
+    /// Drawn as a small tag, in that tag's colours: a tag that opens
+    /// something is a button like any other (Spec 10 §8).
+    var tagStyle: TagView.Style? { didSet { refresh() } }
     var title = "" { didSet { refresh() } }
     var fontSize: CGFloat = 12 { didSet { refresh() } }
     var fontWeight = NSFont.Weight.medium { didSet { refresh() } }
@@ -213,7 +216,34 @@ final class FlatButton: NSControl {
 
     var fitting: NSSize {
         let width = ceil((title as NSString).size(withAttributes: [.font: font_]).width)
+        if tagStyle != nil { return NSSize(width: width + 10, height: 16) }
         return NSSize(width: width + 22, height: max(24, fontSize + 12))
+    }
+
+    private func drawAsTag(_ tag: TagView.Style) {
+        var fill = Palette.raisedHigh
+        var text = Palette.dimText
+        switch tag {
+        case .quiet:
+            if isDown || isHovered { fill = fill.blended(withFraction: 0.12, of: .white) ?? fill }
+        case .red, .dashedRed:
+            fill = Palette.live.withAlphaComponent(isDown || isHovered ? 0.30 : 0.18)
+            text = Palette.live
+        case .amber:
+            fill = Palette.browsing.withAlphaComponent(isDown || isHovered ? 0.30 : 0.18)
+            text = Palette.browsing
+        }
+        let path = NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4)
+        fill.setFill()
+        path.fill()
+        if window?.firstResponder === self {
+            Palette.selection.setStroke()
+            path.lineWidth = 2
+            path.stroke()
+        }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font_, .foregroundColor: text]
+        let size = (title as NSString).size(withAttributes: attributes)
+        (title as NSString).draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attributes)
     }
 
     /// What VoiceOver reads when that isn't the title: a dot's state in words, a glyph's meaning.
@@ -275,6 +305,7 @@ final class FlatButton: NSControl {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        if let tagStyle { return drawAsTag(tagStyle) }
         var fill: NSColor?
         var text = Palette.text
         var outline: NSColor?

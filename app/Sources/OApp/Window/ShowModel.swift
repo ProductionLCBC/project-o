@@ -38,12 +38,21 @@ public final class ShowModel {
     /// Cancel and the button that does it (Spec 10 §4, §9). With no window
     /// to ask, nothing that needs asking is done.
     public var confirm: ((Confirmation, @escaping @MainActor (Bool) -> Void) -> Void)?
+    /// How a note reaches the engine's command log (Spec 10 §3, "Notes"):
+    /// the session's `note` request. Nil while no engine is connected, and
+    /// then nothing is noted and nothing kept to note later.
+    public var note: ((_ fields: [String: JSONValue], _ text: String) -> Void)?
+    /// Called when a view setting changed, with the settings as they stand: what writes `view.json` (Spec 10 §4).
+    public var onSettings: ((ViewSettings) -> Void)?
 
     // MARK: What the operator chose
 
     public private(set) var browse = BrowseState()
     public private(set) var selection = StripSelection()
-    public private(set) var settings = ViewSettings()
+    public private(set) var settings = ViewSettings() {
+        didSet { if settings != oldValue, !isLoadingSettings { onSettings?(settings) } }
+    }
+    private var isLoadingSettings = false
     public private(set) var expandedPlaylists: Set<String> = []
     public private(set) var gridSearch = ""
     public private(set) var librarySearch = ""
@@ -76,6 +85,11 @@ public final class ShowModel {
     var noticeTasks: [NoticePlace: any ClockTask] = [:]
     /// Spec 10 §6, "Importing" — the files on their way in, and what waits on each.
     public private(set) lazy var imports = MediaImports(model: self)
+    /// Spec 10 §14 — what the app saw of the engine that ended: its last `live` event and its timers.
+    public internal(set) var lastSeen: RestoreBanner.LastSeen?
+    /// Spec 10 §14 — since when, on the app's clock, the engine has counted documents waiting to be written.
+    private var unsavedSince: TimeInterval?
+    private var unsavedTask: (any ClockTask)?
 
     /// The grid as it stands; rebuilt when what it shows changes.
     public private(set) var grid = GridModel()
@@ -112,10 +126,16 @@ public final class ShowModel {
         if changes.contains(.connection) {
             out.formUnion([.grid, .left, .right, .strip, .top, .pool])
             // "the engine ending drops it too and may lose the import" (Spec 10 §6).
-            if !store.isConnected { imports.engineEnded() }
+            if !store.isConnected {
+                imports.engineEnded()
+                // What the next engine's banner may offer again (Spec 10 §14): the store still holds what it last heard.
+                if store.catalog != nil { lastSeen = RestoreBanner.LastSeen(live: store.live, timers: Array(store.timers.values)) }
+                unsavedSince = nil
+            }
         }
+        if changes.contains(.saving) { savingChanged() }
         if changes.contains(.live) {
-            if store.hasState { browse.connected(live: store.live, lastBrowsed: nil) }
+            if store.hasState { browse.connected(live: store.live, lastBrowsed: knownLastBrowsed) }
             // "until the list is next fired": the list the pointer is in has been fired.
             if let list = store.live.listUuid, store.live.cue != nil { updated.remove(list) }
             if !store.live.gone.contains("item") { removed = nil }
@@ -123,6 +143,8 @@ public final class ShowModel {
             out.formUnion([.grid, .left, .right, .top])
         }
         if !changes.isDisjoint(with: [.catalog, .lists]) {
+            // With nothing live, the grid opens on "the last thing browsed" once the catalog says it is still there.
+            if store.hasState { browse.connected(live: store.live, lastBrowsed: knownLastBrowsed) }
             selection.keep(only: stripChannels)
             holdLists()
             out.formUnion([.grid, .left, .right, .strip, .top, .pool])
@@ -131,8 +153,9 @@ public final class ShowModel {
         if changes.contains(.media) { out.formUnion([.grid, .pool, .strip]) }
         if !changes.isDisjoint(with: [.channels, .stacks]) { out.formUnion([.strip, .right, .top]) }
         if !changes.isDisjoint(with: [.outputs, .audio, .popups, .timers, .engine, .saving, .history, .devices]) { out.formUnion([.right, .top]) }
-        // The lock comes on or off: the buttons that edit show enabled or disabled with the reason (Spec 10 §10).
-        if changes.contains(.engine) { out.formUnion([.left, .pool]) }
+        // The lock comes on or off: the buttons that edit show enabled or disabled with the reason (Spec 10 §10); and
+        // the engine says what became of the last state, which the banner over the grid shows (§14).
+        if changes.contains(.engine) { out.formUnion([.left, .pool, .grid]) }
         if out.contains(.grid) { rebuildGrid() }
         if changes.contains(.live), grid.liveCell != nil { followLiveSoon() }
         changed(out)
@@ -230,22 +253,52 @@ public final class ShowModel {
 
     /// "Click a playlist to browse it"; "Click a list to browse it in the grid".
     public func browse(_ context: GridContext) {
+        let before = browse.shown
         browse.browse(context)
         if case .list = context { revealedList = nil }
+        settings.lastBrowsed = context
         holdLists()
         rebuildGrid()
         changed([.grid, .left, .top])
+        if context != before { noteBrowse(context) }
+    }
+
+    /// "the last thing browsed", when the catalog still has it.
+    private var knownLastBrowsed: GridContext? {
+        guard let catalog = store.catalog else { return nil }
+        switch settings.lastBrowsed {
+        case .playlist(let uuid)?: return catalog.playlist(uuid: uuid) == nil ? nil : .playlist(uuid)
+        case .list(let uuid)?: return catalog.list(uuid: uuid) == nil ? nil : .list(uuid)
+        case nil: return nil
+        }
+    }
+
+    /// Spec 10 §3, "Notes" — `browse`: "The grid shows another playlist or
+    /// list", with "`playlist` (uuid) or `list` (number)".
+    private func noteBrowse(_ context: GridContext) {
+        guard let catalog = store.catalog else { return }
+        switch context {
+        case .playlist(let uuid):
+            guard let playlist = catalog.playlist(uuid: uuid)?.playlist else { return }
+            note?(["event": .string("browse"), "playlist": .string(uuid)], "The grid shows the playlist \"" + playlist.title + "\"")
+        case .list(let uuid):
+            guard let list = catalog.list(uuid: uuid) else { return }
+            note?(["event": .string("browse"), "list": .number(Double(list.number))], "The grid shows list \(list.number), \"" + list.title + "\"")
+        }
     }
 
     /// "Back to Live (⌘L, or the button) returns the grid to the live
     /// context and scrolls to the live cue; ⌘L also scrolls to the live cue
     /// when it is out of view without browsing."
     public func backToLive() {
+        let wasBrowsing = isBrowsing
         browse.backToLive(live: store.live)
         holdLists()
         rebuildGrid()
         changed([.grid, .left, .top])
         onFollowLive?()
+        // Spec 10 §3, "Notes" — `backToLive`: noted when it brought the grid back, not when ⌘L only scrolled.
+        if wasBrowsing { note?(["event": .string("backToLive")], "Back to live") }
     }
 
     /// A click on a playlist in the tree: it is browsed, and expanded by §5's rule.
@@ -300,7 +353,28 @@ public final class ShowModel {
     }
 
     public var tags: [TopBarTag] {
-        TopBarTag.all(channels: store.catalog?.channels ?? [], audio: store.audio, popups: store.popups, engine: store.engine, saving: store.saving)
+        TopBarTag.all(channels: store.catalog?.channels ?? [], audio: store.audio, popups: store.popups, engine: store.engine, saving: savingTag)
+    }
+
+    /// Spec 10 §14, "The saving tag".
+    public var savingTag: SavingTag? {
+        SavingTag.make(store.saving, unsavedFor: unsavedSince.map { clock.now - $0 })
+    }
+
+    /// The engine's count of documents waiting changed: the tag shows once
+    /// they "have waited more than five seconds", so the top bar is asked
+    /// again then.
+    private func savingChanged() {
+        if store.saving.unsaved > 0 {
+            guard unsavedSince == nil else { return }
+            unsavedSince = clock.now
+            unsavedTask?.cancel()
+            unsavedTask = after(SavingTag.wait + 0.05) { [weak self] in self?.changed([.top]) }
+        } else {
+            unsavedSince = nil
+            unsavedTask?.cancel()
+            unsavedTask = nil
+        }
     }
 
     public var isRemoteLit: Bool { remote.isLit(at: clock.now) }
@@ -522,11 +596,42 @@ public final class ShowModel {
 
     /// "View ▸ Reset Layout puts the defaults back; it's a UI action, not a command."
     public func resetLayout() {
-        let recent = settings.recentMedia
-        settings = ViewSettings()
-        settings.recentMedia = recent
+        // What the operator did, and where the window stands, isn't layout: it stays.
+        var fresh = ViewSettings()
+        fresh.recentMedia = settings.recentMedia
+        fresh.windowFrame = settings.windowFrame
+        fresh.lastBrowsedPlaylist = settings.lastBrowsedPlaylist
+        fresh.lastBrowsedList = settings.lastBrowsedList
+        fresh.dismissedRestoreRun = settings.dismissedRestoreRun
+        settings = fresh
+        poolFilter.sort = settings.poolSort
+        poolFilter.kind = settings.poolKind
+        poolFilter.folder = settings.poolFolder
         selection.keep(only: stripChannels)
+        rebuildGrid()
         changed([.grid, .left, .right, .strip, .top, .pool])
+    }
+
+    /// Spec 10 §4 — the settings `view.json` held at launch take the place
+    /// of the defaults. Reading them isn't a change, so nothing is written.
+    public func load(settings loaded: ViewSettings) {
+        isLoadingSettings = true
+        settings = loaded
+        isLoadingSettings = false
+        poolFilter.sort = loaded.poolSort
+        poolFilter.kind = loaded.poolKind
+        poolFilter.folder = loaded.poolFolder
+        selection.keep(only: stripChannels)
+        if store.hasState { browse.connected(live: store.live, lastBrowsed: knownLastBrowsed) }
+        holdLists()
+        rebuildGrid()
+        changed([.grid, .left, .right, .strip, .top, .pool, .layout])
+    }
+
+    /// "the window's frame": the window was moved or sized. Nothing is drawn again for it.
+    public func windowMoved(to frame: [Double]) {
+        guard frame.count == 4, settings.windowFrame != frame else { return }
+        settings.windowFrame = frame
     }
 
     public func dismissFirstLine() {

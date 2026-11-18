@@ -654,6 +654,8 @@ final class GridView: Surface {
     let document = GridDocument()
     let empty = Kit.label(Strings.text(.gridEmpty), size: 13)
     private var firstLine: FirstLineView?
+    /// Spec 10 §14, "The last state" — the banner about what the engine put back, or didn't.
+    private(set) var restoreLine: RestoreLineView?
     static let headerHeight: CGFloat = 56
     /// The window, which opens the fields in place and the small panels (Spec 10 §10).
     weak var host: ShowWindowView?
@@ -727,6 +729,16 @@ final class GridView: Surface {
             let view = FirstLineView(line) { [weak model] in model?.dismissFirstLine() }
             addSubview(view)
             firstLine = view
+        }
+        let banner = model.restoreBanner
+        if banner != restoreLine?.banner {
+            restoreLine?.removeFromSuperview()
+            restoreLine = nil
+            if let banner {
+                let view = RestoreLineView(banner, model: model)
+                addSubview(view)
+                restoreLine = view
+            }
         }
         notice.show(model.notices[.grid])
         document.set(grid, model: model, machineRoot: machineRoot,
@@ -895,6 +907,11 @@ final class GridView: Surface {
             firstLine.frame = NSRect(x: 0, y: 0, width: w, height: FirstLineView.height)
             top = FirstLineView.height
         }
+        if let restoreLine {
+            let height = restoreLine.height(width: w)
+            restoreLine.frame = NSRect(x: 0, y: top, width: w, height: height)
+            top += height
+        }
         let viewSize = view.fitting
         view.frame = NSRect(x: w - 20 - viewSize.width, y: top + 15, width: viewSize.width, height: 26)
         let searchWidth: CGFloat = min(220, max(120, w * 0.24))
@@ -958,5 +975,82 @@ final class FirstLineView: Surface {
         let settingsSize = settings.fitting
         settings.frame = NSRect(x: dismiss.frame.minX - 8 - settingsSize.width, y: 8, width: settingsSize.width, height: 24)
         text.frame = NSRect(x: 20, y: 12, width: max(0, settings.frame.minX - 32), height: 16)
+    }
+}
+
+/// Spec 10 §14, "The last state" — "a banner says "Picked up where the
+/// engine stopped, at 09:41. Video started again from the top." It names
+/// what didn't come back, and says that timers came back unset ..., with Set
+/// Timers Again"; or it says why nothing was put back, and offers "Fire 3
+/// Verse 2 again". "Dismissed, it stays away for that run".
+@MainActor
+final class RestoreLineView: Surface {
+    let banner: RestoreBanner
+    let text = Kit.content(Kit.label(size: 12.5))
+    let setTimers = FlatButton(Strings.text(.restoreTimersAgain), style: .plain)
+    let fireAgain = FlatButton(style: .plain)
+    let dismiss = FlatButton(Strings.text(.firstDismiss), style: .bare)
+
+    init(_ banner: RestoreBanner, model: ShowModel) {
+        self.banner = banner
+        super.init(frame: .zero)
+        fill = Palette.browsing.withAlphaComponent(0.14)
+        text.stringValue = StateWording.banner(banner).joined(separator: " ")
+        text.maximumNumberOfLines = 3
+        text.lineBreakMode = .byWordWrapping
+        text.cell?.wraps = true
+        text.toolTip = text.stringValue
+        let away = model.store.cannotSend
+        if case .setAgain = banner.timers {
+            setTimers.isEnabled = away == nil
+            setTimers.reason = ShowWording.unavailable(away)
+            setTimers.onPress = { [weak model] in model?.setTimersAgain() }
+        } else {
+            setTimers.isHidden = true
+        }
+        if let fire = banner.fireAgain {
+            fireAgain.title = StateWording.fireAgain(fire)
+            // "its Make Live and the restore banner's Fire Again (§14) are disabled with "Rename to fire"" (§6).
+            fireAgain.isEnabled = away == nil && fire.sending != nil
+            fireAgain.reason = fire.refusal.map(ShowWording.refusal) ?? ShowWording.unavailable(away)
+            fireAgain.onPress = { [weak model] in model?.fireAgain() }
+        } else {
+            fireAgain.isHidden = true
+        }
+        dismiss.onPress = { [weak model] in model?.dismissRestoreBanner() }
+        for view in [text, setTimers, fireAgain, dismiss] as [NSView] { addSubview(view) }
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(Strings.text(.restoreLabel))
+        // VoiceOver hears it when it appears.
+        NSAccessibility.post(element: self, notification: .announcementRequested,
+                             userInfo: [.announcement: text.stringValue, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    private var buttonsWidth: CGFloat {
+        var width = dismiss.fitting.width + 14
+        for button in [setTimers, fireAgain] where !button.isHidden { width += button.fitting.width + 8 }
+        return width
+    }
+
+    /// The height its words need at a width: the banner grows rather than cut a sentence short.
+    func height(width: CGFloat) -> CGFloat {
+        let room = max(80, width - 32 - buttonsWidth)
+        let needed = ceil(text.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: room, height: 200)).height ?? 16)
+        return max(40, needed + 24)
+    }
+
+    override func layout() {
+        super.layout()
+        var right = bounds.width - 14
+        for button in [dismiss, fireAgain, setTimers] where !button.isHidden {
+            let size = button.fitting
+            button.frame = NSRect(x: right - size.width, y: 8, width: size.width, height: 24)
+            right -= size.width + 8
+        }
+        text.frame = NSRect(x: 20, y: 12, width: max(0, right - 26), height: max(16, bounds.height - 24))
     }
 }

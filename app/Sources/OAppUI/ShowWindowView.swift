@@ -93,6 +93,16 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         // The digits waiting, the command bar's lines and the table the overlay lists.
         keys.onChange = { [weak self] in self?.keysChanged() }
         topBar.onKeys = { [weak self] in self?.toggleKeys() }
+        // "Popup 1" while a slot is set, which opens the Popups tab (Spec 10 §8).
+        topBar.onPopupTag = { [weak self] in
+            guard let self else { return }
+            if self.model.settings.tabbedPanelCollapsed { self.model.change { $0.tabbedPanelCollapsed = false } }
+            self.tabs.show(.popups)
+        }
+        // "A click lists what is waiting, with Reveal in Finder for the machine folder" (Spec 10 §14).
+        topBar.onRevealMachine = { [weak self] in
+            if let root = self?.machineRoot { self?.reveal?(root) }
+        }
         leftDivider.onBegin = { [weak self] in self?.dragStart = self?.model.settings.leftColumnWidth ?? 0 }
         leftDivider.onDrag = { [weak self] delta in
             guard let self else { return }
@@ -356,6 +366,33 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
                 self?.closeSheet()
                 self?.model.restore(version, ofList: listUuid)
             })
+        }
+    }
+
+    /// Spec 10 §14, "Snapshots" — Restore a Snapshot…: the sheet of
+    /// snapshots, which "shows it working until its result" and then says a
+    /// refusal "with its reason in plain words".
+    func restoreSnapshot() {
+        if let cannot = model.cannotRestore { return model.say(.notSent(cannot), at: .top) }
+        model.snapshots { [weak self] snapshots in
+            guard let self else { return }
+            let machine = self.model.store.catalog?.settings?.uuid.uuidString ?? self.model.store.hello?.machine
+            let sheet = Sheets.snapshots(snapshots, thisMachine: machine, cannot: self.model.cannotRestore) { [weak self] snapshot in
+                guard let self else { return }
+                self.model.restore(snapshot, began: { [weak self] in
+                    self?.sheetView?.show(status: Strings.text(.snapshotsWorking))
+                    self?.sheetView?.buttons.forEach { $0.isEnabled = false }
+                }, ended: { [weak self] rejection in
+                    guard let sheet = self?.sheetView else { return }
+                    sheet.buttons.forEach { $0.isEnabled = true }
+                    if let rejection {
+                        sheet.show(status: StateWording.refusal(rejection), isProblem: true)
+                    } else {
+                        sheet.show(status: Strings.text(.snapshotsRestored))
+                    }
+                })
+            }
+            self.present(sheet: sheet)
         }
     }
 
@@ -645,7 +682,10 @@ final class MenuBar: NSObject, NSMenuDelegate {
             },
             // Spec 10 §6, "The header" — "Import… (⌘I, a file dialog)".
             item(.menuImportMedia, key: "i", enabled: { [weak self] in self?.model?.cannotImport == nil }) { [weak self] in self?.view?.importMedia() },
-            .separator(), later(.menuTakeSnapshot), later(.menuRestoreSnapshot),
+            .separator(),
+            // Spec 10 §12 — Take Snapshot works under the lock; the restore pickers don't.
+            item(.menuTakeSnapshot, enabled: { [weak self] in self?.model?.store.cannotSend == nil }) { [weak self] in self?.model?.takeSnapshot() },
+            item(.menuRestoreSnapshot, enabled: { [weak self] in self?.model?.cannotRestore == nil }) { [weak self] in self?.view?.restoreSnapshot() },
         ])
         let edit: [NSMenuItem] = [
             history(undo: true), history(undo: false), .separator(),

@@ -48,6 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Spec 10 §4 — a view setting changed within the last second is written before the app goes.
+        controller?.saveViewSettingsNow()
         controller?.closeScreens()
     }
 

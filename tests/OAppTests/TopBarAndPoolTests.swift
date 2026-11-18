@@ -47,24 +47,24 @@ final class TopBarModelTests: XCTestCase {
 
     func test_theTagsShowOnlyWhileTheyApply() {
         let channels = [Channel(number: 1, label: "Background", audioOutputs: [1])]
-        XCTAssertEqual(TopBarTag.all(channels: channels, audio: [:], popups: [:], engine: EngineStatus(), saving: SavingStatus()), [])
+        XCTAssertEqual(TopBarTag.all(channels: channels, audio: [:], popups: [:], engine: EngineStatus(), saving: nil), [])
         let tags = TopBarTag.all(channels: channels, audio: [1: AudioStatus(number: 1, state: "ok", muted: true)],
                                  popups: [1: PopupStatus(slot: 1, text: "Nursery 14"), 2: PopupStatus(slot: 2), 3: PopupStatus(slot: 3, text: "Car 7")],
-                                 engine: EngineStatus(badges: [.init(kind: "disk")]), saving: SavingStatus(unsaved: 3))
-        XCTAssertEqual(tags, [.audioMuted, .popup(1), .popup(3), .engine(badges: 1), .saving(unsaved: 3)])
+                                 engine: EngineStatus(badges: [.init(kind: "disk")]), saving: .unsaved(3))
+        XCTAssertEqual(tags, [.audioMuted, .popup(1), .popup(3), .engine(badges: 1), .saving(.unsaved(3))])
     }
 
     func test_audioLostIsForAnOutputAChannelRoutesTo() {
         // Area 13 reading — an embedded output nothing feeds is always silent, and says nothing.
         let channels = [Channel(number: 1, label: "Background", audioOutputs: [1])]
         let unfed = TopBarTag.all(channels: channels, audio: [1: AudioStatus(number: 1, state: "ok", muted: false), 2: AudioStatus(number: 2, state: "silent", muted: false)],
-                                  popups: [:], engine: EngineStatus(), saving: SavingStatus())
+                                  popups: [:], engine: EngineStatus(), saving: nil)
         XCTAssertEqual(unfed, [])
         let lost = TopBarTag.all(channels: channels, audio: [1: AudioStatus(number: 1, state: "silent", muted: true)], popups: [:], engine: EngineStatus(),
-                                 saving: SavingStatus())
+                                 saving: nil)
         XCTAssertEqual(lost, [.audioLost], "lost says more than muted")
         let fallback = TopBarTag.all(channels: channels, audio: [1: AudioStatus(number: 1, state: "fallback", muted: false)], popups: [:], engine: EngineStatus(),
-                                     saving: SavingStatus())
+                                     saving: nil)
         XCTAssertEqual(fallback, [], "on its fallback device it still sounds")
     }
 

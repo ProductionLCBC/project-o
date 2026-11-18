@@ -136,4 +136,16 @@ enum Sheets {
         return PickerSheetView(heading: Strings.text(.versionsHeading, title), note: onAir && !versions.isEmpty ? Strings.text(.versionsOnAir) : nil,
                                empty: Strings.text(.versionsEmpty), button: Strings.text(.versionsRestore), rows: rows)
     }
+
+    /// "Restore a Snapshot… ... opens the snapshots from the `snapshots`
+    /// query, newest first, each with its time, its reason and its size, and
+    /// the campus and machine when another machine took it."
+    static func snapshots(_ snapshots: [SnapshotSummary], thisMachine: String?, cannot: CannotEdit?, restore: @escaping (SnapshotSummary) -> Void) -> PickerSheetView {
+        let rows = snapshots.sorted { $0.takenAt > $1.takenAt }.map { snapshot in
+            let words = StateWording.snapshot(snapshot, thisMachine: thisMachine)
+            return PickerSheetView.Row(title: words.title, detail: words.detail, isEnabled: cannot == nil, reason: cannot.map(EditWording.reason)) { restore(snapshot) }
+        }
+        return PickerSheetView(heading: Strings.text(.snapshotsHeading), note: nil, empty: Strings.text(.snapshotsEmpty),
+                               button: Strings.text(.versionsRestore), rows: rows)
+    }
 }

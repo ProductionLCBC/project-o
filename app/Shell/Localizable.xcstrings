@@ -97,6 +97,90 @@
         }
       }
     },
+    "badge.clock" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running on the backup clock"
+          }
+        }
+      }
+    },
+    "badge.gpu" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The graphics card was reset"
+          }
+        }
+      }
+    },
+    "badge.keychain" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Keychain can’t be read: remote control and unlocking are off"
+          }
+        }
+      }
+    },
+    "badge.memory" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memory is low"
+          }
+        }
+      }
+    },
+    "badge.other" : {
+      "comment" : "One of the engine's standing warnings, of a kind this build has no sentence for. %@ is its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine reports “%@”"
+          }
+        }
+      }
+    },
+    "badge.thermal" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Mac is hot and may slow down"
+          }
+        }
+      }
+    },
+    "badge.watchdog" : {
+      "comment" : "One of the engine's standing warnings.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The engine recovered from a stall"
+          }
+        }
+      }
+    },
     "cannot.alreadyLive" : {
       "comment" : "The reason Make Live is disabled on the playlist that is live.",
       "extractionState" : "manual",
@@ -4945,6 +5029,18 @@
         }
       }
     },
+    "notice.snapshotTaken" : {
+      "comment" : "A short message after File ▸ Take Snapshot.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshot taken."
+          }
+        }
+      }
+    },
     "output.device" : {
       "comment" : "A row of an output's details: the screen or port it uses.",
       "extractionState" : "manual",
@@ -6181,6 +6277,294 @@
         }
       }
     },
+    "restore.fireAgain" : {
+      "comment" : "A button in the banner: fires the cue that was live. %1$lld is the cue's number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire %1$lld %2$@ again"
+          }
+        }
+      }
+    },
+    "restore.label" : {
+      "comment" : "VoiceOver: the banner about what the engine put back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About the last run"
+          }
+        }
+      }
+    },
+    "restore.left.channel.gone" : {
+      "comment" : "In the banner: something that didn't come back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld no longer exists."
+          }
+        }
+      }
+    },
+    "restore.left.channel.missing" : {
+      "comment" : "In the banner: something that came back without its file.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld’s media is missing."
+          }
+        }
+      }
+    },
+    "restore.left.other" : {
+      "comment" : "In the banner: something that didn't come back, of a kind this build has no sentence for.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something else didn’t come back."
+          }
+        }
+      }
+    },
+    "restore.left.output.gone" : {
+      "comment" : "In the banner: something that didn't come back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output %lld no longer exists."
+          }
+        }
+      }
+    },
+    "restore.left.popup.clearing" : {
+      "comment" : "In the banner: a popup message that wasn't put back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popup %lld was on its way off, and stayed off."
+          }
+        }
+      }
+    },
+    "restore.left.stack.gone" : {
+      "comment" : "In the banner: something that didn't come back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld no longer exists."
+          }
+        }
+      }
+    },
+    "restore.restored" : {
+      "comment" : "The same banner when the time isn't known.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Picked up where the engine stopped. Video started again from the top."
+          }
+        }
+      }
+    },
+    "restore.restored.at" : {
+      "comment" : "The banner after the engine put the screens back following a crash. %@ is the time of day the state was saved.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Picked up where the engine stopped, at %@. Video started again from the top."
+          }
+        }
+      }
+    },
+    "restore.skipped.clean" : {
+      "comment" : "The banner when the screens weren't put back at launch.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was put back: the last run ended cleanly."
+          }
+        }
+      }
+    },
+    "restore.skipped.old" : {
+      "comment" : "The banner when the screens weren't put back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was put back: what was on the screens was saved more than two hours ago."
+          }
+        }
+      }
+    },
+    "restore.skipped.other" : {
+      "comment" : "The banner when the screens weren't put back for a reason this build has no sentence for.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was put back."
+          }
+        }
+      }
+    },
+    "restore.skipped.restoredBefore" : {
+      "comment" : "The banner when the screens weren't put back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing was put back: it had been put back once already, and the engine stopped again within a minute."
+          }
+        }
+      }
+    },
+    "restore.timers.again" : {
+      "comment" : "A button in the banner: sets each timer to what it was and starts those that were running.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Timers Again"
+          }
+        }
+      }
+    },
+    "restore.timers.unset" : {
+      "comment" : "In the banner after the screens were put back.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timers came back unset."
+          }
+        }
+      }
+    },
+    "saving.diskFull" : {
+      "comment" : "In the saving tag's list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The disk is full: changes are kept in memory and aren’t saved."
+          }
+        }
+      }
+    },
+    "saving.diskLow" : {
+      "comment" : "In the saving tag's list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The disk is nearly full: automatic snapshots are paused."
+          }
+        }
+      }
+    },
+    "saving.logMemory" : {
+      "comment" : "In the saving tag's list while the engine can't write its log.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The log is kept in memory until the disk has room."
+          }
+        }
+      }
+    },
+    "saving.reveal" : {
+      "comment" : "In the saving tag's list: shows the folder this Mac's documents are in.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal the Machine Folder in Finder"
+          }
+        }
+      }
+    },
+    "saving.tag.diskFull" : {
+      "comment" : "A tag in the top bar: the disk is full.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disk full: changes not saved"
+          }
+        }
+      }
+    },
+    "saving.tag.diskLow" : {
+      "comment" : "A tag in the top bar: the disk is nearly full.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disk low"
+          }
+        }
+      }
+    },
+    "saving.tag.unsaved" : {
+      "comment" : "A tag in the top bar: documents have waited more than five seconds to be written. %lld is how many.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unsaved (%lld)"
+          }
+        }
+      }
+    },
+    "saving.written" : {
+      "comment" : "In the saving tag's list when no document is waiting.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every change is written."
+          }
+        }
+      }
+    },
     "sheet.close" : {
       "comment" : "The button that closes a sheet of things to choose from.",
       "extractionState" : "manual",
@@ -6189,6 +6573,174 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Close"
+          }
+        }
+      }
+    },
+    "snapshots.detail" : {
+      "comment" : "Under a snapshot: %1$@ is why it was taken, %2$@ its size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "snapshots.detail.other" : {
+      "comment" : "Under a snapshot another Mac took: %1$@ is why it was taken, %2$@ its size, %3$@ the campus and %4$@ the start of that machine's id.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ · from %3$@, machine %4$@"
+          }
+        }
+      }
+    },
+    "snapshots.empty" : {
+      "comment" : "In the sheet when the machine has no snapshot.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There are no snapshots yet."
+          }
+        }
+      }
+    },
+    "snapshots.heading" : {
+      "comment" : "The heading of the sheet of snapshots to restore from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshots"
+          }
+        }
+      }
+    },
+    "snapshots.reason.command" : {
+      "comment" : "Why a snapshot was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taken by hand"
+          }
+        }
+      }
+    },
+    "snapshots.reason.launch" : {
+      "comment" : "Why a snapshot was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taken at launch"
+          }
+        }
+      }
+    },
+    "snapshots.reason.other" : {
+      "comment" : "Why a snapshot was taken, when this build has no words for the reason.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a snapshot"
+          }
+        }
+      }
+    },
+    "snapshots.reason.playlist" : {
+      "comment" : "Why a snapshot was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taken when a playlist went live"
+          }
+        }
+      }
+    },
+    "snapshots.reason.restore" : {
+      "comment" : "Why a snapshot was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taken before a restore"
+          }
+        }
+      }
+    },
+    "snapshots.reason.timer" : {
+      "comment" : "Why a snapshot was taken.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "taken automatically"
+          }
+        }
+      }
+    },
+    "snapshots.refused" : {
+      "comment" : "At the foot of the sheet when the engine refused. %@ is the reason, a sentence of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not restored. %@"
+          }
+        }
+      }
+    },
+    "snapshots.refused.detail" : {
+      "comment" : "The same, with the engine's own words naming what stood in the way as %2$@.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not restored. %1$@ The engine says: %2$@"
+          }
+        }
+      }
+    },
+    "snapshots.restored" : {
+      "comment" : "At the foot of the sheet after a snapshot was restored.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restored. Undo puts it back."
+          }
+        }
+      }
+    },
+    "snapshots.working" : {
+      "comment" : "At the foot of the sheet while a snapshot is restored.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restoring…"
           }
         }
       }
@@ -7094,7 +7646,7 @@
       }
     },
     "top.tag.saving" : {
-      "comment" : "A tag in the top bar counting documents waiting to be written.",
+      "comment" : "In the list a click on the saving tag opens. %lld is how many documents the engine hasn't written yet.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -7103,13 +7655,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld change not saved yet"
+                  "value" : "%lld document is waiting to be written"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld changes not saved yet"
+                  "value" : "%lld documents are waiting to be written"
                 }
               }
             }
