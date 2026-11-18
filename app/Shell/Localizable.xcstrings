@@ -229,6 +229,822 @@
         }
       }
     },
+    "command.audio.mute.all.off" : {
+      "comment" : "Plain name of `audio all mute off`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unmute all audio"
+          }
+        }
+      }
+    },
+    "command.audio.mute.all.on" : {
+      "comment" : "Plain name of `audio all mute on`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute all audio"
+          }
+        }
+      }
+    },
+    "command.audio.mute.all.toggle" : {
+      "comment" : "Plain name of `audio all mute toggle`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute or unmute all audio"
+          }
+        }
+      }
+    },
+    "command.audio.mute.off" : {
+      "comment" : "Plain name of `audio N mute off`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unmute audio output %lld"
+          }
+        }
+      }
+    },
+    "command.audio.mute.on" : {
+      "comment" : "Plain name of `audio N mute on`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute audio output %lld"
+          }
+        }
+      }
+    },
+    "command.audio.mute.toggle" : {
+      "comment" : "Plain name of `audio N mute toggle`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute or unmute audio output %lld"
+          }
+        }
+      }
+    },
+    "command.channel.audioTransition" : {
+      "comment" : "Plain name of `channel N audiotransition R`: %2$lld is the transition's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set channel %1$lld’s audio transition to %2$lld"
+          }
+        }
+      }
+    },
+    "command.channel.clear" : {
+      "comment" : "Plain name of `channel N clear`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.clear.all" : {
+      "comment" : "Plain name of `channel all clear`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear every channel"
+          }
+        }
+      }
+    },
+    "command.channel.end.clear" : {
+      "comment" : "Plain name of `channel N end clear`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld clears at its end"
+          }
+        }
+      }
+    },
+    "command.channel.end.hold" : {
+      "comment" : "Plain name of `channel N end hold`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld holds its last frame at its end"
+          }
+        }
+      }
+    },
+    "command.channel.end.loop" : {
+      "comment" : "Plain name of `channel N end loop`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld loops at its end"
+          }
+        }
+      }
+    },
+    "command.channel.freeze.off" : {
+      "comment" : "Plain name of `channel N freeze off`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfreeze channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.freeze.on" : {
+      "comment" : "Plain name of `channel N freeze on`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeze channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.freeze.toggle" : {
+      "comment" : "Plain name of `channel N freeze toggle`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeze or unfreeze channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.grade" : {
+      "comment" : "Plain name of `channel N grade G`: %2$lld is the grade's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set channel %1$lld’s grade to %2$lld"
+          }
+        }
+      }
+    },
+    "command.channel.grade.none" : {
+      "comment" : "Plain name of `channel N grade 0`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove channel %lld’s grade"
+          }
+        }
+      }
+    },
+    "command.channel.lock" : {
+      "comment" : "Plain name of `channel N lock`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.lock.all" : {
+      "comment" : "Plain name of `channel all lock`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock every channel"
+          }
+        }
+      }
+    },
+    "command.channel.pause" : {
+      "comment" : "Plain name of `channel N pause`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.pause.all" : {
+      "comment" : "Plain name of `channel all pause`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause every channel"
+          }
+        }
+      }
+    },
+    "command.channel.play" : {
+      "comment" : "Plain name of `channel N play`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.play.all" : {
+      "comment" : "Plain name of `channel all play`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play every channel"
+          }
+        }
+      }
+    },
+    "command.channel.reset" : {
+      "comment" : "Plain name of `channel N reset`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset channel %lld’s attributes"
+          }
+        }
+      }
+    },
+    "command.channel.reset.all" : {
+      "comment" : "Plain name of `channel all reset`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset every channel’s attributes"
+          }
+        }
+      }
+    },
+    "command.channel.stop" : {
+      "comment" : "Plain name of `channel N stop`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.stop.all" : {
+      "comment" : "Plain name of `channel all stop`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop every channel"
+          }
+        }
+      }
+    },
+    "command.channel.transition" : {
+      "comment" : "Plain name of `channel N transition R`: %2$lld is the transition's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set channel %1$lld’s transition to %2$lld"
+          }
+        }
+      }
+    },
+    "command.channel.unlock" : {
+      "comment" : "Plain name of `channel N unlock`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock channel %lld"
+          }
+        }
+      }
+    },
+    "command.channel.unlock.all" : {
+      "comment" : "Plain name of `channel all unlock`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock every channel"
+          }
+        }
+      }
+    },
+    "command.clearAll" : {
+      "comment" : "Plain name of `system clearall`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear all channels (popups stay)"
+          }
+        }
+      }
+    },
+    "command.cue" : {
+      "comment" : "Plain name of `cue N`: fires that cue in the live list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to cue %lld"
+          }
+        }
+      }
+    },
+    "command.disarm" : {
+      "comment" : "Plain name of `disarm`: the cue armed to fire by itself doesn't.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold the auto-advance"
+          }
+        }
+      }
+    },
+    "command.itemCue" : {
+      "comment" : "Plain name of `item N cue M`: %1$lld is the playlist item, %2$lld the cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire cue %2$lld of item %1$lld"
+          }
+        }
+      }
+    },
+    "command.itemSection" : {
+      "comment" : "Plain name of `item N section \"NAME\"`: %1$lld is the playlist item, %2$@ the section's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to “%2$@” in item %1$lld"
+          }
+        }
+      }
+    },
+    "command.listCue" : {
+      "comment" : "Plain name of `list N cue M`: %1$lld is the list's number, %2$lld the cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire cue %2$lld of list %1$lld"
+          }
+        }
+      }
+    },
+    "command.macro" : {
+      "comment" : "Plain name of `macro N`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run macro %lld"
+          }
+        }
+      }
+    },
+    "command.next" : {
+      "comment" : "Plain name of the command `next`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next cue"
+          }
+        }
+      }
+    },
+    "command.output.stack" : {
+      "comment" : "Plain name of `output N stack M`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch output %1$lld to stack %2$lld"
+          }
+        }
+      }
+    },
+    "command.playlist" : {
+      "comment" : "Plain name of `playlist \"TITLE\"`: %@ is the playlist's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make “%@” live"
+          }
+        }
+      }
+    },
+    "command.popup.clear" : {
+      "comment" : "Plain name of `popup N clear`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear popup %lld"
+          }
+        }
+      }
+    },
+    "command.popup.set" : {
+      "comment" : "Plain name of `popup N set \"TEXT\"`: %1$lld is the popup slot, %2$@ the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show “%2$@” in popup %1$lld"
+          }
+        }
+      }
+    },
+    "command.preflight" : {
+      "comment" : "Plain name of `system preflight`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run the preflight check"
+          }
+        }
+      }
+    },
+    "command.previous" : {
+      "comment" : "Plain name of the command `previous`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous cue"
+          }
+        }
+      }
+    },
+    "command.redo" : {
+      "comment" : "Plain name of `redo`, in the keys overlay.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo the last change undone"
+          }
+        }
+      }
+    },
+    "command.snapshot" : {
+      "comment" : "Plain name of `system snapshot`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take a snapshot"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.all.off" : {
+      "comment" : "Plain name of `stack all blackout off`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End every stack’s blackout"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.all.on" : {
+      "comment" : "Plain name of `stack all blackout on`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black out every stack"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.all.toggle" : {
+      "comment" : "Plain name of `stack all blackout toggle`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blackout of every stack on or off"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.off" : {
+      "comment" : "Plain name of `stack N blackout off`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End the blackout of stack %lld"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.on" : {
+      "comment" : "Plain name of `stack N blackout on`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black out stack %lld"
+          }
+        }
+      }
+    },
+    "command.stack.blackout.toggle" : {
+      "comment" : "Plain name of `stack N blackout toggle`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blackout of stack %lld on or off"
+          }
+        }
+      }
+    },
+    "command.stack.mute.off" : {
+      "comment" : "Plain name of `stack S mute N off`: %1$lld is the stack, %2$lld the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unmute channel %2$lld in stack %1$lld"
+          }
+        }
+      }
+    },
+    "command.stack.mute.on" : {
+      "comment" : "Plain name of `stack S mute N on`: %1$lld is the stack, %2$lld the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute channel %2$lld in stack %1$lld"
+          }
+        }
+      }
+    },
+    "command.stack.mute.toggle" : {
+      "comment" : "Plain name of `stack S mute N toggle`: %1$lld is the stack, %2$lld the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute or unmute channel %2$lld in stack %1$lld"
+          }
+        }
+      }
+    },
+    "command.timer.pause" : {
+      "comment" : "Plain name of `timer N pause`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause timer %lld"
+          }
+        }
+      }
+    },
+    "command.timer.reset" : {
+      "comment" : "Plain name of `timer N reset`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset timer %lld"
+          }
+        }
+      }
+    },
+    "command.timer.start" : {
+      "comment" : "Plain name of `timer N start`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start timer %lld"
+          }
+        }
+      }
+    },
+    "command.undo" : {
+      "comment" : "Plain name of `undo`, in the keys overlay.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo the last change to the library"
+          }
+        }
+      }
+    },
+    "commandBar.label" : {
+      "comment" : "VoiceOver: the field that takes a command as text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command bar"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.blocked" : {
+      "comment" : "Beside the command bar: a lock refused the command. %@ is the command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: blocked by a lock"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.engineAway" : {
+      "comment" : "Beside the command bar, when Return was pressed with no engine connected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not sent: the engine is away"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.noop" : {
+      "comment" : "Beside the command bar: the command changed nothing. %@ is the command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: nothing changed"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.ok" : {
+      "comment" : "Beside the command bar: the engine ran the command. %@ is the command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: done"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.rejected" : {
+      "comment" : "Beside the command bar: the engine refused the command. %1$@ is the command, %2$@ the engine's reason.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: rejected. %2$@"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.sent" : {
+      "comment" : "Beside the command bar, until the engine answers. %@ is the command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: sent"
+          }
+        }
+      }
+    },
+    "commandBar.outcome.steppedOn" : {
+      "comment" : "Beside the command bar: the command ran and cut a transition short. %@ is the command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: done, over a running transition"
+          }
+        }
+      }
+    },
+    "commandBar.placeholder" : {
+      "comment" : "The command bar's placeholder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type a command, then Return"
+          }
+        }
+      }
+    },
     "common.cancel" : {
       "comment" : "A button that closes a dialog and does nothing.",
       "extractionState" : "manual",
@@ -1065,6 +1881,582 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Triggers"
+          }
+        }
+      }
+    },
+    "hint.commandReturnSaves" : {
+      "comment" : "The top bar, while the cursor is in a field of several lines that saves on Command-Return.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editing: ⌘Return saves · Esc discards"
+          }
+        }
+      }
+    },
+    "hint.returnSaves" : {
+      "comment" : "The top bar, while the cursor is in a field that edits and saves on Return.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editing: Return saves · Esc discards"
+          }
+        }
+      }
+    },
+    "hint.textEditor" : {
+      "comment" : "The top bar, while the cursor is in edit mode's text editor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editing text: ⌥Return splits · Esc leaves"
+          }
+        }
+      }
+    },
+    "hint.typing" : {
+      "comment" : "The top bar, while the cursor is in a search field or another field that doesn't edit the library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Typing: Esc for show keys"
+          }
+        }
+      }
+    },
+    "key.alt" : {
+      "comment" : "The sign for the Option key, before a key's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌥"
+          }
+        }
+      }
+    },
+    "key.chord" : {
+      "comment" : "A key with its modifiers: %1$@ is the modifiers' signs, %2$@ the key, as in ⇧Space.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "key.ctrl" : {
+      "comment" : "The sign for the Control key, before a key's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃"
+          }
+        }
+      }
+    },
+    "key.delete" : {
+      "comment" : "The Delete (backspace) key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "key.down" : {
+      "comment" : "The down arrow key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↓"
+          }
+        }
+      }
+    },
+    "key.end" : {
+      "comment" : "The End key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End"
+          }
+        }
+      }
+    },
+    "key.escape" : {
+      "comment" : "The Escape key, as a sign.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⎋"
+          }
+        }
+      }
+    },
+    "key.forwardDelete" : {
+      "comment" : "The forward Delete key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward Delete"
+          }
+        }
+      }
+    },
+    "key.function" : {
+      "comment" : "A function key: %lld is its number, 1 to 20.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "F%lld"
+          }
+        }
+      }
+    },
+    "key.home" : {
+      "comment" : "The Home key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home"
+          }
+        }
+      }
+    },
+    "key.left" : {
+      "comment" : "The left arrow key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "←"
+          }
+        }
+      }
+    },
+    "key.pad" : {
+      "comment" : "A key of the numeric keypad: %@ is what is printed on it, a digit or a sign.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keypad %@"
+          }
+        }
+      }
+    },
+    "key.pad.enter" : {
+      "comment" : "The numeric keypad's Enter key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keypad Enter"
+          }
+        }
+      }
+    },
+    "key.pageDown" : {
+      "comment" : "The Page Down key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page Down"
+          }
+        }
+      }
+    },
+    "key.pageUp" : {
+      "comment" : "The Page Up key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page Up"
+          }
+        }
+      }
+    },
+    "key.return" : {
+      "comment" : "The Return key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return"
+          }
+        }
+      }
+    },
+    "key.right" : {
+      "comment" : "The right arrow key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "→"
+          }
+        }
+      }
+    },
+    "key.shift" : {
+      "comment" : "The sign for the Shift key, before a key's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⇧"
+          }
+        }
+      }
+    },
+    "key.space" : {
+      "comment" : "The space bar.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space"
+          }
+        }
+      }
+    },
+    "key.tab" : {
+      "comment" : "The Tab key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tab"
+          }
+        }
+      }
+    },
+    "key.up" : {
+      "comment" : "The up arrow key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↑"
+          }
+        }
+      }
+    },
+    "keys.bindings" : {
+      "comment" : "The keys overlay: the heading over the list of keys and what each sends.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac’s key bindings"
+          }
+        }
+      }
+    },
+    "keys.close" : {
+      "comment" : "The keys overlay: how to close it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esc or a click closes this."
+          }
+        }
+      }
+    },
+    "keys.fixed" : {
+      "comment" : "The keys overlay: the heading over the keys that can't be changed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always"
+          }
+        }
+      }
+    },
+    "keys.fixed.backToLive.key" : {
+      "comment" : "The shortcut of Go ▸ Back to Live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘L"
+          }
+        }
+      }
+    },
+    "keys.fixed.digits" : {
+      "comment" : "The keys overlay: what typing a number does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to that cue in the live list. Esc, or three seconds, clears the number."
+          }
+        }
+      }
+    },
+    "keys.fixed.digits.key" : {
+      "comment" : "The keys overlay: typing a number on the digit keys and pressing Return.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "0–9, then Return"
+          }
+        }
+      }
+    },
+    "keys.fixed.edit.key" : {
+      "comment" : "The shortcut of Mode ▸ Edit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘2"
+          }
+        }
+      }
+    },
+    "keys.fixed.escape" : {
+      "comment" : "The keys overlay: what plain Escape does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave a field, or close what is open. It never sends a command."
+          }
+        }
+      }
+    },
+    "keys.fixed.multiviewer.key" : {
+      "comment" : "The shortcut of View ▸ Multiviewer.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌥⌘M"
+          }
+        }
+      }
+    },
+    "keys.fixed.optionDoubleClick" : {
+      "comment" : "The keys overlay: what ⌥-double-click on a cue does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit a cue without firing it"
+          }
+        }
+      }
+    },
+    "keys.fixed.optionDoubleClick.key" : {
+      "comment" : "Double-clicking a cue with the Option key held.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌥-double-click"
+          }
+        }
+      }
+    },
+    "keys.fixed.release" : {
+      "comment" : "The keys overlay: what ⌃⌥⌘⎋ does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take every output off the screen this window is on"
+          }
+        }
+      }
+    },
+    "keys.fixed.release.key" : {
+      "comment" : "Control-Option-Command-Escape, as signs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃⌥⌘⎋"
+          }
+        }
+      }
+    },
+    "keys.fixed.show.key" : {
+      "comment" : "The shortcut of Mode ▸ Show.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘1"
+          }
+        }
+      }
+    },
+    "keys.ignored.notAKeyName" : {
+      "comment" : "The keys overlay: a row of the bindings file whose key the app can't read. %@ is the key as the file has it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” isn’t a key name, so its binding is ignored."
+          }
+        }
+      }
+    },
+    "keys.ignored.repeated" : {
+      "comment" : "The keys overlay: a row of the bindings file on a key an earlier row already binds. %@ is the key as the file has it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is bound twice. Only its first binding fires."
+          }
+        }
+      }
+    },
+    "keys.ignored.reserved" : {
+      "comment" : "The keys overlay: a row of the bindings file on a key that can't be bound. %@ is the key as the file has it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is reserved, so its binding is ignored."
+          }
+        }
+      }
+    },
+    "keys.none" : {
+      "comment" : "The keys overlay, when the binding table has no keyboard rows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No keys are bound on this Mac."
+          }
+        }
+      }
+    },
+    "keys.note.menu" : {
+      "comment" : "The keys overlay: a note that no binding fires while a menu is open.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While a menu is open it takes every key, ⇧⎋ included."
+          }
+        }
+      }
+    },
+    "keys.note.releaseUnregistered" : {
+      "comment" : "The keys overlay: a note when the system refused the app's system-wide key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS didn’t give Project O the key ⌃⌥⌘⎋, so it works only while Project O is the active app. Help ▸ Release Output from This Screen does the same."
+          }
+        }
+      }
+    },
+    "keys.note.undo" : {
+      "comment" : "The keys overlay: a note about undo.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo changes the library, never what is on the screens."
+          }
+        }
+      }
+    },
+    "keys.warn.clearAll" : {
+      "comment" : "The keys overlay: a warning when the binding table has no key for `system clearall`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No key is bound to Clear all channels."
+          }
+        }
+      }
+    },
+    "keys.warn.next" : {
+      "comment" : "The keys overlay: a warning when the binding table has no key for `next`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No key is bound to Next cue."
           }
         }
       }

@@ -30,6 +30,13 @@ public struct EngineRequest: Equatable, Sendable {
         EngineRequest(type: "command", fields: ["command": encoded(command), "source": .string(source.rawValue)])
     }
 
+    /// A command as the command bar's parser read it (Spec 10 §9), with its
+    /// `when` guard when it has one: the object form is the command's own
+    /// keys with `when` beside them (Spec 2 §7), and the engine judges it.
+    public static func command(_ command: GuardedCommand, source: AppSource) -> EngineRequest {
+        EngineRequest(type: "command", fields: ["command": (try? JSONCoding.encode(command)) ?? .null, "source": .string(source.rawValue)])
+    }
+
     /// Spec 2 §9 — `{ "id": 18, "type": "commands", "commands": [ ... ],
     /// "group": true }`: several commands as one group, which "validates as
     /// a whole" and lands on one frame (Spec 2 §8).
