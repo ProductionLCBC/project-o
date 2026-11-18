@@ -79,7 +79,7 @@ final class ChipView: NSView {
             text = .white
         case .held:
             Palette.faintText.setStroke()
-            path.lineWidth = 1
+            path.lineWidth = Look.outlineScale
             path.stroke()
         case .redundant:
             Palette.browsing.withAlphaComponent(0.28).setFill()
@@ -95,7 +95,7 @@ final class ChipView: NSView {
             text = Palette.browsing
         case .clear:
             Palette.faintText.setStroke()
-            path.lineWidth = 1
+            path.lineWidth = Look.outlineScale
             path.stroke()
         }
         let number = "\(chip.channel)" as NSString
@@ -230,7 +230,10 @@ final class CueCellView: Surface {
         toolTip = help.isEmpty ? nil : help.joined(separator: "\n")
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel(([ShowWording.cue(cell), trigger.stringValue] + tags.map(\.text)).filter { !$0.isEmpty }.joined(separator: ", "))
+        // Spec 10 §15 — "cells say their number, label, section, trigger, and "live" or "armed"".
+        let sectionWords = (cell.section ?? "").isEmpty ? "" : Strings.text(.gridCueSection, cell.section ?? "")
+        let armed = cell.isArmed ? Strings.text(.gridCueArmed) : ""
+        setAccessibilityLabel(([ShowWording.cue(cell), sectionWords, trigger.stringValue, armed] + tags.map(\.text)).filter { !$0.isEmpty }.joined(separator: ", "))
         setAccessibilityHelp(help.joined(separator: ". "))
         setAccessibilityEnabled(section.refusal == nil)
     }
@@ -526,11 +529,19 @@ final class GridDocument: Surface {
         return acceptPastEnd(payload)
     }
 
+    /// Spec 10 §15 — "The grid is a collection whose cells say their number, label, section, trigger, and "live" or "armed"."
+    private func speakAsCollection() {
+        setAccessibilityElement(true)
+        setAccessibilityRole(.list)
+        setAccessibilityLabel(Strings.text(.gridLabel))
+    }
+
     func set(_ grid: GridModel, model: ShowModel, machineRoot: URL?, onMenu: @escaping (CueCellView, NSEvent) -> Void,
              onDoubleClick: @escaping (CueCellView) -> Void, headerMenu: @escaping (ListHeaderView) -> NSMenu?,
              headerDrop: @escaping (DragPayload, _ item: String?) -> DropPlan, performDrop: @escaping (DropPlan) -> Void,
              cueDrop: @escaping (CueCellView, DragPayload) -> DropPlan, landOnCue: @escaping (CueCellView, DropPlan) -> Void) {
         self.model = model
+        speakAsCollection()
         planPastEnd = { headerDrop($0, nil) }
         self.performDrop = performDrop
         registerForDraggedTypes(Dragging.own)
@@ -661,6 +672,48 @@ final class GridView: Surface {
     weak var host: ShowWindowView?
     /// What the grid says for a few seconds beside what was tried (Spec 10 §10).
     let notice = NoticeLabel()
+    /// Spec 10 §15 — the keyboard's focus among the list headers and the cues: ⌥ with the arrows moves it, ⌥Return or
+    /// ⌥Space presses the cue as a click does, ⌃Return opens the cue's menu or the header's.
+    private(set) lazy var focus: FocusGroup = {
+        let group = FocusGroup(owner: document)
+        group.entries = { [weak self] in self?.focusEntries ?? [] }
+        return group
+    }()
+
+    private var focusEntries: [FocusEntry] {
+        var entries: [FocusEntry] = []
+        var next = 0
+        for (view, section) in document.headers {
+            guard section.kind == .list else { continue }
+            let place = section.itemUuid ?? section.listUuid ?? section.title
+            if let header = view as? ListHeaderView {
+                entries.append(FocusEntry(key: "h:" + place, view: header, activate: {}, menu: { [weak header] in header?.menuNow }))
+            }
+            for _ in section.cells where document.cells.indices.contains(next) {
+                let cell = document.cells[next]
+                next += 1
+                entries.append(FocusEntry(key: "c:" + place + "/" + cell.cell.uuid, view: cell, activate: { [weak cell] in cell?.press() },
+                                          menu: { [weak self, weak cell] in cell.flatMap { self?.cueMenu(for: $0) } }))
+            }
+        }
+        return entries
+    }
+
+    override var acceptsFirstResponder: Bool { !document.cells.isEmpty }
+
+    override func becomeFirstResponder() -> Bool {
+        focus.became(active: true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        focus.became(active: false)
+        return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if !focus.handle(event) { super.keyDown(with: event) }
+    }
 
     init(model: ShowModel) {
         self.model = model
@@ -753,6 +806,7 @@ final class GridView: Surface {
                      performDrop: { [weak model] plan in model?.perform(plan, at: .grid) },
                      cueDrop: { [weak model] cell, payload in model?.plan(payload, ontoCue: cell.cell, in: cell.section) ?? .none },
                      landOnCue: { [weak self] cell, plan in self?.landed(plan, on: cell) })
+        focus.place()
         needsLayout = true
     }
 

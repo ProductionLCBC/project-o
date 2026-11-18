@@ -120,7 +120,7 @@ final class RowView: Surface, NSDraggingSource {
     let title = Kit.content(Kit.label(size: 12.5))
     private let trailing = Kit.content(Kit.label(size: 11, mono: true))
     private var tags: [TagView] = []
-    private let content: RowContent
+    let content: RowContent
     var onClick: ((_ option: Bool) -> Void)?
     /// Spec 10 §5 — "Double-click or the menu renames one in place".
     var onDoubleClick: (() -> Void)?
@@ -251,6 +251,40 @@ final class RowList: NSScrollView {
 
     private let document = Ground()
     private(set) var rows: [RowView] = []
+    /// Spec 10 §15 — the keyboard's focus among the rows: ⌥ with the arrows moves it, ⌥Return or ⌥Space chooses the
+    /// row, ⌃Return opens its menu.
+    private(set) lazy var focus: FocusGroup = {
+        let group = FocusGroup(owner: document)
+        group.entries = { [weak self] in self?.focusEntries ?? [] }
+        return group
+    }()
+
+    private var focusEntries: [FocusEntry] {
+        var seen: [String: Int] = [:]
+        return rows.filter { !$0.content.isHeading }.map { row in
+            // What the row is: its place in the tree and its words, and which of several alike.
+            let name = "\(Int(row.content.indent))|\(row.content.title)"
+            let count = seen[name, default: 0]
+            seen[name] = count + 1
+            return FocusEntry(key: "\(name)|\(count)", view: row, activate: { [weak row] in row?.onClick?(false) }, menu: { [weak row] in row?.menuNow })
+        }
+    }
+
+    override var acceptsFirstResponder: Bool { rows.contains { !$0.content.isHeading } }
+
+    override func becomeFirstResponder() -> Bool {
+        focus.became(active: true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        focus.became(active: false)
+        return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if !focus.handle(event) { super.keyDown(with: event) }
+    }
     /// The menu of the empty space under the rows.
     var makeMenu: (() -> NSMenu?)? {
         get { document.makeMenu }
@@ -287,6 +321,7 @@ final class RowList: NSScrollView {
         for row in rows { document.addSubview(row) }
         needsLayout = true
         layoutRows()
+        focus.place()
     }
 
     private func layoutRows() {

@@ -356,7 +356,12 @@ final class TabsView: Surface {
         }
     }
 
+    /// Draws the panel again, keeping the keyboard's focus on the control it was on (Spec 10 §15).
     func refresh() {
+        FocusKeeper.keeping(in: self) { redraw() }
+    }
+
+    private func redraw() {
         for (index, button) in tabButtons.enumerated() { button.isOn = index == tab.rawValue && !isCollapsed }
         collapse.title = isCollapsed ? "+" : "–"
         collapse.setAccessibilityLabel(Strings.text(isCollapsed ? .tabExpand : .tabCollapse))

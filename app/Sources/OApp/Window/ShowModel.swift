@@ -44,6 +44,10 @@ public final class ShowModel {
     public var note: ((_ fields: [String: JSONValue], _ text: String) -> Void)?
     /// Called when a view setting changed, with the settings as they stand: what writes `view.json` (Spec 10 §4).
     public var onSettings: ((ViewSettings) -> Void)?
+    /// Called with what VoiceOver should be told as the show moves (Spec 10 §15).
+    public var onAnnounce: ((Announcement) -> Void)?
+    /// Spec 10 §15, "Reduce Motion" — the system's setting, which the window keeps this at.
+    public var reducesMotion = false
 
     // MARK: What the operator chose
 
@@ -90,6 +94,7 @@ public final class ShowModel {
     /// Spec 10 §14 — since when, on the app's clock, the engine has counted documents waiting to be written.
     private var unsavedSince: TimeInterval?
     private var unsavedTask: (any ClockTask)?
+    private var announcer = LiveAnnouncer()
 
     /// The grid as it stands; rebuilt when what it shows changes.
     public private(set) var grid = GridModel()
@@ -124,6 +129,8 @@ public final class ShowModel {
     private func storeChanged(_ changes: Set<StoreChange>) {
         var out: Set<Change> = []
         if changes.contains(.connection) {
+            // What is live at a connection is where things stand, not a change to announce (Spec 10 §15).
+            announcer.reset()
             out.formUnion([.grid, .left, .right, .strip, .top, .pool])
             // "the engine ending drops it too and may lose the import" (Spec 10 §6).
             if !store.isConnected {
@@ -135,6 +142,7 @@ public final class ShowModel {
         }
         if changes.contains(.saving) { savingChanged() }
         if changes.contains(.live) {
+            if store.hasState { announcer.live(store.live).forEach { onAnnounce?($0) } }
             if store.hasState { browse.connected(live: store.live, lastBrowsed: knownLastBrowsed) }
             // "until the list is next fired": the list the pointer is in has been fired.
             if let list = store.live.listUuid, store.live.cue != nil { updated.remove(list) }
@@ -152,6 +160,10 @@ public final class ShowModel {
         if changes.contains(.thumbnails) { out.insert(.grid) }
         if changes.contains(.media) { out.formUnion([.grid, .pool, .strip]) }
         if !changes.isDisjoint(with: [.channels, .stacks]) { out.formUnion([.strip, .right, .top]) }
+        // "an output that stops presenting" is announced (Spec 10 §15).
+        if !changes.isDisjoint(with: [.outputs, .stacks, .catalog]), store.hasState, store.catalog != nil {
+            announcer.outputs(outputDots).forEach { onAnnounce?($0) }
+        }
         if !changes.isDisjoint(with: [.outputs, .audio, .popups, .timers, .engine, .saving, .history, .devices]) { out.formUnion([.right, .top]) }
         // The lock comes on or off: the buttons that edit show enabled or disabled with the reason (Spec 10 §10); and
         // the engine says what became of the last state, which the banner over the grid shows (§14).
@@ -180,6 +192,8 @@ public final class ShowModel {
             if moment.steppedOn { steppedOnUntil[moment.channel] = now + 1 }
             if moment.blocked { blockedUntil[moment.channel] = now + 1 }
             if moment.steppedOn || moment.blocked { after(1) { [weak self] in self?.changed([.strip]) } }
+            // "a write a lock blocked or that stepped on a transition" (Spec 10 §15).
+            announcer.channel(moment).forEach { onAnnounce?($0) }
             changed([.strip])
         case .remote(let sources):
             remote.arrived(from: sources, at: now)
@@ -194,8 +208,9 @@ public final class ShowModel {
         case .media(let event):
             // Spec 8 §7 — an import's progress and its outcome, by its job.
             imports.event(event)
-        case .command:
-            break
+        case .command(let event):
+            // Spec 10 §15 — the command that moves the pointer gives the next `live` change its source.
+            announcer.command(event)
         }
     }
 
@@ -425,6 +440,8 @@ public final class ShowModel {
     /// How far a channel's transition bar has run, 0 to 1, or nil with none under way.
     public func transitionProgress(channel: Int) -> Double? {
         guard let running = transitions[channel], running.ms > 0 else { return nil }
+        // Spec 10 §15 — Reduce Motion "shows the transition bar's end state instead of running it".
+        if reducesMotion { return 1 }
         return min(1, max(0, (clock.now - running.startedAt) * 1000 / Double(running.ms)))
     }
 

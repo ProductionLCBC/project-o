@@ -133,6 +133,12 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         topBar.onOutput = { [weak self] dot, anchor in self?.showOutput(dot, at: anchor) }
         model.onChange = { [weak self] changes in self?.refresh(changes) }
         model.onFollowLive = { [weak self] in self?.grid.scrollToLive() }
+        // Spec 10 §15 — what VoiceOver is told as the show moves.
+        model.onAnnounce = { [weak self] announcement in self?.say(AnnounceWording.text(announcement)) }
+        // The regions the keyboard's focus rests in, by name.
+        for (list, name) in [(left.playlists, StringKey.focusPlaylists), (left.library, .focusLibrary), (pool.rail, .focusPoolFolders)] {
+            list.setAccessibilityLabel(Strings.text(name))
+        }
         mach?.onChange = { [weak self] in self?.drawPictures() }
         // "While another app is active, the whole bar says ..." (Spec 10 §8).
         let center = NotificationCenter.default
@@ -393,6 +399,30 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
                 })
             }
             self.present(sheet: sheet)
+        }
+    }
+
+    /// What the window last told VoiceOver, for a test; the newest last.
+    private(set) var spoken: [String] = []
+
+    /// Spec 10 §15 — an announcement: VoiceOver reads it over whatever it was reading.
+    func say(_ words: String) {
+        spoken.append(words)
+        if spoken.count > 20 { spoken.removeFirst(spoken.count - 20) }
+        NSAccessibility.post(element: window ?? self, notification: .announcementRequested,
+                             userInfo: [.announcement: words, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+
+    /// Spec 10 §15 — the system's Increase Contrast and Reduce Motion, as they stand: "Increase Contrast thickens
+    /// borders and outlines", and Reduce Motion "shows the transition bar's end state instead of running it".
+    func follow(increaseContrast: Bool, reduceMotion: Bool) {
+        Look.increasesContrast = increaseContrast
+        model.reducesMotion = reduceMotion
+        refreshAll()
+        var waiting: [NSView] = [self]
+        while let view = waiting.popLast() {
+            view.needsDisplay = true
+            waiting.append(contentsOf: view.subviews)
         }
     }
 

@@ -101,6 +101,9 @@ final class MainWindowController {
         window.isReleasedWhenClosed = false
         window.minSize = size
         window.collectionBehavior = [.fullScreenPrimary]
+        // Spec 10 §15 — "Tab and ⇧Tab move the focus between regions and controls": the regions draw their controls
+        // again as the show moves, so the order Tab follows is worked out again as they do.
+        window.autorecalculatesKeyViewLoop = true
         // "the app has no Hide, Minimize or Zoom items": nor the buttons that do the same.
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true

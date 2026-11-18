@@ -112,15 +112,33 @@ final class StripCellView: Surface {
             dotMarks.append(mark)
         }
         meter.isHidden = !cell.hasMeter
-        meter.setAccessibilityLabel(Strings.text(.meterLabel, cell.number))
+        // Spec 10 §15 — "The strip's meters and transition bars are left out of the spoken order."
+        meter.setAccessibilityElement(false)
         transition.isHidden = true
         transition.setAccessibilityElement(false)
         for view in [picture, text, badge, label, kind, detail, remaining, meter, transition] as [NSView] + tags + buttons + dots { addSubview(view) }
         dropNote.onCancel = { [weak model] row in model?.imports.cancel(row: row) }
         addSubview(dropNote)
         tick()
-        setAccessibilityElement(false)
-        setAccessibilityLabel(Strings.text(.stripChannel, cell.number, cell.label))
+        // Spec 10 §15 — "Every control has a label and its state ("Channel 2 Foreground, text, "Great is Thy
+        // faithfulness", locked, in stacks 1 and 2")."
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(spoken)
+    }
+
+    /// The channel in words: its number and label, the kind of what it holds, that in quotation marks, its lock and the stacks that show it.
+    var spoken: String {
+        var parts = [Strings.text(.stripChannel, cell.number, cell.label), ShowWording.kind(cell.kind)]
+        if !cell.contentLabel.isEmpty { parts.append(Strings.text(.stripSpokenContent, cell.contentLabel)) }
+        if cell.isLocked { parts.append(Strings.text(.stripSpokenLocked)) }
+        let stacks = cell.dots.filter { $0.state == .showing }.map(\.stack)
+        if stacks.count == 1 {
+            parts.append(Strings.text(.stripSpokenStack, stacks[0]))
+        } else if stacks.count > 1 {
+            parts.append(Strings.text(.stripSpokenStacks, ListFormatter.localizedString(byJoining: stacks.map(String.init))))
+        }
+        return parts.joined(separator: ", ")
     }
 
     @available(*, unavailable)
@@ -232,8 +250,12 @@ final class StripCellView: Surface {
 
     override func rightMouseDown(with event: NSEvent) { showMenu(event) }
 
-    /// Spec 10 §7, "A cell's menu".
     private func showMenu(_ event: NSEvent) {
+        NSMenu.popUpContextMenu(menuNow, with: event, for: self)
+    }
+
+    /// Spec 10 §7, "A cell's menu" — as it stands now, for a right-click, for ⌃Return (§15) and for a test.
+    var menuNow: NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let away = model.store.cannotSend
@@ -291,7 +313,7 @@ final class StripCellView: Surface {
         }
         menu.addItem(.separator())
         menu.addItem(ClosureMenuItem(title: Strings.text(.stripSelectOnly)) { [weak model] in model?.selectOnly(number) })
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
+        return menu
     }
 
     var shownTags: [String] { tags.map(\.text) }
@@ -344,6 +366,38 @@ final class StripView: Surface {
     private let document = Surface()
     private(set) var cells: [StripCellView] = []
     static let headerHeight: CGFloat = 72
+    /// Spec 10 §15 — the keyboard's focus among the channels' cells: ⌥ with the arrows moves it, ⌥Return or ⌥Space
+    /// selects that channel alone, as a click on its thumbnail does, and ⌃Return opens the cell's menu.
+    private(set) lazy var focus: FocusGroup = {
+        let group = FocusGroup(owner: document)
+        group.entries = { [weak self] in
+            (self?.cells ?? []).map { cell in
+                FocusEntry(key: "\(cell.cell.number)", view: cell, activate: { [weak self, weak cell] in
+                    guard let self, let cell else { return }
+                    self.originUntil = [cell.cell.number: self.model.now + 5]
+                    self.model.selectOnly(cell.cell.number)
+                }, menu: { [weak cell] in cell?.menuNow })
+            }
+        }
+        return group
+    }()
+
+    override var acceptsFirstResponder: Bool { !cells.isEmpty }
+
+    override func becomeFirstResponder() -> Bool {
+        focus.became(active: true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        focus.became(active: false)
+        return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if !focus.handle(event) { super.keyDown(with: event) }
+    }
+
     /// Spec 10 §7, "Drops" — how long a drag has been over which cell, and what that cell says meanwhile.
     private var hover = DropHover()
     private(set) var hovering: (channel: Int, text: String)?
@@ -390,7 +444,13 @@ final class StripView: Surface {
         model.show(stripStack: tag == 0 ? nil : tag)
     }
 
+    /// Draws the strip again, keeping the keyboard's focus on the control it was on (Spec 10 §15).
     func refresh() {
+        FocusKeeper.keeping(in: self) { redraw() }
+        focus.place()
+    }
+
+    private func redraw() {
         let away = model.store.cannotSend
         let reason = ShowWording.unavailable(away)
         clearAll.isEnabled = away == nil
@@ -554,7 +614,17 @@ final class StripView: Surface {
 /// Spec 10 §6, "Tiles" — one item of the pool.
 @MainActor
 final class PoolTileView: Surface, NSDraggingSource {
-    static let size = NSSize(width: 140, height: 98)
+    /// Spec 10 §6, "The header" — "tile size": the three sizes a tile is drawn at.
+    static func size(_ size: ViewSettings.TileSize) -> NSSize {
+        switch size {
+        case .small: return NSSize(width: 108, height: 82)
+        case .medium: return NSSize(width: 140, height: 98)
+        case .large: return NSSize(width: 190, height: 130)
+        }
+    }
+
+    /// The size of the collapsed panel's one strip, whatever the header's choice.
+    static let size = size(.medium)
     /// Spec 10 §6, "A tile's menu".
     var makeMenu: (() -> NSMenu?)?
     private var pressedAt: NSPoint?
@@ -620,14 +690,16 @@ final class PoolTileView: Surface, NSDraggingSource {
 
     override func layout() {
         super.layout()
-        picture.frame = NSRect(x: 6, y: 6, width: bounds.width - 12, height: 54)
-        glyph.frame = NSRect(x: 6, y: 20, width: bounds.width - 12, height: 24)
-        duration.frame = NSRect(x: 6, y: 44, width: bounds.width - 16, height: 13)
-        name.frame = NSRect(x: 7, y: 63, width: bounds.width - 14, height: 14)
-        kind.frame = NSRect(x: 7, y: 78, width: bounds.width - 14, height: 13)
+        // The picture takes what the two lines of words under it leave, at any of the three sizes.
+        let pictureHeight = max(20, bounds.height - 44)
+        picture.frame = NSRect(x: 6, y: 6, width: bounds.width - 12, height: pictureHeight)
+        glyph.frame = NSRect(x: 6, y: 6 + (pictureHeight - 24) / 2, width: bounds.width - 12, height: 24)
+        duration.frame = NSRect(x: 6, y: 6 + pictureHeight - 16, width: bounds.width - 16, height: 13)
+        name.frame = NSRect(x: 7, y: pictureHeight + 9, width: bounds.width - 14, height: 14)
+        kind.frame = NSRect(x: 7, y: pictureHeight + 24, width: bounds.width - 14, height: 13)
         if let overlay {
             let size = overlay.fitting
-            overlay.frame = NSRect(x: (bounds.width - size.width) / 2, y: 25, width: size.width, height: size.height)
+            overlay.frame = NSRect(x: (bounds.width - size.width) / 2, y: 6 + (pictureHeight - size.height) / 2, width: size.width, height: size.height)
         }
     }
 
@@ -678,6 +750,8 @@ final class PoolView: Surface {
     let search = Kit.search(placeholder: Strings.text(.poolSearch))
     let kind = NSPopUpButton(frame: .zero, pullsDown: false)
     let sort = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// "tile size".
+    let size = NSPopUpButton(frame: .zero, pullsDown: false)
     let usedInList = FlatButton(Strings.text(.poolUsedInList), style: .bare)
     let replaced = FlatButton(Strings.text(.poolReplaced), style: .bare)
     let importMedia = FlatButton(Strings.text(.poolImport), style: .plain)
@@ -687,6 +761,33 @@ final class PoolView: Surface {
     private(set) var tiles: [PoolTileView] = []
     /// The window, which opens the file dialogs and the Defaults… panel.
     weak var host: ShowWindowView?
+    /// Spec 10 §15 — the keyboard's focus among the tiles: ⌥ with the arrows moves it, ⌥Return or ⌥Space selects the
+    /// tile as a click does, and ⌃Return opens its menu, which fires it.
+    private(set) lazy var focus: FocusGroup = {
+        let group = FocusGroup(owner: document)
+        group.entries = { [weak self] in
+            (self?.tiles ?? []).map { tile in
+                FocusEntry(key: tile.tile.id, view: tile, activate: { [weak tile] in tile?.onClick?(1, NSEvent()) }, menu: { [weak tile] in tile?.menuNow })
+            }
+        }
+        return group
+    }()
+
+    override var acceptsFirstResponder: Bool { !tiles.isEmpty }
+
+    override func becomeFirstResponder() -> Bool {
+        focus.became(active: true)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        focus.became(active: false)
+        return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if !focus.handle(event) { super.keyDown(with: event) }
+    }
     /// What the pool says for a few seconds about something tried there (Spec 10 §10).
     let notice = NoticeLabel()
     /// "the selected item's details", under the header's controls.
@@ -708,7 +809,7 @@ final class PoolView: Surface {
         fill = Palette.panel
         search.target = self
         search.action = #selector(searched)
-        for (popup, action) in [(kind, #selector(kindPicked)), (sort, #selector(sortPicked))] {
+        for (popup, action) in [(kind, #selector(kindPicked)), (sort, #selector(sortPicked)), (size, #selector(sizePicked))] {
             popup.font = .systemFont(ofSize: 11.5)
             popup.isBordered = false
             popup.target = self
@@ -718,6 +819,8 @@ final class PoolView: Surface {
         kind.setAccessibilityLabel(Strings.text(.poolKindAll))
         for key in [StringKey.poolSortName, .poolSortDate] { sort.addItem(withTitle: Strings.text(key)) }
         sort.setAccessibilityLabel(Strings.text(.poolSortName))
+        for key in [StringKey.poolSizeSmall, .poolSizeMedium, .poolSizeLarge] { size.addItem(withTitle: Strings.text(key)) }
+        size.setAccessibilityLabel(Strings.text(.poolSize))
         usedInList.fontSize = 11
         replaced.fontSize = 11
         usedInList.onPress = { [weak self] in self?.toggleUsed() }
@@ -738,7 +841,7 @@ final class PoolView: Surface {
         scroll.autohidesScrollers = true
         scroll.scrollerStyle = .overlay
         scroll.documentView = document
-        for view in [title, search, kind, sort, usedInList, replaced, importMedia, notice, details, moreJobs, dismissAll, rail, scroll] as [NSView] { addSubview(view) }
+        for view in [title, search, kind, sort, size, usedInList, replaced, importMedia, notice, details, moreJobs, dismissAll, rail, scroll] as [NSView] { addSubview(view) }
         refresh()
     }
 
@@ -811,6 +914,18 @@ final class PoolView: Surface {
     }
     @objc private func sortPicked() { model.setPool { $0.sort = self.sort.indexOfSelectedItem == 1 ? .dateAdded : .name } }
 
+    private static let sizes: [ViewSettings.TileSize] = [.small, .medium, .large]
+
+    @objc private func sizePicked() {
+        let picked = Self.sizes[max(0, min(2, size.indexOfSelectedItem))]
+        model.change { $0.poolTileSize = picked }
+    }
+
+    /// The size the tiles are drawn at: the header's choice, and the middle one in the collapsed panel's strip.
+    private var tileSize: NSSize {
+        PoolTileView.size(model.settings.panel == .collapsed ? .medium : model.settings.poolTileSize)
+    }
+
     /// "a "used in this list" filter over the browsed list's references".
     private func toggleUsed() {
         if model.poolFilter.usedIn != nil {
@@ -836,6 +951,7 @@ final class PoolView: Surface {
         replaced.isOn = filter.replacedOnly
         kind.selectItem(at: [ViewSettings.PoolKind.all, .video, .image, .audio].firstIndex(of: filter.kind) ?? 0)
         sort.selectItem(at: filter.sort == .dateAdded ? 1 : 0)
+        size.selectItem(at: Self.sizes.firstIndex(of: model.settings.poolTileSize) ?? 1)
         let collapsed = model.settings.panel == .collapsed
         let cannotImport = model.cannotImport
         importMedia.isEnabled = cannotImport == nil
@@ -900,6 +1016,7 @@ final class PoolView: Surface {
             return view
         }
         for tile in tiles { document.addSubview(tile) }
+        focus.place()
         needsLayout = true
     }
 
@@ -926,7 +1043,8 @@ final class PoolView: Surface {
             button.frame = NSRect(x: right - size.width, y: 9, width: size.width, height: 22)
             right -= size.width + 2
         }
-        sort.frame = NSRect(x: right - 104, y: 7, width: 104, height: 26)
+        size.frame = NSRect(x: right - 84, y: 7, width: 84, height: 26)
+        sort.frame = NSRect(x: size.frame.minX - 104, y: 7, width: 104, height: 26)
         kind.frame = NSRect(x: sort.frame.minX - 72, y: 7, width: 72, height: 26)
         search.frame = NSRect(x: 104, y: 8, width: max(60, min(220, kind.frame.minX - 116)), height: 24)
         // Under the controls: what was tried and couldn't be, or the selected item's details; then the imports.
@@ -955,15 +1073,16 @@ final class PoolView: Surface {
         let gap: CGFloat = 10
         var x: CGFloat = 12
         var y: CGFloat = 4
+        let each = tileSize
         for tile in tiles {
-            if x + PoolTileView.size.width > width - 8, x > 12 {
+            if x + each.width > width - 8, x > 12 {
                 x = 12
-                y += PoolTileView.size.height + gap
+                y += each.height + gap
             }
-            tile.frame = NSRect(origin: NSPoint(x: x, y: y), size: PoolTileView.size)
-            x += PoolTileView.size.width + gap
+            tile.frame = NSRect(origin: NSPoint(x: x, y: y), size: each)
+            x += each.width + gap
         }
-        document.frame = NSRect(x: 0, y: 0, width: width, height: max(scroll.contentSize.height, y + PoolTileView.size.height + 8))
+        document.frame = NSRect(x: 0, y: 0, width: width, height: max(scroll.contentSize.height, y + each.height + 8))
     }
 
     override func draw(_ dirtyRect: NSRect) {

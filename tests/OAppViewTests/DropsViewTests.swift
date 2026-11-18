@@ -551,6 +551,37 @@ final class DropsViewTests: XCTestCase {
         XCTAssertEqual(rig.sent.count, 0, "There is no single-click firing")
     }
 
+    /// "The header: ... tile size ...", a view setting (§4: "the pool's folder, sort, kind filter and tile size").
+    func test_theHeadersTileSizeDrawsTheTilesAtThreeSizes() throws {
+        let rig = try Rig()
+        let pool = rig.view.pool
+        XCTAssertEqual(pool.size.itemTitles, ["Small", "Medium", "Large"])
+        XCTAssertEqual(pool.size.titleOfSelectedItem, "Medium", "the first-run layout")
+        rig.view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(pool.tiles.first?.frame.size, PoolTileView.size(.medium))
+        pool.size.selectItem(at: 2)
+        _ = NSApplication.shared.sendAction(try XCTUnwrap(pool.size.action), to: pool.size.target, from: pool.size)
+        XCTAssertEqual(rig.model.settings.poolTileSize, .large)
+        rig.view.layoutSubtreeIfNeeded()
+        let large = try XCTUnwrap(rig.view.pool.tiles.first)
+        XCTAssertEqual(large.frame.size, PoolTileView.size(.large))
+        large.layoutSubtreeIfNeeded()
+        XCTAssertFalse(Audit.isCutOff(large.kind), "the words under the picture show whole at every size")
+        XCTAssertEqual(rig.view.pool.size.titleOfSelectedItem, "Large")
+        rig.model.change { $0.poolTileSize = .small }
+        rig.view.layoutSubtreeIfNeeded()
+        let small = try XCTUnwrap(rig.view.pool.tiles.first)
+        XCTAssertEqual(small.frame.size, PoolTileView.size(.small))
+        small.layoutSubtreeIfNeeded()
+        XCTAssertLessThanOrEqual(small.kind.frame.maxY, small.bounds.height)
+        // The collapsed panel's one strip, of what was used lately, stays at the middle size, which its height is made for.
+        rig.model.goLive(media: try rig.tile("dawn.mp4").tile.id, on: 1)
+        rig.model.change { $0.panel = .collapsed }
+        rig.view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(rig.view.pool.tiles.first?.frame.size, PoolTileView.size(.medium))
+        XCTAssertEqual(Audit.unlabelled(in: rig.view.pool), [])
+    }
+
     // MARK: - Panels (Spec 10 §9, §10)
 
     /// A popover the system closed by itself, on a click elsewhere, leaves

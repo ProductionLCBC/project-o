@@ -15,8 +15,12 @@ class Surface: NSView {
     var outlineWidth: CGFloat = 1 { didSet { needsDisplay = true } }
     var isDashed = false { didSet { needsDisplay = true } }
 
+    /// The outline as it is drawn: Spec 10 §15 — "Increase Contrast thickens borders and outlines."
+    var drawnOutlineWidth: CGFloat { outlineWidth * Look.outlineScale }
+
     override func draw(_ dirtyRect: NSRect) {
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: outline == nil ? 0 : outlineWidth / 2, dy: outline == nil ? 0 : outlineWidth / 2),
+        let width = drawnOutlineWidth
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: outline == nil ? 0 : width / 2, dy: outline == nil ? 0 : width / 2),
                                 xRadius: radius, yRadius: radius)
         if let fill {
             fill.setFill()
@@ -24,7 +28,7 @@ class Surface: NSView {
         }
         if let outline {
             outline.setStroke()
-            path.lineWidth = outlineWidth
+            path.lineWidth = width
             if isDashed { path.setLineDash([4, 3], count: 2, phase: 0) }
             path.stroke()
         }
@@ -300,8 +304,11 @@ final class FlatButton: NSControl {
         return isEnabled
     }
 
+    /// Spec 10 §15 — "⌥Return or ⌥Space presses or activates whatever has
+    /// the focus". Space alone presses too, where no binding holds it (§9).
     override func keyDown(with event: NSEvent) {
-        if event.charactersIgnoringModifiers == " " { press() } else { super.keyDown(with: event) }
+        let optionReturn = (event.keyCode == 36 || event.keyCode == 76) && event.modifierFlags.contains(.option)
+        if event.charactersIgnoringModifiers == " " || optionReturn { press() } else { super.keyDown(with: event) }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -345,12 +352,12 @@ final class FlatButton: NSControl {
         }
         if let outline {
             outline.setStroke()
-            path.lineWidth = 1.5
+            path.lineWidth = 1.5 * Look.outlineScale
             path.stroke()
         }
         if window?.firstResponder === self {
             Palette.selection.setStroke()
-            path.lineWidth = 2
+            path.lineWidth = 2 * Look.outlineScale
             path.stroke()
         }
         let attributes: [NSAttributedString.Key: Any] = [.font: font_, .foregroundColor: text]

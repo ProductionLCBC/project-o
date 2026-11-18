@@ -25,6 +25,162 @@
         }
       }
     },
+    "announce.api" : {
+      "comment" : "VoiceOver: a cue went live from another app on the network. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From the network: %@"
+          }
+        }
+      }
+    },
+    "announce.armed" : {
+      "comment" : "VoiceOver: a cue is armed to fire by itself. %lld is how many seconds until it does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Auto in %lld second"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Auto in %lld seconds"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "announce.auto" : {
+      "comment" : "VoiceOver: a cue went live by its own trigger. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto: %@"
+          }
+        }
+      }
+    },
+    "announce.blocked" : {
+      "comment" : "VoiceOver: a cue tried to write a locked channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld is locked: a write was blocked"
+          }
+        }
+      }
+    },
+    "announce.elsewhere" : {
+      "comment" : "VoiceOver: a cue went live from a source this build has no word for. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From elsewhere: %@"
+          }
+        }
+      }
+    },
+    "announce.macro" : {
+      "comment" : "VoiceOver: a cue went live from a macro. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From a macro: %@"
+          }
+        }
+      }
+    },
+    "announce.midi" : {
+      "comment" : "VoiceOver: a cue went live from a MIDI device. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From MIDI: %@"
+          }
+        }
+      }
+    },
+    "announce.osc" : {
+      "comment" : "VoiceOver: a cue went live from an OSC message. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From OSC: %@"
+          }
+        }
+      }
+    },
+    "announce.output" : {
+      "comment" : "VoiceOver: an output stopped. %@ is the output as the top bar says it, such as 1 Main · lost.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output stopped presenting: %@"
+          }
+        }
+      }
+    },
+    "announce.restore" : {
+      "comment" : "VoiceOver: a cue is live again after the engine put the last state back. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Put back: %@"
+          }
+        }
+      }
+    },
+    "announce.steppedOn" : {
+      "comment" : "VoiceOver: a channel was written while its transition was still running.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A write on channel %lld cut a transition short"
+          }
+        }
+      }
+    },
+    "announce.streamDeck" : {
+      "comment" : "VoiceOver: a cue went live from a Stream Deck. %@ is the cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From Stream Deck: %@"
+          }
+        }
+      }
+    },
     "app.name" : {
       "comment" : "The app's name, as the main window's title shows it.",
       "extractionState" : "manual",
@@ -2497,6 +2653,66 @@
         }
       }
     },
+    "focus.library" : {
+      "comment" : "VoiceOver: the library tree, when it has the keyboard focus.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        }
+      }
+    },
+    "focus.playlists" : {
+      "comment" : "VoiceOver: the list of playlists, when it has the keyboard focus.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists"
+          }
+        }
+      }
+    },
+    "focus.pool" : {
+      "comment" : "VoiceOver: the pool's tiles, when they have the keyboard focus.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "focus.poolFolders" : {
+      "comment" : "VoiceOver: the pool's list of folders, when it has the keyboard focus.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media folders"
+          }
+        }
+      }
+    },
+    "focus.strip" : {
+      "comment" : "VoiceOver: the channel strip, when it has the keyboard focus.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels"
+          }
+        }
+      }
+    },
     "grid.browsing" : {
       "comment" : "In the grid's header while it shows something that isn't live.",
       "extractionState" : "manual",
@@ -2529,6 +2745,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cue %1$lld, %2$@"
+          }
+        }
+      }
+    },
+    "grid.cue.armed" : {
+      "comment" : "VoiceOver, in a cue's description: it will fire by itself.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "armed"
+          }
+        }
+      }
+    },
+    "grid.cue.section" : {
+      "comment" : "VoiceOver, in a cue's description: the section it belongs to, such as section Verse.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "section %@"
           }
         }
       }
@@ -2589,6 +2829,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "From the library: Next stops at its last cue"
+          }
+        }
+      }
+    },
+    "grid.label" : {
+      "comment" : "VoiceOver: the grid of cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cues"
           }
         }
       }
@@ -5449,6 +5701,54 @@
         }
       }
     },
+    "pool.size" : {
+      "comment" : "VoiceOver: the pool header's choice of how large its tiles are.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tile size"
+          }
+        }
+      }
+    },
+    "pool.size.large" : {
+      "comment" : "The pool's tile size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large"
+          }
+        }
+      }
+    },
+    "pool.size.medium" : {
+      "comment" : "The pool's tile size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medium"
+          }
+        }
+      }
+    },
+    "pool.size.small" : {
+      "comment" : "The pool's tile size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Small"
+          }
+        }
+      }
+    },
     "pool.sort.date" : {
       "comment" : "The pool's sort order.",
       "extractionState" : "manual",
@@ -7089,6 +7389,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select Only This Channel"
+          }
+        }
+      }
+    },
+    "strip.spoken.content" : {
+      "comment" : "VoiceOver, in a channel's description: what the channel holds, in quotation marks.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”"
+          }
+        }
+      }
+    },
+    "strip.spoken.locked" : {
+      "comment" : "VoiceOver, in a channel's description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "locked"
+          }
+        }
+      }
+    },
+    "strip.spoken.stack" : {
+      "comment" : "VoiceOver, in a channel's description: the one stack that shows it, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in stack %lld"
+          }
+        }
+      }
+    },
+    "strip.spoken.stacks" : {
+      "comment" : "VoiceOver, in a channel's description: the stacks that show it. %@ is their numbers as a list, such as 1 and 2.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "in stacks %@"
           }
         }
       }

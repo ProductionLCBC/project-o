@@ -65,6 +65,11 @@ final class AppController {
         store.observe { [weak self] changes in
             if !changes.isDisjoint(with: [.catalog, .outputs, .devices, .connection]) { self?.screensChanged() }
         }
+        // Spec 10 §15 — Increase Contrast and Reduce Motion, at launch and whenever the operator changes them.
+        followDisplayOptions()
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.followDisplayOptions() }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.screensChanged() }
         }
@@ -175,6 +180,13 @@ final class AppController {
     /// The window a new sheet goes on: the main window, or the sheet already on it.
     private var sheetParent: NSWindow {
         windowController.window.attachedSheet ?? windowController.window
+    }
+
+    // MARK: - The system's accessibility settings (Spec 10 §15)
+
+    private func followDisplayOptions() {
+        windowController.regions.follow(increaseContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast,
+                                        reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
     }
 
     // MARK: - View settings (Spec 10 §4)

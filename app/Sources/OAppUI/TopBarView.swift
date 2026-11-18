@@ -92,7 +92,12 @@ final class TopBarView: Surface {
         return formatter.string(from: date)
     }
 
+    /// Draws the bar again, keeping the keyboard's focus on the button it was on (Spec 10 §8, §15).
     func refresh() {
+        FocusKeeper.keeping(in: self) { redraw() }
+    }
+
+    private func redraw() {
         let inactive = activeElsewhere != nil
         notActive.stringValue = activeElsewhere.map { Strings.text(.topNotActive, $0) } ?? ""
         notActive.isHidden = !inactive
