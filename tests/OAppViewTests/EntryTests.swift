@@ -121,12 +121,18 @@ final class EntryTests: XCTestCase {
         XCTAssertEqual(entries("Go"), ["Back to Live l", "Go to Cue… j", "Hold Auto-Advance", "Command Bar k"])
         XCTAssertEqual(entries("Mode"), ["Show 1", "Edit 2"])
         XCTAssertEqual(entries("Help"), ["Keys /", "Release Output from This Screen \u{1B}"])
-        let later = ["Settings…", "Lock Station", "New Playlist", "New List", "Import Media…", "Take Snapshot", "Restore a Snapshot…", "Undo", "Redo", "Edit"]
+        let later = ["Settings…", "Lock Station", "Import Media…", "Take Snapshot", "Restore a Snapshot…", "Edit"]
         for menu in bar.titles {
             for item in bar.entries(of: menu) where later.contains(item.title) && item.submenu == nil {
                 XCTAssertFalse(item.isEnabled, "\(item.title) waits for its area")
                 XCTAssertEqual(item.toolTip, "Not in this build yet.")
             }
+        }
+        // Spec 10 §5, §10 — New Playlist, New List, Undo and Redo are the app's own now, and say nothing of a later build.
+        for title in ["New Playlist", "New List", "Undo", "Redo"] {
+            let item = (bar.entries(of: "File") + bar.entries(of: "Edit")).first { $0.title == title }
+            XCTAssertNotNil(item, title)
+            XCTAssertNil(item?.toolTip, title)
         }
         // Spec 10 §9 — the keys overlay and ⌃⌥⌘⎋ are there from the keys' build; the command bar's entry follows the machine's setting.
         for item in bar.entries(of: "Help") { XCTAssertTrue(item.isEnabled, item.title) }

@@ -50,6 +50,13 @@ final class ShowWindowView: Surface {
     var releaseKeyRegistered = true
     /// What a keyboard layout prints on a key, for the overlay, where a test gives a layout of its own; nil is the Mac's current one.
     var layoutLabel: ((UInt16) -> String?)?
+    /// Spec 10 §10 — the field open in place, if one is, and the small panel open in a popover.
+    private(set) var inlineEditor: InlineEditor?
+    private(set) var prompt: PromptView?
+    private var promptPopover: NSPopover?
+    /// Spec 10 §14 — the sheet of versions or snapshots up now, if one is.
+    private(set) var sheetView: PickerSheetView?
+    private var sheetWindow: NSWindow?
 
     init(model: ShowModel, keys: KeysModel, mach: MachLink?, banner: BannerView) {
         self.model = model
@@ -71,6 +78,9 @@ final class ShowWindowView: Surface {
             addSubview(view)
         }
         commandBar.isHidden = !keys.showsCommandBar
+        // The window opens the fields in place and the panels the regions' edits ask for (Spec 10 §10).
+        left.host = self
+        grid.host = self
         // The digits waiting, the command bar's lines and the table the overlay lists.
         keys.onChange = { [weak self] in self?.keysChanged() }
         topBar.onKeys = { [weak self] in self?.toggleKeys() }
@@ -154,7 +164,100 @@ final class ShowWindowView: Surface {
     var isShowingKeys: Bool { keysOverlay != nil }
 
     /// Whether a popover of the window's is open (Spec 10 §9, "When bindings fire", 6).
-    var hasPopover: Bool { outputPopover?.isShown ?? false }
+    var hasPopover: Bool { (outputPopover?.isShown ?? false) || prompt != nil }
+
+    // MARK: - Fields in place and small panels (Spec 10 §10)
+
+    /// Opens a field in place over `anchor`, or over `rect` of it. A field
+    /// already open commits first, and stays if it can't.
+    func editInPlace(over anchor: NSView, rect: NSRect? = nil, text: String, kind: FieldKind = .edit, label: String, placeholder: String = "",
+                     commit: @escaping (String) -> CannotEdit?) {
+        if let open = inlineEditor, !open.commitNow() { return }
+        let editor = InlineEditor(text: text, kind: kind, label: label, placeholder: placeholder, commit: commit)
+        var frame = convert(rect ?? anchor.bounds, from: anchor)
+        if kind != .inPlaceText { frame.size.height = max(frame.height, 24) }
+        editor.frame = frame.intersection(bounds.insetBy(dx: 2, dy: 2))
+        editor.onClose = { [weak self, weak editor] in
+            if self?.inlineEditor === editor { self?.inlineEditor = nil }
+        }
+        // Under the keys overlay, over everything else.
+        if let keysOverlay { addSubview(editor, positioned: .below, relativeTo: keysOverlay) } else { addSubview(editor) }
+        inlineEditor = editor
+        editor.focus()
+    }
+
+    /// Spec 10 §10 — "⌘Q, ⌘2 and Lock Station commit an open field first."
+    /// Says whether nothing is left open: a field whose text can't be saved
+    /// stays, with its reason, and what was asked for waits.
+    @discardableResult
+    func commitOpenField() -> Bool {
+        inlineEditor?.commitNow() ?? true
+    }
+
+    /// Shows a small panel in a popover beside `anchor`.
+    func present(_ panel: PromptView, at anchor: NSView?) {
+        closePrompt()
+        panel.finish()
+        panel.onClose = { [weak self] in self?.closePrompt() }
+        prompt = panel
+        // A window that is on no screen shows no popover; the panel is the same either way.
+        guard let anchor, anchor.window?.isVisible == true else { return }
+        let controller = NSViewController()
+        controller.view = panel
+        let popover = NSPopover()
+        popover.contentViewController = controller
+        popover.contentSize = panel.frame.size
+        popover.behavior = .semitransient
+        popover.appearance = NSAppearance(named: .darkAqua)
+        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxX)
+        promptPopover = popover
+        if let first = panel.firstField { panel.window?.makeFirstResponder(first) }
+    }
+
+    func closePrompt() {
+        promptPopover?.close()
+        promptPopover = nil
+        prompt = nil
+    }
+
+    // MARK: - Sheets to choose from (Spec 10 §14)
+
+    /// Puts a sheet of things to choose from on the main window (Spec 10
+    /// §4: "every confirmation and file dialog is a sheet on the main window").
+    func present(sheet view: PickerSheetView) {
+        closeSheet()
+        view.onClose = { [weak self] in self?.closeSheet() }
+        sheetView = view
+        // A window that is on no screen shows no sheet; what it would hold is the same either way.
+        guard let window, window.isVisible else { return }
+        let controller = NSViewController()
+        controller.view = view
+        let sheet = NSWindow(contentViewController: controller)
+        sheet.styleMask = [.titled]
+        sheet.appearance = NSAppearance(named: .darkAqua)
+        sheet.setContentSize(view.frame.size)
+        window.beginSheet(sheet)
+        sheetWindow = sheet
+    }
+
+    func closeSheet() {
+        if let sheetWindow { window?.endSheet(sheetWindow) }
+        sheetWindow = nil
+        sheetView = nil
+    }
+
+    /// Spec 10 §14, "A list's versions" — Restore a Version…, from a list's menu or its header's.
+    func restoreVersion(of listUuid: String) {
+        model.versions(ofList: listUuid) { [weak self] title, versions, onAir in
+            guard let self else { return }
+            let cannot = self.model.cannotEdit(listUuid: listUuid)
+            self.present(sheet: Sheets.versions(title: title, versions: versions, onAir: onAir, cannot: cannot) { [weak self] version in
+                // The question that follows names the version whole, and is a sheet of its own.
+                self?.closeSheet()
+                self?.model.restore(version, ofList: listUuid)
+            })
+        }
+    }
 
     /// "The keys overlay (Help ▸ Keys, ⌘/, or ? in the top bar)".
     func showKeys() {
@@ -375,13 +478,44 @@ final class MenuBar: NSObject, NSMenuDelegate {
     }
 
     private func item(_ title: StringKey, key: String = "", modifiers: NSEvent.ModifierFlags = [.command], state: (() -> Bool)? = nil,
-                      enabled: (() -> Bool)? = nil, _ run: @escaping @MainActor () -> Void) -> NSMenuItem {
+                      enabled: (() -> Bool)? = nil, named: (() -> String)? = nil, _ run: @escaping @MainActor () -> Void) -> NSMenuItem {
         let item = ClosureMenuItem(title: Strings.text(title), key: key, modifiers: modifiers, run)
+        if let enabled { item.isAllowed = { enabled() } }
         updates.append { [weak item] in
             if let state { item?.state = state() ? .on : .off }
             if let enabled { item?.isEnabled = enabled() }
+            if let named { item?.title = named() }
         }
         return item
+    }
+
+    /// The field being typed in, whose own typing ⌘Z undoes (Spec 10 §10).
+    private var typingField: NSTextView? {
+        NSApplication.shared.keyWindow?.firstResponder as? NSTextView ?? controller?.windowController.window.firstResponder as? NSTextView
+    }
+
+    /// Spec 10 §10, "Undo and redo" — "Edit ▸ Undo and Redo send `undo` and
+    /// `redo` ... While a text field has the focus, ⌘Z and ⇧⌘Z undo its own
+    /// typing instead (Spec 5 §8)".
+    private func history(undo: Bool) -> NSMenuItem {
+        item(undo ? .menuUndo : .menuRedo, key: "z", modifiers: undo ? [.command] : [.shift, .command],
+             enabled: { [weak self] in
+                 if let field = self?.typingField { return undo ? field.undoManager?.canUndo ?? false : field.undoManager?.canRedo ?? false }
+                 return (undo ? self?.model?.undoStep : self?.model?.redoStep) != nil
+             },
+             named: { [weak self] in
+                 if self?.typingField != nil { return Strings.text(undo ? .menuUndo : .menuRedo) }
+                 return EditWording.menuTitle(undo: undo, step: undo ? self?.model?.undoStep : self?.model?.redoStep)
+             },
+             { [weak self] in
+                 if let field = self?.typingField {
+                     if undo { field.undoManager?.undo() } else { field.undoManager?.redo() }
+                 } else if undo {
+                     self?.model?.undo()
+                 } else {
+                     self?.model?.redo()
+                 }
+             })
     }
 
     private func standard(_ title: StringKey, _ action: Selector, key: String) -> NSMenuItem {
@@ -399,18 +533,24 @@ final class MenuBar: NSObject, NSMenuDelegate {
             quit,
         ])
         add(.menuFile, to: [
-            later(.menuNewPlaylist, key: "n"), later(.menuNewList, key: "n", modifiers: [.shift, .command]), later(.menuImportMedia, key: "i"),
+            // Spec 10 §5 — "New playlist: the window's + button or ⌘N"; "New List (⇧⌘N, or New List Here)".
+            item(.menuNewPlaylist, key: "n", enabled: { [weak self] in self?.model?.cannotEditMachine == nil }) { [weak self] in self?.view?.left.beginNewPlaylist() },
+            item(.menuNewList, key: "n", modifiers: [.shift, .command], enabled: { [weak self] in self?.model?.cannotEditMasters == nil }) { [weak self] in
+                self?.view?.left.newList()
+            },
+            later(.menuImportMedia, key: "i"),
             .separator(), later(.menuTakeSnapshot), later(.menuRestoreSnapshot),
         ])
         let edit: [NSMenuItem] = [
-            later(.menuUndo, key: "z"), later(.menuRedo, key: "z", modifiers: [.shift, .command]), .separator(),
+            history(undo: true), history(undo: false), .separator(),
             standard(.menuCut, #selector(NSText.cut(_:)), key: "x"), standard(.menuCopy, #selector(NSText.copy(_:)), key: "c"),
             standard(.menuPaste, #selector(NSText.paste(_:)), key: "v"), standard(.menuSelectAll, #selector(NSText.selectAll(_:)), key: "a"),
             .separator(),
             item(.menuFindInList, key: "f", enabled: { [weak self] in self?.model?.grid.context != nil }) { [weak self] in self?.view?.grid.focusSearch() },
         ]
         add(.menuEdit, to: edit)
-        // The text items find their target along the responder chain.
+        // The text items find their target along the responder chain: AppKit enables Cut, Copy, Paste and Select All
+        // by asking it, and leaves Undo, Redo and Find in List, whose targets are their own, as the app set them.
         menu.items.last?.submenu?.autoenablesItems = true
         add(.menuView, to: [
             item(.menuMultiviewer, key: "m", modifiers: [.option, .command], state: { [weak self] in self?.model?.settings.multiviewer ?? false }) { [weak self] in

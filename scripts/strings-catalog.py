@@ -514,7 +514,8 @@ ENTRIES = [
     ("cannot.liveNow", "It’s live. Archive a Copy works while it is.", "The reason Archive is disabled on the live playlist."),
     ("cannot.alreadyLive", "It’s already live.", "The reason Make Live is disabled on the playlist that is live."),
     ("cannot.folderNotEmpty", "The folder isn’t empty.", "The reason Delete Folder is disabled."),
-    ("cannot.missing", "The file is missing.", "The reason an action on a missing or deleted media item is disabled."),
+    ("cannot.missing", "The file is missing.", "The reason an action on a missing or deleted media item, or on a list that is gone, is disabled."),
+    ("cannot.removed", "It was removed from the playlist.", "The reason an action on a list that was removed while live is disabled."),
 
     # Rejections (Spec 10 §10: one sentence per code of Spec 5 §6 and Spec 8 §7)
     ("rejected.unknownObject", "It isn’t there any more.", "The engine refused an edit: what it names is gone."),
@@ -620,6 +621,37 @@ ENTRIES = [
     ("confirm.restoreSnapshot.title.machine", "Replace this machine’s playlists, key bindings and macros with the copies from %@?",
      "Asked before a snapshot is restored on a machine that may not change the library. %@ is when it was taken."),
     ("confirm.restoreSnapshot.body", "Outputs, stacks and settings stay as they are. A snapshot of now is taken first, and Undo puts it back.", "Under the question."),
+
+    # Fields and small panels of the edits (Spec 10 §5, §6, §10)
+    ("field.copy", "Copy", "A button beside a field whose text couldn't be saved: copies what was typed."),
+    ("field.newPlaylist", "Playlist title", "The placeholder and label of the field that takes a new playlist's title."),
+    ("field.newFolder", "Folder name", "The placeholder and label of the field that takes a new folder's name."),
+    ("field.newHeader", "Header label", "The placeholder and label of the field that takes a new header's label."),
+    ("field.rename", "New name for %@", "VoiceOver: an in-place rename field. %@ is the current name."),
+    ("field.text", "Words of cue %lld", "VoiceOver: the field that edits a cue's words in place. %lld is the cue's number."),
+    ("prompt.save", "Save", "The button of a small panel that saves what it holds."),
+    ("prompt.none", "None", "A checkbox in a small panel: no date, no time, or no automatic advance."),
+    ("prompt.duplicate", "Duplicate “%@” as", "The heading of the panel that asks for a copy's title. %@ is the playlist's title."),
+    ("prompt.newTitle", "New title", "The label of the field for a copy's title."),
+    ("prompt.schedule", "Date and time of “%@”", "The heading of the panel that sets a playlist's service date and time. %@ is its title."),
+    ("prompt.date", "Date", "The label of the service date."),
+    ("prompt.time", "Time", "The label of the service time."),
+    ("prompt.note", "Note on cue %lld", "The heading of the panel that edits a cue's note. %lld is the cue's number."),
+    ("prompt.note.field", "Note", "The label of the note's field."),
+    ("prompt.triggerTime", "Fire by itself, after the cue before it", "The heading of the panel that sets a cue's time trigger."),
+    ("prompt.advanceAfter", "Fire the next cue by itself, after this one", "The heading of the panel that sets a cue's advance-after."),
+    ("prompt.seconds", "Seconds", "The label of a field that takes a number of seconds."),
+    ("prompt.badSeconds", "Type a number of seconds, such as 8 or 2.5.", "Shown when the seconds field doesn't hold a duration."),
+    ("prompt.empty", "It needs a name.", "Shown when a title or a name was left empty."),
+
+    # Restores (Spec 10 §14)
+    ("sheet.close", "Close", "The button that closes a sheet of things to choose from."),
+    ("versions.heading", "Kept versions of “%@”", "The heading of the sheet of a list's kept versions. %@ is the list's title."),
+    ("versions.row", "Version %1$lld, kept %2$@", "A kept version: %1$lld is its number, %2$@ when it was kept."),
+    ("versions.detail", "“%1$@” · %2$@", "Under a kept version: %1$@ is the title it had, %2$@ how many cues, such as 14 cues."),
+    ("versions.empty", "No earlier version of this list is kept.", "In the sheet when a list has no kept version."),
+    ("versions.onAir", "This list is on air: each cue takes a restored version at its next fire.", "In the sheet when the list is live."),
+    ("versions.restore", "Restore…", "The button beside a kept version or a snapshot; it asks before it restores."),
 ]
 
 

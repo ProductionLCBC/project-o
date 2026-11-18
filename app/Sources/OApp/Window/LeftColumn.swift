@@ -174,12 +174,14 @@ public enum LibraryTree {
         return row
     }
 
-    static func parent(of path: String) -> String {
+    /// The folder a folder is in ("" at the top).
+    public static func parent(of path: String) -> String {
         guard let slash = path.lastIndex(of: "/") else { return "" }
         return String(path[..<slash])
     }
 
-    static func name(of path: String) -> String {
+    /// A folder's own name, the last part of its path.
+    public static func name(of path: String) -> String {
         guard let slash = path.lastIndex(of: "/") else { return path }
         return String(path[path.index(after: slash)...])
     }

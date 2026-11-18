@@ -43,6 +43,8 @@ final class TopBarView: Surface {
             refresh()
         }
     }
+    /// The message last read out, so VoiceOver hears each once.
+    private var said: String?
 
     init(model: ShowModel) {
         self.model = model
@@ -103,8 +105,23 @@ final class TopBarView: Surface {
             countdown.stringValue = ""
             countdown.isHidden = true
         }
-        hint.stringValue = fieldHint ?? ""
-        hint.isHidden = fieldHint == nil || inactive
+        // Spec 10 §10 — "After an undo or a redo, the window says for three seconds what changed"; a refusal of one, too.
+        // It takes the place of the line about a focused field's keys while it stands.
+        if let notice = model.notices[.top] {
+            hint.stringValue = EditWording.notice(notice)
+            if case .done = notice { hint.textColor = Palette.text } else { hint.textColor = Palette.browsing }
+            hint.isHidden = inactive
+            if said != hint.stringValue {
+                said = hint.stringValue
+                NSAccessibility.post(element: self, notification: .announcementRequested,
+                                     userInfo: [.announcement: hint.stringValue, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+            }
+        } else {
+            said = nil
+            hint.stringValue = fieldHint ?? ""
+            hint.textColor = Palette.selection
+            hint.isHidden = fieldHint == nil || inactive
+        }
         time.stringValue = Self.clockText()
         remote.isHollow = !model.isRemoteLit
         remote.setAccessibilityLabel(Strings.text(.topRemote))

@@ -52,6 +52,8 @@ final class AppController {
         windowController = MainWindowController(model: model, mach: mach, clock: clock)
         model.doubleClickInterval = { NSEvent.doubleClickInterval }
         windowController.banner.onRestart = { [weak self] in self?.askToRestart() }
+        // Spec 10 §4 — "every confirmation and file dialog is a sheet on the main window".
+        model.confirm = { [weak self] confirmation, answer in self?.ask(confirmation, answer) }
         releaser.onRaised = { [weak self] raised in self?.raiseWindow(raised) }
         // "If the engine doesn't answer within two seconds, the window stays raised with the not-responding banner (§2)".
         releaser.onSilent = { [weak self] in self?.supervisor?.engineIsSilent() }
@@ -140,6 +142,21 @@ final class AppController {
         }
     }
 
+    /// Spec 10 §5, §10, §14 — asks before a delete or a restore: a sheet
+    /// with Cancel and the button that does it. Escape cancels, and Return
+    /// presses nothing (§9).
+    func ask(_ confirmation: Confirmation, _ answer: @escaping @MainActor (Bool) -> Void) {
+        let words = EditWording.words(confirmation)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = words.title
+        alert.informativeText = words.body.joined(separator: "\n")
+        alert.addButton(withTitle: Strings.text(.cancel))
+        alert.addButton(withTitle: words.button)
+        Self.keepReturnFromPressing(alert)
+        presentAlert(alert, sheetParent) { response in answer(response == .alertSecondButtonReturn) }
+    }
+
     /// How the app answers the system once Quit's question is answered; a seam, since the real one ends the process.
     var replyToTerminate: @MainActor (Bool) -> Void = { NSApplication.shared.reply(toApplicationShouldTerminate: $0) }
 
@@ -211,6 +228,9 @@ final class AppController {
         }
         // Asked already: the question is up, or the engine is being stopped.
         guard !isQuitting else { return .terminateLater }
+        // Spec 10 §10 — "⌘Q, ⌘2 and Lock Station commit an open field first." A field whose text can't be saved
+        // stays open with its reason, and the quit waits for the operator (Area 13 reading, with the plan).
+        guard windowController.regions.commitOpenField() else { return .terminateCancel }
         isQuitting = true
         let words = QuitQuestion.make(unsaved: store.saving.unsaved)
         let alert = NSAlert()

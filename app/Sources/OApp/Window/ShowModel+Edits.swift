@@ -57,6 +57,18 @@ extension ShowModel {
         return true
     }
 
+    /// A field commits (Spec 10 §10, "Text fields"): "each send one edit
+    /// when they commit, never while typing ... A commit that can't be sent,
+    /// because the lock came on or the engine went away, leaves the field
+    /// open with its text, the reason and Copy." Returns why it couldn't be
+    /// sent, or nil when it went or there was nothing to send, so the field
+    /// may close.
+    public func commit(_ sending: Sending?, master: Bool, at place: NoticePlace, then done: (@MainActor (CommandOutcome) -> Void)? = nil) -> CannotEdit? {
+        guard let sending, sending.request != nil else { return nil }
+        if let cannot = store.cannotEdit(master: master) { return .unavailable(cannot) }
+        return edit(sending, at: place, then: done) ? nil : .unavailable(.engineAway)
+    }
+
     /// Shows a message at a place for its few seconds; a newer one there takes its place.
     public func say(_ notice: Notice, at place: NoticePlace) {
         notices[place] = notice

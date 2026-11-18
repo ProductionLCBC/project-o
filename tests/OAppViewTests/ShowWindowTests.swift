@@ -13,6 +13,8 @@ enum Audit {
         var found: [String] = []
         func walk(_ view: NSView) {
             guard !view.isHidden else { return }
+            // The editor AppKit puts in a field while it is typed in reads as that field, which has the label.
+            if (view as? NSTextView)?.isFieldEditor == true { return }
             // A line of text reads itself, and a scroll area is not a control: everything else VoiceOver stops on needs a label.
             let isStaticText = (view as? NSTextField).map { !$0.isEditable } ?? false
             let isContainer = view is NSScrollView || view is NSScroller || view is NSClipView

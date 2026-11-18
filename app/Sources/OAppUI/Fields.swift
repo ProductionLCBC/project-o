@@ -51,6 +51,8 @@ class ShowField: NSTextField, KeyField {
         super.init(frame: .zero)
         // The field acts on Return and on nothing else: leaving it, by Escape, Tab or a click elsewhere, sends nothing.
         (cell as? NSTextFieldCell)?.sendsActionOnEndEditing = false
+        // Spec 10 §10 — "While a text field has the focus, ⌘Z and ⇧⌘Z undo its own typing".
+        (cell as? NSTextFieldCell)?.allowsUndo = true
     }
 
     @available(*, unavailable)

@@ -72,6 +72,7 @@ public enum EditWording {
         case .alreadyLive: return Strings.text(.cannotAlreadyLive)
         case .folderNotEmpty: return Strings.text(.cannotFolderNotEmpty)
         case .missing: return Strings.text(.cannotMissing)
+        case .removed: return Strings.text(.cannotRemoved)
         case .fire(let refusal): return ShowWording.refusal(refusal)
         case .later: return Strings.text(.unavailableLater)
         }

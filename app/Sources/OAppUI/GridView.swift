@@ -140,6 +140,12 @@ final class CueCellView: Surface {
     private var tags: [TagView] = []
     private let settings: ViewSettings
     var onMenu: ((CueCellView, NSEvent) -> Void)?
+    /// Spec 10 §6, "Double-click" — the second press of a double-click, which fired nothing.
+    var onDoubleClick: ((CueCellView) -> Void)?
+
+    /// Where a field over the cell goes when its words are edited in place:
+    /// over the picture, or over the whole cell when the grid is compact.
+    var editRect: NSRect { settings.showsThumbnails ? picture.frame : bounds }
 
     init(cell: CueCell, section: GridSection, model: ShowModel, machineRoot: URL?) {
         self.cell = cell
@@ -285,7 +291,14 @@ final class CueCellView: Surface {
             return
         }
         model.follow.buttonDown = true
-        _ = model.press(cue: cell, in: section, option: event.modifierFlags.contains(.option))
+        press(option: event.modifierFlags.contains(.option))
+    }
+
+    /// A press of the main button, as the pointer makes one. "Its first
+    /// press has already fired the cue, as every press does; ⌥-double-click,
+    /// or the cue's menu, edits without firing."
+    func press(option: Bool = false) {
+        if model.press(cue: cell, in: section, option: option) == .doubleClick { onDoubleClick?(self) }
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -364,6 +377,9 @@ final class ListHeaderView: Surface {
 
     var shownTags: [String] { tags.map(\.text) }
 
+    /// The header's menu as it stands now, for a test and for ⌃Return (Spec 10 §15).
+    var menuNow: NSMenu? { makeMenu?() }
+
     override func rightMouseDown(with event: NSEvent) {
         if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
     }
@@ -382,7 +398,8 @@ final class GridDocument: Surface {
     private weak var model: ShowModel?
     private var tracking: NSTrackingArea?
 
-    func set(_ grid: GridModel, model: ShowModel, machineRoot: URL?, onMenu: @escaping (CueCellView, NSEvent) -> Void) {
+    func set(_ grid: GridModel, model: ShowModel, machineRoot: URL?, onMenu: @escaping (CueCellView, NSEvent) -> Void,
+             onDoubleClick: @escaping (CueCellView) -> Void, headerMenu: @escaping (ListHeaderView) -> NSMenu?) {
         self.model = model
         settings = model.settings
         for (view, _) in headers { view.removeFromSuperview() }
@@ -397,19 +414,14 @@ final class GridDocument: Surface {
                 headers.append((heading, section))
             case .list:
                 let header = ListHeaderView(section)
-                // "Its menu: ... Show in Library"; its edits come with §10's stage.
-                if !section.isLocal, !section.isMissing, let list = section.listUuid {
-                    header.makeMenu = { [weak model] in
-                        let menu = NSMenu()
-                        menu.addItem(ClosureMenuItem(title: Strings.text(.menuShowInLibrary)) { model?.showInLibrary(list: list) })
-                        return menu
-                    }
-                }
+                // Spec 10 §6, "A list header" — its menu.
+                header.makeMenu = { [weak header] in header.flatMap(headerMenu) }
                 addSubview(header)
                 headers.append((header, section))
                 for cell in section.cells {
                     let view = CueCellView(cell: cell, section: section, model: model, machineRoot: machineRoot)
                     view.onMenu = onMenu
+                    view.onDoubleClick = onDoubleClick
                     addSubview(view)
                     cells.append(view)
                 }
@@ -502,6 +514,10 @@ final class GridView: Surface {
     let empty = Kit.label(Strings.text(.gridEmpty), size: 13)
     private var firstLine: FirstLineView?
     static let headerHeight: CGFloat = 56
+    /// The window, which opens the fields in place and the small panels (Spec 10 §10).
+    weak var host: ShowWindowView?
+    /// What the grid says for a few seconds beside what was tried (Spec 10 §10).
+    let notice = NoticeLabel()
 
     init(model: ShowModel) {
         self.model = model
@@ -519,7 +535,7 @@ final class GridView: Surface {
         scroll.autohidesScrollers = true
         scroll.scrollerStyle = .overlay
         scroll.documentView = document
-        for sub in [title, detail, fromLibrary, search, view, scroll, empty] as [NSView] { addSubview(sub) }
+        for sub in [title, detail, fromLibrary, notice, search, view, scroll, empty] as [NSView] { addSubview(sub) }
         refresh()
     }
 
@@ -571,7 +587,11 @@ final class GridView: Surface {
             addSubview(view)
             firstLine = view
         }
-        document.set(grid, model: model, machineRoot: machineRoot) { [weak self] cell, event in self?.showCueMenu(cell, event) }
+        notice.show(model.notices[.grid])
+        document.set(grid, model: model, machineRoot: machineRoot,
+                     onMenu: { [weak self] cell, event in self?.showCueMenu(cell, event) },
+                     onDoubleClick: { [weak self] cell in self?.doubleClicked(cell) },
+                     headerMenu: { [weak self] header in self?.headerMenu(for: header) })
         needsLayout = true
     }
 
@@ -623,29 +643,87 @@ final class GridView: Surface {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 4), in: view)
     }
 
-    /// Spec 10 §6, "A cue's menu" — Fire now; its edits come with §10's stage.
+    // MARK: - A cue's menu and its edits (Spec 10 §6, §10)
+
     private func showCueMenu(_ cell: CueCellView, _ event: NSEvent) {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        let fire = ClosureMenuItem(title: Strings.text(.triggerGo)) { [weak model] in
-            guard let model, let sending = model.fire(cell.cell, in: cell.section) else { return }
-            model.send(sending)
+        NSMenu.popUpContextMenu(cueMenu(for: cell), with: event, for: cell)
+    }
+
+    /// Spec 10 §6, "A cue's menu".
+    func cueMenu(for cell: CueCellView) -> NSMenu {
+        MenuBuilder.menu(Menus.cue(model.cueContext(cell.cell, in: cell.section))) { [weak self, weak cell] entry in
+            guard let cell else { return }
+            self?.perform(entry, cue: cell)
         }
-        if let refusal = cell.section.refusal {
-            fire.isEnabled = false
-            fire.toolTip = ShowWording.refusal(refusal)
-        } else if let away = model.store.cannotSend {
-            fire.isEnabled = false
-            fire.toolTip = UnavailableWording.sentence(for: away)
+    }
+
+    /// Says beside the grid why an edit wasn't sent, when it wasn't.
+    private func say(_ cannot: CannotEdit?) {
+        if let cannot { model.say(.notSent(cannot), at: .grid) }
+    }
+
+    private func perform(_ entry: MenuEntry, cue view: CueCellView) {
+        let (cell, section) = (view.cell, view.section)
+        switch entry.kind {
+        case .fire:
+            if let sending = model.fire(cell, in: section) { model.send(sending) }
+        case .editText:
+            editText(view)
+        case .note:
+            host?.present(Prompts.note(cell, in: section, model: model), at: view)
+        case .triggerGo:
+            say(model.trigger(.go, cell: cell, in: section))
+        case .triggerTime:
+            host?.present(Prompts.triggerTime(cell, in: section, model: model), at: view)
+        case .advanceAfter:
+            host?.present(Prompts.advanceAfter(cell, in: section, model: model).panel, at: view)
+        case .duplicateSection:
+            say(model.duplicateSection(cell: cell, in: section))
+        case .hold:
+            model.send(Actions.hold())
+        default:
+            break
         }
-        menu.addItem(fire)
-        // "and Hold, on the armed cue (`disarm`)".
-        if cell.cell.isArmed {
-            let hold = ClosureMenuItem(title: Strings.text(.nextHold)) { [weak model] in model?.send(Actions.hold()) }
-            hold.isEnabled = model.store.cannotSend == nil
-            menu.addItem(hold)
+    }
+
+    /// Spec 10 §6, "Double-click" — "on a cue with a text write on the text
+    /// channel ... edits that text in place (§10); on any other cue it opens
+    /// edit mode's Cues page on it (Spec 11 §2)", which is Area 14's.
+    private func doubleClicked(_ view: CueCellView) {
+        if model.textBody(of: view.cell, in: view.section) != nil { editText(view) }
+    }
+
+    /// Spec 10 §10, "In-place text" — "opens a field over the cell holding
+    /// the body of its text write. Return makes a new line; ⌘Return commits,
+    /// and so does a click outside ... Escape cancels."
+    func editText(_ view: CueCellView) {
+        guard let body = model.textBody(of: view.cell, in: view.section) else { return }
+        if let cannot = model.cueContext(view.cell, in: view.section).edit { return say(cannot) }
+        let (cell, section) = (view.cell, view.section)
+        host?.editInPlace(over: view, rect: view.editRect, text: body, kind: .inPlaceText, label: Strings.text(.fieldText, cell.number)) { [weak model] in
+            model?.commitText($0, cell: cell, in: section)
         }
-        NSMenu.popUpContextMenu(menu, with: event, for: cell)
+    }
+
+    /// Spec 10 §6, "A list header" — its menu.
+    func headerMenu(for header: ListHeaderView) -> NSMenu? {
+        let section = header.section
+        return MenuBuilder.menu(model.headerMenu(for: section)) { [weak self] entry in self?.perform(entry, header: section) }
+    }
+
+    private func perform(_ entry: MenuEntry, header section: GridSection) {
+        switch entry.kind {
+        case .removeItem:
+            if case .playlist(let playlist)? = model.grid.context, let item = section.itemUuid { model.removeItem(item, from: playlist, at: .grid) }
+        case .showInLibrary:
+            if let list = section.listUuid { model.showInLibrary(list: list) }
+        case .grade(let channel, let grade):
+            say(model.grade(grade, channel: channel, in: section))
+        case .restoreVersion:
+            if let list = section.listUuid { host?.restoreVersion(of: list) }
+        default:
+            break
+        }
     }
 
     override func layout() {
@@ -673,7 +751,10 @@ final class GridView: Surface {
         detail.frame = NSRect(x: x, y: top + 21, width: Kit.width(of: detail), height: 16)
         let noteHeight: CGFloat = fromLibrary.isHidden ? 0 : 20
         fromLibrary.frame = NSRect(x: 20, y: top + Self.headerHeight - 8, width: w - 40, height: 16)
-        let headerHeight = Self.headerHeight + noteHeight
+        // What the grid says about an edit stands under its header, for its few seconds.
+        let noticeHeight = notice.height(width: w - 40)
+        notice.frame = NSRect(x: 20, y: top + Self.headerHeight - 8 + noteHeight, width: w - 40, height: noticeHeight)
+        let headerHeight = Self.headerHeight + noteHeight + (noticeHeight > 0 ? noticeHeight + 4 : 0)
         scroll.frame = NSRect(x: 0, y: top + headerHeight, width: w, height: max(0, bounds.height - top - headerHeight))
         document.arrange(width: scroll.contentSize.width)
         empty.frame = NSRect(x: 20, y: bounds.height / 2 - 10, width: w - 40, height: 20)

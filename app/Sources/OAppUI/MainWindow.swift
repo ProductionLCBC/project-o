@@ -24,8 +24,23 @@ final class MainWindow: NSWindow {
 
     override func sendEvent(_ event: NSEvent) {
         if !takesClicks, Self.isPointerEvent(event.type) { return }
-        if event.type == .leftMouseDown || event.type == .rightMouseDown { handKeysBack(ifClickedOutsideAFieldAt: event.locationInWindow) }
+        if event.type == .leftMouseDown || event.type == .rightMouseDown {
+            if commitFieldInPlace(ifClickedOutsideItAt: event.locationInWindow) { return }
+            handKeysBack(ifClickedOutsideAFieldAt: event.locationInWindow)
+        }
         super.sendEvent(event)
+    }
+
+    /// Spec 10 §10, "In-place text" — "⌘Return commits, and so does a click
+    /// outside, which does nothing else: it doesn't fire, select or drag
+    /// what it lands on." Says whether the press was that click, so it goes
+    /// no further. Every field opened in place commits the same way (Area
+    /// 13 reading: a rename's click outside saves, as the Finder's does).
+    func commitFieldInPlace(ifClickedOutsideItAt point: NSPoint) -> Bool {
+        guard let regions = contentView as? ShowWindowView, let editor = regions.inlineEditor else { return false }
+        if editor.bounds.contains(editor.convert(point, from: nil)) { return false }
+        editor.commitNow()
+        return true
     }
 
     /// Spec 10 §9, "A text field" — "Search fields and the command bar keep

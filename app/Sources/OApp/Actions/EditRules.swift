@@ -24,8 +24,10 @@ public enum CannotEdit: Equatable, Sendable {
     case alreadyLive
     /// "Delete Folder is enabled only for an empty folder".
     case folderNotEmpty
-    /// The media item's file is missing, or the item was deleted.
+    /// The media item's file is missing, or the item was deleted; or the list is gone.
     case missing
+    /// The list was removed from the playlist and is finishing (Spec 7 §4).
+    case removed
     /// A fire the title or the number doesn't name (Spec 10 §6).
     case fire(FireRefusal)
     /// Another area builds it (Spec 10 §16).

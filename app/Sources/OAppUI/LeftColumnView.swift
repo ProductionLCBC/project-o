@@ -36,6 +36,8 @@ final class RowView: Surface {
     private var tags: [TagView] = []
     private let content: RowContent
     var onClick: ((_ option: Bool) -> Void)?
+    /// Spec 10 §5 — "Double-click or the menu renames one in place".
+    var onDoubleClick: (() -> Void)?
     var makeMenu: (() -> NSMenu?)?
 
     init(_ content: RowContent) {
@@ -95,6 +97,8 @@ final class RowView: Surface {
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control) {
             showMenu(event)
+        } else if event.clickCount == 2, let onDoubleClick {
+            onDoubleClick()
         } else {
             onClick?(event.modifierFlags.contains(.option))
         }
@@ -105,6 +109,9 @@ final class RowView: Surface {
     private func showMenu(_ event: NSEvent) {
         if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
     }
+
+    /// The row's menu as it stands now, for a test and for ⌃Return (Spec 10 §15).
+    var menuNow: NSMenu? { makeMenu?() }
 
     override func accessibilityPerformPress() -> Bool {
         guard !content.isHeading else { return false }
@@ -118,8 +125,26 @@ final class RowView: Surface {
 /// A scrolling column of rows.
 @MainActor
 final class RowList: NSScrollView {
-    private let document = Surface()
+    /// The rows' ground, which has a menu of its own where no row is: the Library's New Folder and New List Here.
+    private final class Ground: Surface {
+        var makeMenu: (() -> NSMenu?)?
+
+        override func rightMouseDown(with event: NSEvent) {
+            if let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            if event.modifierFlags.contains(.control), let menu = makeMenu?() { NSMenu.popUpContextMenu(menu, with: event, for: self) }
+        }
+    }
+
+    private let document = Ground()
     private(set) var rows: [RowView] = []
+    /// The menu of the empty space under the rows.
+    var makeMenu: (() -> NSMenu?)? {
+        get { document.makeMenu }
+        set { document.makeMenu = newValue }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -177,18 +202,25 @@ final class LeftColumnView: Surface {
     private var splitStart = 0.5
     /// Called when an item is clicked, so the grid scrolls to its list (Spec 10 §5).
     var onShowItem: ((String) -> Void)?
+    /// The window, which opens the fields in place and the small panels (Spec 10 §10).
+    weak var host: ShowWindowView?
+    /// What the column says for a few seconds beside what was tried (Spec 10 §10).
+    let notice = NoticeLabel()
 
     init(model: ShowModel) {
         self.model = model
         super.init(frame: .zero)
         fill = Palette.panel
         newPlaylist.setAccessibilityLabel(Strings.text(.menuNewPlaylist))
-        // The edits of §5 come with §10's stage.
-        newPlaylist.isEnabled = false
-        newPlaylist.reason = Strings.text(.unavailableLater)
+        // "New playlist: the window's + button or ⌘N opens a title field in the tree".
+        newPlaylist.onPress = { [weak self] in self?.beginNewPlaylist() }
         search.target = self
         search.action = #selector(searched)
-        for view in [playlistsTitle, newPlaylist, playlists, libraryTitle, search, library, split] as [NSView] { addSubview(view) }
+        for view in [playlistsTitle, newPlaylist, playlists, libraryTitle, search, library, notice, split] as [NSView] { addSubview(view) }
+        library.makeMenu = { [weak self] in
+            guard let self else { return nil }
+            return MenuBuilder.menu(Menus.libraryTop(cannotEditMasters: self.model.cannotEditMasters)) { [weak self] entry in self?.perform(entry, folder: "", over: nil) }
+        }
         split.onBegin = { [weak self] in self?.splitStart = self?.model.settings.leftSplit ?? 0.5 }
         split.onDrag = { [weak self] delta in
             guard let self, self.bounds.height > 0 else { return }
@@ -207,7 +239,11 @@ final class LeftColumnView: Surface {
     }
 
     func refresh() {
-        let cannotSend = model.store.cannotSend
+        let cannotNew = model.cannotEditMachine
+        newPlaylist.isEnabled = cannotNew == nil
+        newPlaylist.reason = cannotNew.map(UnavailableWording.sentence)
+        notice.show(model.notices[.left])
+        needsLayout = true
         playlists.set(model.playlistRows.map { row in
             var content = RowContent()
             var spoken = [row.title]
@@ -239,22 +275,15 @@ final class LeftColumnView: Surface {
             switch row.kind {
             case .playlist:
                 view.onClick = { [weak model] option in model?.choose(playlist: row.playlist, option: option) }
-                view.makeMenu = { [weak self] in self?.playlistMenu(row, cannotSend: cannotSend) }
-            case .item:
-                view.onClick = { [weak self] _ in
-                    self?.model.browse(.playlist(row.playlist))
-                    if let item = row.itemUuid { self?.onShowItem?(item) }
-                }
-                // Spec 10 §5, "An item's menu" — "Show in Library, for a linked item"; its edits come with §10's stage.
-                if !row.isLocal, !row.isMissing, let list = row.listUuid {
-                    view.makeMenu = { [weak model] in
-                        let menu = NSMenu()
-                        menu.addItem(ClosureMenuItem(title: Strings.text(.menuShowInLibrary)) { model?.showInLibrary(list: list) })
-                        return menu
+                view.makeMenu = { [weak self, weak view] in self?.playlistMenu(row, over: view) }
+            case .item, .header:
+                if row.kind == .item {
+                    view.onClick = { [weak self] _ in
+                        self?.model.browse(.playlist(row.playlist))
+                        if let item = row.itemUuid { self?.onShowItem?(item) }
                     }
                 }
-            case .header:
-                break
+                view.makeMenu = { [weak self, weak view] in self?.itemMenu(row, over: view) }
             }
             return view
         })
@@ -279,8 +308,18 @@ final class LeftColumnView: Surface {
             }
             let view = RowView(content)
             switch row.kind {
-            case .folder: view.onClick = { [weak model] _ in model?.toggle(folder: row.path) }
-            case .list: view.onClick = { [weak model] _ in if let uuid = row.uuid { model?.browse(.list(uuid)) } }
+            case .folder:
+                view.onClick = { [weak model] _ in model?.toggle(folder: row.path) }
+                // "Double-click or the menu renames one in place".
+                view.onDoubleClick = { [weak self, weak view] in self?.perform(MenuEntry(.renameFolder), folder: row.path, over: view) }
+                view.makeMenu = { [weak self, weak view] in
+                    guard let self else { return nil }
+                    let entries = Menus.folder(isEmpty: self.model.isEmpty(folder: row.path), cannotEditMasters: self.model.cannotEditMasters)
+                    return MenuBuilder.menu(entries) { [weak self, weak view] entry in self?.perform(entry, folder: row.path, over: view) }
+                }
+            case .list:
+                view.onClick = { [weak model] _ in if let uuid = row.uuid { model?.browse(.list(uuid)) } }
+                view.makeMenu = { [weak self, weak view] in self?.listMenu(row, over: view) }
             }
             return view
         })
@@ -290,23 +329,138 @@ final class LeftColumnView: Surface {
         }
     }
 
-    /// Spec 10 §5, "A playlist's menu" — Make Live now; its edits come with §10's stage.
-    private func playlistMenu(_ row: PlaylistRow, cannotSend: Unavailable?) -> NSMenu {
-        let menu = NSMenu()
-        let item = ClosureMenuItem(title: Strings.text(.menuMakeLive)) { [weak model] in
-            guard let model, let playlist = model.store.catalog?.playlist(uuid: row.playlist), let sending = try? GridFire.makeLive(playlist).get() else { return }
-            model.send(sending)
+    // MARK: - The playlists' edits (Spec 10 §5)
+
+    /// "New playlist: the window's + button or ⌘N opens a title field in the tree; Return sends `edit playlist create "TITLE"`."
+    func beginNewPlaylist() {
+        guard model.cannotEditMachine == nil else { return }
+        let top = NSRect(x: 4, y: 2, width: max(60, playlists.bounds.width - 8), height: RowView.height - 1)
+        host?.editInPlace(over: playlists, rect: top, text: "", label: Strings.text(.fieldNewPlaylist), placeholder: Strings.text(.fieldNewPlaylist)) { [weak model] in
+            model?.newPlaylist(title: $0)
         }
-        if let refusal = row.refusal {
-            item.isEnabled = false
-            item.toolTip = ShowWording.refusal(refusal)
-        } else if let cannotSend {
-            item.isEnabled = false
-            item.toolTip = UnavailableWording.sentence(for: cannotSend)
+    }
+
+    /// Spec 10 §5, "A playlist's menu".
+    private func playlistMenu(_ row: PlaylistRow, over view: RowView?) -> NSMenu? {
+        guard let entry = model.store.catalog?.playlist(uuid: row.playlist) else { return nil }
+        let entries = Menus.playlist(entry, live: model.store.live, cannotSend: model.store.cannotSend, cannotEdit: model.cannotEditMachine)
+        return MenuBuilder.menu(entries) { [weak self, weak view] chosen in self?.perform(chosen, playlist: entry.playlist, over: view) }
+    }
+
+    private func perform(_ entry: MenuEntry, playlist: Playlist, over view: RowView?) {
+        let uuid = playlist.uuid.uuidString.lowercased()
+        switch entry.kind {
+        case .makeLive:
+            model.makeLive(playlist: uuid)
+        case .renamePlaylist:
+            guard let view else { return }
+            host?.editInPlace(over: view, text: playlist.title, label: Strings.text(.fieldRename, playlist.title)) { [weak model] in model?.rename(playlist: uuid, to: $0) }
+        case .dateAndTime:
+            host?.present(Prompts.schedule(playlist, model: model).panel, at: view)
+        case .duplicatePlaylist:
+            host?.present(Prompts.duplicate(playlist, model: model), at: view)
+        case .archiveCopy:
+            model.edit(Edits.archiveCopy(playlist: playlist.uuid), at: .left)
+        case .archive:
+            model.edit(Edits.archive(playlist: playlist.uuid, true), at: .left)
+        case .restoreFromArchive:
+            model.edit(Edits.archive(playlist: playlist.uuid, false), at: .left)
+        case .deletePlaylist:
+            model.deletePlaylist(uuid)
+        default:
+            break
         }
-        menu.autoenablesItems = false
-        menu.addItem(item)
-        return menu
+    }
+
+    /// Spec 10 §5, "An item's menu".
+    private func itemMenu(_ row: PlaylistRow, over view: RowView?) -> NSMenu? {
+        guard let entry = model.store.catalog?.playlist(uuid: row.playlist), let uuid = row.itemUuid,
+              let item = entry.playlist.items.first(where: { $0.uuid.uuidString.lowercased() == uuid }) else { return nil }
+        // A linked item whose list is gone has nothing to show in the library.
+        let entries = Menus.item(item, in: entry, cannotEdit: model.cannotEditMachine).filter { !($0.kind == .showInLibrary && row.isMissing) }
+        return MenuBuilder.menu(entries) { [weak self, weak view] chosen in self?.perform(chosen, item: uuid, row: row, over: view) }
+    }
+
+    private func perform(_ entry: MenuEntry, item: String, row: PlaylistRow, over view: RowView?) {
+        switch entry.kind {
+        case .removeItem:
+            model.removeItem(item, from: row.playlist)
+        case .addHeaderAbove:
+            guard let view else { return }
+            host?.editInPlace(over: view, text: "", label: Strings.text(.fieldNewHeader), placeholder: Strings.text(.fieldNewHeader)) { [weak model] in
+                model?.addHeader($0, above: item, in: row.playlist)
+            }
+        case .renameHeader:
+            guard let view else { return }
+            host?.editInPlace(over: view, text: row.title, label: Strings.text(.fieldRename, row.title)) { [weak model] in
+                model?.rename(header: item, in: row.playlist, to: $0)
+            }
+        case .showInLibrary:
+            if let list = row.listUuid { model.showInLibrary(list: list) }
+        default:
+            break
+        }
+    }
+
+    // MARK: - The library's edits (Spec 10 §5)
+
+    /// Spec 10 §5, "A list's menu".
+    private func listMenu(_ row: LibraryRow, over view: RowView?) -> NSMenu? {
+        guard let catalog = model.store.catalog, let uuid = row.uuid, let list = catalog.list(uuid: uuid) else { return nil }
+        let entries = Menus.list(list, playlists: catalog.playlists, cannotEditMasters: model.cannotEditMasters, cannotEditMachine: model.cannotEditMachine)
+        return MenuBuilder.menu(entries) { [weak self, weak view] chosen in self?.perform(chosen, list: list, over: view) }
+    }
+
+    private func perform(_ entry: MenuEntry, list: ListSummary, over view: RowView?) {
+        switch entry.kind {
+        case .addToPlaylist(let playlist):
+            model.add(list: list.uuid, toPlaylist: playlist)
+        case .renameList:
+            guard let view else { return }
+            host?.editInPlace(over: view, text: list.title, label: Strings.text(.fieldRename, list.title)) { [weak model] in model?.rename(list: list.uuid, to: $0) }
+        case .duplicateList:
+            model.edit(Edits.duplicate(list: list.number), at: .left)
+        case .restoreVersion:
+            host?.restoreVersion(of: list.uuid)
+        case .deleteList:
+            model.deleteList(list.uuid)
+        case .newListHere:
+            model.newList(in: list.folder)
+        default:
+            break
+        }
+    }
+
+    /// A folder's menu, and with an empty path the Library's own: a folder or a list at the top.
+    private func perform(_ entry: MenuEntry, folder path: String, over view: RowView?) {
+        switch entry.kind {
+        case .renameFolder:
+            guard let view, model.cannotEditMasters == nil else { return }
+            let name = LibraryTree.name(of: path)
+            host?.editInPlace(over: view, text: name, label: Strings.text(.fieldRename, name)) { [weak model] in model?.rename(folder: path, to: $0) }
+        case .newFolder:
+            // The field opens under the folder's row, or at the top of the tree.
+            let rect = view.map { NSRect(x: 14, y: $0.bounds.height + 1, width: max(60, $0.bounds.width - 14), height: RowView.height - 1) }
+                ?? NSRect(x: 4, y: 2, width: max(60, library.bounds.width - 8), height: RowView.height - 1)
+            host?.editInPlace(over: view ?? library, rect: rect, text: "", label: Strings.text(.fieldNewFolder), placeholder: Strings.text(.fieldNewFolder)) { [weak model] in
+                model?.newFolder($0, in: path)
+            }
+        case .deleteFolder:
+            model.edit(Edits.delete(folder: path), at: .left)
+        case .newListHere:
+            model.newList(in: path)
+        default:
+            break
+        }
+    }
+
+    /// File ▸ New List (⇧⌘N): "for the selected folder, or ... at the top".
+    /// The selected folder is the one the list the grid browses from the
+    /// library is in (Area 13 reading: the tree has no selection of its own).
+    func newList() {
+        var folder: String?
+        if case .list(let uuid)? = model.browse.shown { folder = model.store.catalog?.list(uuid: uuid)?.folder }
+        model.newList(in: folder)
     }
 
     override func layout() {
@@ -318,7 +472,10 @@ final class LeftColumnView: Surface {
         playlists.frame = NSRect(x: 0, y: 34, width: w, height: max(0, split - 34))
         libraryTitle.frame = NSRect(x: 14, y: split + 12, width: w - 28, height: 14)
         search.frame = NSRect(x: 10, y: split + 34, width: w - 20, height: 24)
-        library.frame = NSRect(x: 0, y: split + 64, width: w, height: max(0, bounds.height - split - 64))
+        // What the column says about an edit stands at its foot, over the library's last rows.
+        let noticeHeight = notice.height(width: w - 28)
+        notice.frame = NSRect(x: 14, y: bounds.height - noticeHeight - 8, width: w - 28, height: noticeHeight)
+        library.frame = NSRect(x: 0, y: split + 64, width: w, height: max(0, bounds.height - split - 64 - (noticeHeight > 0 ? noticeHeight + 14 : 0)))
         self.split.frame = NSRect(x: 0, y: split - DividerView.thickness / 2, width: w, height: DividerView.thickness)
     }
 
@@ -332,8 +489,17 @@ final class LeftColumnView: Surface {
 
 /// A menu item that runs a closure.
 @MainActor
-final class ClosureMenuItem: NSMenuItem {
+final class ClosureMenuItem: NSMenuItem, NSMenuItemValidation {
     private nonisolated(unsafe) var run: @MainActor () -> Void = {}
+    /// Whether it can be chosen now, asked each time its menu opens or its
+    /// key is pressed; nil leaves it as it was set. In a menu AppKit
+    /// enables by itself (the Edit menu, for its text items), this is what
+    /// AppKit asks.
+    nonisolated(unsafe) var isAllowed: (@MainActor () -> Bool)?
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        isAllowed?() ?? isEnabled
+    }
 
     init(title: String, key: String = "", modifiers: NSEvent.ModifierFlags = [.command], _ run: @escaping @MainActor () -> Void) {
         super.init(title: title, action: #selector(fire), keyEquivalent: key)
@@ -351,8 +517,8 @@ final class ClosureMenuItem: NSMenuItem {
         run()
     }
 
-    /// Runs it, as choosing it would.
+    /// Runs it, as choosing it would: nothing happens when it can't be chosen now.
     func choose() {
-        if isEnabled { run() }
+        if isAllowed?() ?? isEnabled { run() }
     }
 }

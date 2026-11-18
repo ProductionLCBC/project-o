@@ -158,13 +158,25 @@
       }
     },
     "cannot.missing" : {
-      "comment" : "The reason an action on a missing or deleted media item is disabled.",
+      "comment" : "The reason an action on a missing or deleted media item, or on a list that is gone, is disabled.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "The file is missing."
+          }
+        }
+      }
+    },
+    "cannot.removed" : {
+      "comment" : "The reason an action on a list that was removed while live is disabled.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It was removed from the playlist."
           }
         }
       }
@@ -1665,6 +1677,78 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "This engine is version %@ and speaks another version of the API, so Project O can’t drive it."
+          }
+        }
+      }
+    },
+    "field.copy" : {
+      "comment" : "A button beside a field whose text couldn't be saved: copies what was typed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        }
+      }
+    },
+    "field.newFolder" : {
+      "comment" : "The placeholder and label of the field that takes a new folder's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder name"
+          }
+        }
+      }
+    },
+    "field.newHeader" : {
+      "comment" : "The placeholder and label of the field that takes a new header's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Header label"
+          }
+        }
+      }
+    },
+    "field.newPlaylist" : {
+      "comment" : "The placeholder and label of the field that takes a new playlist's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist title"
+          }
+        }
+      }
+    },
+    "field.rename" : {
+      "comment" : "VoiceOver: an in-place rename field. %@ is the current name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New name for %@"
+          }
+        }
+      }
+    },
+    "field.text" : {
+      "comment" : "VoiceOver: the field that edits a cue's words in place. %lld is the cue's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Words of cue %lld"
           }
         }
       }
@@ -4873,6 +4957,174 @@
         }
       }
     },
+    "prompt.advanceAfter" : {
+      "comment" : "The heading of the panel that sets a cue's advance-after.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire the next cue by itself, after this one"
+          }
+        }
+      }
+    },
+    "prompt.badSeconds" : {
+      "comment" : "Shown when the seconds field doesn't hold a duration.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type a number of seconds, such as 8 or 2.5."
+          }
+        }
+      }
+    },
+    "prompt.date" : {
+      "comment" : "The label of the service date.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        }
+      }
+    },
+    "prompt.duplicate" : {
+      "comment" : "The heading of the panel that asks for a copy's title. %@ is the playlist's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate “%@” as"
+          }
+        }
+      }
+    },
+    "prompt.empty" : {
+      "comment" : "Shown when a title or a name was left empty.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It needs a name."
+          }
+        }
+      }
+    },
+    "prompt.newTitle" : {
+      "comment" : "The label of the field for a copy's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New title"
+          }
+        }
+      }
+    },
+    "prompt.none" : {
+      "comment" : "A checkbox in a small panel: no date, no time, or no automatic advance.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "prompt.note" : {
+      "comment" : "The heading of the panel that edits a cue's note. %lld is the cue's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note on cue %lld"
+          }
+        }
+      }
+    },
+    "prompt.note.field" : {
+      "comment" : "The label of the note's field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note"
+          }
+        }
+      }
+    },
+    "prompt.save" : {
+      "comment" : "The button of a small panel that saves what it holds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "prompt.schedule" : {
+      "comment" : "The heading of the panel that sets a playlist's service date and time. %@ is its title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date and time of “%@”"
+          }
+        }
+      }
+    },
+    "prompt.seconds" : {
+      "comment" : "The label of a field that takes a number of seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seconds"
+          }
+        }
+      }
+    },
+    "prompt.time" : {
+      "comment" : "The label of the service time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time"
+          }
+        }
+      }
+    },
+    "prompt.triggerTime" : {
+      "comment" : "The heading of the panel that sets a cue's time trigger.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire by itself, after the cue before it"
+          }
+        }
+      }
+    },
     "quit.keepOutputs" : {
       "comment" : "The quit dialog's button that quits the app and leaves the engine and the outputs running.",
       "extractionState" : "manual",
@@ -5277,6 +5529,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Project O can’t play this kind of file."
+          }
+        }
+      }
+    },
+    "sheet.close" : {
+      "comment" : "The button that closes a sheet of things to choose from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
           }
         }
       }
@@ -6525,6 +6789,78 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "versions.detail" : {
+      "comment" : "Under a kept version: %1$@ is the title it had, %2$@ how many cues, such as 14 cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” · %2$@"
+          }
+        }
+      }
+    },
+    "versions.empty" : {
+      "comment" : "In the sheet when a list has no kept version.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No earlier version of this list is kept."
+          }
+        }
+      }
+    },
+    "versions.heading" : {
+      "comment" : "The heading of the sheet of a list's kept versions. %@ is the list's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kept versions of “%@”"
+          }
+        }
+      }
+    },
+    "versions.onAir" : {
+      "comment" : "In the sheet when the list is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This list is on air: each cue takes a restored version at its next fire."
+          }
+        }
+      }
+    },
+    "versions.restore" : {
+      "comment" : "The button beside a kept version or a snapshot; it asks before it restores.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore…"
+          }
+        }
+      }
+    },
+    "versions.row" : {
+      "comment" : "A kept version: %1$lld is its number, %2$@ when it was kept.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %1$lld, kept %2$@"
           }
         }
       }

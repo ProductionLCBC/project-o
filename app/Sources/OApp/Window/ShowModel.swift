@@ -32,6 +32,10 @@ public final class ShowModel {
     public var onChange: ((Set<Change>) -> Void)?
     /// Called when the grid should bring the live cue into view (Spec 10 §6, "Following the live cue").
     public var onFollowLive: (() -> Void)?
+    /// How the window asks before a delete or a restore: a sheet with
+    /// Cancel and the button that does it (Spec 10 §4, §9). With no window
+    /// to ask, nothing that needs asking is done.
+    public var confirm: ((Confirmation, @escaping @MainActor (Bool) -> Void) -> Void)?
 
     // MARK: What the operator chose
 
@@ -119,6 +123,8 @@ public final class ShowModel {
         if changes.contains(.media) { out.formUnion([.grid, .pool, .strip]) }
         if !changes.isDisjoint(with: [.channels, .stacks]) { out.formUnion([.strip, .right, .top]) }
         if !changes.isDisjoint(with: [.outputs, .audio, .popups, .timers, .engine, .saving, .history, .devices]) { out.formUnion([.right, .top]) }
+        // The lock comes on or off: the buttons that edit show enabled or disabled with the reason (Spec 10 §10).
+        if changes.contains(.engine) { out.formUnion([.left, .pool]) }
         if out.contains(.grid) { rebuildGrid() }
         if changes.contains(.live), grid.liveCell != nil { followLiveSoon() }
         changed(out)

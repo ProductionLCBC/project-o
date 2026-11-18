@@ -514,6 +514,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     case historyUndo = "history.undo"
     case historyRedo = "history.redo"
     case noticeNotSent = "notice.notSent"
+    case cannotRemoved = "cannot.removed"
     case historyChanges = "history.changes"
     case historyUndoDetail = "history.undo.detail"
     case historyRedoDetail = "history.redo.detail"
@@ -568,6 +569,37 @@ public enum StringKey: String, CaseIterable, Sendable {
     case confirmRestoreSnapshotTitle = "confirm.restoreSnapshot.title"
     case confirmRestoreSnapshotTitleMachine = "confirm.restoreSnapshot.title.machine"
     case confirmRestoreSnapshotBody = "confirm.restoreSnapshot.body"
+
+    // Fields and small panels of the edits
+    case fieldCopy = "field.copy"
+    case fieldNewPlaylist = "field.newPlaylist"
+    case fieldNewFolder = "field.newFolder"
+    case fieldNewHeader = "field.newHeader"
+    case fieldRename = "field.rename"
+    case fieldText = "field.text"
+    case promptSave = "prompt.save"
+    case promptNone = "prompt.none"
+    case promptDuplicate = "prompt.duplicate"
+    case promptNewTitle = "prompt.newTitle"
+    case promptSchedule = "prompt.schedule"
+    case promptDate = "prompt.date"
+    case promptTime = "prompt.time"
+    case promptNote = "prompt.note"
+    case promptNoteField = "prompt.note.field"
+    case promptTriggerTime = "prompt.triggerTime"
+    case promptAdvanceAfter = "prompt.advanceAfter"
+    case promptSeconds = "prompt.seconds"
+    case promptBadSeconds = "prompt.badSeconds"
+    case promptEmpty = "prompt.empty"
+
+    // Restores (Spec 10 §14)
+    case sheetClose = "sheet.close"
+    case versionsHeading = "versions.heading"
+    case versionsRow = "versions.row"
+    case versionsDetail = "versions.detail"
+    case versionsEmpty = "versions.empty"
+    case versionsOnAir = "versions.onAir"
+    case versionsRestore = "versions.restore"
 }
 
 /// The table the keys are looked up in, and what is done to a string on its
