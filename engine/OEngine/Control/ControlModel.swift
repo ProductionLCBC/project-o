@@ -273,17 +273,29 @@ public struct ControlModel: Sendable {
 }
 
 /// Spec 1 §2 — "renderSize: the largest output size among stacks that include
-/// the channel"; Spec 4 §5 — stack textures are "The output size".
-public struct MachineGeometry: Sendable {
+/// the channel"; Spec 4 §5 — a stack texture is "The size of the output
+/// showing it". The sizes the engine's textures have, worked out again
+/// whenever a channel, a stack, an output or what an output shows changes.
+public struct MachineGeometry: Equatable, Sendable {
     public let stackSizes: [Int: PixelSize]
     public let channelSizes: [Int: PixelSize]
 
-    public init(library: Library, machine: Machine) {
+    /// Spec 4 §5 — a stack texture is "The size of the output showing it,
+    /// the largest when several do; for a stack no output shows, that of the
+    /// largest output whose default stack it is, else 1920 by 1080 (Spec 11
+    /// §3). The old stack of a running switch keeps its size until the switch
+    /// ends". `state` says which stack each output shows, an output without
+    /// an entry being on its default stack; `switching` names, by output, the
+    /// old stack of a switch still running.
+    public init(library: Library, machine: Machine, state: ShowState? = nil, switching: [Int: Int] = [:]) {
+        func size(_ output: Output) -> PixelSize { PixelSize(width: output.format.width, height: output.format.height) }
         var stacks: [Int: PixelSize] = [:]
         for stack in machine.stacks {
-            let showing = machine.outputs.filter { $0.defaultStack == stack.number }
-            let largest = showing.map { PixelSize(width: $0.format.width, height: $0.format.height) }
-                .max { $0.pixelCount < $1.pixelCount }
+            let showing = machine.outputs.filter {
+                (state?.outputs[$0.number] ?? $0.defaultStack) == stack.number || switching[$0.number] == stack.number
+            }
+            let defaulting = machine.outputs.filter { $0.defaultStack == stack.number }
+            let largest = (showing.isEmpty ? defaulting : showing).map(size).max { $0.pixelCount < $1.pixelCount }
             stacks[stack.number] = largest ?? PixelSize(.hd)
         }
         var channels: [Int: PixelSize] = [:]

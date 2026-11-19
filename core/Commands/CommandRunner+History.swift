@@ -114,8 +114,7 @@ extension Runner {
             return .failure(rejection)
         case .success(let outcome):
             let before = (library: context.library, machine: context.machine)
-            context.library = outcome.library
-            context.machine = outcome.machine
+            adopt(outcome.library, outcome.machine)
             let line = ExecutedCommand(group: group, source: source, command: outcome.logged, result: outcome.isNoop ? .noop : .ok,
                                        effects: [], fire: fire, inverse: outcome.inverse, changes: outcome.changes,
                                        structure: outcome.structure, warnings: outcome.warnings)
@@ -173,6 +172,8 @@ extension Runner {
         }
 
         let before = (library: context.library, machine: context.machine)
+        // A step that fails partway leaves the state as it found it too: an entry a first command dropped comes back whole.
+        let stateBefore = state
         let ran = makeGroupID()
         var lines: [ExecutedCommand] = []
         replaying = true
@@ -184,6 +185,7 @@ extension Runner {
                 replaying = false
                 context.library = before.library
                 context.machine = before.machine
+                state = stateBefore
                 // What the machine can't do now keeps its own reason; a rule the step would break is `conflict`.
                 let own: Set<RejectionReason> = [.diskFull, .noTrash, .onAir]
                 let refusal = own.contains(rejection.reason) ? rejection : Rejection(
@@ -251,8 +253,7 @@ extension Runner {
             case .success(let outcomes):
                 var lines: [ExecutedCommand] = []
                 for outcome in outcomes {
-                    context.library = outcome.library
-                    context.machine = outcome.machine
+                    adopt(outcome.library, outcome.machine)
                     lines.append(ExecutedCommand(group: group, source: source, command: .edit(outcome.logged),
                                                  result: outcome.isNoop ? .noop : .ok, effects: [], inverse: outcome.inverse.map(Command.edit),
                                                  changes: outcome.changes, structure: outcome.structure, warnings: outcome.warnings))
@@ -308,8 +309,7 @@ extension Runner {
         case .failure(let rejection):
             return .failure(rejection)
         case .success(let outcome):
-            context.library = outcome.library
-            context.machine = outcome.machine
+            adopt(outcome.library, outcome.machine)
             return .success([ExecutedCommand(group: group, source: source, command: .media(outcome.logged),
                                              result: outcome.isNoop ? .noop : .ok, effects: [], inverse: outcome.inverse.map(Command.media),
                                              changes: outcome.changes)])
