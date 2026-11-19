@@ -124,8 +124,21 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.preset(1)?.layouts[.stack(2)]?.boxes.map { $0.textStyle?.fromStyle }, [3, 3])
     }
 
-    func test_renumberingMachineObjectsRewritesSettingsKeysMacrosAndLayouts() {
+    /// Spec 5 §4 — "A stack, output, audio output or input belongs to one
+    /// machine, but portable documents name machine-level numbers so that
+    /// they meet them at every campus ... Renumbering a machine-level object
+    /// therefore rewrites references in the machine root only. It leaves
+    /// portable documents alone".
+    func test_renumberingAMachineObjectRewritesTheMachineRootAndLeavesPortableDocuments() {
         var (library, machine) = roots
+        // A master's cue may name an output, a stack, an audio output and an input: it meets them by number at every campus.
+        library.lists[0].cues[0].commands.append(GuardedCommand(.outputStack(output: 2, stack: 2)))
+        library.lists[0].cues[0].commands.append(GuardedCommand(.audioMute(audio: .number(1), state: .on)))
+        library.lists[0].cues[0].commands.append(GuardedCommand(.channelWrite(ChannelWrite(channel: .number(1), content: .input(1)))))
+        // A local copy is a document of the machine root (Spec 1 §2).
+        machine.localLists[0].cues[0].commands.append(GuardedCommand(.outputStack(output: 2, stack: 2)))
+        machine.localLists[0].cues[0].commands.append(GuardedCommand(.audioMute(audio: .number(1), state: .on)))
+        let portable = library
 
         XCTAssertEqual(Identity.renumber(.stack, from: 1, to: 3, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(machine.outputs.map(\.defaultStack), [3, 3])
@@ -133,17 +146,34 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(machine.macro(2)?.commands.map(\.command)[1], .outputStack(output: 1, stack: 3))
         XCTAssertEqual(machine.macro(2)?.commands.map(\.command)[2], .stackBlackout(stack: .number(3), state: .off))
         XCTAssertEqual(machine.keys[4].command, .stackBlackout(stack: .number(3), state: .toggle))
-        XCTAssertEqual(library.preset(3)?.layouts.keys.sorted(), [.any, .stack(2)], "preset layouts for other stacks are untouched")
+
         XCTAssertEqual(Identity.renumber(.stack, from: 2, to: 6, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(library.preset(3)?.layouts.keys.sorted(), [.any, .stack(6)], "a preset's per-stack layout follows the stack")
         XCTAssertEqual(machine.macro(2)?.commands.map(\.command)[3], .stackMute(stack: 6, channel: 2, state: .off))
+        XCTAssertEqual(machine.localLists[0].cues[0].commands.suffix(2).first?.command, .outputStack(output: 2, stack: 6))
+        XCTAssertEqual(library.preset(3)?.layouts.keys.sorted(), [.any, .stack(2)],
+                       "a preset's layout for stack 2 still meets stack 2 at every campus")
+        XCTAssertEqual(library.preset(1)?.layouts.keys.sorted(), [.any, .stack(2)], "and so does Preset 1's confidence layout")
 
         XCTAssertEqual(Identity.renumber(.output, from: 2, to: 7, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(machine.audioOutput(2)?.device, .sdiOutput(7))
+        XCTAssertEqual(machine.localLists[0].cues[0].commands.suffix(2).first?.command, .outputStack(output: 7, stack: 6))
         XCTAssertEqual(machine.macro(2)?.commands.map(\.command)[1], .outputStack(output: 1, stack: 3))
 
         XCTAssertEqual(Identity.renumber(.audioOutput, from: 1, to: 4, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(library.channels.map(\.audioOutputs), [[4], [4], [4]])
+        XCTAssertEqual(machine.audioOutputs.map(\.number), [2, 4])
+        XCTAssertEqual(machine.localLists[0].cues[0].commands.last?.command, .audioMute(audio: .number(4), state: .on))
+        XCTAssertEqual(library.channels.map(\.audioOutputs), [[1], [1], [1]], "channels are portable: they still name audio output 1")
+
+        XCTAssertEqual(Identity.renumber(.input, from: 1, to: 2, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(machine.inputs.map(\.number), [2])
+
+        XCTAssertEqual(library, portable, "no portable document changed")
+    }
+
+    /// Spec 1 §4 — "every internal reference in the library and the machine
+    /// root is rewritten in the same save", for the portable types.
+    func test_renumberingAMacroOrAListRewritesBothRoots() {
+        var (library, machine) = roots
 
         XCTAssertEqual(Identity.renumber(.macro, from: 2, to: 6, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(machine.settings.startupMacro, 6)
@@ -155,12 +185,42 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(machine.playlist(uuid: F.playlistUuid)?.items.map(\.kind)[1], .linked(list: 43, listUuid: F.listUuid(42)))
         XCTAssertEqual(library.list(number: 43)?.uuid, F.listUuid(42))
         XCTAssertEqual(machine.localLists[0].number, 42, "a local copy is its own document; its number records what it was cut from")
+    }
 
-        // Input references live in content expressions and the inputs document.
-        library.lists[0].cues[0].commands.append(GuardedCommand(.channelWrite(ChannelWrite(channel: .number(1), content: .input(1)))))
-        XCTAssertEqual(Identity.renumber(.input, from: 1, to: 2, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(machine.inputs.map(\.number), [2])
-        XCTAssertEqual(library.lists[0].cues[0].commands.last?.command, .channelWrite(ChannelWrite(channel: .number(1), content: .input(2))))
+    /// Spec 8 §8 — "`dropChannels` ... each a channel number or null": a
+    /// reference like any other, so it follows its channel (Spec 1 §4).
+    func test_renumberingAChannelCarriesTheMachinesDropChannels() {
+        var (library, machine) = roots
+        XCTAssertEqual(machine.settings.dropChannels, DropChannels(video: 1, image: 1, audio: nil))
+        XCTAssertEqual(Identity.renumber(.channel, from: 1, to: 8, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(machine.settings.dropChannels, DropChannels(video: 8, image: 8, audio: nil))
+        XCTAssertEqual(Identity.swap(.channel, 8, 2, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(machine.settings.dropChannels, DropChannels(video: 2, image: 2, audio: nil))
+    }
+
+    /// Spec 1 §4 and Spec 5 §4 — the references a renumber rewrites are the
+    /// ones `References` finds: afterwards what named the old number names
+    /// the new, in both roots for a portable type and in the machine root
+    /// alone for a machine-level one.
+    func test_whatNamedTheOldNumberNamesTheNew() {
+        let cases: [(NumberedType, Int)] = [(.channel, 2), (.preset, 2), (.textStyle, 1), (.grade, 1), (.transition, 2),
+                                            (.audioTransition, 1), (.macro, 2), (.stack, 2), (.output, 2), (.audioOutput, 1)]
+        for (type, from) in cases {
+            var (library, machine) = roots
+            let before = References.to(type, from, library: library, machine: machine)
+            XCTAssertFalse(before.isEmpty, "\(type.displayName) \(from) is named in the fixture")
+            XCTAssertEqual(Identity.renumber(type, from: from, to: 90, library: &library, machine: &machine), .renumbered, type.displayName)
+            let moved = References.to(type, 90, library: library, machine: machine)
+            let stayed = References.to(type, from, library: library, machine: machine)
+            if type.isMachineLevel {
+                XCTAssertEqual(moved.count, before.filter { !$0.site.isPortable }.count, "\(type.displayName): the machine root follows")
+                XCTAssertEqual(stayed.count, before.filter(\.site.isPortable).count, "\(type.displayName): portable documents stay")
+                XCTAssertTrue(stayed.allSatisfy(\.site.isPortable), type.displayName)
+            } else {
+                XCTAssertEqual(moved.count, before.count, type.displayName)
+                XCTAssertTrue(stayed.isEmpty, "\(type.displayName): nothing names \(from) any more")
+            }
+        }
     }
 
     // MARK: - Media identity
