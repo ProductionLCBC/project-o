@@ -1,6 +1,6 @@
 # Spec 4: Render pipeline
 
-Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-11-16 from the Area 19 review (§12, audio devices at launch) , 2026-11-17 on Adam's answer to the Area 13 plan (§15, the gate lifted for Area 13) and 2026-11-18 on his answer to the Area 14 plan (§15, the gate lifted for Area 14) · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
+Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-11-16 from the Area 19 review (§12, audio devices at launch) , 2026-11-17 on Adam's answer to the Area 13 plan (§15, the gate lifted for Area 13) and 2026-11-18 on his answers to the Area 14 plan (§15, the gate lifted for Area 14; §5, a stack's size at a switch; §8 and §9, a box keeps its previous lines) · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
 
 ## 1. Purpose and scope
 
@@ -97,12 +97,12 @@ The render thread performs no decision-making beyond step 2 and step 5. Everythi
 
 ## 5. Resources
 
-Everything the render thread touches is allocated before it is needed, in private GPU memory, from pools sized for the current show. Allocation happens at three moments only: show load, a stack or output change (between ticks, double-buffered so the old pools serve until the new ones exist), and a decoder session start on the decode thread. Never on the render thread.
+Everything the render thread touches is allocated before it is needed, in private GPU memory, from pools sized for the current show. Allocation happens at three moments only: show load, a stack or output change (between ticks, double-buffered so the old pools serve until the new ones exist), and a decoder session start on the decode thread. Never on the render thread. A stack or output change is anything that changes a size below or adds or removes a channel or a stack: an edit, an undo, a restore or a reload from disk (Spec 5 §2), and a stack switch onto an output of another size.
 
 | Resource | Format | Size | Count | Notes |
 | --- | --- | --- | --- | --- |
 | Channel texture | RGBA16Float, premultiplied linear, private | The channel's render size (largest including stack, or 1920 by 1080 when no stack holds it and the strip's pictures need it, Spec 10 §2) | 1 per channel, plus mip chain when a due stack samples below half scale | 70.8 MB at 4096×2160 |
-| Stack texture | RGBA16Float, private | The output size; for a stack no output shows, that of an output whose default stack it is, else 1920 by 1080 (Spec 11 §3) | 3 per output (present ring) plus 1 for output transitions | A 1080p stack is 16.6 MB |
+| Stack texture | RGBA16Float, private | The size of the output showing it, the largest when several do; for a stack no output shows, that of the largest output whose default stack it is, else 1920 by 1080 (Spec 11 §3). The old stack of a running switch keeps its size until the switch ends | 3 per output (present ring) plus 1 for output transitions | A 1080p stack is 16.6 MB |
 | Decoded frame | VideoToolbox's IOSurface in its native format (NV12, P010, 4:2:2 10-bit, or 16-bit RGBA for 4444) | Source size | Decoder pool of 8 per session: 4 queued, 1 on screen, headroom for the outgoing instance | Wrapped by CVMetalTextureCache; no copy |
 | Still image | RGBA16Float linear with mips, private | Downsampled at load to the channel render size | 1 per still on a channel; 2 during a transition | Decoded with ImageIO off-thread |
 | Text texture | BGRA8Unorm sRGB, premultiplied | The box's pixel width, one line high | LRU cache capped by bytes (default 256 MB) | The GPU converts sRGB to linear on sample |
@@ -111,6 +111,8 @@ Everything the render thread touches is allocated before it is needed, in privat
 | Thumbnail and multiviewer textures | BGRA8Unorm sRGB | Small (480 px wide thumbnails; a quarter-size multiviewer; 256 by 144 channel pictures, Spec 10 §2; editor pictures up to 1920 pixels wide, Spec 11 §3) | A fixed pool | Section 10 |
 
 **Budget for the spike configuration** (two 4K channels, a 4K main stack, a 1080p confidence stack, two decoders): about 140 MB of channel textures, 260 MB of stack textures, 420 MB of decoder pools, plus caches, comfortably under 1 GB on a Mac mini's unified memory. Pre-flight computes this figure from the machine's stacks and channel caps and warns above a configurable ceiling.
+
+**A stack switch** (`output N stack M`) onto an output of another size rebuilds stack M at that output's size on the tick of the switch, and the old stack when the switch's transition ends and it is no longer mixed. A channel whose render size is `largest` follows its stacks and keeps playing into its new texture. The stack's text draws from its previous rasters, scaled, until the new ones are ready (section 9), and its previews are sent to the operator app again (Spec 10 §2).
 
 **Heaps.** Channel and stack textures come from an `MTLHeap` per size class so a stack change reallocates without fragmenting; decoder pools are VideoToolbox's own; everything else is individually allocated at load. Texture usage flags are the minimum each role needs (`shaderRead` for sources, `renderTarget | shaderRead` for channel and stack textures) so Metal can lay them out optimally.
 
@@ -182,7 +184,7 @@ Text has no look of its own; a box gives it one, per stack, at that stack's size
 
 **Cache.** Keyed by a hash of (field text, text style value, box pixel width, box pixel height, fit policy, output scale, tabular digits). Entries hold the line textures and the layout. The cache is an LRU bounded by bytes (section 5). Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each offset box, the text one cue beyond its offset, so a fire never waits on text; a cache miss on a fire draws nothing for that box on the first tick and the texture from the second, which the soak metrics count as a `textLate` event that should read zero.
 
-**Variables.** A box whose text contains variables is re-laid-out only when its resolved text changes, at the pace Spec 6 §5 sets: at once for context values, at most ten times a second for a popup, and at most once a wall-clock second for the clock, timers and `[Service In]`; the result replaces the cache entry. A timer box therefore costs one small raster per second. Boxes with `transitionOnVariableChange` run their box transition between the old and new textures; the rest swap.
+**Variables.** A box whose text contains variables is re-laid-out only when its resolved text changes, at the pace Spec 6 §5 sets: at once for context values, at most ten times a second for a popup, and at most once a wall-clock second for the clock, timers and `[Service In]`; the result replaces the cache entry. Until the new raster is ready the box keeps drawing the old value's lines (section 9), so a clock never blanks as its minute changes, and that counts nothing late. A timer box therefore costs one small raster per second. Boxes with `transitionOnVariableChange` run their box transition between the old and new textures; the rest swap.
 
 **Thumbnails** use the same rasterizer at thumbnail scale so a cue's thumbnail shows the real line breaks, not an approximation.
 
@@ -197,7 +199,7 @@ One pass per due stack, compositing its slots bottom to top into the stack textu
 | Box binding | Source for this stack | Drawn as |
 | --- | --- | --- |
 | pixels | The channel texture (or nothing for text content) | A quad placing the channel texture in the box frame by fit mode: `fit` letterboxes, `fill` crops to cover, `stretch` ignores aspect, `crop` centers at 1:1 |
-| field | The cached line textures for (this channel's field text with variables resolved, or the list's metadata when the write lacks the field, Spec 6 §3; this box; this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate`. After an edit that changes how a box's text looks (the box's frame, fit or text style, or the text style itself) while the text is on air, the box keeps drawing its previous lines until the new raster is ready, so a look edit never blanks a line for a tick (Spec 5 §2) |
+| field | The cached line textures for (this channel's field text with variables resolved, or the list's metadata when the write lacks the field, Spec 6 §3; this box; this stack) | One quad per line, laid out by the cached layout; a missing cache entry draws nothing this tick and counts `textLate`. When the box has been drawing this text and only its raster is missing, the box keeps drawing its previous lines until the new raster is ready and counts nothing late: after an edit that changes how the text looks (the box's frame, fit or text style, or the text style itself), after its stack changes size (section 5), when the lines are scaled with the stack, and when a variable in it takes a new value (section 8). So a look edit, a stack switch or a clock's new minute never blanks a line for a tick (Spec 5 §2). Text a cue has just written is not the text the box was drawing, and still waits for its own raster |
 | static | The cached textures for the box's own text with variables resolved | As field |
 
 **Fallback boxes** draw only if no earlier box at the same offset in the same channel's group drew anything, which the control thread decides when resolving (it knows the content kind), not the GPU.
