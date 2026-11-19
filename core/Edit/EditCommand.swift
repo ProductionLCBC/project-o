@@ -453,9 +453,12 @@ extension EditCommand {
 extension EditCommand {
     /// Spec 1 §4 — "When an object's number changes, every internal
     /// reference in the library and the machine root is rewritten": an edit
-    /// held by a cue or a macro names objects by number in its address, and
-    /// `edit.cueChannel` names a channel and what its write refers to. JSON
-    /// values are kept as written.
+    /// held by a cue or a macro names objects by number in its address,
+    /// `edit.cueChannel` names a channel and what its write refers to, and a
+    /// value names what its field names: a slot's preset, a box's grade, the
+    /// commands a held edit would give a cue or a macro. A path is left as
+    /// written: a preset's layout key meets its stack by number at every
+    /// campus, and doesn't follow a stack here (Spec 5 §4).
     public func mapReferences(_ transform: (NumberedType, Int) -> Int) -> EditCommand {
         var e = self
         switch address {
@@ -465,6 +468,7 @@ extension EditCommand {
         case .slot(let stack, let channel): e.address = .slot(stack: transform(.stack, stack), channel: transform(.channel, channel))
         default: break
         }
+        e.action = valueMapped(transform)
         if case .cueChannel(var c) = action {
             c.attributes = c.attributes.map { $0.mapReferences(transform) }
             if case .write(let content, let riders) = c.state,
@@ -476,6 +480,52 @@ extension EditCommand {
             e.action = .cueChannel(c)
         }
         return e
+    }
+
+    /// The action with the numbers in its value passed through `transform`.
+    private func valueMapped(_ transform: (NumberedType, Int) -> Int) -> EditAction {
+        func commands(_ value: JSONValue) -> JSONValue { EditField.commands.mappingReferences(in: value, transform) }
+        func command(_ value: JSONValue) -> JSONValue { commands(.array([value]))[0] ?? value }
+        func cue(_ value: JSONValue) -> JSONValue {
+            guard let held = value["commands"] else { return value }
+            return value.setting("commands", to: commands(held))
+        }
+        switch (address, action) {
+        // A cue's commands, set whole, one at a time or inserted (Spec 5 §4).
+        case (.cue, .set("commands", let value)): return .set(path: "commands", value: commands(value))
+        case (.cue, .set(let path, let value)) where path.hasPrefix("commands."): return .set(path: path, value: command(value))
+        case (.cue, .insert("commands", let at, let value)): return .insert(path: "commands", at: at, value: command(value))
+        // A cue inserted into a list, and the cues of a list made with a body.
+        case (.list, .insert("cues", let at, let value)): return .insert(path: "cues", at: at, value: cue(value))
+        case (.list, .create(let body?, let folder, let title)):
+            guard let cues = body["cues"]?.arrayValue else { return action }
+            return .create(body: body.setting("cues", to: .array(cues.map(cue))), folder: folder, title: title)
+        default: break
+        }
+        // The objects with a field table (Spec 5 §6, check 5 reads the same table).
+        let table: EditField?
+        switch address {
+        case .numbered(let type, _): table = EditFields.table(for: type)
+        case .slot: table = EditFields.slot
+        default: table = nil
+        }
+        guard let table else { return action }
+        switch action {
+        case .set(let path, let value):
+            guard let field = EditPath(path).flatMap({ table.field(at: $0) }) else { return action }
+            return .set(path: path, value: field.mappingReferences(in: value, transform))
+        case .insert(let path, let at, let value):
+            guard let field = EditPath(path).flatMap({ table.field(at: $0) }) else { return action }
+            for case .list(let element) in field.shapes {
+                return .insert(path: path, at: at, value: element.mappingReferences(in: value, transform))
+            }
+            if case .commands = field { return .insert(path: path, at: at, value: command(value)) }
+            return action
+        case .create(let body?, let folder, let title):
+            return .create(body: table.mappingReferences(in: body, transform), folder: folder, title: title)
+        default:
+            return action
+        }
     }
 }
 

@@ -1,5 +1,8 @@
-// OCore — Spec 5 §2–§7, the edit path's checks and changes, for the edits
-// Area 9 builds: lists, cues, folders and playlists (Spec 7 §7).
+// OCore — Spec 5 §2–§7, the edit path's checks and changes: the edits Area 9
+// built, of lists, cues, folders and playlists (Spec 7 §7), here and in the
+// files beside this one, and the ones Area 14 built, of channels, stacks and
+// slots, presets, text styles, grades, transitions, audio transitions, macros
+// and an output's default stack and transitions (Spec 11 §11).
 //
 // Pure, like the projection: the roots in, the roots out, nothing read from a
 // clock or a disk. The engine runs it on the control thread and hands what it
@@ -194,6 +197,11 @@ struct Editor {
         Rejection(reason: reason, message: message)
     }
 
+    /// Spec 5 §6, check 7 — what is on air now. An edit a cue or macro holds
+    /// is checked when its holder is saved (check 8), long before it runs, so
+    /// that check reads no state: what is on air is asked when the edit fires.
+    var live: ShowState? { context.dryRun ? nil : context.state }
+
     // MARK: - The objects
 
     mutating func apply(_ edit: EditCommand, makeUUID: () -> UUID) throws -> (EditCommand, EditCommand?) {
@@ -203,20 +211,9 @@ struct Editor {
         case .folder(let path): return try editFolder(path, edit.action)
         case .playlist(let uuid): return try editPlaylist(uuid, edit.action, makeUUID: makeUUID)
         case .item(let playlist, let item): return try editItem(playlist: playlist, item: item, edit.action)
-        case .numbered(let type, _):
-            switch type {
-            case .channel, .preset, .textStyle, .grade, .transition, .audioTransition, .macro, .stack:
-                throw reject(.notInV1, "\(type.displayName) edits come with Area 14")
-            case .output:
-                throw reject(.notInV1, "output edits come with Areas 14 and 17")
-            case .audioOutput:
-                throw reject(.notInV1, "audio output edits come with Area 17")
-            case .input:
-                throw reject(.notInV1, "input edits come with live inputs, after v1")
-            case .list:
-                throw reject(.unknownObject, "a list is named list N")
-            }
-        case .slot: throw reject(.notInV1, "stack edits come with Area 14")
+        // Spec 7 §7 as Spec 11 corrected it — what edit mode edits (Area 14).
+        case .numbered(let type, let number): return try editNumbered(type, number, edit.action, makeUUID: makeUUID)
+        case .slot(let stack, let channel): return try editSlot(stack: stack, channel: channel, edit.action)
         case .key, .keys: throw reject(.notInV1, "key binding edits come with Area 17")
         case .machine: throw reject(.notInV1, "machine settings edits come with Area 17")
         case .media(let id): return try editMedia(id, edit.action)
@@ -236,9 +233,20 @@ struct Editor {
         if machine.settings.operatorLock.enabled {
             throw reject(.operatorLock, "the station is locked: edits wait until it is unlocked")
         }
-        if machine.settings.libraryMode == .readOnlyMasters, isLibraryObject(edit.address) {
+        if machine.settings.libraryMode == .readOnlyMasters, isLibraryObject(edit.address), !makesMachineMacro(edit) {
             throw reject(.readOnlyLibrary, "this machine's masters are read-only (readOnlyMasters): \(edit.address.object) edits are made where the library is writable")
         }
+    }
+
+    /// Spec 1 §2 — "a macro that references a stack or output is
+    /// machine-level and is written to the machine root": a macro created
+    /// with such commands never touches the library, so it passes on a
+    /// `readOnlyMasters` machine like any machine-level edit (Spec 5 §7).
+    func makesMachineMacro(_ edit: EditCommand) -> Bool {
+        guard case .numbered(.macro, _) = edit.address, case .create(let body?, _, _) = edit.action,
+              let commands = body["commands"]?.arrayValue else { return false }
+        let entries = commands.compactMap { try? JSONCoding.decode(GuardedCommand.self, from: $0) }
+        return Macro(number: 1, commands: entries).isMachineLevel
     }
 
     func isLibraryObject(_ address: EditAddress) -> Bool {
@@ -306,23 +314,23 @@ struct Editor {
     /// machine (check 5, a portable document's machine-level numbers
     /// excepted), its macros free of cycles (check 8), and an edit it holds
     /// "validated when its holder is saved, like any edit" (check 8).
-    func checkCueCommand(_ entry: GuardedCommand) throws {
+    func checkCueCommand(_ entry: GuardedCommand, holder: SourceKind = .cue) throws {
         if entry.command.isUnknown || entry.command.isInvalid {
             throw reject(.badValue, "\(entry.command.cmd): " + (entry.command.invalidReason ?? "not in the vocabulary"))
         }
         if case .edit(let held) = entry.command {
-            if entry.when != nil { throw reject(.badValue, "a guard on a cue command is reserved in v1 and does not run") }
+            if entry.when != nil { throw reject(.badValue, "a guard on a \(holder.rawValue) command is reserved in v1 and does not run") }
             var dry = context
             dry.dryRun = true
             if case .failure(var rejection) = LibraryEditor.apply(held, library: library, machine: machine, context: dry) {
-                rejection.message = "the edit the cue holds: " + rejection.message
+                rejection.message = "the edit the \(holder.rawValue) holds: " + rejection.message
                 if context.restoring, rejection.reason == .unknownObject || rejection.reason == .unknownReference { return }
                 throw rejection
             }
             return
         }
         let validation = ValidationContext(library: library, machine: machine, state: nil,
-                                           source: CommandSource(kind: .cue), portable: true)
+                                           source: CommandSource(kind: holder), portable: true)
         guard let rejection = CommandValidator.validate(entry.command, guard: entry.when, context: validation) else { return }
         let mapped = Editor.editCode(rejection.reason)
         if context.restoring, mapped == .unknownReference { return }

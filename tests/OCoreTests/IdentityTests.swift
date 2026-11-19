@@ -198,6 +198,52 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(machine.settings.dropChannels, DropChannels(video: 2, image: 2, audio: nil))
     }
 
+    /// Spec 1 §4 — "every internal reference in the library and the machine
+    /// root is rewritten": an edit a cue or a macro holds names objects in
+    /// its value too, a slot's preset or the command it would insert, and
+    /// those numbers follow. Spec 11 §3 counts them among "the commands,
+    /// riders, guards and held edits of cues and macros".
+    func test_theNumbersInTheValueOfAHeldEditFollowARenumber() throws {
+        var (library, machine) = roots
+        let edits = Edits()
+        func hold(_ text: String) throws {
+            library.lists[0].cues[0].commands.append(GuardedCommand(.edit(try XCTUnwrap(edits.edit(text)))))
+        }
+        try hold("edit stack 2 slot 3 preset 4")
+        try hold("edit preset 3 layouts.*.boxes.0.grade 1")
+        try hold("edit stack 1 insert slots 0 {\"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": 4}")
+        try hold("edit list 7 cue \(F.list7Cues[0].uuidString.lowercased()) insert commands 0 {\"cmd\": \"macro.run\", \"macro\": 2}")
+        try hold("edit macro 1 commands [{\"cmd\": \"macro.run\", \"macro\": 2}]")
+        try hold("edit channel 9 create {\"defaultPreset\": 4}")
+        let count = library.lists[0].cues[0].commands.count
+        func held(_ back: Int) -> EditCommand? {
+            if case .edit(let edit) = library.lists[0].cues[0].commands[count - back].command { return edit }
+            return nil
+        }
+        XCTAssertTrue(References.to(.preset, 4, library: library, machine: machine).count >= 3, "the uses query finds them")
+        XCTAssertTrue(References.to(.grade, 1, library: library, machine: machine).contains { if case .cue = $0.site { return $0.site.isPortable } else { return false } })
+
+        XCTAssertEqual(Identity.renumber(.preset, from: 4, to: 9, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(held(6), EditCommand(.slot(stack: 2, channel: 3), .set(path: "preset", value: .number(9))))
+        XCTAssertEqual(held(4)?.action, .insert(path: "slots", at: 0, value: .object(["channel": .number(3), "mute": .bool(false),
+                                                                                        "opacity": .number(1), "preset": .number(9)])))
+        XCTAssertEqual(held(1)?.action, .create(body: .object(["defaultPreset": .number(9)]), folder: nil, title: nil))
+
+        XCTAssertEqual(Identity.renumber(.grade, from: 1, to: 8, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(held(5), EditCommand(.numbered(.preset, 3), .set(path: "layouts.*.boxes.0.grade", value: .number(8))))
+
+        XCTAssertEqual(Identity.renumber(.macro, from: 2, to: 6, library: &library, machine: &machine), .renumbered)
+        XCTAssertEqual(held(3)?.action, .insert(path: "commands", at: 0, value: .object(["cmd": .string("macro.run"), "macro": .number(6)])))
+        XCTAssertEqual(held(2)?.action, .set(path: "commands", value: .array([.object(["cmd": .string("macro.run"), "macro": .number(6)])])))
+
+        // A stack's number in a path is a layout's key, which meets its stack at every campus: it stays (Spec 5 §4).
+        var (portable, local) = roots
+        let layout = try XCTUnwrap(edits.edit("edit preset 3 unset layouts.2"))
+        local.macros[0].commands.append(GuardedCommand(.edit(layout)))
+        XCTAssertEqual(Identity.renumber(.stack, from: 2, to: 6, library: &portable, machine: &local), .renumbered)
+        XCTAssertEqual(local.macros[0].commands.last?.command, .edit(layout))
+    }
+
     /// Spec 1 §4 and Spec 5 §4 — the references a renumber rewrites are the
     /// ones `References` finds: afterwards what named the old number names
     /// the new, in both roots for a portable type and in the machine root

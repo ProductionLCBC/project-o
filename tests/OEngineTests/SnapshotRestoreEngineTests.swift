@@ -376,8 +376,8 @@ final class SnapshotRestoreEngineTests: XCTestCase {
         XCTAssertTrue(swapped?.message.contains("channel 3 (2 in the snapshot)") ?? false, swapped?.message ?? "")
     }
 
-    /// "A restore that would delete a channel with content in a stack an output shows is refused with
-    /// `onAir`"; and (Adam's answer of 2026-11-14) one that changes the channel list at all is `notInV1`
+    /// "A restore that would delete a channel on air, with content in a stack an output shows or sounding
+    /// on an audio output, is refused with `onAir`"; and (Adam's answer of 2026-11-14) one that changes the channel list at all is `notInV1`
     /// until Area 14, with `onAir` first.
     func test_deletingAChannelOnAirIsOnAirAndAnotherChannelListIsNotInV1() throws {
         try plant("2026-10-29-090000") { snapshot in

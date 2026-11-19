@@ -229,10 +229,11 @@ public enum Restores {
             let now = Dictionary(library.channels.map { ($0.number, $0) }, uniquingKeysWith: { first, _ in first })
             let then = Dictionary(theirs.library.channels.map { ($0.number, $0) }, uniquingKeysWith: { first, _ in first })
             let removed = now.keys.filter { then[$0] == nil }.sorted()
-            // "A restore that would delete a channel with content in a stack an output shows is refused
-            // with `onAir`, as Spec 5 §6 refuses that delete".
-            if let state, let live = removed.first(where: { onAir($0, state: state, machine: machine) }) {
-                return .failure(Rejection(reason: .onAir, message: "channel \(live) has content in a stack an output shows, and snapshot \"\(id)\" doesn't have it"))
+            // "A restore that would delete a channel on air, with content in a stack an output shows or
+            // sounding on an audio output, is refused with `onAir`, as Spec 5 §6 refuses that delete".
+            if let state, let live = removed.first(where: { OnAir.channel($0, state: state, library: library, machine: machine) }) {
+                let how = OnAir.showing(live, state: state, machine: machine) ? "has content in a stack an output shows" : "is sounding on an audio output"
+                return .failure(Rejection(reason: .onAir, message: "channel \(live) \(how), and snapshot \"\(id)\" doesn't have it"))
             }
             // Adam's answer of 2026-11-14 — a snapshot that adds, removes or resizes a channel is
             // refused until Area 14 rebuilds the channels between ticks.
@@ -264,15 +265,6 @@ public enum Restores {
         return .success(Outcome(library: newLibrary, machine: newMachine, logged: .systemRestoreSnapshot(id: id),
                                 inverse: .systemRestoreSnapshot(id: before), changes: LibraryChange.merged(changes), structure: structure,
                                 warnings: warnings))
-    }
-
-    /// Whether a channel has content in a stack an output shows.
-    static func onAir(_ channel: Int, state: ShowState, machine: Machine) -> Bool {
-        guard let content = state.channels[channel]?.content, content != .empty else { return false }
-        return machine.outputs.contains { output in
-            let stack = state.outputs[output.number] ?? output.defaultStack
-            return machine.stack(stack)?.slots.contains { $0.channel == channel } ?? false
-        }
     }
 
     /// The numbered objects both hold, by uuid, whose numbers differ: `channel 3 (2 in the snapshot)`.

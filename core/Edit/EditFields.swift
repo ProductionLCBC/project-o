@@ -193,6 +193,8 @@ extension EditField {
                 var mapped = entry
                 mapped.command = entry.command.mapReferences(transform)
                 mapped.when = entry.when?.mapReferences(transform)
+                // A command no number of which moved stays as it was written.
+                guard mapped != entry else { return item }
                 return (try? JSONCoding.encode(mapped)) ?? item
             })
         case .text, .flag, .whole, .number, .choice, .wholeChoice, .literal, .anything:
@@ -208,6 +210,45 @@ extension EditField {
             return number
         }
         return out
+    }
+}
+
+// MARK: - A field from the table alone
+
+extension EditField {
+    /// The concrete shapes this field can take, with what wraps them taken off.
+    var shapes: [EditField] {
+        switch self {
+        case .readOnly(let field), .optional(let field): return field.shapes
+        case .either(let fields): return fields.flatMap(\.shapes)
+        default: return [self]
+        }
+    }
+
+    /// The field a path names, read from the table without an object: what
+    /// the value of an edit that isn't being applied, one a cue or a macro
+    /// holds, is. Where a part has several shapes the path may fit more than
+    /// one, and the value picks.
+    func field(at path: EditPath) -> EditField? {
+        var candidates: [EditField] = [self]
+        for component in path.components {
+            var next: [EditField] = []
+            for shape in candidates.flatMap(\.shapes) {
+                switch shape {
+                case .record(let fields, _):
+                    if let field = fields[component] { next.append(field) }
+                case .map(let element, let keys):
+                    if keys.accepts(component) { next.append(element) }
+                case .list(let element):
+                    if Int(component) != nil { next.append(element) }
+                default:
+                    break
+                }
+            }
+            if next.isEmpty { return nil }
+            candidates = next
+        }
+        return candidates.count == 1 ? candidates[0] : .either(candidates)
     }
 }
 

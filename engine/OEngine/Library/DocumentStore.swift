@@ -92,7 +92,7 @@ final class DocumentStore {
         self.log = log
         self.wallMilliseconds = wallMilliseconds
         var onDisk: Set<DocumentRef> = [.keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions,
-                                        .audioTransitions]
+                                        .audioTransitions, .stacks, .outputs, .machineSettings]
         for preset in library.presets where library.documentPaths["preset/\(preset.number)"] != nil { onDisk.insert(.preset(preset.number)) }
         for list in library.lists where library.documentPaths[FileLayout.documentKey(list: list.uuid)] != nil { onDisk.insert(.list(list.uuid)) }
         for macro in library.macros where library.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.libraryMacro(macro.number)) }
@@ -158,6 +158,9 @@ final class DocumentStore {
         case .preset(let number):
             return "library/" + (library.documentPaths["preset/\(number)"] ?? library.preset(number).map { FileLayout.path(for: .preset($0)) }
                 ?? "presets/\(number)")
+        case .stacks: return "machine/" + FileLayout.path(for: .stacks(machine.stacks))
+        case .outputs: return "machine/" + FileLayout.path(for: .outputs(machine.outputs))
+        case .machineSettings: return "machine/" + FileLayout.path(for: .machine(machine.settings))
         }
     }
 
@@ -201,6 +204,37 @@ final class DocumentStore {
         for ref in removed where DocumentChanges.exists(ref, library: library, machine: machine) && dirty[ref] == nil {
             dirty[ref] = now
         }
+        followNumbers(library: library, machine: machine)
+    }
+
+    /// Spec 5 §2 — "a renumbered object ... renames its file": a preset or a
+    /// macro is named here by its number, and the edit that changed the
+    /// number carried its file's path to the new one (`documentPaths`). So the
+    /// file on disk belongs to the new number from now, and its next save
+    /// renames it, where a document with no file would be written beside it.
+    private func followNumbers(library: Library, machine: Machine) {
+        for ref in Array(onDisk) {
+            switch ref {
+            case .preset(let number) where library.documentPaths["preset/\(number)"] == nil: onDisk.remove(ref)
+            case .libraryMacro(let number) where library.documentPaths["macro/\(number)"] == nil: onDisk.remove(ref)
+            case .machineMacro(let number) where machine.documentPaths["macro/\(number)"] == nil: onDisk.remove(ref)
+            default: break
+            }
+        }
+        for preset in library.presets where library.documentPaths["preset/\(preset.number)"] != nil { onDisk.insert(.preset(preset.number)) }
+        for macro in library.macros where library.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.libraryMacro(macro.number)) }
+        for macro in machine.macros where machine.documentPaths["macro/\(macro.number)"] != nil { onDisk.insert(.machineMacro(macro.number)) }
+    }
+
+    /// The file a per-object document is saved from, which the save renames
+    /// to the document's own name: nil when the document has no file yet, and
+    /// nil when its old name is the name another document of its kind is
+    /// about to take. Two presets with one label that swap numbers each have
+    /// the other's old name; each is then written whole under its own, and
+    /// neither save moves the file the other just wrote.
+    private func fileToRename(_ ref: DocumentRef, recorded: String?, others: [String]) -> String? {
+        guard onDisk.contains(ref), let recorded, !others.contains(recorded) else { return nil }
+        return recorded
     }
 
     /// Spec 7 §2 — one structure change as file operations; the document
@@ -331,16 +365,18 @@ final class DocumentStore {
         case .libraryMacro(let number):
             guard let macro = library.macro(number) else { return }
             let recorded = library.documentPaths["macro/\(number)"]
+            let others = library.macros.filter { $0.number != number }.map { FileLayout.path(for: .macro($0)) }
             let plan = Writer.save(.macro(macro), extras: library.documentExtras[.macro] ?? [:],
-                                   currentPath: onDisk.contains(ref) ? recorded : nil)
+                                   currentPath: fileToRename(ref, recorded: recorded, others: others))
             let path = FileLayout.path(for: .macro(macro))
             library.documentPaths["macro/\(number)"] = path
             issue(ref, .library, plan.operations, path: path, recorded: recorded, wasOnDisk: onDisk.contains(ref))
         case .machineMacro(let number):
             guard let macro = machine.macro(number) else { return }
             let recorded = machine.documentPaths["macro/\(number)"]
+            let others = machine.macros.filter { $0.number != number }.map { FileLayout.path(for: .macro($0)) }
             let plan = Writer.save(.macro(macro), extras: machine.documentExtras[.macro] ?? [:],
-                                   currentPath: onDisk.contains(ref) ? recorded : nil)
+                                   currentPath: fileToRename(ref, recorded: recorded, others: others))
             let path = FileLayout.path(for: .macro(macro))
             machine.documentPaths["macro/\(number)"] = path
             issue(ref, .machine, plan.operations, path: path, recorded: recorded, wasOnDisk: onDisk.contains(ref))
@@ -367,11 +403,22 @@ final class DocumentStore {
         case .preset(let number):
             guard let preset = library.preset(number) else { return }
             let recorded = library.documentPaths["preset/\(number)"]
-            let plan = Writer.save(.preset(preset), currentPath: onDisk.contains(ref) ? recorded : nil)
+            let others = library.presets.filter { $0.number != number }.map { FileLayout.path(for: .preset($0)) }
+            let plan = Writer.save(.preset(preset), currentPath: fileToRename(ref, recorded: recorded, others: others))
             let path = FileLayout.path(for: .preset(preset))
             library.documentPaths["preset/\(number)"] = path
             issue(ref, .library, plan.operations, path: path, recorded: recorded, wasOnDisk: onDisk.contains(ref))
+        case .stacks: issueMachine(ref, .stacks(machine.stacks), machine)
+        case .outputs: issueMachine(ref, .outputs(machine.outputs), machine)
+        case .machineSettings: issueMachine(ref, .machine(machine.settings), machine)
         }
+    }
+
+    /// Spec 5 §2 — one of the machine's single documents (`stacks.json`,
+    /// `outputs.json`, `machine.json`), which an edit changes, at its fixed name.
+    private func issueMachine(_ ref: DocumentRef, _ document: Document, _ machine: Machine) {
+        let plan = Writer.save(document, extras: machine.documentExtras[document.kind] ?? [:])
+        issue(ref, .machine, plan.operations, path: FileLayout.path(for: document), recorded: nil, wasOnDisk: true)
     }
 
     /// Spec 9 §6 — one of the library's single documents (`library.json`, a
@@ -538,7 +585,8 @@ final class DocumentStore {
             if let recorded = revert.recorded, machine.documentPaths["macro/\(number)"] == revert.planned { machine.documentPaths["macro/\(number)"] = recorded }
         case .preset(let number):
             if let recorded = revert.recorded, library.documentPaths["preset/\(number)"] == revert.planned { library.documentPaths["preset/\(number)"] = recorded }
-        case .localList, .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions:
+        case .localList, .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions,
+             .stacks, .outputs, .machineSettings:
             break
         }
     }

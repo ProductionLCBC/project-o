@@ -51,8 +51,21 @@ struct Edits {
             library = last.library
             machine = last.machine
             log += outcomes
+            // CLAUDE.md — "Commands are stored as objects, printed and parsed in canonical text; `parse(print(x)) == x`":
+            // what the log records of every edit a test runs, and its inverse, read back as they print.
+            for outcome in outcomes {
+                for command in [outcome.logged] + (outcome.inverse.map { [$0] } ?? []) { Edits.assertPrints(command) }
+            }
         }
         return result
+    }
+
+    static func assertPrints(_ edit: EditCommand) {
+        guard let text = CommandText.print(.edit(edit)) else { return XCTFail("\(edit) has no text form") }
+        switch CommandText.parse(text) {
+        case .success(let entry): XCTAssertEqual(entry.command, .edit(edit), text)
+        case .failure(let rejection): XCTFail("\(text) → \(rejection.reason): \(rejection.message)")
+        }
     }
 
     /// Runs an edit that must apply; its outcomes.
@@ -107,6 +120,25 @@ struct Edits {
     var archived: Playlist { machine.playlist(uuid: F.archivedSundayUuid) ?? Playlist(uuid: UUID(), title: "", items: []) }
 
     func list(_ number: Int) -> List? { library.list(number: number) }
+
+    /// Runs runtime commands over the roots as they stand and keeps the
+    /// state they leave, so an edit meets what is on air (Spec 5 §6, check 7).
+    mutating func play(_ texts: String..., file: StaticString = #filePath, line: UInt = #line) {
+        var state = context.state ?? ShowState.fresh(library: library, machine: machine)
+        let projection = ProjectionContext(frame: 0, library: library, machine: machine, source: CommandSource(kind: .osc))
+        for text in texts {
+            switch CommandText.parse(text, options: ParseOptions(library: library, machine: machine)) {
+            case .success(let entry): state = project(state, [entry.command], context: projection).0
+            case .failure(let rejection): XCTFail("\(text) → \(rejection.reason): \(rejection.message)", file: file, line: line)
+            }
+        }
+        context.state = state
+    }
+
+    /// The change an edit of a numbered object reports (Spec 5 §2).
+    static func changed(_ type: NumberedType, _ number: Int, _ paths: [String] = []) -> LibraryChange {
+        LibraryChange(object: type.editWord, address: [type.editWord: .number(Double(number))], paths: paths)
+    }
 }
 
 extension XCTestCase {

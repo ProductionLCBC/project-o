@@ -392,8 +392,8 @@ final class RestoreRulesTests: XCTestCase {
         XCTAssertEqual(reason(restore(then, machine: macros)), .conflict)
     }
 
-    /// "A restore that would delete a channel with content in a stack an output shows is refused with
-    /// `onAir`, as Spec 5 §6 refuses that delete".
+    /// "A restore that would delete a channel on air, with content in a stack an output shows or
+    /// sounding on an audio output, is refused with `onAir`, as Spec 5 §6 refuses that delete".
     func test_deletingAChannelOnAirRefusesWithOnAir() throws {
         var older = library
         older.channels.removeAll { $0.number == 1 }
@@ -401,6 +401,17 @@ final class RestoreRulesTests: XCTestCase {
         var state = ShowState.fresh(library: library, machine: machine)
         state.channels[1]?.content = .text(TextInstance(fields: ["body": "Great is thy faithfulness"]))
         XCTAssertEqual(reason(restore(then, state: state)), .onAir)
+
+        // Channel 3 is in the confidence stack alone, which no output shows: sound on it is on air all the same
+        // (Adam's answer of 2026-11-18).
+        var silent = library
+        silent.channels.removeAll { $0.number == 3 }
+        var sounding = ShowState.fresh(library: library, machine: machine)
+        let context = ProjectionContext(frame: 0, library: library, machine: machine, source: CommandSource(kind: .osc))
+        sounding = project(sounding, [.channelWrite(ChannelWrite(channel: .number(3), content: .media(MediaContent(ref: F.mountains))))], context: context).0
+        let refused = restore(snapshot(silent), state: sounding)
+        XCTAssertEqual(reason(refused), .onAir)
+        XCTAssertTrue(message(refused).contains("channel 3 is sounding on an audio output"), message(refused))
     }
 
     /// Adam's answer of 2026-11-14 — a snapshot that adds, removes or resizes a channel is refused with
