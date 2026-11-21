@@ -113,7 +113,14 @@ public final class PickedFrames: @unchecked Sendable {
 
     /// Drop every retained plane, so sources can be released.
     public func clearAll() {
-        for i in 0..<capacity {
+        clear(first: capacity)
+    }
+
+    /// Drop the retained planes of the first `count` slots: the ones a tick
+    /// filled. The buffer is sized for every channel the engine could hold
+    /// (Spec 4 §5), so the render thread clears what it used, not all of it.
+    public func clear(first count: Int) {
+        for i in 0..<min(max(0, count), capacity) {
             frames[i].clear()
             results[i] = .nothing
         }

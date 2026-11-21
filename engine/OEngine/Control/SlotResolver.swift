@@ -120,7 +120,7 @@ public enum SlotResolver {
     /// draws nothing, whatever its binding"; "At an offset, a static box draws
     /// only while the lookahead reaches that far"; "Fallback boxes look only at
     /// earlier boxes with the same offset."
-    public static func resolve(_ inputs: Inputs, slotIndex: Int, slot: StackSlot,
+    public static func resolve(_ inputs: Inputs, slot: StackSlot,
                                state: (Int) -> ShowState?,
                                pixels: (StackSlot, Int, ContentInstance?) -> PixelSource?,
                                text: (BoxKey, Box, BoxTemplate, ShowState) -> BoxText,
@@ -130,7 +130,7 @@ public enum SlotResolver {
         var out: [SlotBox] = []
         var drewAt: Set<Int> = []
         for (boxIndex, box) in layout.boxes.enumerated() {
-            let key = BoxKey(stack: inputs.stack.number, slot: slotIndex, box: boxIndex)
+            let key = BoxKey(stack: inputs.stack.number, slot: slot.channel, box: boxIndex)
             let allowed = transitionAllowed(for: box)
             guard box.isDrawnOffset, !(box.fallback && drewAt.contains(box.offset)), let shown = state(box.offset) else {
                 out.append(SlotBox(key: key, box: box, resolved: nil, transitionAllowed: allowed))

@@ -338,8 +338,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let variableRoots = VariableRoots(library: library, machine: roots.machine, kept: KeptCopies(list: list))
         let clock = variables.publishedClock()
         var boxes: [ResolvedBox] = []
-        for (slotIndex, slot) in stackObject.effectiveSlots(library: library).enumerated() {
-            let results = SlotResolver.resolve(inputs, slotIndex: slotIndex, slot: slot,
+        for slot in stackObject.effectiveSlots(library: library) {
+            let results = SlotResolver.resolve(inputs, slot: slot,
                                                state: { offset in
                                                    guard offset >= 0, index + offset < states.count else { return nil }
                                                    return states[index + offset]

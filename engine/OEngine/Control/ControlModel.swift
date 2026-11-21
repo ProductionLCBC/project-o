@@ -214,8 +214,12 @@ public struct OutputRuntime: Sendable {
 }
 
 /// Spec 4 §9 — box transitions are tracked per box of a slot of a stack.
+/// The slot is named by its channel, which a stack holds once (Spec 6 §2):
+/// the number stays the slot's when slots are added, removed or moved (Spec
+/// 11 §6), where its place in the stack would not.
 public struct BoxKey: Hashable, Sendable {
     public var stack: Int
+    /// The slot's channel number.
     public var slot: Int
     public var box: Int
 }
@@ -250,6 +254,11 @@ public struct BoxRun: Sendable {
     public var startFrame: Int64 = 0
     public var durationFrames: Int64 = 0
     public var outgoing: BoxContent?
+    /// Spec 4 §8 — "the result replaces the cache entry": the rasters this
+    /// box's value changes replaced, still in the cache while the box may be
+    /// drawing them (Spec 4 §9, a box "keeps drawing its previous lines until
+    /// the new raster is ready"), released once the new value's raster drew.
+    public var replaced: [TextKey] = []
 
     public func state(at frame: Int64) -> BoxTransitionState? {
         guard let outgoing, durationFrames > 0, frame < startFrame + durationFrames, type != .cut else { return nil }
@@ -311,6 +320,12 @@ public struct MachineGeometry: Equatable, Sendable {
         }
         stackSizes = stacks
         channelSizes = channels
+    }
+
+    /// The sizes the textures were made at, when one couldn't be made at the size the rule gives (Spec 4 §12).
+    init(stackSizes: [Int: PixelSize], channelSizes: [Int: PixelSize]) {
+        self.stackSizes = stackSizes
+        self.channelSizes = channelSizes
     }
 
     public func stackSize(_ stack: Int) -> PixelSize { stackSizes[stack] ?? PixelSize(.hd) }

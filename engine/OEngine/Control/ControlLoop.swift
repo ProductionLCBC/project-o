@@ -83,7 +83,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// roots built in memory, whose edits are never written.
     internal(set) var documents: DocumentStore?
     public let pacing: Pacing
-    public let geometry: MachineGeometry
+    /// Spec 4 §5 — the sizes the textures below have, as the last rebuild left them (`rebuildResources`).
+    public internal(set) var geometry: MachineGeometry
     let backend: any RenderBackend
     let sources: SourceTable
     let sourceFactory: any SourceFactory
@@ -139,7 +140,7 @@ public final class ControlLoop: @unchecked Sendable {
     var heldEvents: [GroupID: HeldEvent] = [:]
     /// Spec 8 §6 (plan) — "no report within ten seconds puts every moved file back".
     public var mediaParkTimeout: Int64 = 10_000_000_000
-    public private(set) var model: ControlModel
+    public internal(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
     private var pendingSourceRemovals: [(handle: InstanceHandle, releasedAt: Int64)] = []
@@ -147,31 +148,47 @@ public final class ControlLoop: @unchecked Sendable {
     /// built for; the engine sets it over its render loop. Nil (a control
     /// loop on its own, in a test) counts every published plan as taken.
     var planTaken: (@Sendable () -> Int64)?
-    public let channelTextures: [Int: TextureHandle]
-    public let channelSnapshots: [Int: TextureHandle]
-    public let stackRings: [Int: [TextureHandle]]
+    /// Spec 4 §5 — one texture and one snapshot per channel and three per stack, by number. The control thread's
+    /// own, made again between ticks when a channel, a stack or a size changes (`rebuildResources`); other threads
+    /// read `publishedSurfaces`.
+    public internal(set) var channelTextures: [Int: TextureHandle] = [:]
+    public internal(set) var channelSnapshots: [Int: TextureHandle] = [:]
+    public internal(set) var stackRings: [Int: [TextureHandle]] = [:]
     /// Spec 10 §2 — "each stack's preview as three IOSurfaces": the three preview textures of each stack, by stack
     /// number, written in turn.
-    public let previewSurfaces: [Int: [TextureHandle]]
+    public internal(set) var previewSurfaces: [Int: [TextureHandle]] = [:]
     /// Spec 10 §2 — "a live picture of each channel for the strip (§7), 256 by 144 pixels, as three IOSurfaces per
     /// channel": by channel number, written in turn.
-    public let pictureSurfaces: [Int: [TextureHandle]]
+    public internal(set) var pictureSurfaces: [Int: [TextureHandle]] = [:]
+    /// Spec 4 §5 — what this build made again, or nil when it made nothing. Reset every build.
+    public internal(set) var lastRebuild: Rebuild?
+    /// Spec 4 §5 — "the old pools serve until the new ones exist", and for this many frames more: the sinks present
+    /// a frame behind the tick, and the readback thread and the preview topic read on their own time. About two
+    /// seconds; a test may shorten it.
+    public var retireGraceFrames: Int64
+    /// What the outputs showed, and the old stacks of the switches running, when the textures were last sized.
+    var builtShowing: [Int: Int]?
+    var builtSwitching: [Int: Int] = [:]
+    /// Spec 4 §7 — the frozen picture a resized channel's transition is leaving, in the texture it was taken in.
+    var heldSnapshots: [Int: (texture: TextureHandle, size: PixelSize)] = [:]
+    /// Spec 4 §10 — the ring a stack had before the rebuild of `frame`: an interlaced output's first field on that tick.
+    var retiredRings: [Int: (ring: [TextureHandle], frame: Int64)] = [:]
     /// Spec 4 §5 — "256 by 144 channel pictures".
     public static let pictureSize = PixelSize(width: 256, height: 144)
     /// Which of a stack's three preview surfaces the last planned preview writes, and of a channel's three the last
     /// planned picture; the next one takes the surface after it, "the oldest of the three".
-    public private(set) var previewSlots: [Int: Int] = [:]
-    public private(set) var pictureSlots: [Int: Int] = [:]
+    public internal(set) var previewSlots: [Int: Int] = [:]
+    public internal(set) var pictureSlots: [Int: Int] = [:]
     /// How many previews have been planned for each stack: once it is three, every one of its surfaces has been
     /// asked for a frame.
-    public private(set) var previewsPlanned: [Int: Int] = [:]
+    public internal(set) var previewsPlanned: [Int: Int] = [:]
     /// Spec 4 §2 — "While the operator app holds its Mach channel, the strip's channel pictures are a consumer at the
     /// preview rate too": set while a client holds the channel, read by each build. With no client no picture is
     /// planned and no channel pass is added for one.
     public let picturesWanted = Atomic<Bool>(false)
     /// The frame a stack pass last sampled each channel's texture at, for "a channel with pixel content that no stack
     /// pass has sampled since the last [preview tick]".
-    private var lastSampled: [Int: Int64] = [:]
+    var lastSampled: [Int: Int64] = [:]
     public private(set) var lastExecuted: [ExecutedCommand] = []
     /// Spec 2 §8 — the groups this build rejected, with their ids and
     /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
@@ -187,7 +204,7 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
     private let builtAt = Atomic<Int64>(0)
-    private var pendingSnapshotWhenReady: Set<Int> = []
+    var pendingSnapshotWhenReady: Set<Int> = []
     private var slideWarned = false
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
     /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
@@ -291,41 +308,19 @@ public final class ControlLoop: @unchecked Sendable {
         timers = TimerBank(count: machine.settings.timers)
         lastLive = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: KeptCopies())
         handlePool = (0..<Int32(sources.capacity)).reversed()
-        // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, a preview per stack.
-        var channelTextures: [Int: TextureHandle] = [:]
-        var channelSnapshots: [Int: TextureHandle] = [:]
-        for channel in library.channels {
-            let size = geometry.channelSize(channel.number)
-            channelTextures[channel.number] = backend.makeTexture(TextureDescriptor(role: .channel, size: size, mipmapped: true, label: "channel \(channel.number)"))
-            channelSnapshots[channel.number] = backend.makeTexture(TextureDescriptor(role: .channel, size: size, label: "channel \(channel.number) snapshot"))
-        }
-        var stackRings: [Int: [TextureHandle]] = [:]
-        var previewSurfaces: [Int: [TextureHandle]] = [:]
-        var pictureSurfaces: [Int: [TextureHandle]] = [:]
-        for channel in library.channels {
-            pictureSurfaces[channel.number] = (0..<FrameRing.depth).map {
-                backend.makeTexture(TextureDescriptor(role: .preview, size: ControlLoop.pictureSize, label: "channel \(channel.number) picture \($0)"))
-            }
-        }
-        for stack in machine.stacks {
-            let size = geometry.stackSize(stack.number)
-            stackRings[stack.number] = (0..<FrameRing.depth).map { backend.makeTexture(TextureDescriptor(role: .stack, size: size, label: "stack \(stack.number) slot \($0)")) }
-            let preview = PixelSize(width: max(16, size.width / 4), height: max(9, size.height / 4))
-            previewSurfaces[stack.number] = (0..<FrameRing.depth).map {
-                backend.makeTexture(TextureDescriptor(role: .preview, size: preview, label: "stack \(stack.number) preview \($0)"))
-            }
-        }
-        self.channelTextures = channelTextures
-        self.channelSnapshots = channelSnapshots
-        self.stackRings = stackRings
-        self.previewSurfaces = previewSurfaces
-        self.pictureSurfaces = pictureSurfaces
+        retireGraceFrames = max(Int64(PlanRing.depth + FrameRing.depth), pacing.frames(forMs: 2000))
+        // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, three
+        // previews per stack and three pictures per channel. The same step that makes them again between ticks.
+        rebuildResources(frame: 0, launching: true)
+        lastRebuild = nil
+        surfacesSnapshot = (previewSurfaces, pictureSurfaces)
     }
 
     /// Spec 4 §12 — for the watchdog: when a plan was last built.
     public var lastBuilt: MonotonicTime { MonotonicTime(nanoseconds: builtAt.load(ordering: .acquiring)) }
 
     private let stateLock = NSLock()
+    private var surfacesSnapshot: (previews: [Int: [TextureHandle]], pictures: [Int: [TextureHandle]]) = ([:], [:])
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
     private var namedSnapshot: Set<String> = []
@@ -375,6 +370,15 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return stateSnapshot
+    }
+
+    /// Spec 10 §2 — each stack's three preview textures and each channel's
+    /// three picture textures as the last build left them, for the Mach
+    /// channel's thread: an edit or a stack switch can make them again.
+    public var publishedSurfaces: (previews: [Int: [TextureHandle]], pictures: [Int: [TextureHandle]]) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return surfacesSnapshot
     }
 
     /// The roots after the last build, for readers on other threads.
@@ -520,6 +524,9 @@ public final class ControlLoop: @unchecked Sendable {
             lastRootsChanged = true
             kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
         }
+        // Spec 4 §5 and Spec 5 §2 — "A new channel or stack gets its textures before the tick that first draws
+        // it": whatever this build's commands changed, the plan below names textures that exist, at their sizes.
+        rebuildResources(frame: frame)
         // Spec 9 §3 — "Every ten minutes", when something changed.
         timerSnapshot(now: now)
         // Spec 9 §5 — the `history` topic follows "whenever either stack changes".
@@ -547,6 +554,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
+        if lastRebuild != nil { surfacesSnapshot = (previewSurfaces, pictureSurfaces) }
         if let named { namedSnapshot = named }
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         publishedMediaState = (mediaFiles, mediaTiles)
@@ -1284,7 +1292,7 @@ public final class ControlLoop: @unchecked Sendable {
         runtime.audioDecoder = nil
     }
 
-    private func release(_ content: ContentRuntime, frame: Int64) {
+    func release(_ content: ContentRuntime, frame: Int64) {
         guard case .media(var m) = content else { return }
         releaseAudio(of: &m)
         guard let source = m.source else { return }
@@ -1468,7 +1476,10 @@ public final class ControlLoop: @unchecked Sendable {
         case .content(let c)?:
             outgoing = binding(for: c, at: frame)
         case .snapshot?:
-            if let snapshot = channelSnapshots[channel] {
+            if let held = heldSnapshots[channel] {
+                // The channel changed size while this transition ran: its frozen picture is in the texture it was taken in.
+                outgoing = SourceBinding(source: .texture(held.texture), layout: .finished, matrix: .bt709, range: .full, size: held.size)
+            } else if let snapshot = channelSnapshots[channel] {
                 outgoing = SourceBinding(source: .texture(snapshot), layout: .finished, matrix: .bt709, range: .full, size: size)
             }
         case nil:
@@ -1655,7 +1666,7 @@ public final class ControlLoop: @unchecked Sendable {
         let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
                                          muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
-        for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
+        for slot in stack.effectiveSlots(library: library) {
             // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each
             // offset box, the text one cue beyond its offset".
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
@@ -1665,7 +1676,7 @@ public final class ControlLoop: @unchecked Sendable {
                 }
             }
             let results = SlotResolver.resolve(
-                inputs, slotIndex: slotIndex, slot: slot,
+                inputs, slot: slot,
                 // Spec 6 §3 — "At 0 the box draws its slot's channel as it is now. At +K it draws the channel as
                 // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
                 state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
@@ -1914,19 +1925,26 @@ public final class ControlLoop: @unchecked Sendable {
     /// stack for a switch, black for blackout". An interlaced output's pass
     /// also names the previous tick's stack texture as the first field (and
     /// the old stack's texture of that tick during a switch), with this
-    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03).
+    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03). On
+    /// the tick a stack's ring is made again (Spec 4 §5), the previous
+    /// tick's picture is in the ring it had, and the first field reads that.
     private func sinkPass(_ output: Output, frame: Int64) -> SinkPass? {
         let live = model.state.outputs[output.number] ?? output.defaultStack
-        guard let ring = stackRings[live] else { return nil }
+        guard let ring = stackRings[live], ring.count == FrameRing.depth else { return nil }
         let slot = Int(frame % Int64(FrameRing.depth))
         let previousSlot = Int((frame + Int64(FrameRing.depth) - 1) % Int64(FrameRing.depth))
+        // The ring `stack` wrote on the tick before this one.
+        func before(_ stack: Int, _ current: [TextureHandle]) -> [TextureHandle] {
+            guard let retired = retiredRings[stack], retired.frame == frame, retired.ring.count == FrameRing.depth else { return current }
+            return retired.ring
+        }
         var second: SecondTexture = .none
         var firstFieldSecond: SecondTexture = .none
         var mix: Float = 0
         let ort = model.outputs[output.number] ?? OutputRuntime()
-        if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack] {
+        if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack], oldRing.count == FrameRing.depth {
             second = .stack(oldRing[slot])
-            firstFieldSecond = .stack(oldRing[previousSlot])
+            firstFieldSecond = .stack(before(run.oldStack, oldRing)[previousSlot])
             mix = run.oldMix(at: frame)
         }
         let black = ort.blackout.map { $0.mix(at: frame) } ?? ort.blackoutMix
@@ -1938,7 +1956,7 @@ public final class ControlLoop: @unchecked Sendable {
         let interlaced = pacing.isInterlaced(output: output.number)
         var encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
         if interlaced, encode == .v210 { encode = .v210Interlaced }
-        let firstField = interlaced && frame > 0 ? FieldSources(stack: ring[previousSlot], second: firstFieldSecond) : nil
+        let firstField = interlaced && frame > 0 ? FieldSources(stack: before(live, ring)[previousSlot], second: firstFieldSecond) : nil
         return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField)
     }
 }

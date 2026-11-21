@@ -127,8 +127,11 @@ public final class Engine: @unchecked Sendable {
             }
         }
         self.sinks = byOutput
-        let capacity = max(8, library.channels.count * 4)
-        sources = SourceTable(capacity: capacity)
+        // Spec 4 §5 — "from pools sized for the current show", and an edit can add a channel to the show (Spec 5
+        // §2): the tables the render thread reads without a lock are sized once, for every channel the texture table
+        // could hold (five textures a channel), so a new channel never asks them to grow.
+        let channelLimit = max(4, library.channels.count, backend.resources.capacity / 5)
+        sources = SourceTable(capacity: max(8, channelLimit * 2))
         metrics = MetricsRing(capacity: 4096)
         watchdog = Watchdog(log: log)
         // Spec 4 §12 — an audio device lost while running is a recovery the soak counts (Spec 4 §13).
@@ -139,7 +142,7 @@ public final class Engine: @unchecked Sendable {
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
-                            maxChannelPasses: max(4, library.channels.count))
+                            maxChannelPasses: channelLimit)
         // Spec 4 §3 — what the render thread has taken decides when a released source's slot is used again.
         control.planTaken = { [render] in render.lastTakenPlanFrame }
         // Spec 4 §2 — "the wall clock is read only to stamp log lines": the engine's own, so its log's lines and
@@ -271,6 +274,13 @@ public final class Engine: @unchecked Sendable {
         // the answers to the requests this build took (at the end, below).
         api.deliverResults(control)
         afterBuild?(control)
+        // Spec 10 §2 — "when a channel is removed, a message names it and the app drops its surfaces", and the
+        // surfaces are sent again "whenever a stack's surfaces are made again" and "when a channel is added or
+        // renumbered": after an edit or a stack switch that made textures again (Spec 4 §5).
+        if let rebuild = control.lastRebuild {
+            for channel in rebuild.channelsGone { mach?.channelRemoved(channel) }
+            if rebuild.surfacesChanged { mach?.resendSurfaces() }
+        }
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
         for event in control.lastMediaEvents { publisher.publish(event) }
@@ -329,7 +339,6 @@ public final class Engine: @unchecked Sendable {
         let backend = self.backend
         if let surface { surfaceSource = surface }
         let find = surfaceSource ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
-        let previews = control.previewSurfaces, pictures = control.pictureSurfaces
         @Sendable func sets(_ handles: [Int: [TextureHandle]]) -> [MachSurfaceSet] {
             handles.keys.sorted().compactMap { number in
                 let surfaces = (handles[number] ?? []).compactMap(find)
@@ -340,7 +349,8 @@ public final class Engine: @unchecked Sendable {
         let audio = self.audio
         let control = self.control
         let render = self.render
-        let source = MachChannel.Source(previews: { sets(previews) }, pictures: { sets(pictures) },
+        // The sets as the last build left them: an edit or a stack switch makes them again (Spec 4 §5).
+        let source = MachChannel.Source(previews: { sets(control.publishedSurfaces.previews) }, pictures: { sets(control.publishedSurfaces.pictures) },
                                         finished: { receipt in backend.completion(of: receipt).map { !$0.failed } },
                                         meters: { audio?.takeMeters() ?? [] })
         let channel = MachChannel(service: service, name: MachServiceName.engine(run: run), notices: render.auxNotices, source: source, log: log,

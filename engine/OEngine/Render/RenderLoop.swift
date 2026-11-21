@@ -210,7 +210,7 @@ public final class RenderLoop: @unchecked Sendable {
         consumedTick.store(time.tick, ordering: .releasing)
         consumedAt.store(time.wake.nanoseconds, ordering: .releasing)
         ticksRun.add(1, ordering: .relaxed)
-        picks.clearAll()
+        picks.clear(first: plan.channelPasses.count * 2)
     }
 
     private func pick(_ source: SourceRef, into slot: Int, record: inout TickRecord, channel: Int, instanceIndex: inout Int) -> PickResult {
