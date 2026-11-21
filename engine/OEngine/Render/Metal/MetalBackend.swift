@@ -159,9 +159,26 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
 
     // MARK: - Prepare (control side)
 
+    /// The scratch textures made so far, for the tests of when they are made.
+    var scratchTexturesMade: Int { blurScratch.made }
+
+    /// The size of a blurring channel's scratch pair, for the tests.
+    func blurScratchSize(channel: Int) -> PixelSize? {
+        blurScratch.textures(channel: channel).map { PixelSize(width: $0.a.width, height: $0.a.height) }
+    }
+
     /// Spec 4 §7 — every variant the plan needs exists before the render
-    /// thread sees the plan; blur scratch textures exist for channels that blur.
+    /// thread sees the plan; blur scratch textures exist for channels that
+    /// blur, and a gamma-blend stack's scratch exists at the stack's size
+    /// (Spec 4 §5: "Never on the render thread").
     public func prepare(_ plan: FramePlan) {
+        prepare(plan, offline: false)
+    }
+
+    /// `offline` is the thumbnail job's render, on its own thread: it needs
+    /// the pipelines, and its stack's scratch is its own (`renderOffline`).
+    func prepare(_ plan: FramePlan, offline: Bool) {
+        if !offline { blurScratch.beginPlan() }
         for pass in plan.channelPasses {
             do {
                 try pipelines.ensureChannel(MetalBackend.variant(for: pass))
@@ -179,6 +196,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             }
             if pass.gammaBlend {
                 do { try pipelines.ensureLinearize() } catch { log.error("linearize pipeline: \(error)") }
+                // The scratch is the size of the texture the pass draws into, which a rebuild can change (Spec 4 §5).
+                if !offline, let target = texture(pass.target) {
+                    blurScratch.ensureStack(stack: pass.stack, size: PixelSize(width: target.width, height: target.height), device: device)
+                }
             }
         }
         for pass in plan.sinkPasses {
@@ -264,7 +285,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         }
         if !plan.stackPasses.isEmpty, let buffer = queue.makeCommandBuffer() {
             buffer.label = "stacks \(tick.tick)"
-            for pass in plan.stackPasses where !(options.skipAux && pass.auxOnly) { encodeStack(pass, into: buffer) }
+            for pass in plan.stackPasses where !(options.skipAux && pass.auxOnly) { encodeStack(pass, into: buffer, offline: false) }
             buffer.commit()
             slot.stack = buffer
         }
@@ -466,7 +487,9 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
 
     // MARK: - The stack pass (Spec 4 §9), the sink encode (Spec 4 §10), aux passes
 
-    private func encodeStack(_ pass: StackPass, into buffer: MTLCommandBuffer) {
+    /// `offline` is the thumbnail job's render, on its own thread, which may
+    /// make its scratch; the render thread only looks its own up.
+    private func encodeStack(_ pass: StackPass, into buffer: MTLCommandBuffer, offline: Bool) {
         guard let target = texture(pass.target) else { return }
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = target
@@ -493,8 +516,13 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             }
         }
         encoder.endEncoding()
-        // Spec 4 §9 — gamma blend: "the final stack pass output is linearized again for the sink".
-        if pass.gammaBlend, let linearize = pipelines.linearizePipeline, let scratch = blurScratch.stackScratch(stack: pass.stack, size: PixelSize(width: target.width, height: target.height), device: device) {
+        // Spec 4 §9 — gamma blend: "the final stack pass output is linearized again for the sink". The scratch
+        // was made when the plan was prepared; with none of this size the pass is left as drawn for this tick
+        // rather than a texture made here (Spec 4 §5).
+        let targetSize = PixelSize(width: target.width, height: target.height)
+        let scratch = !pass.gammaBlend ? nil
+            : offline ? blurScratch.offlineScratch(size: targetSize, device: device) : blurScratch.stackScratch(stack: pass.stack, size: targetSize)
+        if pass.gammaBlend, let linearize = pipelines.linearizePipeline, let scratch {
             if let blit = buffer.makeBlitCommandEncoder() {
                 blit.copy(from: target, to: scratch)
                 blit.endEncoding()
@@ -679,10 +707,11 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     /// into the thumbnail's BGRA8 sRGB texture; waits, bounded. Returns false
     /// when the GPU did not finish in time.
     public func renderOffline(_ pass: StackPass, into target: TextureHandle) -> Bool {
-        prepare(FramePlan(frame: 0, stackPasses: [pass], auxPasses: [AuxPass(kind: .thumbnail, stack: pass.stack, source: pass.target, target: target)]))
+        prepare(FramePlan(frame: 0, stackPasses: [pass], auxPasses: [AuxPass(kind: .thumbnail, stack: pass.stack, source: pass.target, target: target)]),
+                offline: true)
         guard let stack = texture(pass.target), let thumbnail = texture(target), let buffer = auxQueue.makeCommandBuffer() else { return false }
         buffer.label = "thumbnail stack \(pass.stack)"
-        encodeStack(pass, into: buffer)
+        encodeStack(pass, into: buffer, offline: true)
         encodeDownscale(source: stack, target: thumbnail, into: buffer, label: "thumbnail")
         buffer.commit()
         return MetalBackend.waitBounded(buffer)
@@ -905,28 +934,64 @@ final class ReceiptRing: @unchecked Sendable {
 
 /// Spec 4 §7 — the half-resolution scratch pair of a blurring channel, and a
 /// full-size scratch for gamma-blend stacks. Allocated on the control side in
-/// `prepare`, read on the render thread.
+/// `prepare`, read on the render thread, which makes none (Spec 4 §5: "Never
+/// on the render thread"). A channel or a stack can change size between
+/// ticks (Spec 4 §5), so a pair follows its channel's size, and a stack has a
+/// scratch for each size a plan was prepared at: a plan from before the
+/// change, still to be encoded, finds its own. A size no plan has asked for
+/// in about ten seconds of plans goes. The thumbnail job's render, on its
+/// own thread at its own size, has one scratch of its own.
 final class BlurScratch: @unchecked Sendable {
     struct Pair {
         var a: MTLTexture
         var b: MTLTexture
     }
 
+    private struct StackKey: Hashable {
+        var stack: Int
+        var width: Int
+        var height: Int
+    }
+
     private let lock = NSLock()
     private var pairs: [Int: Pair] = [:]
-    private var stacks: [Int: MTLTexture] = [:]
+    private var stacks: [StackKey: (texture: MTLTexture, asked: UInt64)] = [:]
+    private var offline: MTLTexture?
+    private var plans: UInt64 = 0
+    private var count = 0
+    /// How many plans a stack's scratch outlives the last one that asked for it.
+    static let keptPlans: UInt64 = 600
 
-    func ensure(channel: Int, size: PixelSize, device: MTLDevice) {
+    /// The textures made so far.
+    var made: Int {
         lock.lock()
         defer { lock.unlock() }
-        guard pairs[channel] == nil else { return }
-        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: max(1, size.width / 2), height: max(1, size.height / 2), mipmapped: false)
+        return count
+    }
+
+    /// Control side: a live plan is being prepared.
+    func beginPlan() {
+        lock.lock()
+        defer { lock.unlock() }
+        plans += 1
+        guard plans % 64 == 0 else { return }
+        stacks = stacks.filter { plans - $0.value.asked < BlurScratch.keptPlans }
+    }
+
+    func ensure(channel: Int, size: PixelSize, device: MTLDevice) {
+        let width = max(1, size.width / 2)
+        let height = max(1, size.height / 2)
+        lock.lock()
+        defer { lock.unlock() }
+        if let pair = pairs[channel], pair.a.width == width, pair.a.height == height { return }
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
         d.usage = [.renderTarget, .shaderRead]
         d.storageMode = .private
         guard let a = device.makeTexture(descriptor: d), let b = device.makeTexture(descriptor: d) else { return }
         a.label = "blur scratch a \(channel)"
         b.label = "blur scratch b \(channel)"
         pairs[channel] = Pair(a: a, b: b)
+        count += 2
     }
 
     func textures(channel: Int) -> Pair? {
@@ -935,16 +1000,44 @@ final class BlurScratch: @unchecked Sendable {
         return pairs[channel]
     }
 
-    func stackScratch(stack: Int, size: PixelSize, device: MTLDevice) -> MTLTexture? {
-        lock.lock()
-        defer { lock.unlock() }
-        if let existing = stacks[stack], existing.width == size.width, existing.height == size.height { return existing }
+    private static func make(size: PixelSize, device: MTLDevice, label: String) -> MTLTexture? {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: max(1, size.width), height: max(1, size.height), mipmapped: false)
         d.usage = [.shaderRead]
         d.storageMode = .private
-        guard let t = device.makeTexture(descriptor: d) else { return nil }
-        stacks[stack] = t
-        return t
+        let texture = device.makeTexture(descriptor: d)
+        texture?.label = label
+        return texture
+    }
+
+    /// Control side, in `prepare`: the scratch of a gamma-blend stack at the size its plan draws it.
+    func ensureStack(stack: Int, size: PixelSize, device: MTLDevice) {
+        let key = StackKey(stack: stack, width: size.width, height: size.height)
+        lock.lock()
+        defer { lock.unlock() }
+        if stacks[key] != nil {
+            stacks[key]?.asked = plans
+            return
+        }
+        guard let texture = BlurScratch.make(size: size, device: device, label: "gamma scratch \(stack)") else { return }
+        stacks[key] = (texture, plans)
+        count += 1
+    }
+
+    /// Render thread: the scratch made for this stack at this size, or nil. Never makes one.
+    func stackScratch(stack: Int, size: PixelSize) -> MTLTexture? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stacks[StackKey(stack: stack, width: size.width, height: size.height)]?.texture
+    }
+
+    /// The thumbnail job's thread: its one scratch, made again when it renders at another size.
+    func offlineScratch(size: PixelSize, device: MTLDevice) -> MTLTexture? {
+        lock.lock()
+        defer { lock.unlock() }
+        if let offline, offline.width == size.width, offline.height == size.height { return offline }
+        offline = BlurScratch.make(size: size, device: device, label: "gamma scratch, offline")
+        if offline != nil { count += 1 }
+        return offline
     }
 }
 

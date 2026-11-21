@@ -460,7 +460,16 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
                 return
             }
             guard let buffer = queue.makeCommandBuffer() else { return }
-            backend.encodeDisplay(frame, into: drawable.texture, command: buffer)
+            guard backend.encodeDisplay(frame, into: drawable.texture, command: buffer) else {
+                // Spec 4 §1 — "A missing frame is a repeat, never black": nothing was drawn into this drawable
+                // (the frame's stack texture is gone, Spec 4 §5), so it is not presented and the last one stays.
+                if lastTick >= 0 {
+                    presents.write(PresentRecord(output: output, frame: lastTick, rePresented: true, latencyNs: 0, completion: nil,
+                                                 dropsSinceStart: currentState.drops))
+                }
+                lastPresentNs.store(now.nanoseconds, ordering: .releasing)
+                return
+            }
             buffer.present(drawable)
             buffer.commit()
             presents.write(PresentRecord(output: output, frame: frame.tick, rePresented: false,
