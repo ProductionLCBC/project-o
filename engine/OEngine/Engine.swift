@@ -140,6 +140,8 @@ public final class Engine: @unchecked Sendable {
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
                             maxChannelPasses: max(4, library.channels.count))
+        // Spec 4 §3 — what the render thread has taken decides when a released source's slot is used again.
+        control.planTaken = { [render] in render.lastTakenPlanFrame }
         // Spec 4 §2 — "the wall clock is read only to stamp log lines": the engine's own, so its log's lines and
         // the command log's are stamped by one clock.
         log.setClock { variables.now() }
@@ -240,15 +242,24 @@ public final class Engine: @unchecked Sendable {
     /// side is stalled on purpose and the render loop reuses its last plan
     /// (Spec 4 §3).
     public func runTick(_ time: TickTime, buildPlan: Bool = true) {
-        if buildPlan {
-            recoverIfNeeded()
-            api.buildWillStart()
-            planRing.publish(control.build(for: time.tick, now: time.reference))
-            finishBuild()
-        }
+        if buildPlan { publish(self.buildPlan(time)) }
         render.tick(time)
         // Spec 9 §2 — "each file is synced once a second", on the harness's engine time.
         logs?.pulse(now: time.reference)
+    }
+
+    /// The control side's build for one tick, the plan not yet published: the
+    /// harness holds it back to run a build that takes longer than its tick.
+    func buildPlan(_ time: TickTime) -> FramePlan {
+        recoverIfNeeded()
+        api.buildWillStart()
+        return control.build(for: time.tick, now: time.reference)
+    }
+
+    /// Spec 4 §3 — the finished plan handed to the render thread, and the control side's work after it.
+    func publish(_ plan: FramePlan) {
+        planRing.publish(plan)
+        finishBuild()
     }
 
     /// The control side's work once a plan is published: OSC's feedback and
@@ -390,11 +401,14 @@ public final class Engine: @unchecked Sendable {
     /// the last plan that named it has been consumed": once a build, on the
     /// control side, the text cache and the resource table free what was
     /// released the ring's depth ago. The threaded engine did not do this before
-    /// the first soak, so nothing deferred was ever freed.
+    /// the first soak, so nothing deferred was ever freed. Reckoned by the
+    /// frame of the newest plan the render thread has taken, not by the ticks
+    /// it has rendered: while the control thread is behind, the render thread
+    /// reuses a plan, and what that plan names stays.
     func sweepReleases() {
-        let consumed = render.lastConsumedTick
-        control.text.sweep(consumedTick: consumed)
-        backend.resources.sweep(consumedTick: consumed)
+        let taken = render.lastTakenPlanFrame
+        control.text.sweep(consumedTick: taken)
+        backend.resources.sweep(consumedTick: taken)
     }
 
     /// Spec 4 §12 — "Metal device lost or command buffer error ... rebuild

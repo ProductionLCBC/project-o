@@ -142,7 +142,11 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
-    private var pendingSourceRemovals: [(handle: InstanceHandle, afterFrame: Int64)] = []
+    private var pendingSourceRemovals: [(handle: InstanceHandle, releasedAt: Int64)] = []
+    /// Spec 4 §3 — the frame the newest plan the render thread has taken was
+    /// built for; the engine sets it over its render loop. Nil (a control
+    /// loop on its own, in a test) counts every published plan as taken.
+    var planTaken: (@Sendable () -> Int64)?
     public let channelTextures: [Int: TextureHandle]
     public let channelSnapshots: [Int: TextureHandle]
     public let stackRings: [Int: [TextureHandle]]
@@ -467,6 +471,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// queued groups, then the runtimes advanced, then the plan.
     public func build(for frame: Int64, now: MonotonicTime) -> FramePlan {
         model.frame = frame
+        // Spec 4 §3 — whatever this build's plan may name waits, when released, for a plan built after it.
+        backend.resources.noteBuild(frame: frame)
         sweepReleases(before: frame)
         advanceRuntimes(frame)
         var groups = engineGroups(frame)
@@ -553,11 +559,17 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 4 §3 — a source's slot is reused only after every plan that could
-    /// name it was consumed; two ticks is the plan ring's depth of slack.
+    /// name it was consumed; two ticks is the plan ring's depth of slack. And
+    /// only once the render thread has taken a plan built after the release:
+    /// while the control thread is behind, the render thread reuses a plan
+    /// from before it, and can still pick from the source. The control
+    /// thread, catching up, can build twice for one frame, so "after" is a
+    /// later frame.
     private func sweepReleases(before frame: Int64) {
-        var keep: [(handle: InstanceHandle, afterFrame: Int64)] = []
+        let taken = planTaken?() ?? Int64.max
+        var keep: [(handle: InstanceHandle, releasedAt: Int64)] = []
         for entry in pendingSourceRemovals {
-            if entry.afterFrame <= frame {
+            if entry.releasedAt + 2 <= frame, taken > entry.releasedAt {
                 sources.remove(entry.handle)
                 handlePool.append(entry.handle.rawValue)
             } else {
@@ -1277,7 +1289,7 @@ public final class ControlLoop: @unchecked Sendable {
         releaseAudio(of: &m)
         guard let source = m.source else { return }
         source.release()
-        pendingSourceRemovals.append((m.handle, frame + 2))
+        pendingSourceRemovals.append((m.handle, frame))
     }
 
     // MARK: - Media time (Spec 4 §2, §6)
