@@ -224,9 +224,53 @@ public struct BoxKey: Hashable, Sendable {
     public var box: Int
 }
 
+/// Spec 4 §9 — which box a run remembers. Runs are kept by a box's place (its
+/// stack, its slot's channel, its index in the layout), and an edit can put
+/// another box in that place: a slot given another preset, a preset given a
+/// layout of its own for the stack, a box inserted or removed before this
+/// one. What the place held before is then not this box's to dissolve from
+/// or to keep drawing. How the box looks (its frame, fit, style, transition)
+/// and a static box's own text are not part of this: an edit of those is an
+/// edit of the same box.
+public struct BoxIdentity: Equatable, Sendable {
+    public enum Bound: Equatable, Sendable {
+        case pixels
+        case field(String)
+        case text
+
+        public init(_ kind: Binding.Kind) {
+            switch kind {
+            case .pixels: self = .pixels
+            case .field(let name): self = .field(name)
+            case .static: self = .text
+            }
+        }
+    }
+
+    public var preset: UUID
+    public var layout: LayoutKey
+    public var bound: Bound
+    public var offset: Int
+
+    public init(preset: UUID, layout: LayoutKey, bound: Bound, offset: Int) {
+        self.preset = preset
+        self.layout = layout
+        self.bound = bound
+        self.offset = offset
+    }
+}
+
 public struct BoxRun: Sendable {
+    /// The box this run is of; a run under the same key for another box starts afresh.
+    public var identity: BoxIdentity?
     public var previousContent: BoxContent?
     public var previousText: String?
+    /// Spec 4 §9 — whether the text the box took in this build is the text
+    /// it was drawing, before its variables resolve: "When the box has been
+    /// drawing this text and only its raster is missing, the box keeps
+    /// drawing its previous lines". False for a box's first text and for
+    /// "Text a cue has just written", which "still waits for its own raster".
+    public var sameTextAsBefore = false
     /// Spec 4 §8 and Spec 6 §5 — what a text box last adopted: "A box whose
     /// text names variables is laid out again only when its resolved text
     /// changes ... How soon depends on what changed". The text before its

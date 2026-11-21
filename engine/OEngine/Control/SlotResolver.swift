@@ -46,6 +46,10 @@ public enum SlotResolver {
         /// empty once its variables resolve: a value went empty, which runs
         /// the box transition only with `transitionOnVariableChange`.
         public var hiddenByValue = false
+        /// Spec 4 §9 — a text box whose raster the cache did not have: its
+        /// content is empty, and the caller decides whether it keeps its
+        /// previous lines or "draws nothing this tick and counts `textLate`".
+        public var textMissed = false
     }
 
     /// What every slot of one stack pass shares.
@@ -112,7 +116,9 @@ public enum SlotResolver {
     /// text box's variables in that state (Spec 6 §5: a field's in the
     /// content's scope, a static box's in the pointer's; the control loop
     /// paces the values it adopts, Spec 4 §8); `onTextMiss` hears of every
-    /// text job the cache could not answer ("counts `textLate`").
+    /// text job the cache could not answer, and each such box says so
+    /// (`textMissed`), for the caller to keep its previous lines or count it
+    /// late (Spec 4 §9).
     ///
     /// Spec 6 §3 — "v1 draws 0 to +3 (P4), and a negative offset draws nothing
     /// until v1.5 adds the ring buffer. Outside −2 to +3, the reference report
@@ -139,6 +145,11 @@ public enum SlotResolver {
             let frameRect = PixelRect(box.frame, in: inputs.size)
             var resolved: ResolvedBox?
             var hiddenByValue = false
+            var textMissed = false
+            let missed: (TextJob) -> Void = { job in
+                textMissed = true
+                onTextMiss(job)
+            }
             switch box.binding.kind {
             case .pixels:
                 if let source = pixels(slot, box.offset, shown.channels[slot.channel]?.content) {
@@ -154,7 +165,7 @@ public enum SlotResolver {
                     let value = text(key, box, BoxTemplate(raw: raw, scope: .content(channel: slot.channel)), shown)
                     if !value.text.isEmpty {
                         resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
-                                           opacity: opacity, onTextMiss: onTextMiss)
+                                           opacity: opacity, onTextMiss: missed)
                     } else {
                         hiddenByValue = true
                     }
@@ -163,13 +174,14 @@ public enum SlotResolver {
                 let value = text(key, box, BoxTemplate(raw: raw, scope: .pointer), shown)
                 if !value.text.isEmpty {
                     resolved = textBox(value.text, tabular: value.tabular, box: box, frame: frameRect, inputs: inputs, slot: slot,
-                                       opacity: opacity, onTextMiss: onTextMiss)
+                                       opacity: opacity, onTextMiss: missed)
                 } else {
                     hiddenByValue = true
                 }
             }
             if resolved != nil { drewAt.insert(box.offset) }
-            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed, hiddenByValue: hiddenByValue))
+            out.append(SlotBox(key: key, box: box, resolved: resolved, transitionAllowed: allowed, hiddenByValue: hiddenByValue,
+                               textMissed: textMissed))
         }
         return out
     }

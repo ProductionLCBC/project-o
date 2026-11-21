@@ -1667,6 +1667,7 @@ public final class ControlLoop: @unchecked Sendable {
                                          muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
         for slot in stack.effectiveSlots(library: library) {
+            claimBoxRuns(slot: slot, inputs: inputs, frame: frame)
             // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each
             // offset box, the text one cue beyond its offset".
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
@@ -1688,16 +1689,29 @@ public final class ControlLoop: @unchecked Sendable {
                     return adopt(key, template: template.raw, resolved: resolved, box: box, frame: frame, second: resolving.second,
                                  frameRect: PixelRect(box.frame, in: size), size: size)
                 },
-                onTextMiss: { job in
-                    scratch.jobs.append(job)
-                    textLateThisBuild += 1
-                })
+                onTextMiss: { job in scratch.jobs.append(job) })
             for result in results {
                 guard var box = result.resolved else {
                     // Spec 6 §5 — a box hidden by a value going empty swaps unless it asks to transition.
                     let allowed = result.hiddenByValue ? result.box.transitionOnVariableChange : result.transitionAllowed
                     endBox(result.key, frame: frame, box: result.box, allowed: allowed, slot: slot, inputs: inputs, into: &boxes)
                     continue
+                }
+                if result.textMissed {
+                    // Spec 4 §9 — "When the box has been drawing this text and only its raster is missing, the box
+                    // keeps drawing its previous lines until the new raster is ready and counts nothing late": after
+                    // a look edit, a change of the stack's size, or a variable's new value. Its transition, if the
+                    // change runs one, starts when the raster arrives, so what the run remembers stays as it is.
+                    if let run = model.boxRuns[result.key], run.sameTextAsBefore, let previous = run.previousContent, !previous.isEmpty {
+                        box.content = previous
+                        box.transition = run.state(at: frame)
+                        boxes.append(box)
+                        continue
+                    }
+                    // "a missing cache entry draws nothing this tick and counts `textLate`".
+                    textLateThisBuild += 1
+                } else if box.binding.isText {
+                    settleReplaced(result.key, box: result.box, frame: frame)
                 }
                 // Spec 6 §5 — "A box with `transitionOnVariableChange` runs its box transition between the old text
                 // and the new; the rest swap": a value's change asks the box, new text transitions as any write.
@@ -1797,18 +1811,21 @@ public final class ControlLoop: @unchecked Sendable {
     /// adopts takes every value at its newest. The raster a value's change
     /// replaces goes, its textures freed once any box transition between the
     /// two has run; new text's stays in the cache, where a `previous` finds it.
+    /// Spec 4 §9 — the replaced raster stays while the new value's is missing
+    /// and the box draws the old lines; it goes when the new one has drawn.
     private func adopt(_ key: BoxKey, template: String, resolved: ResolvedText, box: Box, frame: Int64, second: Int64,
                        frameRect: PixelRect, size: PixelSize) -> SlotResolver.BoxText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
+        // Spec 4 §9 — the text the box was drawing, or new text: only the first keeps its previous lines on a miss.
+        run.sameTextAsBefore = run.adoptedText != nil && run.adoptedTemplate == template
         let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
         func take(valueChange: Bool, clocked: Bool) -> SlotResolver.BoxText {
             // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
-            // are the ones the cache holds.
+            // are the ones the cache holds. Spec 4 §9 — the box may go on drawing the old value's lines until the
+            // new raster is ready, so the old raster is released once the new one has drawn (`settleReplaced`).
             if valueChange, let old = run.adoptedText, !old.isEmpty, old != now.text || run.adoptedTabular != now.tabular {
-                let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-                text.release(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
-                             afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+                run.replaced.append(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key)
             }
             run.adoptedTemplate = template
             run.adoptedText = now.text
@@ -1854,6 +1871,38 @@ public final class ControlLoop: @unchecked Sendable {
         }
         guard second != run.clockedSecond else { return held }
         return take(valueChange: true, clocked: true)
+    }
+
+    /// Spec 4 §9 — each box of a slot claims the run kept under its key: a run
+    /// of another box (`BoxIdentity`) is dropped, so this box starts afresh,
+    /// its first text showing at once with nothing to dissolve from and no
+    /// previous lines to keep.
+    private func claimBoxRuns(slot: StackSlot, inputs: SlotResolver.Inputs, frame: Int64) {
+        let preset = inputs.preset(for: slot)
+        let stack = inputs.stack.number
+        let layout: LayoutKey = preset.layouts[.stack(stack)] != nil ? .stack(stack) : .any
+        for (index, box) in (preset.layout(for: stack)?.boxes ?? []).enumerated() {
+            let key = BoxKey(stack: stack, slot: slot.channel, box: index)
+            let identity = BoxIdentity(preset: preset.uuid, layout: layout, bound: BoxIdentity.Bound(box.binding.kind), offset: box.offset)
+            if let run = model.boxRuns[key] {
+                guard run.identity != identity else { continue }
+                releaseReplaced(run, afterTick: frame + Int64(PlanRing.depth))
+            }
+            var fresh = BoxRun()
+            fresh.identity = identity
+            model.boxRuns[key] = fresh
+        }
+    }
+
+    /// Spec 4 §8 — "the result replaces the cache entry": a text box drew
+    /// from the cache, so the rasters its value changes replaced go, their
+    /// textures freed once any box transition between old and new has run.
+    private func settleReplaced(_ key: BoxKey, box: Box, frame: Int64) {
+        guard var run = model.boxRuns[key], !run.replaced.isEmpty else { return }
+        let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+        releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+        run.replaced = []
+        model.boxRuns[key] = run
     }
 
     /// Spec 6 §5 — "at most ten times a second": the frames of the master tick
@@ -1909,6 +1958,12 @@ public final class ControlLoop: @unchecked Sendable {
                         into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
+        if !run.replaced.isEmpty {
+            // The box draws no text now: the rasters its values replaced go once its way out has run.
+            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+            releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+            run.replaced = []
+        }
         if run.previousText != nil {
             startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && allowed, frame: frame)
             run.previousContent = nil
