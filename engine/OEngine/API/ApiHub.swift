@@ -166,6 +166,8 @@ public final class ApiHub: @unchecked Sendable {
     }
 
     private func forget(_ connection: ApiConnection) {
+        // Spec 11 §3 — "a connection's files when it closes": its `render` canvases, what waits on them, and their files.
+        engine?.renders?.forget(connection: connection.id)
         lock.lock()
         connections.removeValue(forKey: connection.id)
         inbox.removeAll { $0.connection === connection }
@@ -453,12 +455,37 @@ public final class ApiHub: @unchecked Sendable {
         let members = request.members
         let what = members["what"]?.stringValue ?? ""
         // Spec 11 §3 — "`render` answers with a file on this Mac, so it is the local socket's only, refused on the
-        // LAN with `localOnly`".
+        // LAN with `localOnly`". It is drawn on the thumbnail job's queue and answered when its picture is written,
+        // not in its place among the connection's answers: a picture that takes a while holds no other answer back.
         if what == "render" {
-            let rejection = connection.origin == .lan
-                ? Rejection(reason: .localOnly, message: "render answers with a file on the engine's Mac")
-                : Rejection(reason: .notInV1, message: "the render query comes with edit mode (Area 14)")
-            connection.send(Self.rejected(id, rejection))
+            guard connection.origin == .local else {
+                connection.send(Self.rejected(id, Rejection(reason: .localOnly, message: "render answers with a file on the engine's Mac")))
+                return
+            }
+            guard let renders = engine.renders else {
+                connection.send(Self.rejected(id, Rejection(reason: .conflict, message: "this engine draws no pictures: it has no thumbnail job")))
+                return
+            }
+            // "named by connection, canvas and request `id`": an id a file's name can't carry is refused.
+            guard let fileID = RenderRequest.fileID(id) else {
+                connection.send(Self.rejected(id, Rejection(reason: .badValue,
+                                                            message: "a render's id names its file: a whole number, or up to 32 letters and digits")))
+                return
+            }
+            // The roots and the sizes this build left, which the picture is read against (Spec 11 §3, "Size").
+            let library = snapshot.library, machine = snapshot.machine
+            let geometry = engine.control.geometry
+            let number = connection.id
+            workers.async {
+                switch RenderRequest.parse(members, library: library, machine: machine) {
+                case .failure(let rejection):
+                    connection.send(Self.rejected(id, rejection))
+                case .success(let request):
+                    let job = RenderQueue.Job(connection: number, id: id, fileID: fileID, request: request, library: library, machine: machine,
+                                              geometry: geometry, answer: { [weak connection] message in connection?.send(message) })
+                    if let refusal = renders.submit(job) { connection.send(Self.rejected(id, refusal)) }
+                }
+            }
             return
         }
         let place = connection.reserve()

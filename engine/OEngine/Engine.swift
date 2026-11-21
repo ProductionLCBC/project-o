@@ -95,7 +95,23 @@ public final class Engine: @unchecked Sendable {
                     "file": .string(ApiQueries.relative(result.url, to: self.machineRoot)),
                 ], seq: self.control.commandLog.lastSeq))
             }
+            setUpRenders()
         }
+    }
+    /// Spec 11 §3 — the `render` query's canvases and files: there once the
+    /// engine has a thumbnail job to draw with and knows its machine root.
+    var renders: RenderQueue?
+
+    /// Spec 11 §3 — "The files. `machine/thumbnails/render/` ...; the folder
+    /// is emptied at launch": makes the `render` query's queue over the
+    /// thumbnail job, once, when both the job and the machine root are
+    /// known. A test gives its own folder.
+    func setUpRenders(folder: URL? = nil) {
+        guard renders == nil, let thumbnails else { return }
+        guard let folder = folder ?? machineRoot?.appendingPathComponent("thumbnails").appendingPathComponent("render") else { return }
+        renders = RenderQueue(folder: folder, machineRoot: machineRoot, log: log,
+                              schedule: { [thumbnails] work in thumbnails.performAhead(work) },
+                              draw: { [thumbnails] job in thumbnails.draw(job) })
     }
     /// Spec 10 §2 — "while any output presents it keeps the displays and the
     /// system from sleeping": told the outputs' states after every build.

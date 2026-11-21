@@ -39,6 +39,13 @@ public enum LibraryVersion {
         feed(library.textStyles)
         feed(library.transitions)
         feed(library.channels)
+        // Spec 5 §2 and Spec 11 §6 — the stack a thumbnail is drawn on is edited too: its slots and their presets,
+        // its base, and the shape it is drawn at (Spec 4 §5).
+        if let machine, let stack = machine.stack(machine.settings.thumbnailStack) {
+            feed(stack)
+            let size = MachineGeometry(library: library, machine: machine).stackSize(stack.number)
+            feed(Data("\(size.width)x\(size.height)".utf8))
+        }
         feed(media(of: list, library: library, machine: machine).sorted().map { ref -> MediaState in
             let chain = MediaResolver.chain(from: ref, library: library.mediaIndex, machine: machine?.mediaLocal)
             let found = MediaResolver.entry(for: chain.reached, library: library.mediaIndex, machine: machine?.mediaLocal)

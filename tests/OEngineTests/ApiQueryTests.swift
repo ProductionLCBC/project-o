@@ -267,10 +267,9 @@ final class ApiQueryTests: XCTestCase {
 
     // MARK: - not yet, and never
 
-    func test_renderWaitsForEditModeAndAnUnknownQueryIsRefused() throws {
+    func test_anUnknownQueryIsRefused() throws {
         let api = try ApiFixture()
         let client = api.local()
-        rejected(try ask(api, client, "render"), "notInV1")
         rejected(try ask(api, client, "weather"), "badValue")
         rejected(try ask(api, client, ""), "badValue")
     }

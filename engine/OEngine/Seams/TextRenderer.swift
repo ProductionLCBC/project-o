@@ -83,11 +83,16 @@ public struct TextLayout: Equatable, Sendable {
     public var pointSize: Double
     public var lines: [LayoutLine]
     public var overflowed: Bool
+    /// Spec 6 §4 — "keeps the whole lines that fit, counted from the top":
+    /// how many lines the text would have had at the size drawn that are not
+    /// among them. Spec 11 §3 reports it for a layout's sample as `linesCut`.
+    public var linesCut: Int
 
-    public init(pointSize: Double, lines: [LayoutLine], overflowed: Bool) {
+    public init(pointSize: Double, lines: [LayoutLine], overflowed: Bool, linesCut: Int = 0) {
         self.pointSize = pointSize
         self.lines = lines
         self.overflowed = overflowed
+        self.linesCut = linesCut
     }
 }
 

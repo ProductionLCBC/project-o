@@ -717,6 +717,21 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         return MetalBackend.waitBounded(buffer)
     }
 
+    /// Spec 11 §3 — the `render` query's grade picture, "The item's poster or
+    /// still through the grade": one channel pass off the render thread, on
+    /// the thumbnail job's thread and the aux queue, its source a texture (a
+    /// poster or a still), never a decoded instance. Waits, bounded; false
+    /// when the GPU did not finish in time. The pass names a channel number
+    /// no live channel has, so a blur's scratch pair is its own.
+    public func renderOfflineChannel(_ pass: ChannelPass) -> Bool {
+        prepare(FramePlan(frame: 0, channelPasses: [pass]), offline: true)
+        guard let buffer = auxQueue.makeCommandBuffer() else { return false }
+        buffer.label = "render channel \(pass.channel)"
+        encodeChannel(pass, picks: PickedFrames(capacity: 2), index: 0, into: buffer, options: EncodeOptions())
+        buffer.commit()
+        return MetalBackend.waitBounded(buffer)
+    }
+
     // MARK: - Harness and control side (Spec 4 §14, §16)
 
     public func readback(_ handle: TextureHandle) -> CapturedFrame? {

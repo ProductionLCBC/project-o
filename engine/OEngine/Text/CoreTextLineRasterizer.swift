@@ -114,6 +114,8 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         var lineHeight: Double
         var fits: Bool
         var truncated: Bool
+        /// The lines the whole text makes at this size, before any are cut.
+        var lineCount = 0
     }
 
     func attributed(_ text: String, values: TextStyleValues, font: CTFont, outputHeight: Int) -> CFAttributedString {
@@ -195,6 +197,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
                 .trimmingCharacters(in: .newlines)
         }
         var texts = lines.map { substring(CTLineGetStringRange($0)) }
+        let lineCount = lines.count
         if let maxLines, maxLines > 0, lines.count > maxLines {
             // Spec 4 §8 — "maxLines truncates after N lines with an ellipsis and reports the overflow"; Spec 6 §4 —
             // the kept lines are whole, and the last one is its own text ending in the ellipsis.
@@ -205,7 +208,8 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         }
         let widest = lines.map { CoreTextLineRasterizer.visibleWidth(of: $0) }.max() ?? 0
         let fits = visible.length == total && widest <= Double(box.width) + 0.5 && Double(lines.count) * lineHeight <= Double(box.height) + 0.5
-        return (Laid(lines: lines, texts: texts, pixelSize: pixelSize, lineHeight: lineHeight, fits: fits, truncated: truncated), resolved)
+        return (Laid(lines: lines, texts: texts, pixelSize: pixelSize, lineHeight: lineHeight, fits: fits, truncated: truncated, lineCount: lineCount),
+                resolved)
     }
 
     // MARK: - Rasterize
@@ -251,7 +255,8 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             if whole > 0 {
                 (laid, font) = layout(job.text, values: values, pixelSize: laid.pixelSize, box: job.box, outputHeight: job.outputHeight, tabular: job.tabular, maxLines: whole)
             } else {
-                laid = Laid(lines: [], texts: [], pixelSize: laid.pixelSize, lineHeight: laid.lineHeight, fits: false, truncated: true)
+                laid = Laid(lines: [], texts: [], pixelSize: laid.pixelSize, lineHeight: laid.lineHeight, fits: false, truncated: true,
+                            lineCount: laid.lineCount)
             }
         }
         // Spec 6 §4 — "It places the block of lines in the box: the first line at the box's top, the block
@@ -295,7 +300,8 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
         }
         // Spec 6 §4 — "the overflow is reported for the editor and pre-flight".
         return TextRaster(lines: lines, layout: TextLayout(pointSize: laid.pixelSize * 1080 / Double(job.outputHeight), lines: layoutLines,
-                                                           overflowed: laid.truncated || overflowsBox),
+                                                           overflowed: laid.truncated || overflowsBox,
+                                                           linesCut: max(0, laid.lineCount - laid.lines.count)),
                           substitutedFont: font.substituted)
     }
 
