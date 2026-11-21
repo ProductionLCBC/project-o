@@ -452,11 +452,12 @@ public final class ApiHub: @unchecked Sendable {
         let id = request.id
         let members = request.members
         let what = members["what"]?.stringValue ?? ""
-        // Spec 10 §3 — "`render` answers with a file on this Mac, so on the LAN it is `localOnly`"; both are Area 14's.
-        if what == "render" || what == "uses" {
-            let rejection = what == "render" && connection.origin == .lan
+        // Spec 11 §3 — "`render` answers with a file on this Mac, so it is the local socket's only, refused on the
+        // LAN with `localOnly`".
+        if what == "render" {
+            let rejection = connection.origin == .lan
                 ? Rejection(reason: .localOnly, message: "render answers with a file on the engine's Mac")
-                : Rejection(reason: .notInV1, message: "the \(what) query comes with edit mode (Area 14)")
+                : Rejection(reason: .notInV1, message: "the render query comes with edit mode (Area 14)")
             connection.send(Self.rejected(id, rejection))
             return
         }

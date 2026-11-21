@@ -267,12 +267,57 @@ final class ApiQueryTests: XCTestCase {
 
     // MARK: - not yet, and never
 
-    func test_renderAndUsesWaitForEditModeAndAnUnknownQueryIsRefused() throws {
+    func test_renderWaitsForEditModeAndAnUnknownQueryIsRefused() throws {
         let api = try ApiFixture()
         let client = api.local()
         rejected(try ask(api, client, "render"), "notInV1")
-        rejected(try ask(api, client, "uses"), "notInV1")
         rejected(try ask(api, client, "weather"), "badValue")
         rejected(try ask(api, client, ""), "badValue")
+    }
+
+    // MARK: - uses (Spec 11 §3)
+
+    /// "`uses` lists what refers to a numbered object, counted over both
+    /// roots' documents on this machine", answered "with its request's `id`
+    /// as `{"id": …, "type": "answer", …}`", "local and LAN alike", "as
+    /// fresh as the last `library` event".
+    func test_usesListsWhatRefersToAnObject() throws {
+        let api = try ApiFixture()
+        let client = api.local()
+        let answer = try ask(api, client, "uses", ["object": .string("channel"), "channel": .number(2)])
+        XCTAssertEqual(answer["type"], .string("answer"))
+        XCTAssertEqual(answer["more"], .bool(false))
+        let counts = try XCTUnwrap(answer["counts"]?.objectValue)
+        XCTAssertEqual(Set(counts.keys), Set(Uses.kinds))
+        let stacks = try XCTUnwrap(answer["uses"]?.objectValue?["stacks"]?.arrayValue)
+        XCTAssertTrue(stacks.contains(.object(["stack": .number(1), "slot": .number(2)])), "\(stacks)")
+        XCTAssertTrue(stacks.contains(.object(["stack": .number(2), "slot": .number(2)])))
+        XCTAssertEqual(counts["stacks"], .number(Double(stacks.count)))
+        XCTAssertGreaterThan(counts["cues"]?.intValue ?? 0, 0, "the fixture's cues write channel 2")
+
+        // After an edit, the next answer has it.
+        try api.engine.send("edit stack 2 slot 2 remove", source: .ui).map { throw $0 }
+        api.engine.tick()
+        let after = try ask(api, client, "uses", ["object": .string("channel"), "channel": .number(2)])
+        let left = try XCTUnwrap(after["uses"]?.objectValue?["stacks"]?.arrayValue)
+        XCTAssertFalse(left.contains(.object(["stack": .number(2), "slot": .number(2)])))
+
+        // The LAN asks it too.
+        let lan = api.lan()
+        XCTAssertEqual(try ask(api, lan, "uses", ["object": .string("preset"), "preset": .number(1)])["type"], .string("answer"))
+    }
+
+    func test_usesRefusesWhatItCannotRead() throws {
+        let api = try ApiFixture()
+        let client = api.local()
+        rejected(try ask(api, client, "uses"), "missingArgument")
+        rejected(try ask(api, client, "uses", ["object": .string("list"), "list": .number(42)]), "badValue")
+        rejected(try ask(api, client, "uses", ["object": .string("preset")]), "missingArgument")
+        rejected(try ask(api, client, "uses", ["object": .string("preset"), "preset": .string("three")]), "badValue")
+        rejected(try ask(api, client, "uses", ["object": .string("preset"), "preset": .number(0)]), "badValue")
+        // A number nothing has: answered, with nothing naming it.
+        let none = try ask(api, client, "uses", ["object": .string("grade"), "grade": .number(99)])
+        XCTAssertEqual(none["type"], .string("answer"))
+        XCTAssertEqual(none["uses"], .object([:]))
     }
 }
