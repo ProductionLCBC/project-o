@@ -377,21 +377,36 @@ final class SnapshotRestoreEngineTests: XCTestCase {
     }
 
     /// "A restore that would delete a channel on air, with content in a stack an output shows or sounding
-    /// on an audio output, is refused with `onAir`"; and (Adam's answer of 2026-11-14) one that changes the channel list at all is `notInV1`
-    /// until Area 14, with `onAir` first.
-    func test_deletingAChannelOnAirIsOnAirAndAnotherChannelListIsNotInV1() throws {
+    /// on an audio output, is refused with `onAir`"; and "A snapshot that adds, removes or resizes a channel
+    /// restores like any other: the engine rebuilds its channel textures and ShowState's entries between
+    /// ticks, as it does for an edit of the same channels (Spec 5 §2, Spec 4 §5). A channel that comes back
+    /// starts empty, and a channel on air that would go still answers `onAir`."
+    func test_aSnapshotWithAnotherChannelListRestoresAndAChannelOnAirIsOnAir() throws {
         try plant("2026-10-29-090000") { snapshot in
             try channels(&snapshot) { $0["number"] != .number(2) }
         }
-        let empty = restore("2026-10-29-090000")
-        XCTAssertEqual(empty?.reason, .notInV1, "nothing on air: the channel list still can't change")
-        XCTAssertTrue(empty?.message.contains("channel 2 removed") ?? false, empty?.message ?? "")
-
         // Cue 1 of list 42 writes channel 2, which stack 1 holds and both outputs show.
         XCTAssertNil(run("list 42 cue 1", source: .osc))
         XCTAssertNotEqual(disk.engine.state.channels[2]?.content, .empty)
         XCTAssertEqual(restore("2026-10-29-090000")?.reason, .onAir)
         XCTAssertEqual(library.channels.count, 3)
+
+        // Off air, the channel goes: its textures and its entry in the state with it.
+        XCTAssertNil(run("channel 2 clear", source: .osc))
+        XCTAssertNotNil(disk.control.channelTextures[2])
+        XCTAssertNil(restore("2026-10-29-090000"))
+        XCTAssertEqual(library.channels.map(\.number), [1, 3])
+        XCTAssertNil(disk.control.channelTextures[2])
+        XCTAssertNil(disk.control.pictureSurfaces[2])
+        XCTAssertNil(disk.engine.state.channels[2])
+        XCTAssertNil(disk.engine.lastPlan?.channelPasses.first { $0.channel == 2 })
+
+        // Undoing the restore brings it back: empty, with textures of its own.
+        XCTAssertNil(run("undo"))
+        XCTAssertEqual(library.channels.map(\.number), [1, 2, 3])
+        XCTAssertNotNil(disk.control.channelTextures[2])
+        XCTAssertEqual(disk.control.pictureSurfaces[2]?.count, 3)
+        XCTAssertEqual(disk.engine.state.channels[2]?.content, .empty, "a channel that comes back starts empty")
     }
 
     /// "the live list may go", "and the pointer goes on from its kept copies when its playlist, item or
