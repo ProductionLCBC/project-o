@@ -75,6 +75,7 @@ public enum OEngineCommandLine {
            started makes a relaunch without it; --released keeps every output on that screen closed;
            exits with status 3 when another engine holds the machine root, 4 when the roots don't load
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio] [--no-lan]
+           [--edit-seconds N]
            [--screens display:<uuid>,display:<uuid>]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure;
            its display outputs take the screens --screens names, in order, or every screen of this Mac left to right,
@@ -227,6 +228,11 @@ public enum OEngineCommandLine {
         // pictures count in its GPU p99 (Spec 4 §13)."
         let machClient: SoakMachClient? = soak ? SoakMachClient() : nil
         machClient?.hold(run: process.engine.run)
+        // Area 14 — the soak's editing client: every minute (or --edit-seconds) an edit that makes the engine rebuild
+        // its textures between ticks (Spec 4 §5) and a `render` (Spec 11 §3), so the run's thresholds hold with an
+        // operator editing.
+        let editClient: SoakEditClient? = soak ? SoakEditClient(hub: process.engine.api, library: roots.library, machine: roots.machine, log: process.log) : nil
+        editClient?.start(every: Double(try args.int("--edit-seconds") ?? 60))
         if let seconds { print("oengine: stopping after \(seconds) s") }
 
         let finishing = Atomic<Bool>(false)
@@ -238,7 +244,9 @@ public enum OEngineCommandLine {
             guard !finishing.exchange(true, ordering: .acquiringAndReleasing) else { return }
             DispatchQueue.global(qos: .userInitiated).async {
                 driver?.stop()
+                editClient?.stop()
                 let held = machClient?.verdict()
+                let edited = editClient?.verdict()
                 machClient?.release()
                 process.stop()
                 print(process.summary())
@@ -247,6 +255,11 @@ public enum OEngineCommandLine {
                     print(held.lines.joined(separator: "\n"))
                     for failure in held.failures { print("FAIL: " + failure) }
                     if !held.failures.isEmpty { code = 1 }
+                }
+                if let edited {
+                    print(edited.lines.joined(separator: "\n"))
+                    for failure in edited.failures { print("FAIL: " + failure) }
+                    if !edited.failures.isEmpty { code = 1 }
                 }
                 if soak {
                     do {
