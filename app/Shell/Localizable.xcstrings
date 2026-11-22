@@ -2029,6 +2029,414 @@
         }
       }
     },
+    "edit.browser" : {
+      "comment" : "VoiceOver: edit mode's left column, with its three tabs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browser"
+          }
+        }
+      }
+    },
+    "edit.cell.clears" : {
+      "comment" : "VoiceOver, in a cell's description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "clears"
+          }
+        }
+      }
+    },
+    "edit.cell.holds" : {
+      "comment" : "VoiceOver, in a cell's description: %@ is what the channel holds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "holds %@"
+          }
+        }
+      }
+    },
+    "edit.cell.holdsFrom" : {
+      "comment" : "VoiceOver, in a cell's description: %1$@ is what the channel holds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "holds %1$@ from cue %2$lld"
+          }
+        }
+      }
+    },
+    "edit.cell.holdsNothing" : {
+      "comment" : "VoiceOver, in a cell's description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "holds nothing"
+          }
+        }
+      }
+    },
+    "edit.cell.input" : {
+      "comment" : "On a cue grid tile that writes a live input.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input %lld"
+          }
+        }
+      }
+    },
+    "edit.cell.missing" : {
+      "comment" : "On a cue grid tile whose media isn't in the pool.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "missing"
+          }
+        }
+      }
+    },
+    "edit.cell.slide" : {
+      "comment" : "On a cue grid tile that writes a slide.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slide"
+          }
+        }
+      }
+    },
+    "edit.cell.spoken" : {
+      "comment" : "VoiceOver: one cell of the cue grid. %3$@ is the channel's label, %4$@ what the cue does there.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld, channel %2$lld %3$@: %4$@"
+          }
+        }
+      }
+    },
+    "edit.cell.text" : {
+      "comment" : "A text write named without its words, as when a channel holds text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "text"
+          }
+        }
+      }
+    },
+    "edit.cell.writesInput" : {
+      "comment" : "VoiceOver, in a cell's description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes input %lld"
+          }
+        }
+      }
+    },
+    "edit.cell.writesMedia" : {
+      "comment" : "VoiceOver, in a cell's description: %@ is the media item's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes %@"
+          }
+        }
+      }
+    },
+    "edit.cell.writesSlide" : {
+      "comment" : "VoiceOver, in a cell's description.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes a slide"
+          }
+        }
+      }
+    },
+    "edit.cell.writesText" : {
+      "comment" : "VoiceOver, in a cell's description: %@ is the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes text, %@"
+          }
+        }
+      }
+    },
+    "edit.chip.add" : {
+      "comment" : "A chip the cue doesn't write yet: a plus, then the attribute's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ %@"
+          }
+        }
+      }
+    },
+    "edit.chip.audioTransition" : {
+      "comment" : "An attribute chip's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio transition"
+          }
+        }
+      }
+    },
+    "edit.chip.db" : {
+      "comment" : "A gain chip's value, in decibels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dB"
+          }
+        }
+      }
+    },
+    "edit.chip.gain" : {
+      "comment" : "An attribute chip's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain"
+          }
+        }
+      }
+    },
+    "edit.chip.grade" : {
+      "comment" : "An attribute chip's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
+    "edit.chip.mixed" : {
+      "comment" : "A chip or a field whose selected cues differ.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed"
+          }
+        }
+      }
+    },
+    "edit.chip.numbered" : {
+      "comment" : "A chip's value when its object has no label: the attribute's name and the object's number, such as Grade 3.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld"
+          }
+        }
+      }
+    },
+    "edit.chip.scoped" : {
+      "comment" : "A chip: its value, then its scope.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "edit.chip.spoken" : {
+      "comment" : "VoiceOver: a chip's value, then its scope, such as Grade 3, from here on.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "edit.chip.timed" : {
+      "comment" : "A chip's value with a duration: the transition's label, then the duration, such as Dissolve 0.5 s.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "edit.chip.transition" : {
+      "comment" : "An attribute chip's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition"
+          }
+        }
+      }
+    },
+    "edit.column.channel" : {
+      "comment" : "The heading of the inspector's fourth column: the selected row's channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "edit.column.commands" : {
+      "comment" : "The heading of the inspector's third column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commands"
+          }
+        }
+      }
+    },
+    "edit.column.cue" : {
+      "comment" : "The heading of the inspector's first column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue"
+          }
+        }
+      }
+    },
+    "edit.column.trigger" : {
+      "comment" : "The heading of the inspector's second column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trigger"
+          }
+        }
+      }
+    },
+    "edit.commands.add" : {
+      "comment" : "The inspector's row that opens the list of commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+ Add command"
+          }
+        }
+      }
+    },
+    "edit.commands.asText" : {
+      "comment" : "The inspector's switch that shows the cue's commands as lines of text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commands as text"
+          }
+        }
+      }
+    },
+    "edit.commands.changesLibrary" : {
+      "comment" : "Under a cue's command that is itself an edit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes the library when fired"
+          }
+        }
+      }
+    },
+    "edit.commands.kept" : {
+      "comment" : "Under a cue's command the app doesn't know.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not a command this version knows. It is kept as written and can only be removed."
+          }
+        }
+      }
+    },
+    "edit.commands.selectOne" : {
+      "comment" : "In the Commands column while several cues are selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select one cue to edit its commands"
+          }
+        }
+      }
+    },
     "edit.confirm.deleteCues.armed" : {
       "comment" : "Under the delete-cues question, when the armed cue is selected.",
       "extractionState" : "manual",
@@ -2097,6 +2505,1242 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Undo brings back what is deleted."
+          }
+        }
+      }
+    },
+    "edit.content" : {
+      "comment" : "The label of what a cell writes or holds, in the inspector's Channel column.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Content"
+          }
+        }
+      }
+    },
+    "edit.content.from" : {
+      "comment" : "In the inspector: the channel holds what this earlier cue wrote.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From cue %lld"
+          }
+        }
+      }
+    },
+    "edit.content.none" : {
+      "comment" : "In the inspector: the cell clears the channel, or holds nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "—"
+          }
+        }
+      }
+    },
+    "edit.crumb" : {
+      "comment" : "Edit mode's top bar: where the edited list came from, then its title. %1$@ is a playlist's title or the word Library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ › %2$@"
+          }
+        }
+      }
+    },
+    "edit.crumb.library" : {
+      "comment" : "Edit mode's top bar: the edited list was opened from the Library, not from a playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        }
+      }
+    },
+    "edit.cues.add" : {
+      "comment" : "Tooltip and VoiceOver: the + after the last cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a cue at the end"
+          }
+        }
+      }
+    },
+    "edit.cues.channelHeading" : {
+      "comment" : "The heading over the cue grid's column of channel names.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "edit.cues.clear" : {
+      "comment" : "In a cue grid cell where the cue clears the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        }
+      }
+    },
+    "edit.cues.empty" : {
+      "comment" : "In the cue grid of a list with no cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cues yet. Add one with +, or paste the song’s text in the text editor"
+          }
+        }
+      }
+    },
+    "edit.cues.fold" : {
+      "comment" : "Tooltip and VoiceOver: the control that folds a channel's row. %2$@ is the channel's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fold channel %1$lld %2$@"
+          }
+        }
+      }
+    },
+    "edit.cues.folded" : {
+      "comment" : "VoiceOver, after a channel's name: its row is folded.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "folded"
+          }
+        }
+      }
+    },
+    "edit.cues.grid" : {
+      "comment" : "VoiceOver: the grid of cues by channels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue grid"
+          }
+        }
+      }
+    },
+    "edit.cues.header.spoken" : {
+      "comment" : "VoiceOver: a cue's header. %2$@ is the rest: its label, section and trigger.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld, %2$@"
+          }
+        }
+      }
+    },
+    "edit.cues.live" : {
+      "comment" : "VoiceOver: this cue is the live cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "live"
+          }
+        }
+      }
+    },
+    "edit.cues.localCopy" : {
+      "comment" : "In the Cues page's header for a list that is this Mac's own copy: it can't be edited yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local copies are edited from v1.5"
+          }
+        }
+      }
+    },
+    "edit.cues.meta" : {
+      "comment" : "The Cues page's header, after the list's title: how many cues, then the list's version number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cue · version %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld cues · version %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.cues.noChannel" : {
+      "comment" : "The name of a cue grid row for a channel number the cues write that no channel has.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No channel %lld"
+          }
+        }
+      }
+    },
+    "edit.cues.noList" : {
+      "comment" : "In the Cues page when no list is chosen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a list in the Browser to edit its cues"
+          }
+        }
+      }
+    },
+    "edit.cues.openText" : {
+      "comment" : "The Cues page's header and a cue's menu: opens the text editor on this list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Text Editor"
+          }
+        }
+      }
+    },
+    "edit.cues.renumber" : {
+      "comment" : "The Cues page's header: changes the list's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renumber…"
+          }
+        }
+      }
+    },
+    "edit.cues.renumberOther" : {
+      "comment" : "In the header of a read-only list whose number another list shares.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renumber the Other List…"
+          }
+        }
+      }
+    },
+    "edit.cues.sharedNumber" : {
+      "comment" : "In the Cues page's header when two lists have the same number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another list shares number %lld"
+          }
+        }
+      }
+    },
+    "edit.cues.unfold" : {
+      "comment" : "Tooltip and VoiceOver: the control that opens a folded channel's row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open channel %1$lld %2$@"
+          }
+        }
+      }
+    },
+    "edit.cues.zoom" : {
+      "comment" : "VoiceOver and tooltip: the slider that sets how wide a cue's column is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom"
+          }
+        }
+      }
+    },
+    "edit.cues.zoom.value" : {
+      "comment" : "VoiceOver: the zoom slider's value.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld points a cue"
+          }
+        }
+      }
+    },
+    "edit.engine" : {
+      "comment" : "Edit mode's top bar: the pill that says how the engine is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine"
+          }
+        }
+      }
+    },
+    "edit.engine.attention" : {
+      "comment" : "VoiceOver: the engine pill while an output isn't presenting or a warning stands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine: connected. An output or a warning needs a look"
+          }
+        }
+      }
+    },
+    "edit.engine.away" : {
+      "comment" : "VoiceOver: the engine pill while the app has no engine.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine: not connected"
+          }
+        }
+      }
+    },
+    "edit.engine.fine" : {
+      "comment" : "VoiceOver: the engine pill at rest.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine: connected, and every output is presenting"
+          }
+        }
+      }
+    },
+    "edit.field.label" : {
+      "comment" : "The inspector's field for a cue's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Label"
+          }
+        }
+      }
+    },
+    "edit.field.note" : {
+      "comment" : "The inspector's field for a cue's note.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Note"
+          }
+        }
+      }
+    },
+    "edit.field.note.placeholder" : {
+      "comment" : "The placeholder of the inspector's note field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a note"
+          }
+        }
+      }
+    },
+    "edit.field.section" : {
+      "comment" : "The inspector's field for a cue's section.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section"
+          }
+        }
+      }
+    },
+    "edit.fire" : {
+      "comment" : "The inspector's button, and a cue's menu: fires the selected cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fire"
+          }
+        }
+      }
+    },
+    "edit.fire.in" : {
+      "comment" : "Beside Fire: the playlist the cue fires in.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fires in %@"
+          }
+        }
+      }
+    },
+    "edit.fire.library" : {
+      "comment" : "Beside Fire: the cue fires on its own, as a list opened from the Library does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fires from the Library"
+          }
+        }
+      }
+    },
+    "edit.goTo" : {
+      "comment" : "The placeholder of the Program panel's field that takes a cue number of the live list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to cue…"
+          }
+        }
+      }
+    },
+    "edit.inspector.cue" : {
+      "comment" : "The inspector's header: the selected cue's number and how many the list has.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "edit.inspector.none" : {
+      "comment" : "The inspector's header with nothing selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No cue selected"
+          }
+        }
+      }
+    },
+    "edit.inspector.several" : {
+      "comment" : "The inspector's header with several cues selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld cues of %2$lld"
+          }
+        }
+      }
+    },
+    "edit.media.count" : {
+      "comment" : "The Browser's Media tab: how many items the search and filter show.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.media.detail" : {
+      "comment" : "Under a media item's name in the Browser's list: its kind, then its duration.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "edit.media.grid" : {
+      "comment" : "The Browser's Media tab: shows the items as tiles.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grid"
+          }
+        }
+      }
+    },
+    "edit.media.list" : {
+      "comment" : "The Browser's Media tab: shows the items as rows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List"
+          }
+        }
+      }
+    },
+    "edit.menu.delete" : {
+      "comment" : "A cue's menu in the cue grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "edit.menu.duplicate" : {
+      "comment" : "A cue's menu in the cue grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate"
+          }
+        }
+      }
+    },
+    "edit.menu.edit" : {
+      "comment" : "A command's menu in the inspector.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit…"
+          }
+        }
+      }
+    },
+    "edit.menu.editContent" : {
+      "comment" : "A cell's menu in the cue grid, on a cell that writes already.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Content…"
+          }
+        }
+      }
+    },
+    "edit.menu.moveDown" : {
+      "comment" : "A command's menu in the inspector.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Down"
+          }
+        }
+      }
+    },
+    "edit.menu.moveEarlier" : {
+      "comment" : "A cue's menu in the cue grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Earlier"
+          }
+        }
+      }
+    },
+    "edit.menu.moveLater" : {
+      "comment" : "A cue's menu in the cue grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Later"
+          }
+        }
+      }
+    },
+    "edit.menu.moveUp" : {
+      "comment" : "A command's menu in the inspector.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up"
+          }
+        }
+      }
+    },
+    "edit.menu.newCueAfter" : {
+      "comment" : "A cue's menu in the cue grid.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Cue After"
+          }
+        }
+      }
+    },
+    "edit.menu.remove" : {
+      "comment" : "A command's menu in the inspector.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        }
+      }
+    },
+    "edit.menu.write" : {
+      "comment" : "A cell's menu in the cue grid: opens the picker for what the cue writes there.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write…"
+          }
+        }
+      }
+    },
+    "edit.nextCue" : {
+      "comment" : "Tooltip and VoiceOver: selects the cue after, without firing it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Cue"
+          }
+        }
+      }
+    },
+    "edit.notice.skipped" : {
+      "comment" : "The inspector's notice after a this-cue-only chip was set on several cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skipped %lld cue that holds or clears this channel: there it would stay from here on"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skipped %lld cues that hold or clear this channel: there it would stay from here on"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.page.channels" : {
+      "comment" : "Edit mode's page picker and View menu: the channel sheet's page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels"
+          }
+        }
+      }
+    },
+    "edit.page.cues" : {
+      "comment" : "Edit mode's page picker and View menu: the page that edits a list's cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cues"
+          }
+        }
+      }
+    },
+    "edit.page.later" : {
+      "comment" : "In the workspace of an edit-mode page that isn't built yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This page is built in a later stage"
+          }
+        }
+      }
+    },
+    "edit.page.objects" : {
+      "comment" : "Edit mode's page picker and View menu: the page for grades, transitions, text styles and macros.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Objects"
+          }
+        }
+      }
+    },
+    "edit.page.presets" : {
+      "comment" : "Edit mode's page picker and View menu: the preset editor's page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presets"
+          }
+        }
+      }
+    },
+    "edit.page.stacks" : {
+      "comment" : "Edit mode's page picker and View menu: the stack editor's page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stacks"
+          }
+        }
+      }
+    },
+    "edit.page.text" : {
+      "comment" : "Edit mode's page picker and View menu: the text editor's page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "edit.pages" : {
+      "comment" : "VoiceOver: edit mode's page picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit pages"
+          }
+        }
+      }
+    },
+    "edit.preview" : {
+      "comment" : "The title of edit mode's monitor that shows what is selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview"
+          }
+        }
+      }
+    },
+    "edit.preview.spoken" : {
+      "comment" : "VoiceOver: the Preview monitor. %3$@ is the stack's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview: cue %1$lld on stack %2$lld %3$@"
+          }
+        }
+      }
+    },
+    "edit.preview.spoken.empty" : {
+      "comment" : "VoiceOver: the Preview monitor with no cue selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview: nothing selected"
+          }
+        }
+      }
+    },
+    "edit.previousCue" : {
+      "comment" : "Tooltip and VoiceOver: selects the cue before, without firing it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Cue"
+          }
+        }
+      }
+    },
+    "edit.program" : {
+      "comment" : "The title of edit mode's monitor that shows what is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program"
+          }
+        }
+      }
+    },
+    "edit.program.onAir" : {
+      "comment" : "On the Program monitor: the outputs showing this stack. %@ is their numbers, such as 1, 2.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On air · Out %@"
+          }
+        }
+      }
+    },
+    "edit.program.previewOnly" : {
+      "comment" : "On the Program monitor when no output shows this stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview only"
+          }
+        }
+      }
+    },
+    "edit.program.spoken.onAir" : {
+      "comment" : "VoiceOver: the Program monitor. %2$@ is the stack's label, %3$@ the outputs' numbers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program: stack %1$lld %2$@, on air on outputs %3$@"
+          }
+        }
+      }
+    },
+    "edit.program.spoken.previewOnly" : {
+      "comment" : "VoiceOver: the Program monitor when no output shows the stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program: stack %1$lld %2$@, on no output"
+          }
+        }
+      }
+    },
+    "edit.saved" : {
+      "comment" : "Edit mode's top bar: every change is written to disk.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        }
+      }
+    },
+    "edit.scope.once" : {
+      "comment" : "A chip's scope: the attribute applies to this cue's content alone.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "this cue only"
+          }
+        }
+      }
+    },
+    "edit.scope.track" : {
+      "comment" : "A chip's scope: the attribute stays until another cue changes it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "from here on"
+          }
+        }
+      }
+    },
+    "edit.second.spoken" : {
+      "comment" : "VoiceOver: a duration of exactly one second.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 second"
+          }
+        }
+      }
+    },
+    "edit.seconds.spoken" : {
+      "comment" : "VoiceOver: a duration. %@ is the number, already formatted.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ seconds"
+          }
+        }
+      }
+    },
+    "edit.stack" : {
+      "comment" : "An item of the monitors' stack picker: the stack's number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "edit.state.clear" : {
+      "comment" : "The three-way control: the cue clears the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        }
+      }
+    },
+    "edit.state.hold" : {
+      "comment" : "The three-way control: the cue leaves the channel as it is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold"
+          }
+        }
+      }
+    },
+    "edit.state.spoken" : {
+      "comment" : "VoiceOver: the three-way control. %2$@ is the channel's label, %3$@ its state, such as write, text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld %2$@: %3$@"
+          }
+        }
+      }
+    },
+    "edit.state.spoken.clear" : {
+      "comment" : "VoiceOver, the three-way control's state.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "clear"
+          }
+        }
+      }
+    },
+    "edit.state.spoken.hold" : {
+      "comment" : "VoiceOver, the three-way control's state.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hold"
+          }
+        }
+      }
+    },
+    "edit.state.spoken.write" : {
+      "comment" : "VoiceOver, the three-way control's state: %@ is the kind of content.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "write, %@"
+          }
+        }
+      }
+    },
+    "edit.state.write" : {
+      "comment" : "The three-way control: the cue writes content on the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write"
+          }
+        }
+      }
+    },
+    "edit.tab.library" : {
+      "comment" : "A tab of edit mode's Browser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        }
+      }
+    },
+    "edit.tab.media" : {
+      "comment" : "A tab of edit mode's Browser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "edit.tab.playlists" : {
+      "comment" : "A tab of edit mode's Browser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlists"
+          }
+        }
+      }
+    },
+    "edit.trigger.advance" : {
+      "comment" : "The inspector's field: the next cue fires this long after this one.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advance after"
+          }
+        }
+      }
+    },
+    "edit.trigger.go" : {
+      "comment" : "The inspector's trigger choice: the operator fires the cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        }
+      }
+    },
+    "edit.trigger.none" : {
+      "comment" : "The placeholder of the advance-after field when it isn't set.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "edit.trigger.pair" : {
+      "comment" : "The inspector's warning when two timers arm the same cue. The durations are written like 8 s.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld’s advance-after (%2$@) and cue %3$lld’s Time (%4$@) both arm cue %3$lld; %5$@ wins."
+          }
+        }
+      }
+    },
+    "edit.trigger.pair.this" : {
+      "comment" : "The same warning when the armed cue is the selected one.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld’s advance-after (%2$@) and this cue’s Time (%3$@) both arm this cue; %4$@ wins."
+          }
+        }
+      }
+    },
+    "edit.trigger.seconds" : {
+      "comment" : "The placeholder of a field that takes seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "s"
+          }
+        }
+      }
+    },
+    "edit.trigger.time" : {
+      "comment" : "The inspector's trigger choice: the cue fires this long after the cue before it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time after previous"
+          }
+        }
+      }
+    },
+    "edit.trigger.timecode" : {
+      "comment" : "The inspector's trigger choice that isn't built yet.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timecode"
+          }
+        }
+      }
+    },
+    "edit.trigger.timecode.later" : {
+      "comment" : "Tooltip on the disabled Timecode choice.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timecode triggers come in version 2"
+          }
+        }
+      }
+    },
+    "edit.trigger.usePrevious" : {
+      "comment" : "The inspector's button that fills Time with the length of the video the cue before plays.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Previous Video’s Length"
           }
         }
       }
