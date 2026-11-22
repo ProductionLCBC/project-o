@@ -188,6 +188,36 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
 
     public static var sdkAvailable: Bool { odl_sdk_available() }
 
+    // MARK: - Stream times (Spec 4 §10)
+
+    /// Spec 4 §10 — "Frames are scheduled two to three ahead on the card's
+    /// stream time": the stream time of the output's frame number `frame`,
+    /// `start` plus that many frames of `rate`, in nanoseconds. Spec 1 §3 — an
+    /// output's `rate` is its frame rate, interlaced or not (Spec 4 §2 counts
+    /// an interlaced output's fields at twice it), so a 1080i frame lasts one
+    /// frame of its rate, not two. Computed from the frame count and rounded
+    /// once, so a long run never drifts off the card's frame grid.
+    public static func streamTime(start: Int64, frame: Int64, rate: FrameRate) -> Int64 {
+        let num = Int64(max(1, rate.num))
+        let den = Int64(max(1, rate.den))
+        let whole = frame / num
+        let part = frame % num
+        return start + whole * 1_000_000_000 * den + (part * 1_000_000_000 * den + num / 2) / num
+    }
+
+    /// Spec 4 §10 — how long the card shows the output's frame `frame`: the
+    /// gap to the next frame's stream time, so consecutive frames tile the
+    /// stream exactly.
+    public static func frameDuration(frame: Int64, rate: FrameRate) -> Int64 {
+        streamTime(start: 0, frame: frame + 1, rate: rate) - streamTime(start: 0, frame: frame, rate: rate)
+    }
+
+    /// Spec 4 §10 — embedded audio "scheduled against the same stream time as
+    /// the video": three frames, the depth the sink schedules video ahead.
+    public static func audioLead(rate: FrameRate) -> Int64 {
+        streamTime(start: 0, frame: 3, rate: rate)
+    }
+
     // MARK: - Lifecycle
 
     /// Opens the card. An unavailable card does not throw: the sink pauses
@@ -296,8 +326,10 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     private var lastReferenceNs: Int64 = 0
 
     private func scheduleLoop() {
-        let period = format.rate.nanosecondsPerFrame * (format.interlaced ? 2 : 1)
-        var nextDue = streamTime
+        let rate = format.rate
+        let start = streamTime
+        let quarterFrame = Double(DeckLinkSink.frameDuration(frame: 0, rate: rate)) / 4_000_000_000
+        var frame: Int64 = 0
         while running.load(ordering: .relaxed), currentPhase == .running {
             let newest = ring.newest
             let ready = newest.flatMap { frame -> CompletedFrame? in
@@ -308,7 +340,7 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
             var buffered: UInt32 = 0
             _ = odl_buffered_video_frames(device, &buffered)
             if buffered >= 3 {
-                Thread.sleep(forTimeInterval: Double(period) / 4_000_000_000)
+                Thread.sleep(forTimeInterval: quarterFrame)
                 continue
             }
             let slot: Int
@@ -332,7 +364,9 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
                 continue
             }
             let buffer = buffers.buffer(forSlot: slot)
-            let status = odl_schedule_video(device, buffer.contents(), Int32(buffers.rowBytes), nextDue, period, DeckLinkClock.timeScale,
+            let due = DeckLinkSink.streamTime(start: start, frame: frame, rate: rate)
+            let duration = DeckLinkSink.frameDuration(frame: frame, rate: rate)
+            let status = odl_schedule_video(device, buffer.contents(), Int32(buffers.rowBytes), due, duration, DeckLinkClock.timeScale,
                                             UnsafeMutableRawPointer(bitPattern: Int(tick + 1)))
             if status != ODL_OK {
                 log.error("DeckLink output \(output): schedule refused (\(DeckLinkSink.describe(status))); pausing")
@@ -340,9 +374,9 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
                 break
             }
             lastScheduledSlot = slot
-            let latency = DeckLinkSink.presentLatency(scheduledNs: nextDue, referenceNs: referenceNs, nowNs: clock?.now().nanoseconds ?? nextDue,
+            let latency = DeckLinkSink.presentLatency(scheduledNs: due, referenceNs: referenceNs, nowNs: clock?.now().nanoseconds ?? due,
                                                       referenceIsStreamTime: referenceIsStreamTime)
-            nextDue += period
+            frame += 1
             presents.write(PresentRecord(output: output, frame: tick, rePresented: rePresented, latencyNs: latency,
                                          completion: nil, dropsSinceStart: dropsSinceStart))
             lastPresentNs.store(MonotonicClock.now().nanoseconds, ordering: .releasing)
@@ -363,6 +397,8 @@ public final class DeckLinkSink: OutputSink, @unchecked Sendable {
     }
 
     private func playbackStopped() {
+        // A stop the sink asked for is not the card stopping (Spec 4 §12's row is for the card's own).
+        guard running.load(ordering: .acquiring) else { return }
         log.error("DeckLink output \(output): playback stopped by the card; pausing")
         setPhase(.paused)
     }
@@ -390,9 +426,7 @@ extension DeckLinkSink: StreamAudioDestination {
 
     /// Three video frames: the depth the sink schedules video ahead, so the
     /// sound reaches the card with the same lead as the picture.
-    public var audioLeadNs: Int64 {
-        3 * format.rate.nanosecondsPerFrame * (format.interlaced ? 2 : 1)
-    }
+    public var audioLeadNs: Int64 { DeckLinkSink.audioLead(rate: format.rate) }
 
     public func scheduleAudio(_ samples: UnsafeBufferPointer<Int32>, frames: Int, streamTime: Int64) -> Int {
         guard let device, currentPhase == .running else { return 0 }

@@ -106,10 +106,15 @@ public final class SystemDevices: DeviceLister, @unchecked Sendable {
             let modes = withUnsafeBytes(of: port.modes) { raw in
                 Array(raw.bindMemory(to: odl_mode_t.self).prefix(max(0, Int(port.mode_count))))
             }
-            return DetectedPort(device: DetectedPort.devicePrefix + id, name: name, modes: modes.map { mode in
-                VideoFormat(width: Int(mode.width), height: Int(mode.height), rate: FrameRate(num: Int(mode.rate_num), den: Int(mode.rate_den)),
-                            interlaced: mode.interlaced)
-            })
+            return DetectedPort(device: DetectedPort.devicePrefix + id, name: name, modes: modes.map(Self.format(of:)))
         }
+    }
+
+    /// Spec 10 §3 — a port's mode as an output `format` (Spec 1 §3), its rate
+    /// in lowest terms as outputs.json holds it: the card reports 1080i60 as
+    /// 30000/1000, which is `{num: 30, den: 1}`.
+    static func format(of mode: odl_mode_t) -> VideoFormat {
+        VideoFormat(width: Int(mode.width), height: Int(mode.height),
+                    rate: FrameRate(num: Int(mode.rate_num), den: Int(mode.rate_den)).reduced, interlaced: mode.interlaced)
     }
 }

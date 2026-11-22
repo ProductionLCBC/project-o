@@ -137,6 +137,9 @@ struct odl_device {
     bool videoEnabled = false;
     bool audioEnabled = false;
     std::atomic<bool> playing{false};
+    // Set before a stop this module asks for, so the SDK's "playback has stopped"
+    // for it is not reported as the card stopping (ODeckLink.h, odl_playback_stopped_cb).
+    std::atomic<bool> stopRequested{false};
     BMDTimeScale timeScale = 1000;
 };
 
@@ -175,10 +178,13 @@ public:
         return S_OK;
     }
 
+    /// "Called when playback stops for a reason the sink did not ask for": the
+    /// SDK calls this after every StopScheduledPlayback too (the loopback test
+    /// of 2026-11-22 saw it on each requested stop), so a requested stop ends here.
     HRESULT ScheduledPlaybackHasStopped() override {
         if (owner_) {
             owner_->playing.store(false);
-            if (owner_->onStopped) owner_->onStopped(owner_->context);
+            if (!owner_->stopRequested.load() && owner_->onStopped) owner_->onStopped(owner_->context);
         }
         return S_OK;
     }
@@ -371,6 +377,7 @@ odl_status_t odl_open(const char *persistent_id, odl_device_t **out_device) {
 
 void odl_close(odl_device_t *device) {
     if (!device) return;
+    device->stopRequested.store(true);
     if (device->playing.load()) {
         BMDTimeValue actual = 0;
         device->output->StopScheduledPlayback(0, &actual, device->timeScale);
@@ -449,6 +456,7 @@ odl_status_t odl_disable_output(odl_device_t *device) {
 odl_status_t odl_start_playback(odl_device_t *device, int64_t start_time, int64_t time_scale) {
     if (!device || !device->videoEnabled) return ODL_ERR_STATE;
     if (device->playing.load()) return ODL_ERR_STATE;
+    device->stopRequested.store(false);
     if (!succeeded(device->output->StartScheduledPlayback(start_time, time_scale, 1.0))) return ODL_ERR_STATE;
     device->timeScale = time_scale;
     device->playing.store(true);
@@ -458,6 +466,7 @@ odl_status_t odl_start_playback(odl_device_t *device, int64_t start_time, int64_
 odl_status_t odl_stop_playback(odl_device_t *device) {
     if (!device) return ODL_ERR_STATE;
     if (!device->playing.load()) return ODL_ERR_STATE;
+    device->stopRequested.store(true);
     BMDTimeValue actual = 0;
     HRESULT hr = device->output->StopScheduledPlayback(0, &actual, device->timeScale);
     device->playing.store(false);
