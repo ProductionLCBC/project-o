@@ -94,6 +94,9 @@ public final class ControlLoop: @unchecked Sendable {
     public let audio: AudioSystem?
     let log: EngineLog
     let encodeKinds: [Int: EncodeKind]
+    /// Spec 4 §15 — the SDI outputs whose frames carry the capture check's
+    /// stamp (`--stamp-sdi`); set before the engine starts, empty in a show.
+    public var stampedOutputs: Set<Int> = []
     /// Spec 8 §2 — the media root and `machine/media/`, which locations read against.
     let media: MediaFolders
     /// Spec 3 §6 — "the set of media ids the resolver cannot find", as
@@ -1927,6 +1930,10 @@ public final class ControlLoop: @unchecked Sendable {
         var encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
         if interlaced, encode == .v210 { encode = .v210Interlaced }
         let firstField = interlaced && frame > 0 ? FieldSources(stack: ring[previousSlot], second: firstFieldSecond) : nil
-        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField)
+        // Spec 4 §15 — each field's tick for the capture check: the woven frame's first field is the previous tick's.
+        // Only the v210 encode writes it; the process names only SDI outputs.
+        let stamp = stampedOutputs.contains(output.number) ? SinkStamp(firstField: firstField == nil ? frame : frame - 1, secondField: frame) : nil
+        return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField,
+                        stamp: stamp)
     }
 }

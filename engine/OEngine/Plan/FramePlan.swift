@@ -357,9 +357,12 @@ public struct SinkPass: Equatable, Codable, Sendable {
     /// The slot in the output's ring of three (Spec 4 §2).
     public var destination: Int
     public var firstField: FieldSources?
+    /// Spec 4 §15 — the ticks a v210 encode stamps into each field's first
+    /// line for the capture check, in a run that asks for it; nil otherwise.
+    public var stamp: SinkStamp?
 
     public init(output: Int, stack: TextureHandle, second: SecondTexture, mix: Float, encode: EncodeKind, destination: Int,
-                firstField: FieldSources? = nil) {
+                firstField: FieldSources? = nil, stamp: SinkStamp? = nil) {
         self.output = output
         self.stack = stack
         self.second = second
@@ -367,6 +370,7 @@ public struct SinkPass: Equatable, Codable, Sendable {
         self.encode = encode
         self.destination = destination
         self.firstField = firstField
+        self.stamp = stamp
     }
 
     /// Spec 4 §10 — whether this pass weaves two stack frames into one.

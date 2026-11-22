@@ -17,7 +17,21 @@ constant bool kWeave [[function_constant(1)]];
 struct EncodeUniforms {
     float4 mix;    // amount of the second texture, hasSecond, secondIsBlack, unused
     float4 size;   // width, height
+    uint4 stamp;   // stamp (0/1), row 0's tick, row 1's tick, unused (Spec 4 §15)
 };
+
+/// Spec 4 §15 — the frame stamp a test run carries (FrameStamp.swift): word
+/// `index` (0 to 10) of the first line of a field, bit i of the tick as
+/// component i at peak white (940) or black (64), component 32 the marker.
+static inline uint stampWord(uint tick, uint index) {
+    uint word = 0;
+    for (uint k = 0; k < 3; k++) {
+        uint component = index * 3 + k;
+        uint value = component >= 32 ? 940u : (((tick >> component) & 1u) != 0 ? 940u : 64u);
+        word |= value << (10 * k);
+    }
+    return word;
+}
 
 struct VertexOut {
     float4 position [[position]];
@@ -108,8 +122,18 @@ kernel void encodeV210(texture2d<float> stack [[texture(0)]],
         crc[p] = uint(round(512 + 896 * clamp((cr[p * 2] + cr[p * 2 + 1]) * 0.5, -0.5, 0.5)));
     }
     uint base = gid.y * rowWords + gid.x * 4;
-    out[base + 0] = cbc[0] | (yc[0] << 10) | (crc[0] << 20);
-    out[base + 1] = yc[1] | (cbc[1] << 10) | (yc[2] << 20);
-    out[base + 2] = crc[1] | (yc[3] << 10) | (cbc[2] << 20);
-    out[base + 3] = yc[4] | (crc[2] << 10) | (yc[5] << 20);
+    uint words[4];
+    words[0] = cbc[0] | (yc[0] << 10) | (crc[0] << 20);
+    words[1] = yc[1] | (cbc[1] << 10) | (yc[2] << 20);
+    words[2] = crc[1] | (yc[3] << 10) | (cbc[2] << 20);
+    words[3] = yc[4] | (crc[2] << 10) | (yc[5] << 20);
+    // Spec 4 §15 — the first line of each field (rows 0 and 1) starts with the stamp when the run asks for it.
+    if (u.stamp.x != 0 && gid.y < 2 && gid.x < 3) {
+        uint tick = gid.y == 0 ? u.stamp.y : u.stamp.z;
+        for (uint j = 0; j < 4; j++) {
+            uint index = gid.x * 4 + j;
+            if (index < 11) words[j] = stampWord(tick, index);
+        }
+    }
+    for (uint j = 0; j < 4; j++) out[base + j] = words[j];
 }

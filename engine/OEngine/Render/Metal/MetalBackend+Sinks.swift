@@ -52,6 +52,10 @@ extension MetalBackend {
         encoder.setComputePipelineState(pipeline)
         encoder.setTexture(stack, index: 0)
         var uniforms = EncodeUniforms(mix: SIMD4(pass.mix, 0, 0, 0), size: SIMD4(Float(ring.width), Float(ring.height), 0, 0))
+        if let stamp = pass.stamp {
+            // Spec 4 §15 — each field's tick, low 32 bits, for the capture check.
+            uniforms.stamp = SIMD4(1, UInt32(truncatingIfNeeded: stamp.firstField), UInt32(truncatingIfNeeded: stamp.secondField), 0)
+        }
         bindSecond(pass.second, stack: stack, uniforms: &uniforms, index: 1) { encoder.setTexture($0, index: $1) }
         if let first = pass.firstField, let firstStack = texture(first.stack) {
             encoder.setTexture(firstStack, index: 2)
@@ -72,13 +76,14 @@ extension MetalBackend {
     /// Harness: run the v210 encode for a stack texture, woven with a first
     /// field when given one, and hand back the words.
     public func v210Words(stack: TextureHandle, second: SecondTexture = .none, mix: Float = 0, firstField: FieldSources? = nil,
-                          width: Int, height: Int) -> [UInt32]? {
+                          stamp: SinkStamp? = nil, width: Int, height: Int) -> [UInt32]? {
         guard let buffers = V210Buffers(device: device, width: width, height: height) else { return nil }
         v210Rings.register(output: -1, buffers: buffers)
         let kind: EncodeKind = firstField == nil ? .v210 : .v210Interlaced
         try? pipelines.ensureEncode(kind)
         guard let command = queue.makeCommandBuffer() else { return nil }
-        encodeV210(SinkPass(output: -1, stack: stack, second: second, mix: mix, encode: kind, destination: 0, firstField: firstField), into: command)
+        encodeV210(SinkPass(output: -1, stack: stack, second: second, mix: mix, encode: kind, destination: 0, firstField: firstField, stamp: stamp),
+                   into: command)
         command.commit()
         guard MetalBackend.waitBounded(command) else { return nil }
         let buffer = buffers.buffer(forSlot: 0)

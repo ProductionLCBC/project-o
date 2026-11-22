@@ -65,4 +65,5 @@ struct PictureUniforms {
 struct EncodeUniforms {
     var mix: SIMD4<Float>        // amount of the second texture, hasSecond (0/1), secondIsBlack (0/1), unused
     var size: SIMD4<Float>       // width, height, unused, unused
+    var stamp: SIMD4<UInt32> = .zero   // stamp (0/1), row 0's tick, row 1's tick, unused (Spec 4 §15, FrameStamp)
 }

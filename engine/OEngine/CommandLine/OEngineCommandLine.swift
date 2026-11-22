@@ -73,9 +73,11 @@ public enum OEngineCommandLine {
            --relaunch says the engine before this one ended: the last state is put back whatever
            restoreLastState says, and no startup macro runs; a run that ended without a stop since the Mac
            started makes a relaunch without it; --released keeps every output on that screen closed;
+           --stamp-sdi writes each frame's tick into the first line of each field of every SDI output (the first
+           16 pixels), for `oengine capture` on the capture rig; never in a show;
            exits with status 3 when another engine holds the machine root, 4 when the roots don't load
       soak --library <root> --machine <root> --scenario <file> [--minutes N] [--blackbox <folder>] [--osc-port N] [--no-audio] [--no-lan]
-           [--screens display:<uuid>,display:<uuid>]
+           [--screens display:<uuid>,display:<uuid>] [--stamp-sdi]
            run, with the scenario sent over OSC for N minutes (180 by default), then the Spec 4 §13 thresholds; exit 1 on a failure;
            its display outputs take the screens --screens names, in order, or every screen of this Mac left to right,
            and a client of its own holds the Mach channel throughout, so the previews and channel pictures are in its GPU time
@@ -206,6 +208,8 @@ public enum OEngineCommandLine {
         options.relaunch = args.flag("--relaunch")
         options.bootedAtMs = BootTime.wallMilliseconds()
         options.released = args.all("--released")
+        // Spec 4 §15 — the frame stamp `oengine capture` checks, for a run on the capture rig only.
+        options.stampSDI = args.flag("--stamp-sdi")
         // Spec 10 §2 — the LAN API: the system's WebSocket listener, and the token from the login keychain. A run
         // with --no-lan opens neither and never touches the Keychain.
         if !args.flag("--no-lan") { options.lan = EngineProcess.LanOptions(server: NetworkLanServer(), secrets: KeychainStore()) }

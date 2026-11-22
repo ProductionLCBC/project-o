@@ -86,6 +86,9 @@ public final class EngineProcess: @unchecked Sendable {
         /// Spec 10 §2 — the LAN API's wire and the Keychain it reads its token from; nil opens no listener and
         /// touches no Keychain, which is what a test or a run with `--no-lan` wants.
         public var lan: LanOptions?
+        /// Spec 4 §15 — whether each SDI frame carries the frame stamp the
+        /// capture check reads (`--stamp-sdi`); never in a show.
+        public var stampSDI = false
 
         public init() {}
     }
@@ -226,6 +229,11 @@ public final class EngineProcess: @unchecked Sendable {
         // Spec 5 §2 — edits are written to the roots they were loaded from.
         engine.control.attachDocuments(libraryRoot: roots.libraryRoot, machineRoot: roots.machineRoot,
                                        librarySnapshot: roots.librarySnapshot, machineSnapshot: roots.machineSnapshot)
+        // Spec 4 §15 — a capture run's SDI frames carry the stamp the capture check reads; a show's never do.
+        if options.stampSDI {
+            engine.control.stampedOutputs = Set(machine.outputs.filter { $0.kind == .sdi }.map(\.number))
+            log.info("SDI frames carry the capture stamp: outputs \(engine.control.stampedOutputs.sorted())")
+        }
         let control = engine.control
         // Spec 8 §2 — the media worker; Spec 8 §3 — the app's staging folder, which the engine empties at launch.
         let staging = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
