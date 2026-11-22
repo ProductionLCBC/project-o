@@ -2,7 +2,13 @@
 # Project O — test-bench soak run (Spec 4 §13 and §15).
 #
 # Usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio]
-#                         [--no-lan] [--screens display:<uuid>,display:<uuid>]
+#                         [--no-lan] [--screens display:<uuid>,display:<uuid>] [--capture]
+#
+# --capture (Spec 4 §15, Area 7): the machine root has an SDI output on the
+# bench's card, whose SDI output is cabled to its own input (make one with
+# `python3 -I scripts/bench-machine.py make <dest>`); `oengine capture` judges
+# every frame the engine stamps, the weave and the clapper's A/V, and its
+# failures fail the run.
 #
 # Builds the engine in release, writes the synthetic spike media if it is not
 # there yet, then runs `oengine soak`: the engine on the machine's outputs with
@@ -31,7 +37,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio] [--no-lan] [--screens display:<uuid>,...]" >&2
+  echo "usage: scripts/soak.sh <scenario.json> [--minutes N] [--library <root>] [--machine <root>] [--blackbox <folder>] [--no-audio] [--no-lan] [--screens display:<uuid>,...] [--capture]" >&2
   exit 2
 fi
 
@@ -41,10 +47,14 @@ shift
 library="$root/tests/fixtures/spike/library"
 machine="$root/tests/fixtures/spike/machine"
 extra=()
+capture=0
+blackbox=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --library) library="$2"; shift 2 ;;
     --machine) machine="$2"; shift 2 ;;
+    --capture) capture=1; shift ;;
+    --blackbox) blackbox="$2"; extra+=("$1" "$2"); shift 2 ;;
     *) extra+=("$1"); shift ;;
   esac
 done
@@ -67,9 +77,36 @@ cp -cR "$machine" "$work/machine"
 sed -i '' 's/"libraryMode": "readOnlyMasters"/"libraryMode": "writable"/' "$work/machine/machine.json"
 echo "soak.sh: running on clones of the roots in $work, libraryMode writable" >&2
 
+# Spec 4 §15 — with --capture, `oengine capture` reads the card's input (its SDI
+# output cabled to it) for the whole run and the engine stamps every SDI frame;
+# the capture starts first, is stopped with Ctrl-C once the soak has ended, and
+# its verdict joins the soak's. Its record goes into the black box folder.
+capture_pid=""
+if [[ $capture == 1 ]]; then
+  if [[ -z "$blackbox" ]]; then
+    blackbox="$root/tests/soak-output/$(date +%Y-%m-%d-%H%M%S)"
+    extra+=(--blackbox "$blackbox")
+  fi
+  mkdir -p "$blackbox"
+  read -r sdi_device sdi_format < <(python3 -I "$root/scripts/bench-machine.py" sdi "$work/machine")
+  echo "soak.sh: capturing $sdi_device in $sdi_format into $blackbox/capture" >&2
+  "$oengine" capture --device "$sdi_device" --format "$sdi_format" --out "$blackbox/capture" > "$blackbox/capture.log" 2>&1 &
+  capture_pid=$!
+  extra+=(--stamp-sdi)
+  sleep 3
+fi
+
 set +e
 "$oengine" soak --library "$work/library" --machine "$work/machine" --scenario "$scenario" "${extra[@]+"${extra[@]}"}"
 status=$?
+if [[ -n "$capture_pid" ]]; then
+  sleep 2
+  kill -INT "$capture_pid"
+  wait "$capture_pid"
+  capture_status=$?
+  cat "$blackbox/capture.log"
+  if [[ $capture_status != 0 ]]; then status=1; fi
+fi
 set -e
 rm -rf "$work"
 exit "$status"
