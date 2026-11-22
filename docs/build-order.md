@@ -14,7 +14,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | shipped |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | shipped |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | shipped |
-| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started |
+| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | shipped |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | shipped |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started |
@@ -162,6 +162,32 @@ Preset 1's "2" layout, the Clock preset, and the fixtures and JSON Schemas of §
 (library-v1 and spike; no schema bump, §2). Tests first from §11's Area 6 list, with
 goldens for the anchor, the overflow and the confidence stack. Stop for review after the
 core changes and again after the fixtures. Nothing in app/.
+```
+
+**Area 7 — Output sinks: bench verification and fixes** (branch `area/sinks`)
+
+```
+Area: 7, output sinks, as bench verification and fixes (Adam's answer of 2026-11-04),
+written from the loopback test of 2026-11-22. Spec: docs/specs/4-render-pipeline.md §10
+and §15's DeckLink, capture and A/V lines, with §2 for the DeckLink clock, §11 for
+embedded audio, §12's DeckLink row and §16's weave and colour tests; Spec 1 §3 for an
+output's format. The bench Mac's DeckLink SDI 4K (decklink:154e100e; 6G, no 12G) has
+its SDI output cabled to its own input: that loop is the capture rig. On main: the
+display and DeckLink sinks, the encode pass with the switch and blackout mixes and the
+weave, the embedded audio feed, and the soak command. Fix first, tests first, what the
+loopback found: an interlaced output's frames scheduled for two frame periods, so 1080i
+plays at half rate; embedded audio timed on the card's hardware clock while the picture
+plays on its stream clock, a frame apart after the engine's start; a stop the sink asked
+for reported as the card stopping; the card's mode rates listed unreduced. Then the
+capture check: input capture in the DeckLink module's C face; a frame stamp the v210
+encode writes into each field's first line, only under a test option; oengine capture,
+which checks every stamp once and in order, the fields' order and pairing, a clapper
+fixture's flash against its click, and a bars still's code values; soak.sh --capture.
+Then the bench machine root, copied again from the spike fixtures with output 1 (stack
+1) on the card at 1080p60 in place of the wall's display, since §15's wall assumed 12G
+(Adam's answer of 2026-11-22; §15 corrected on the branch first), and short runs on the
+loop at 1080p60, 1080i60 and 2160p30. Stop for review there. The three-hour run with
+capture waits for a window Adam sets, with the Mac to itself.
 ```
 
 **Area 8 — Media pool** (branch `area/media`)

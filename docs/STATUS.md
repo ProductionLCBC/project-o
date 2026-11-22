@@ -22,7 +22,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 held at the soak of 2026-11-02; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. The display-only soak of 2026-11-16, the first of everything merged since, holds the display, GPU, audio and watchdog lines and fails late text and the two memory lines (Needs Adam). |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers; the Spec 3 §6 correction and ADR 0008's acceptance on the branch (85b4e88), `area/presets` merged into `main` with `--no-ff` (af3c948), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Spec 1 §2's `weight` went into Area 11's block. |
-| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | not started | After the bench run, and folded into it on Adam's answer of 2026-11-04: the area becomes bench verification and fixes, its block written from the run's findings. The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
+| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress | In progress on `area/sinks` since 2026-11-22, as bench verification and fixes (Adam's answer of 2026-11-04). That day a DeckLink SDI 4K went into the bench Mac with its SDI output cabled to its input, and a loopback test passed in every mode tried; its block in `docs/build-order.md` was written from that test and Adam said go the same day, taking every recommendation (Now). The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | merged | Adam's `approved` on 2026-11-14 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/media` merged into `main` with `--no-ff` (2c1b3d6), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
@@ -39,6 +39,30 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
+
+**Area 7, output sinks, is in progress on `area/sinks` since 2026-11-22.** That day Adam
+put a DeckLink SDI 4K (`decklink:154e100e`; 6G, so up to 2160p30, no 12G; 16 embedded
+channels; free-running, nothing on its reference input) into the bench Mac, in the Sonnet
+chassis, with its SDI output cabled straight into its own input, and asked for it to be
+tested. A scratch probe (`.build/decklink-loop/` in the main checkout, uncommitted) drove
+the output through the engine's own DeckLink wrapper and captured it on the input: at
+1080p59.94, 1080i59.94, 1080p60 and 2160p29.97 every frame came back bit for bit, none
+late, dropped, skipped, repeated or with a field from another frame, the capture exactly
+one frame after the scheduled time, and the embedded audio bit for bit too (16 channels
+at 4K), a constant 0.6 ms ahead of its frame. The card holds its last frame when nothing
+new is queued, reads a queued frame almost at once (so the engine's three-buffer ring is
+safe), and waits for the first frame when playback starts before any is queued. The test
+found four faults in the sink, never run on a card before: an interlaced output's frames
+are scheduled for two frame periods, so 1080i plays at half rate (shown on the loop);
+embedded audio is timed on the card's hardware clock while the picture plays on its
+stream clock, measured a frame apart after the engine's start; every stop the sink asks
+for is logged as the card stopping; the card's mode rates are listed unreduced. Adam said
+go on the plan the same day, with every recommendation: the faults fixed with tests, a
+capture check (`oengine capture`, a frame stamp in the SDI picture under a test option, a
+clapper and a bars still, `soak.sh --capture`), the bench machine root with output 1 on
+the card at 1080p60 in place of the wall's display, short runs on the loop at 1080p60,
+1080i60 and 2160p30, then a stop for review; the three-hour run with capture waits for a
+window he sets.
 
 **Area 14, edit mode, is in progress on `area/edit`.** Adam approved its plan on
 2026-11-18 and lifted the bench-run gate for this area, on his word and with the date, in
