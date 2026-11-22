@@ -29,7 +29,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | merged | Adam's `approved` on 2026-11-18 as built, with every reading in the brief and its recommended answers; the Spec 10 §14, §15 and §18 corrections applied on the branch (51abfca), `area/show` merged into `main` with `--no-ff` (02bff6f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. He went over the app himself that day and found it generally ok, with problems pausing and seeking to track down later (Needs Adam, Decisions). The last stage's checks on a screen and the system's accessibility audit are still owed; Adam lifted his pause on display tests on 2026-11-18, in the Area 14 session, and neither has been run yet. Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress | In progress on `area/edit` since 2026-11-18: Adam approved the plan that day and lifted the bench-run gate for this area (cabc1ab; Spec 4 §15, Spec 11 §11, `docs/build-order.md` and `app/README.md` say so since that day, and Areas 10, 17 and 18 and Area 7's bench verification still wait). His four answers with the plan: the gate; a stack is drawn at the size of the output showing it, at a live switch too, so the engine is brought to Spec 4 §5 and a stack switched onto an output of another size is rebuilt on that tick (the larger of the choices offered, and not the one recommended); a box keeps its previous lines until the new raster is ready, for a look edit and for a variable's new value alike, counting nothing late, which also answers the soak's once-a-minute blank clock; and a channel sounding on an audio output is on air, so it can't be deleted, renumbered or swapped until it is cleared. With the plan he approved the spec corrections those take, to go on the branch first (Spec 5 §1 and §2, a channel or stack that is made or deleted gains or loses its ShowState entry; Spec 9 §6, the channel-list bullet goes; Spec 4 §5, §8 and §9; Spec 5 §6, check 7), and the plan's readings: the engine refuses a transition's `create` and `duplicate` and keeps its `type` and `color` read-only; a macro that would leave the machine root on a `readOnlyMasters` machine is `readOnlyLibrary`; a stack's mute of a channel goes with that channel's slot; Edit in Stack Editor's menu entry comes with Area 17's Settings, its way in built here; the Text page shows disabled until Area 10. The order: the engine side first (the `core/` fix of a machine-level renumber, wider than Housekeeping recorded; the edits with their checks, warnings and inverses; resources rebuilt between ticks; `render` and `uses`), then a stop for review with a mockup of the edit bar and the Cues page; the frame and the Cues page, and a stop; the stack editor, the channel sheet and the preset editor, and a stop; then the small editors and the brief. It changes the frame path, so a green soak is owed before its merge, in a window Adam sets. **At its first review stop since 2026-11-21:** the engine side is on the branch (74e98f9, fifteen commits, `swift test` green at 2178 tests with 2 skipped, hosted CI green), and the session waits on Adam before it starts the app. On the branch: the spec corrections; the machine-level renumber fix; the edits of channels, stacks and slots, presets, text styles, grades, transitions, audio transitions, macros and an output's default stack and transitions, with their checks, warnings and inverses and their files; the textures made again between ticks, at a live switch too; the hold of previous lines; a snapshot with another channel list restoring; `render` and `uses`; the thumbnail job following an edit of its stack; and an editing client for the soak. Three faults found on `main` are fixed there with tests (Needs Adam). No soak has been run. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress | In progress on `area/edit` since 2026-11-18: Adam approved the plan that day and lifted the bench-run gate for this area (cabc1ab; Spec 4 §15, Spec 11 §11, `docs/build-order.md` and `app/README.md` say so since that day, and Areas 10, 17 and 18 and Area 7's bench verification still wait). His four answers with the plan: the gate; a stack is drawn at the size of the output showing it, at a live switch too, so the engine is brought to Spec 4 §5 and a stack switched onto an output of another size is rebuilt on that tick (the larger of the choices offered, and not the one recommended); a box keeps its previous lines until the new raster is ready, for a look edit and for a variable's new value alike, counting nothing late, which also answers the soak's once-a-minute blank clock; and a channel sounding on an audio output is on air, so it can't be deleted, renumbered or swapped until it is cleared. With the plan he approved the spec corrections those take, to go on the branch first (Spec 5 §1 and §2, a channel or stack that is made or deleted gains or loses its ShowState entry; Spec 9 §6, the channel-list bullet goes; Spec 4 §5, §8 and §9; Spec 5 §6, check 7), and the plan's readings: the engine refuses a transition's `create` and `duplicate` and keeps its `type` and `color` read-only; a macro that would leave the machine root on a `readOnlyMasters` machine is `readOnlyLibrary`; a stack's mute of a channel goes with that channel's slot; Edit in Stack Editor's menu entry comes with Area 17's Settings, its way in built here; the Text page shows disabled until Area 10. The order: the engine side first (the `core/` fix of a machine-level renumber, wider than Housekeeping recorded; the edits with their checks, warnings and inverses; resources rebuilt between ticks; `render` and `uses`), then a stop for review with a mockup of the edit bar and the Cues page; the frame and the Cues page, and a stop; the stack editor, the channel sheet and the preset editor, and a stop; then the small editors and the brief. It changes the frame path, so a green soak is owed before its merge, in a window Adam sets. **At its first review stop since 2026-11-21:** the engine side is on the branch (74e98f9, fifteen commits, `swift test` green at 2178 tests with 2 skipped, hosted CI green), and the session waits on Adam before it starts the app. On the branch: the spec corrections; the machine-level renumber fix; the edits of channels, stacks and slots, presets, text styles, grades, transitions, audio transitions, macros and an output's default stack and transitions, with their checks, warnings and inverses and their files; the textures made again between ticks, at a live switch too; the hold of previous lines; a snapshot with another channel list restoring; `render` and `uses`; the thumbnail job following an edit of its stack; and an editing client for the soak. Three faults found on `main` are fixed there with tests (Needs Adam). On Adam's word of 2026-11-21 the engine side was then run on the real engine that day: two three-hour soaks with an editing client, the second holding every display, GPU, text, audio and watchdog line and failing only the two memory lines `main` fails (Now). The app's stages wait for his changes to the mockup. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
@@ -49,9 +49,39 @@ branch (74e98f9; `swift test` green there at 2178 tests, 2 skipped; hosted CI gr
 every push), and nothing of the app is started. The stop's report is the session's last
 message, with a mockup of the edit bar and the Cues page
 (`nimbalyst-local/mockups/edit-mode-cues-page.mockup.html`, in the main folder,
-uncommitted). It waits on Adam for three things: a look at the stop's readings and the
-mockup, a window for the soak the frame-path changes owe before the merge, and whether he
-wants a short run on the screens first (Needs Adam, Decisions).
+uncommitted). Adam read the stop on 2026-11-21 and has changes to the mockup, which he
+gives later; the app's stages wait for them. Meanwhile, on his word that day ("free to do
+any testing for any amount of time"), the engine side ran on the real engine, a release
+build of the branch, sound into BlackHole, the LAN off:
+
+- **Two three-hour soaks** in the configuration of 2026-11-16 (both screens, both outputs
+  1920 by 1080), each with the soak's new editing client making and removing a stack and a
+  channel every minute and asking for a render. *The second* (20:26 to 23:26) held every
+  display, GPU, text, audio and watchdog line: no frame dropped, late or presented again;
+  GPU p99 5.88 ms against 8.33, the same in every half hour; no text late after the first
+  minute, where `main`'s soak counted one line a minute; no audio underrun; two watchdog
+  events of the known kind (the external screen presenting nothing for under fifty
+  milliseconds) and no recovery; 180 of 180 edit groups applied, 180 of 180 pictures
+  drawn, no build late, texture memory flat. It fails the two memory lines exactly as
+  `main` did on 2026-11-16: heap live 78 to 87 MB, at the same 47 KB a minute, which is
+  the in-memory command log still filling, and footprint less graphics 317 to 341 MB,
+  mostly the purgeable zone rising to its 57 MB cap. *The first* (17:02 to 20:02) read
+  the same except for GPU time: from 17:28:31 to 17:50:10 every tick's stack pass took
+  12.8 ms, and the system log shows the Mac's remote-control client (ScreenConnect)
+  capturing the screens for exactly those seconds; before and after, its GPU p99 was 6.0
+  to 6.1 ms. The engine dropped no frame through it and let its previews give way.
+- **A run with outputs of two sizes** (output 1 at 3840 by 2160, 21 minutes): the engine's
+  log shows the confidence stack and its clock channel made again at each of the
+  scenario's four stack switches, with no frame dropped, no build late and no text late.
+  It fails GPU time at that size, p99 about 21 ms, and so does `main` on the same roots
+  (about 20 ms, 15 ms of it the sink part): four runs back to back, two of each build,
+  read alike. That is this iMac at that size and matters for the bench's LED wall, not
+  for this branch.
+
+The records are in `tests/soak-output/2026-11-21-170206`, `-202623` and `-112945`, with
+the engine's own logs, the runs' output and the scripts kept, uncommitted, in the main
+checkout's `.build/soak-2026-11-21/`. Still open before the merge: Adam's decision on the
+in-memory command log, which is what the memory lines wait on (Needs Adam, Decisions).
 
 Everything else is on `main`. Area 13, show-mode UI, shipped on 2026-11-18 (02bff6f), on
 Adam's `approved`. He went over the app himself before approving, on his try-out roots,
@@ -93,15 +123,15 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
   - *The readings and the mockup.* The engine side's readings are listed in the report,
     with what was chosen and the alternative; the mockup is the edit bar and the Cues page
     in the approved dark look. A word on either changes what the app's stages build.
-  - *A soak window.* The rebuild between ticks, the release rule and the hold of previous
-    lines are all on the frame path, so a green soak is owed before the merge. The soak
-    command has an editing client now: every minute it makes and removes a stack and a
-    channel and asks for a render. It runs only in a window Adam sets, with the Mac to
-    itself.
-  - *A short run on the screens first, or not.* The rebuild is proved on the GPU
-    offscreen (an output keeps its picture on every tick while its stack is made again).
-    It has not been watched on a real screen. Adam has allowed output tests; the session
-    stopped for review rather than open windows on his screens unannounced.
+  - *The mockup.* Adam has changes to it and gives them later; the frame and the Cues
+    page wait for them.
+  - *The soak.* Run on his word of 2026-11-21, twice (Now). The second holds every line
+    but the two memory lines, which `main` fails for the same cause. Whether that counts
+    as the green soak the merge wants is his to say: it does once the command log's size
+    is decided (below), or if he takes the memory lines as the known failure they are.
+  - *On a real screen.* The stack switch between outputs of two sizes rebuilt live four
+    times on the Mac's screens with nothing dropped (Now). Nobody watched the screens
+    while it ran: the record is the engine's log and the black box.
   - *Three faults found on `main`, fixed on the branch with tests.* A source or a texture
     could be freed while the plan the render thread was still using named it, when the
     control thread fell behind (c4bf560; the test shows it on the old rule). A gamma-blend
@@ -149,9 +179,10 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
     and that late text should read zero, and not how the two meet. Answered by Adam on
     2026-11-18, with the Area 14 plan: the box keeps drawing its previous lines until the
     new raster is ready, for a variable's new value as for a look edit, and such a change
-    counts nothing late. Area 14 builds it and corrects Spec 4 §8 and §9 on its branch; it
-    stays owed until a soak counts no late text. Which change since 2026-11-02 brought it
-    in was not found.
+    counts nothing late. Area 14 built it and corrected Spec 4 §8 and §9 on its branch
+    (03fa22a), and both soaks of 2026-11-21 on the branch counted no late text after the
+    first minute; it reaches `main` with Area 14's merge. Which change since 2026-11-02
+    brought it in was not found.
   - *Memory, both lines.* The heap's live bytes rose slowly all run, from 78 MB to 86 MB by
     the five-minute medians, and the footprint less graphics from 316 MB to 334 MB, each
     past §13's limit. The heap's rise is the command log the engine keeps in memory, its
@@ -255,7 +286,14 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
   minutes later, a release build with both screens covered, read a GPU time well inside
   its budget in every half hour, so the frame path is sound; what made the evening's
   readings high was the Mac at that hour, and it was not separated out. A soak or a bench
-  run still wants the Mac to itself, with no remote session on it.
+  run still wants the Mac to itself, with no remote session on it. On 2026-11-21 that
+  was separated out: a soak's stack pass read 12.8 ms on every tick for the twenty-two
+  minutes a ScreenConnect session captured the screens, starting and ending within a
+  second of it (`log show` with the predicate `process == "ScreenConnect" OR process ==
+  "replayd"`), and under 1.2 ms before and after. The same day a passing memory warning
+  from the system made the engine shrink its text cache, as Spec 4 §12 says, and a jump
+  back to an old cue then counted late text; the run's `pressure:` and `text cache:`
+  lines say when that happened.
 - **How the display-only soak was run** (2026-11-16): `scripts/soak.sh` unchanged, with
   `--no-lan`, `--screens` naming both screens and `--machine` a copy of the spike machine
   root whose audio output names BlackHole, so the audio path ran and the room stayed
