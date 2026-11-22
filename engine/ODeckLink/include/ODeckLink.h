@@ -132,6 +132,44 @@ odl_status_t odl_reference_locked(odl_device_t *device, bool *out_locked);
 /// How many frames the card holds that are scheduled and not yet displayed.
 odl_status_t odl_buffered_video_frames(odl_device_t *device, uint32_t *out_count);
 
+// MARK: - Input capture (Spec 4 §15, the capture rig)
+//
+// "Three hours on the test bench with capture of both outputs": the bench's
+// card has its SDI output cabled to its own input (Area 7, 2026-11-22), and
+// `oengine capture` reads that input. The engine itself captures nothing in v1
+// (live inputs are v1.5); this is the capture check's only way in.
+
+typedef struct odl_input odl_input_t;
+
+/// One frame from the input, valid only during the callback.
+typedef struct odl_input_frame {
+    const void *bytes;            // v210, row_bytes a row; NULL when there is no signal
+    int32_t row_bytes;
+    int32_t width;
+    int32_t height;
+    bool no_signal;               // the card reported no input source
+    int64_t hardware_time_ns;     // the frame's time on the input's hardware clock
+    const int32_t *audio;         // interleaved 32-bit samples, NULL when none came
+    int32_t audio_frames;
+    int32_t audio_channels;
+} odl_input_frame_t;
+
+/// Called on the SDK's thread for every frame the input delivers.
+typedef void (*odl_input_frame_cb)(void *context, const odl_input_frame_t *frame);
+/// Called when the input detects a signal in another mode than the one enabled.
+typedef void (*odl_input_format_cb)(void *context, odl_mode_t detected);
+
+/// Opens the input of the card whose persistent id is `persistent_id` (the
+/// same forms odl_open takes). Returns ODL_ERR_UNAVAILABLE from the stub.
+odl_status_t odl_input_open(const char *persistent_id, odl_input_t **out_input);
+void odl_input_close(odl_input_t *input);
+
+/// Enables v210 capture in `mode` with `audio_channels` of embedded audio
+/// (0, 2, 8 or 16; 48 kHz, 32-bit) and starts the streams.
+odl_status_t odl_input_start(odl_input_t *input, odl_mode_t mode, int32_t audio_channels,
+                             odl_input_frame_cb on_frame, odl_input_format_cb on_format, void *context);
+odl_status_t odl_input_stop(odl_input_t *input);
+
 #ifdef __cplusplus
 }
 #endif

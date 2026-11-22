@@ -43,6 +43,8 @@ public enum OEngineCommandLine {
                 return devices()
             case "mach-watch":
                 return try machWatch(rest)
+            case "capture":
+                return try capture(rest)
             default:
                 fail("unknown command \(first)\n" + usage)
                 return 2
@@ -99,6 +101,11 @@ public enum OEngineCommandLine {
            hold a running engine's Mach channel (the name its hello gives) for N seconds, 3 by default, and say
            what arrived: each stack's preview surfaces and each channel's pictures, how many frames a second
            were named, whether the newest hold a picture, and the meters; exit 1 when nothing arrived
+      capture --format 1920x1080p60 [--device decklink:<id>] [--tick-rate 60] [--audio-channels 2] [--seconds N] [--out <folder>]
+           read the card's input (its SDI output cabled to it) until --seconds or Ctrl-C and judge what an engine run with
+           --stamp-sdi sent (Spec 4 §15): every frame once and in order, both fields from one pair, nothing unstamped between
+           the first stamp and the last, each clapper's click within a frame of its flash; an interlaced format names its
+           field rate (1920x1080i59.94); capture.json and capture-events.txt into --out; exit 1 on a failure, 2 when it can't capture
     A display output opens only on the screen its device names (display:<uuid>); while that screen isn't there
     the output is absent, and it opens when the screen appears.
     """

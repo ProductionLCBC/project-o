@@ -529,6 +529,240 @@ odl_status_t odl_buffered_video_frames(odl_device_t *device, uint32_t *out_count
 
 } // extern "C"
 
+// MARK: - Input capture (Spec 4 §15, the capture rig)
+
+struct odl_input {
+    IDeckLink *deckLink = nullptr;
+    IDeckLinkInput *input = nullptr;
+    IDeckLinkInputCallback *callback = nullptr;
+    odl_input_frame_cb onFrame = nullptr;
+    odl_input_format_cb onFormat = nullptr;
+    void *context = nullptr;
+    int32_t audioChannels = 0;
+    bool started = false;
+};
+
+namespace {
+
+/// The card whose persistent id, decimal id or name is `persistentID`, as odl_open finds it.
+IDeckLink *findDeckLink(const char *persistentID, odl_status_t *status) {
+    *status = ODL_ERR_UNAVAILABLE;
+    IDeckLinkIterator *iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) return nullptr;
+    IDeckLink *deckLink = nullptr;
+    IDeckLink *chosen = nullptr;
+    bool any = false;
+    while (succeeded(iterator->Next(&deckLink)) && deckLink) {
+        any = true;
+        if (!chosen && matches(deckLink, persistentID)) {
+            chosen = deckLink;
+        } else {
+            deckLink->Release();
+        }
+        deckLink = nullptr;
+    }
+    iterator->Release();
+    *status = chosen ? ODL_OK : (any ? ODL_ERR_NOT_FOUND : ODL_ERR_UNAVAILABLE);
+    return chosen;
+}
+
+/// The SDK's input thread lands here: each frame, with its audio, goes to the
+/// capture's C callback while its bytes are valid.
+class InputCallback final : public IDeckLinkInputCallback {
+public:
+    explicit InputCallback(odl_input *owner) : owner_(owner) {}
+
+    HRESULT QueryInterface(REFIID iid, LPVOID *ppv) override {
+        if (!ppv) return E_FAIL;
+        if (sameIID(iid, unknownIID()) || sameIID(iid, IID_IDeckLinkInputCallback)) {
+            *ppv = static_cast<IDeckLinkInputCallback *>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG AddRef() override { return ++refs_; }
+    ULONG Release() override {
+        ULONG remaining = --refs_;
+        if (remaining == 0) delete this;
+        return remaining;
+    }
+
+    HRESULT VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode *mode, BMDDetectedVideoInputFormatFlags) override {
+        odl_input *owner = owner_.load();
+        if (!owner || !owner->onFormat || !mode) return S_OK;
+        odl_mode_t detected{};
+        detected.width = static_cast<int32_t>(mode->GetWidth());
+        detected.height = static_cast<int32_t>(mode->GetHeight());
+        BMDTimeValue duration = 0;
+        BMDTimeScale scale = 0;
+        if (succeeded(mode->GetFrameRate(&duration, &scale))) {
+            detected.rate_num = static_cast<int32_t>(scale);
+            detected.rate_den = static_cast<int32_t>(duration);
+        }
+        detected.interlaced = mode->GetFieldDominance() != bmdProgressiveFrame;
+        owner->onFormat(owner->context, detected);
+        return S_OK;
+    }
+
+    HRESULT VideoInputFrameArrived(IDeckLinkVideoInputFrame *video, IDeckLinkAudioInputPacket *audio) override {
+        odl_input *owner = owner_.load();
+        if (!owner || !owner->onFrame) return S_OK;
+        odl_input_frame_t frame{};
+        IDeckLinkVideoBuffer *buffer = nullptr;
+        if (video) {
+            frame.no_signal = (video->GetFlags() & bmdFrameHasNoInputSource) != 0;
+            frame.width = static_cast<int32_t>(video->GetWidth());
+            frame.height = static_cast<int32_t>(video->GetHeight());
+            frame.row_bytes = static_cast<int32_t>(video->GetRowBytes());
+            BMDTimeValue time = 0;
+            BMDTimeValue duration = 0;
+            if (succeeded(video->GetHardwareReferenceTimestamp(1000000000, &time, &duration))) frame.hardware_time_ns = time;
+            if (succeeded(video->QueryInterface(IID_IDeckLinkVideoBuffer, reinterpret_cast<void **>(&buffer))) && buffer) {
+                void *bytes = nullptr;
+                if (succeeded(buffer->StartAccess(bmdBufferAccessRead)) && succeeded(buffer->GetBytes(&bytes))) {
+                    frame.bytes = bytes;
+                } else {
+                    buffer->Release();
+                    buffer = nullptr;
+                }
+            }
+        } else {
+            frame.no_signal = true;
+        }
+        if (audio && owner->audioChannels > 0) {
+            void *samples = nullptr;
+            long count = audio->GetSampleFrameCount();
+            if (count > 0 && succeeded(audio->GetBytes(&samples)) && samples) {
+                frame.audio = static_cast<const int32_t *>(samples);
+                frame.audio_frames = static_cast<int32_t>(count);
+                frame.audio_channels = owner->audioChannels;
+            }
+        }
+        owner->onFrame(owner->context, &frame);
+        if (buffer) {
+            buffer->EndAccess(bmdBufferAccessRead);
+            buffer->Release();
+        }
+        return S_OK;
+    }
+
+    void detach() { owner_.store(nullptr); }
+
+private:
+    ~InputCallback() override = default;
+
+    std::atomic<ULONG> refs_{1};
+    std::atomic<odl_input *> owner_;
+};
+
+/// The input's display mode for an output `format` (Spec 1 §3), as findMode does for the output.
+bool findInputMode(IDeckLinkInput *input, odl_mode_t mode, BMDDisplayMode *found) {
+    IDeckLinkDisplayModeIterator *iterator = nullptr;
+    if (!succeeded(input->GetDisplayModeIterator(&iterator)) || !iterator) return false;
+    bool matched = false;
+    IDeckLinkDisplayMode *candidate = nullptr;
+    while (!matched && succeeded(iterator->Next(&candidate)) && candidate) {
+        BMDTimeValue duration = 0;
+        BMDTimeScale scale = 0;
+        bool sizeOK = candidate->GetWidth() == mode.width && candidate->GetHeight() == mode.height;
+        bool rateOK = succeeded(candidate->GetFrameRate(&duration, &scale)) && duration > 0 && scale > 0 &&
+                      duration * static_cast<int64_t>(mode.rate_num) == scale * static_cast<int64_t>(mode.rate_den);
+        BMDFieldDominance dominance = candidate->GetFieldDominance();
+        bool fieldsOK = mode.interlaced ? (dominance == bmdUpperFieldFirst || dominance == bmdLowerFieldFirst)
+                                        : dominance == bmdProgressiveFrame;
+        if (sizeOK && rateOK && fieldsOK) {
+            *found = candidate->GetDisplayMode();
+            matched = true;
+        }
+        candidate->Release();
+        candidate = nullptr;
+    }
+    iterator->Release();
+    return matched;
+}
+
+} // namespace
+
+extern "C" {
+
+odl_status_t odl_input_open(const char *persistent_id, odl_input_t **out_input) {
+    if (out_input) *out_input = nullptr;
+    if (!out_input) return ODL_ERR_INTERNAL;
+    odl_status_t status = ODL_ERR_UNAVAILABLE;
+    IDeckLink *chosen = findDeckLink(persistent_id, &status);
+    if (!chosen) return status;
+    IDeckLinkInput *input = nullptr;
+    if (!succeeded(chosen->QueryInterface(IID_IDeckLinkInput, reinterpret_cast<void **>(&input))) || !input) {
+        chosen->Release();
+        return ODL_ERR_UNAVAILABLE;   // a card with no input
+    }
+    odl_input *opened = new odl_input();
+    opened->deckLink = chosen;
+    opened->input = input;
+    *out_input = opened;
+    return ODL_OK;
+}
+
+odl_status_t odl_input_start(odl_input_t *input, odl_mode_t mode, int32_t audio_channels,
+                             odl_input_frame_cb on_frame, odl_input_format_cb on_format, void *context) {
+    if (!input || input->started) return ODL_ERR_STATE;
+    BMDDisplayMode displayMode = 0;
+    if (!findInputMode(input->input, mode, &displayMode)) return ODL_ERR_MODE;
+    input->onFrame = on_frame;
+    input->onFormat = on_format;
+    input->context = context;
+    if (!input->callback) input->callback = new InputCallback(input);
+    if (!succeeded(input->input->SetCallback(input->callback))) return ODL_ERR_INTERNAL;
+    bool detect = false;
+    IDeckLinkProfileAttributes *attributes = nullptr;
+    if (succeeded(input->deckLink->QueryInterface(IID_IDeckLinkProfileAttributes, reinterpret_cast<void **>(&attributes))) && attributes) {
+        attributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &detect);
+        attributes->Release();
+    }
+    if (!succeeded(input->input->EnableVideoInput(displayMode, bmdFormat10BitYUV,
+                                                   detect ? bmdVideoInputEnableFormatDetection : bmdVideoInputFlagDefault))) {
+        return ODL_ERR_MODE;
+    }
+    input->audioChannels = 0;
+    if (audio_channels > 0 &&
+        succeeded(input->input->EnableAudioInput(bmdAudioSampleRate48kHz, bmdAudioSampleType32bitInteger, static_cast<uint32_t>(audio_channels)))) {
+        input->audioChannels = audio_channels;
+    }
+    if (!succeeded(input->input->StartStreams())) {
+        if (input->audioChannels > 0) input->input->DisableAudioInput();
+        input->input->DisableVideoInput();
+        return ODL_ERR_STATE;
+    }
+    input->started = true;
+    return ODL_OK;
+}
+
+odl_status_t odl_input_stop(odl_input_t *input) {
+    if (!input || !input->started) return ODL_ERR_STATE;
+    input->input->StopStreams();
+    if (input->audioChannels > 0) input->input->DisableAudioInput();
+    input->input->DisableVideoInput();
+    input->started = false;
+    return ODL_OK;
+}
+
+void odl_input_close(odl_input_t *input) {
+    if (!input) return;
+    if (input->started) odl_input_stop(input);
+    input->input->SetCallback(nullptr);
+    if (input->callback) {
+        static_cast<InputCallback *>(input->callback)->detach();
+        input->callback->Release();
+    }
+    input->input->Release();
+    input->deckLink->Release();
+    delete input;
+}
+
+} // extern "C"
+
 #else
 #error "ODeckLink.mm is compiled only with ODL_HAVE_SDK; Package.swift builds ODeckLinkStub.c when vendor/DeckLinkSDK is absent."
 #endif

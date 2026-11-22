@@ -75,3 +75,19 @@ odl_status_t odl_buffered_video_frames(odl_device_t *device, uint32_t *out_count
     if (out_count) *out_count = 0;
     return ODL_ERR_UNAVAILABLE;
 }
+
+odl_status_t odl_input_open(const char *persistent_id, odl_input_t **out_input) {
+    (void)persistent_id;
+    if (out_input) *out_input = NULL;
+    return ODL_ERR_UNAVAILABLE;
+}
+
+void odl_input_close(odl_input_t *input) { (void)input; }
+
+odl_status_t odl_input_start(odl_input_t *input, odl_mode_t mode, int32_t audio_channels,
+                             odl_input_frame_cb on_frame, odl_input_format_cb on_format, void *context) {
+    (void)input; (void)mode; (void)audio_channels; (void)on_frame; (void)on_format; (void)context;
+    return ODL_ERR_UNAVAILABLE;
+}
+
+odl_status_t odl_input_stop(odl_input_t *input) { (void)input; return ODL_ERR_UNAVAILABLE; }
