@@ -22,7 +22,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 4 | Engine spike (`engine/`): headless OEngine over OSC, two channels, two stacks, three hours clean | `specs/4-render-pipeline.md` §15 | merged | Adam's `approved` on 2026-10-31; `area/spike` merged (e735052); the soak fixes (2074bd6) and the §13 memory breakdown (87011b2) merged on his `approved`. Every display-side criterion of §15 held at the soak of 2026-11-02; the DeckLink criteria wait for the bench run with a card, which Adam has deferred to a window he sets aside. The display-only soak of 2026-11-16, the first of everything merged since, holds the display, GPU, audio and watchdog lines and fails late text and the two memory lines (Needs Adam). |
 | 5 | Render pipeline, the rest: 1080i weave, text cache, thumbnails, multiviewer, measurement | `specs/4-render-pipeline.md` | merged | Adam's `approved` on 2026-11-03 with every recommendation taken; Spec 4 §2, §10, §13, Spec 2 §6 and Spec 1 §5 corrected (e8e1e3f); `area/render` merged into `main` with `--no-ff` (5b3f6ed), branch and worktree removed, task `shipped`. The weave's capture-rig check (§16) joins the bench run. |
 | 6 | Stacks and presets: slots, boxes, text styles, resolution order, blackout and mute, offset +1 | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers; the Spec 3 §6 correction and ADR 0008's acceptance on the branch (85b4e88), `area/presets` merged into `main` with `--no-ff` (af3c948), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. Spec 1 §2's `weight` went into Area 11's block. |
-| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress | In progress on `area/sinks` since 2026-11-22, as bench verification and fixes (Adam's answer of 2026-11-04). That day a DeckLink SDI 4K went into the bench Mac with its SDI output cabled to its input, and a loopback test passed in every mode tried; its block in `docs/build-order.md` was written from that test and Adam said go the same day, taking every recommendation (Now). The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
+| 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress | In progress on `area/sinks` since 2026-11-22, as bench verification and fixes (Adam's answer of 2026-11-04). That day a DeckLink SDI 4K went into the bench Mac with its SDI output cabled to its input, and a loopback test passed in every mode tried; its block in `docs/build-order.md` was written from that test and Adam said go the same day, taking every recommendation (Now). **Paused on 2026-11-22** while Adam moves the card's chassis; it resumes when he has reconnected it. On the branch (fb607d1, pushed): three of the loopback's faults fixed with tests, the frame stamp, `oengine capture`, the bench machine root and `soak.sh --capture`. The first ten-minute run with capture, at 1080p60, passed A/V and failed frame accuracy, and found a fifth and a sixth fault in the engine, not yet fixed (Now). The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | merged | Adam's `approved` on 2026-11-14 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/media` merged into `main` with `--no-ff` (2c1b3d6), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
 | 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Spec 11 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Area 14, whose frame and Cues page it joins. |
@@ -63,6 +63,44 @@ clapper and a bars still, `soak.sh --capture`), the bench machine root with outp
 the card at 1080p60 in place of the wall's display, short runs on the loop at 1080p60,
 1080i60 and 2160p30, then a stop for review; the three-hour run with capture waits for a
 window he sets.
+
+**Paused the same day, while Adam moves the card's chassis; it resumes when he has
+reconnected it.** Nothing was holding the card when it paused. On `area/sinks` (fb607d1,
+pushed; `swift test` not yet run whole on the branch, the suites touched are green):
+
+- *Fixed, with tests* (2216688): an interlaced frame scheduled for one frame of its rate,
+  with stream times from the frame count so a long run can't drift; a stop the sink asks
+  for no longer reported as the card stopping (checked on the card); a port's mode rates
+  in lowest terms. Spec 4 §15 corrected first for the bench's 6G card (a97cbbf).
+- *The capture check* (ed73de1, a701918, fb607d1): `--stamp-sdi` writes each field's tick
+  into the first 16 pixels of its first line; `oengine capture` reads the card's input
+  through new input functions in the DeckLink module and judges every frame, the fields
+  and the clapper; `scripts/bench-machine.py` makes the bench machine root from the spike
+  fixtures (output 1 on the card at 1080p60, audio embedded there); `soak.sh --capture`.
+  Smoke-tested on the card against the probe: 600 frames in order, PASS. The bars still
+  is not built yet.
+- *The first run with capture* (ten minutes at 1080p60, both outputs, the record in the
+  worktree's `.build/bench/p60/`): **A/V passed**, four claps with the click 3.3 to 10 ms
+  after its flash, inside the 16.7 ms limit. This contradicted my reading before the run
+  (picture 1–2 frames late), so the loopback's second fault, embedded audio timed on the
+  card's hardware clock rather than its stream clock, is left as it is: changing it alone
+  would put the sound ahead of the picture by the sink's lead. **Frame accuracy failed**:
+  8 frames shown twice and 6 skipped, each a repeat paired with a skip; the engine itself
+  counted 16 re-sent, 9 dropped and 6 late. The black box shows the render on time (tick
+  6527 drawn, its GPU work under 5 ms) and the sink re-sending 6526 and going on to 6528.
+  *Fault 5:* the sink re-sends the previous frame whenever the card has fewer than three
+  queued and the next frame's GPU work hasn't finished at that instant, though the card
+  still holds two. *Fault 6:* with the card as master clock the engine's ticks carry the
+  card's own time, not the Mac's monotonic clock (Spec 4 §2), so the watchdog logged 1,863
+  false "control thread built no plan for 955,179,132 ms" events (the Mac's uptime) and
+  the display output's latency read the same; video frame choice is unaffected (it reads
+  each audio device's own clock). The late text once a minute is `main`'s known fault,
+  fixed on `area/edit`.
+- *Next, when the card is back:* fault 5 (each frame once in tick order, waiting while the
+  card has slack, re-sending only at its last queued frame; the ring's two newest frames,
+  an uncommitted start in the worktree) and fault 6 (engine time on the Mac's clock, the
+  card pacing the ticks and its own times used only for the card), tests first; then the
+  1080p60 run again, 1080i60 and 2160p30, and the stop for review.
 
 **Area 14, edit mode, is in progress on `area/edit`.** Adam approved its plan on
 2026-11-18 and lifted the bench-run gate for this area, on his word and with the date, in
