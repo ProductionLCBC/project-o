@@ -368,4 +368,8 @@ public enum Confirmation: Equatable, Sendable {
     case restoreVersion(version: Int, title: String, keptAt: String, cues: Int, onAir: Bool)
     /// Spec 10 §14 — "Replace the library, and this machine's playlists, key bindings and macros, with the copies from ...?"
     case restoreSnapshot(takenAt: String, mastersReadOnly: Bool)
+    /// Spec 11 §4 — "Deleting cues asks first only when the cues hold edits,
+    /// or include the live cue or the armed one (choice A-11)": how many
+    /// cues, and which of those reasons apply.
+    case deleteCues(count: Int, live: Bool, armed: Bool, edits: Bool)
 }

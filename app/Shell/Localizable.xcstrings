@@ -2029,6 +2029,78 @@
         }
       }
     },
+    "edit.confirm.deleteCues.armed" : {
+      "comment" : "Under the delete-cues question, when the armed cue is selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This includes the cue armed to fire next."
+          }
+        }
+      }
+    },
+    "edit.confirm.deleteCues.edits" : {
+      "comment" : "Under the delete-cues question, when a selected cue holds an edit command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This includes a cue that changes the library when it is fired."
+          }
+        }
+      }
+    },
+    "edit.confirm.deleteCues.live" : {
+      "comment" : "Under the delete-cues question, when the live cue is selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This includes the live cue."
+          }
+        }
+      }
+    },
+    "edit.confirm.deleteCues.title" : {
+      "comment" : "Edit mode's question before deleting cues, asked only when one is live, armed or changes the library when fired.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld cue?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld cues?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.confirm.deleteCues.undo" : {
+      "comment" : "The last line under the delete-cues question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo brings back what is deleted."
+          }
+        }
+      }
+    },
     "engine.anotherBuild" : {
       "comment" : "A banner, with the Restart the engine button, for as long as the engine running is from another build than the app. %1$@ is the engine's version, %2$@ the app's.",
       "extractionState" : "manual",

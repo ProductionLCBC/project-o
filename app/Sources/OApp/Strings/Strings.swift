@@ -735,6 +735,13 @@ public enum StringKey: String, CaseIterable, Sendable {
     case versionsEmpty = "versions.empty"
     case versionsOnAir = "versions.onAir"
     case versionsRestore = "versions.restore"
+
+    // Edit mode (Spec 11)
+    case editConfirmDeleteCuesTitle = "edit.confirm.deleteCues.title"
+    case editConfirmDeleteCuesLive = "edit.confirm.deleteCues.live"
+    case editConfirmDeleteCuesArmed = "edit.confirm.deleteCues.armed"
+    case editConfirmDeleteCuesEdits = "edit.confirm.deleteCues.edits"
+    case editConfirmDeleteCuesUndo = "edit.confirm.deleteCues.undo"
 }
 
 /// The table the keys are looked up in, and what is done to a string on its

@@ -50,6 +50,17 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.lastBrowsedPlaylist = Recorded.sundayNight
         settings.lastBrowsedList = Recorded.list42
         settings.dismissedRestoreRun = "51e2"
+        // Spec 11 §2 — edit mode's place.
+        settings.editPage = .presets
+        settings.editPlaylist = Recorded.sunday
+        settings.editItem = "ae3aafe3-0000-4000-8000-000000000000"
+        settings.editList = Recorded.list7
+        settings.editCue = Recorded.cues42[1]
+        settings.editChannel = 3
+        settings.browserTab = .media
+        settings.mediaView = .list
+        settings.gridZoom = 88
+        settings.foldedRows = [2: true]
         return settings
     }
 
@@ -72,7 +83,7 @@ final class ViewSettingsFileTests: XCTestCase {
     /// The repository's JSON on disk: sorted keys, two-space indent, LF.
     func test_theFileIsWrittenAsTheRepositoryWritesJSON() throws {
         let text = try XCTUnwrap(String(data: try ViewSettingsFile.data(changed()), encoding: .utf8))
-        XCTAssertTrue(text.hasPrefix("{\n  \"dismissedRestoreRun\" : \"51e2\",\n  \"lastBrowsedList\""), String(text.prefix(80)))
+        XCTAssertTrue(text.hasPrefix("{\n  \"browserTab\" : \"media\",\n  \"dismissedRestoreRun\" : \"51e2\",\n  \"editChannel\""), String(text.prefix(80)))
         XCTAssertTrue(text.hasSuffix("\n}\n"))
         XCTAssertFalse(text.contains("\r"))
         XCTAssertFalse(text.contains("\\/"), "a folder's path is written plain")

@@ -218,6 +218,14 @@ public enum EditWording {
         case .restoreSnapshot(let takenAt, let mastersReadOnly):
             return ConfirmationWords(title: Strings.text(mastersReadOnly ? .confirmRestoreSnapshotTitleMachine : .confirmRestoreSnapshotTitle, takenAt),
                                      body: [Strings.text(.confirmRestoreSnapshotBody)], button: Strings.text(.confirmRestore))
+        case .deleteCues(let count, let live, let armed, let edits):
+            // Spec 11 §4 — why it asks, then that "undo is the way back".
+            var body: [String] = []
+            if live { body.append(Strings.text(.editConfirmDeleteCuesLive)) }
+            if armed { body.append(Strings.text(.editConfirmDeleteCuesArmed)) }
+            if edits { body.append(Strings.text(.editConfirmDeleteCuesEdits)) }
+            body.append(Strings.text(.editConfirmDeleteCuesUndo))
+            return ConfirmationWords(title: Strings.counted(.editConfirmDeleteCuesTitle, count), body: body, button: Strings.text(.confirmDelete))
         }
     }
 

@@ -789,6 +789,14 @@ ENTRIES = [
     ("focus.poolFolders", "Media folders", "VoiceOver: the pool's list of folders, when it has the keyboard focus."),
     ("focus.pool", "Media", "VoiceOver: the pool's tiles, when they have the keyboard focus."),
     ("focus.strip", "Channels", "VoiceOver: the channel strip, when it has the keyboard focus."),
+    # Edit mode (Spec 11)
+    ("edit.confirm.deleteCues.title", ("Delete %lld cue?", "Delete %lld cues?"),
+     "Edit mode's question before deleting cues, asked only when one is live, armed or changes the library when fired."),
+    ("edit.confirm.deleteCues.live", "This includes the live cue.", "Under the delete-cues question, when the live cue is selected."),
+    ("edit.confirm.deleteCues.armed", "This includes the cue armed to fire next.", "Under the delete-cues question, when the armed cue is selected."),
+    ("edit.confirm.deleteCues.edits", "This includes a cue that changes the library when it is fired.",
+     "Under the delete-cues question, when a selected cue holds an edit command."),
+    ("edit.confirm.deleteCues.undo", "Undo brings back what is deleted.", "The last line under the delete-cues question."),
 ]
 
 

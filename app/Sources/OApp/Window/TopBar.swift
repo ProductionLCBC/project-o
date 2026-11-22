@@ -204,6 +204,24 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var lastBrowsedList: String?
     /// "the run whose restore banner was dismissed (§14)".
     public var dismissedRestoreRun: String?
+    /// Spec 11 §2 — "`view.json` (Spec 10 §4) also keeps the last page, each
+    /// page's selection, the Browser's tab and its media view, and the cue
+    /// grid's zoom and folded rows (§4), so edit mode reopens where it was left."
+    public var editPage = EditPage.cues
+    /// The Cues page's selection: where its list came from (a playlist and
+    /// its item, or neither for the Library window), the list, the cue and
+    /// the channel's row.
+    public var editPlaylist: String?
+    public var editItem: String?
+    public var editList: String?
+    public var editCue: String?
+    public var editChannel: Int?
+    public var browserTab = BrowserTab.playlists
+    public var mediaView = MediaListView.grid
+    /// Spec 11 §4, "Zoom" — "The zoom is one setting for every list".
+    public var gridZoom = CueGridZoom.standard
+    /// Spec 11 §4 — "a row the operator folds or opens stays so for every list, by channel number".
+    public var foldedRows: [Int: Bool] = [:]
 
     public init() {}
 
@@ -245,6 +263,17 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.lastBrowsedPlaylist, into: &lastBrowsedPlaylist)
         read(.lastBrowsedList, into: &lastBrowsedList)
         read(.dismissedRestoreRun, into: &dismissedRestoreRun)
+        read(.editPage, into: &editPage)
+        read(.editPlaylist, into: &editPlaylist)
+        read(.editItem, into: &editItem)
+        read(.editList, into: &editList)
+        read(.editCue, into: &editCue)
+        read(.editChannel, into: &editChannel)
+        read(.browserTab, into: &browserTab)
+        read(.mediaView, into: &mediaView)
+        read(.gridZoom, into: &gridZoom)
+        read(.foldedRows, into: &foldedRows)
+        gridZoom = CueGridZoom.clamped(gridZoom)
         // What was read is held to what the window allows.
         leftColumnWidth = Self.clampedLeft(leftColumnWidth)
         rightColumnWidth = Self.clampedRight(rightColumnWidth)
