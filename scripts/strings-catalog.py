@@ -630,6 +630,7 @@ ENTRIES = [
     # Fields and small panels of the edits (Spec 10 §5, §6, §10)
     ("field.copy", "Copy", "A button beside a field whose text couldn't be saved: copies what was typed."),
     ("field.newPlaylist", "Playlist title", "The placeholder and label of the field that takes a new playlist's title."),
+    ("field.newList", "New List", "The text the field for a new list's title holds when it opens, and the title the list takes when the field is emptied."),
     ("field.newFolder", "Folder name", "The placeholder and label of the field that takes a new folder's name."),
     ("field.newHeader", "Header label", "The placeholder and label of the field that takes a new header's label."),
     ("field.rename", "New name for %@", "VoiceOver: an in-place rename field. %@ is the current name."),

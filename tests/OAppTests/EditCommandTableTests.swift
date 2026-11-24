@@ -86,9 +86,10 @@ final class EditCommandTableTests: XCTestCase {
                        ["edit list 42 title \"Great Is Thy Faithfulness (key of D)\""])
         XCTAssertEqual(text(Edits.duplicate(list: 42)), ["edit list 42 duplicate"])
         XCTAssertEqual(text(Edits.delete(list: 42)), ["edit list 42 delete"])
-        XCTAssertEqual(text(Edits.newList(in: "Hymns")), ["edit list create folder \"Hymns\""])
-        XCTAssertEqual(text(Edits.newList(in: nil)), ["edit list create"])
-        XCTAssertEqual(text(Edits.newList(in: "")), ["edit list create"])
+        // Spec 10 §5 as corrected 2026-11-24 — "`edit list create folder "PATH" {"title": "TITLE"}`".
+        XCTAssertEqual(text(Edits.newList(in: "Hymns", title: "Amazing Grace")), ["edit list create folder \"Hymns\" { \"title\": \"Amazing Grace\" }"])
+        XCTAssertEqual(text(Edits.newList(in: nil, title: "New List")), ["edit list create { \"title\": \"New List\" }"])
+        XCTAssertEqual(text(Edits.newList(in: "", title: "New List")), ["edit list create { \"title\": \"New List\" }"])
     }
 
     // MARK: - A cue's menu (§6)

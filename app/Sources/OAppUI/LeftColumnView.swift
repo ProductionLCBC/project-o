@@ -642,7 +642,7 @@ final class LeftColumnView: Surface {
         case .deleteList:
             model.deleteList(list.uuid)
         case .newListHere:
-            model.newList(in: list.folder)
+            beginNewList(in: list.folder, under: view)
         default:
             break
         }
@@ -665,7 +665,7 @@ final class LeftColumnView: Surface {
         case .deleteFolder:
             model.edit(Edits.delete(folder: path), at: .left)
         case .newListHere:
-            model.newList(in: path)
+            beginNewList(in: path, under: view)
         default:
             break
         }
@@ -677,7 +677,21 @@ final class LeftColumnView: Surface {
     func newList() {
         var folder: String?
         if case .list(let uuid)? = model.browse.shown { folder = model.store.catalog?.list(uuid: uuid)?.folder }
-        model.newList(in: folder)
+        beginNewList(in: folder, under: nil)
+    }
+
+    /// Spec 10 §5 — New List "opens a title field in the tree, in the selected
+    /// folder or at the top, holding "New List", selected, as New Playlist
+    /// opens one" (corrected 2026-11-24): under the row its menu came from, as
+    /// New Folder's field opens, or at the top of the tree.
+    private func beginNewList(in folder: String?, under view: RowView?) {
+        guard model.cannotEditMasters == nil else { return }
+        let rect = view.map { NSRect(x: 14, y: $0.bounds.height + 1, width: max(60, $0.bounds.width - 14), height: RowView.height - 1) }
+            ?? NSRect(x: 4, y: 2, width: max(60, library.bounds.width - 8), height: RowView.height - 1)
+        let name = Strings.text(.fieldNewList)
+        host?.editInPlace(over: view ?? library, rect: rect, text: name, label: name, placeholder: name) { [weak model] in
+            model?.newList(in: folder, title: $0)
+        }
     }
 
     override func layout() {

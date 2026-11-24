@@ -261,13 +261,17 @@ final class EditsViewTests: XCTestCase {
         XCTAssertEqual(menu.items.first { $0.title == "Open in Text Editor" }?.toolTip, "Not in this build yet.")
         try XCTUnwrap(menu.entry("Sunday Night")).choose()
         try XCTUnwrap(menu.entry("Duplicate")).choose()
+        // Spec 10 §5 as corrected 2026-11-24 — the title field opens "holding "New List"", and Return names the list.
         try XCTUnwrap(menu.entry("New List Here")).choose()
+        XCTAssertEqual(rig.view.inlineEditor?.field.stringValue, "New List")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
         try XCTUnwrap(menu.entry("Rename")).choose()
         try rig.retype("Great Is Thy Faithfulness (Runyan)")
         rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
         XCTAssertEqual(rig.commands, [
             ["edit playlist \(Self.sundayNight) insert items 4 { \"kind\": \"linked\", \"list\": 42, \"listUuid\": \"\(Self.list42)\" }"],
-            ["edit list 42 duplicate"], ["edit list create folder \"Hymns\""], ["edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""],
+            ["edit list 42 duplicate"], ["edit list create folder \"Hymns\" { \"title\": \"New List\" }"],
+            ["edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""],
         ])
         // "Delete… (`edit list N delete`, after a confirmation naming the playlists that link it, from `listUse`)".
         try XCTUnwrap(menu.entry("Delete…")).choose()
@@ -299,8 +303,18 @@ final class EditsViewTests: XCTestCase {
         // The tree's empty space: a folder or a list at the top.
         let top = try XCTUnwrap(rig.view.left.library.makeMenu?())
         XCTAssertEqual(top.titles, ["New Folder", "New List Here"])
+        // Spec 10 §5 as corrected 2026-11-24 — New List "opens a title field in the tree ... holding "New List"", and
+        // Return sends the field's text, "or "New List" if it was emptied".
         try XCTUnwrap(top.entry("New List Here")).choose()
-        XCTAssertEqual(rig.commands, [["edit folder \"Hymns\" rename \"Old Hymns\""], ["edit folder \"Hymns/Carols\" create"], ["edit list create"]])
+        XCTAssertEqual(rig.view.inlineEditor?.field.stringValue, "New List")
+        try rig.retype("Amazing Grace")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
+        try XCTUnwrap(menu.entry("New List Here")).choose()
+        try rig.retype("")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
+        XCTAssertEqual(rig.commands, [["edit folder \"Hymns\" rename \"Old Hymns\""], ["edit folder \"Hymns/Carols\" create"],
+                                      ["edit list create { \"title\": \"Amazing Grace\" }"],
+                                      ["edit list create folder \"Hymns\" { \"title\": \"New List\" }"]])
     }
 
     // MARK: - A cue (§6, §10)

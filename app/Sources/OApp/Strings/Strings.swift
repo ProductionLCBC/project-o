@@ -708,6 +708,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     // Fields and small panels of the edits
     case fieldCopy = "field.copy"
     case fieldNewPlaylist = "field.newPlaylist"
+    case fieldNewList = "field.newList"
     case fieldNewFolder = "field.newFolder"
     case fieldNewHeader = "field.newHeader"
     case fieldRename = "field.rename"

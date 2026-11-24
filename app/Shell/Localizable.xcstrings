@@ -4789,6 +4789,18 @@
         }
       }
     },
+    "field.newList" : {
+      "comment" : "The text the field for a new list's title holds when it opens, and the title the list takes when the field is emptied.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New List"
+          }
+        }
+      }
+    },
     "field.newPlaylist" : {
       "comment" : "The placeholder and label of the field that takes a new playlist's title.",
       "extractionState" : "manual",
