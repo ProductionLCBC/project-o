@@ -50,16 +50,50 @@ final class TopBarView: Surface {
     /// The message last read out, so VoiceOver hears each once.
     private var said: String?
 
+    // Spec 11 §2, "The top bar in edit mode" — what the bar holds there and not in show mode.
+    /// "Show and Edit, one control with Edit chosen": the well the two buttons sit in.
+    private let modeWell = Surface()
+    /// "then what the page edits".
+    let crumb = Kit.content(Kit.label(size: 12))
+    /// "Center: the page picker: Cues, Text, Stacks, Channels, Presets, Objects."
+    let pagePicker = SegmentedView(EditPage.allCases.map(EditModeWording.page))
+    /// "the saving pill, which reads "Saved" while nothing waits to be written".
+    let saved = PillButton()
+    /// "the engine pill, a green dot and "Engine"".
+    let engine = PillButton()
+    /// Show, Edit and a page chosen in the bar; the window acts on them, since leaving commits an open field first.
+    var onShow: (() -> Void)?
+    var onEdit: (() -> Void)?
+    var onPage: ((EditPage) -> Void)?
+
+    /// The bar's height in each mode: Spec 10 §4's 38 points, and Spec 11 §2's 44 in edit mode.
+    static func height(_ mode: WindowMode) -> CGFloat {
+        mode == .edit ? CGFloat(EditFrame.topBarHeight) : height
+    }
+
     init(model: ShowModel) {
         self.model = model
         super.init(frame: .zero)
         fill = Palette.panel
         show.title = Strings.text(.menuShow)
         show.isOn = true
+        show.onPress = { [weak self] in self?.onShow?() }
         edit.title = Strings.text(.menuEditMode)
-        // Edit mode is Area 14's.
-        edit.isEnabled = false
-        edit.reason = Strings.text(.unavailableLater)
+        edit.onPress = { [weak self] in self?.onEdit?() }
+        modeWell.fill = Palette.well
+        modeWell.radius = 6
+        crumb.textColor = Palette.dimText
+        pagePicker.setAccessibilityLabel(Strings.text(.editPages))
+        pagePicker.onSelect = { [weak self] index in self?.onPage?(EditPage.allCases[index]) }
+        saved.onPress = { [weak self] in
+            guard let self else { return }
+            self.popUp(self.savingMenu, at: self.saved)
+        }
+        engine.onPress = { [weak self] in
+            guard let self else { return }
+            self.popUp(self.outputsMenu, at: self.engine)
+        }
+        for view in [modeWell, crumb, pagePicker, saved, engine] as [NSView] { addSubview(view) }
         liveDot.color = Palette.live
         backToLive.title = Strings.text(.menuBackToLive)
         backToLive.onPress = { [weak model] in model?.backToLive() }
@@ -101,13 +135,22 @@ final class TopBarView: Surface {
         let inactive = activeElsewhere != nil
         notActive.stringValue = activeElsewhere.map { Strings.text(.topNotActive, $0) } ?? ""
         notActive.isHidden = !inactive
-        let browsing = model.isBrowsing
+        // Spec 11 §2 — in edit mode the bar holds Show and Edit, what is edited, the page picker and a short status.
+        let editing = model.mode == .edit
+        let status = editing ? EditStatus.make(dots: model.outputDots, tags: model.tags, isConnected: model.store.isConnected) : nil
+        show.isOn = !editing
+        edit.isOn = editing
+        // "While operator lock is on, Mode ▸ Edit, Edit in the top bar and every entry above are disabled with the reason".
+        let cannotEdit = model.editing.cannotOpen
+        edit.isEnabled = cannotEdit == nil
+        edit.reason = cannotEdit.map(UnavailableWording.sentence)
+        let browsing = model.isBrowsing && !editing
         // "the top bar, the grid's edge and Back to Live turn amber".
         fill = browsing ? Palette.browsing.withAlphaComponent(0.10).blended(withFraction: 0.86, of: Palette.panel) : Palette.panel
         position.stringValue = ShowWording.position(model.livePosition)
         liveDot.isHidden = !model.store.live.isSomethingLive || inactive
         backToLive.isHidden = !browsing || inactive
-        if let ms = model.countdownMs {
+        if let ms = model.countdownMs, !editing {
             countdown.stringValue = ShowWording.countdown(ms: ms)
             countdown.isHidden = inactive
         } else {
@@ -135,8 +178,8 @@ final class TopBarView: Surface {
         remote.isHollow = !model.isRemoteLit
         remote.setAccessibilityLabel(Strings.text(.topRemote))
 
-        // One dot an output.
-        let dots = model.outputDots
+        // One dot an output; in edit mode only "an output that isn't presenting or is blacked out" (Spec 11 §2).
+        let dots = status?.dots ?? model.outputDots
         while outputs.count > dots.count {
             let last = outputs.removeLast()
             last.button.removeFromSuperview()
@@ -163,7 +206,7 @@ final class TopBarView: Surface {
             button.isHidden = inactive
         }
         if let outputsNote = OutputsNote.make(outputs: model.store.catalog?.outputs ?? [], screensAreMirrored: Self.screensAreMirrored),
-           model.store.catalog != nil {
+           model.store.catalog != nil, !editing {
             note.stringValue = ShowWording.note(outputsNote)
             note.isHidden = inactive
         } else {
@@ -173,7 +216,7 @@ final class TopBarView: Surface {
 
         tags.forEach { $0.removeFromSuperview() }
         tagButtons = []
-        tags = model.tags.map { tag in
+        tags = (status?.tags ?? model.tags).map { tag in
             let words = ShowWording.tag(tag)
             let view: NSView
             switch tag {
@@ -188,9 +231,54 @@ final class TopBarView: Surface {
             addSubview(view)
             return view
         }
-        for view in [show, edit, position, time, keys, remote] as [NSView] { view.isHidden = inactive }
-        if !inactive { liveDot.isHidden = !model.store.live.isSomethingLive }
+        for view in [show, edit, time] as [NSView] { view.isHidden = inactive }
+        // Show mode's own: the live position, "?" and the remote dot. Edit mode says the position under its Program monitor.
+        for view in [position, keys, remote] as [NSView] { view.isHidden = inactive || editing }
+        liveDot.isHidden = inactive || editing || !model.store.live.isSomethingLive
+
+        // Edit mode's own (Spec 11 §2).
+        for view in [modeWell, crumb, pagePicker, saved, engine] as [NSView] { view.isHidden = inactive || !editing }
+        if let status {
+            let page = model.editing.page
+            crumb.stringValue = page == .cues || page == .text ? EditModeWording.crumb(model.editing.crumb) : EditModeWording.page(page)
+            pagePicker.selected = EditPage.allCases.firstIndex(of: page)
+            for (index, page) in EditPage.allCases.enumerated() where !page.isBuilt {
+                pagePicker.disable(index, reason: Strings.text(.unavailableLater))
+            }
+            if let saving = status.saving {
+                saved.title = StateWording.tag(saving)
+                saved.style = saving.isRed ? .red : .amber
+            } else {
+                saved.title = Strings.text(.editSaved)
+                saved.style = .quiet
+            }
+            engine.title = Strings.text(.editEngine)
+            engine.setAccessibilityLabel(EditModeWording.engineSpoken(status.engine))
+            switch status.engine {
+            case .fine: engine.dot = .filled(Palette.outputting)
+            case .attention: engine.dot = .hollow(Palette.browsing, square: false)
+            case .away: engine.dot = .hollow(Palette.live, square: true)
+            }
+        }
         needsLayout = true
+    }
+
+    /// Spec 11 §2 — "A click on the engine pill lists every output as show
+    /// mode's dots do, each with its details and its Stack ▸ menu", then the
+    /// standing badges in the engine tag's words.
+    var outputsMenu: NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for dot in model.outputDots {
+            menu.addItem(ClosureMenuItem(title: ShowWording.output(dot)) { [weak self] in
+                guard let self else { return }
+                self.onOutput?(dot, self.engine)
+            })
+        }
+        let badges = model.store.engine.badges
+        if !badges.isEmpty, !model.outputDots.isEmpty { menu.addItem(.separator()) }
+        for badge in badges { menu.addItem(line(StateWording.badge(badge))) }
+        return menu
     }
 
     /// Spec 10 §13 — a Mac "whose screens are mirrored, which macOS reports as one screen".
@@ -205,6 +293,7 @@ final class TopBarView: Surface {
         super.layout()
         let h = bounds.height
         notActive.frame = NSRect(x: 12, y: (h - 18) / 2, width: bounds.width - 24, height: 18)
+        if model.mode == .edit { return layoutEdit(h) }
         var x: CGFloat = 10
         for button in [show, edit] {
             let size = button.fitting
@@ -256,6 +345,49 @@ final class TopBarView: Surface {
         let start = max(x, min((bounds.width - middle) / 2, right - middle - 8))
         countdown.frame = NSRect(x: start, y: (h - 17) / 2, width: countdownWidth, height: 17)
         hint.frame = NSRect(x: start + countdownWidth + gap, y: (h - 16) / 2, width: hintWidth, height: 16)
+    }
+
+    /// Spec 11 §2, "The top bar in edit mode" — Show and Edit and what is
+    /// edited at the left; the page picker in the middle; at the right the
+    /// time, the saving pill and the engine pill, with what needs a look
+    /// before them.
+    private func layoutEdit(_ h: CGFloat) {
+        var x: CGFloat = 12
+        let showSize = show.fitting
+        let editSize = edit.fitting
+        modeWell.frame = NSRect(x: x, y: (h - 28) / 2, width: showSize.width + editSize.width + 6, height: 28)
+        show.frame = NSRect(x: x + 2, y: (h - 24) / 2, width: showSize.width, height: 24)
+        edit.frame = NSRect(x: x + 4 + showSize.width, y: (h - 24) / 2, width: editSize.width, height: 24)
+        x = modeWell.frame.maxX + 12
+        let picker = pagePicker.fitting
+        pagePicker.frame = NSRect(x: floor((bounds.width - picker.width) / 2), y: (h - picker.height) / 2, width: picker.width, height: picker.height)
+        var right = bounds.width - 12
+        for pill in [engine, saved] {
+            let size = pill.fitting
+            pill.frame = NSRect(x: right - size.width, y: (h - size.height) / 2, width: size.width, height: size.height)
+            right -= size.width + 8
+        }
+        let timeWidth = Kit.width(of: time)
+        time.frame = NSRect(x: right - timeWidth, y: (h - 16) / 2, width: timeWidth, height: 16)
+        right -= timeWidth + 12
+        for tag in tags.reversed() {
+            let size = (tag as? TagView)?.fitting ?? (tag as? FlatButton)?.fitting ?? .zero
+            tag.frame = NSRect(x: right - size.width, y: (h - size.height) / 2, width: size.width, height: size.height)
+            right -= size.width + 6
+        }
+        for (button, dot) in outputs.reversed() {
+            let size = button.fitting
+            button.frame = NSRect(x: right - size.width, y: (h - 26) / 2, width: size.width, height: 26)
+            dot.frame = NSRect(x: 9, y: 8, width: 10, height: 10)
+            right -= size.width + 2
+        }
+        // What is edited, then what a focused field's keys do, in the room left before the page picker.
+        let limit = min(pagePicker.frame.minX, right) - 12
+        let crumbWidth = min(Kit.width(of: crumb), max(0, limit - x))
+        crumb.frame = NSRect(x: x, y: (h - 16) / 2, width: crumbWidth, height: 16)
+        x += crumbWidth + 14
+        let hintWidth = hint.isHidden ? 0 : min(Kit.width(of: hint), max(0, limit - x))
+        hint.frame = NSRect(x: x, y: (h - 16) / 2, width: hintWidth, height: 16)
     }
 
     override func draw(_ dirtyRect: NSRect) {

@@ -364,6 +364,16 @@ final class LeftColumnView: Surface {
     weak var host: ShowWindowView?
     /// What the column says for a few seconds beside what was tried (Spec 10 §10).
     let notice = NoticeLabel()
+    /// Spec 11 §2, "The Browser" — "Playlists and Library are show mode's two
+    /// windows (Spec 10 §5), one to a tab": the tab the column shows in edit
+    /// mode, or nil in show mode, where both windows show.
+    var tab: BrowserTab? {
+        didSet {
+            guard tab != oldValue else { return }
+            refresh()
+            needsDisplay = true
+        }
+    }
 
     init(model: ShowModel) {
         self.model = model
@@ -405,6 +415,9 @@ final class LeftColumnView: Surface {
         newPlaylist.reason = cannotNew.map(UnavailableWording.sentence)
         notice.show(model.notices[.left])
         needsLayout = true
+        // Spec 11 §2 — in edit mode a click picks the list the Cues page edits, and the row of that list is the one marked.
+        let editing = model.mode == .edit
+        let edited = model.editing
         playlists.set(model.playlistRows.map { row in
             var content = RowContent()
             var spoken = [row.title]
@@ -413,7 +426,7 @@ final class LeftColumnView: Surface {
                 content.disclosure = row.isExpanded
                 content.title = row.title
                 content.trailing = ShowWording.serviceDate(row.date)
-                content.isSelected = row.isBrowsed
+                content.isSelected = row.isBrowsed && !editing
                 content.isDimmed = row.isArchived
                 if row.isArchived { content.tags.append((Strings.text(.tagArchived), .quiet)) }
             case .header:
@@ -427,6 +440,7 @@ final class LeftColumnView: Surface {
                 content.isDimmed = row.isArchived
                 if row.isMissing, !row.title.isEmpty { content.tags.append((Strings.text(.tagMissing), .red)) }
                 if row.isLocal { content.tags.append((Strings.text(.tagLocal), .quiet)) }
+                content.isSelected = editing && edited.source == .playlist(row.playlist) && row.itemUuid != nil && edited.itemUuid == row.itemUuid
             }
             content.hasLiveDot = row.isLive
             if row.isLive { spoken.append(Strings.text(.tagLive)) }
@@ -436,15 +450,31 @@ final class LeftColumnView: Surface {
             view.performDrop = { [weak model] plan in model?.perform(plan, at: .left) }
             switch row.kind {
             case .playlist:
-                view.onClick = { [weak model] option in model?.choose(playlist: row.playlist, option: option) }
+                view.onClick = { [weak model] option in
+                    guard let model else { return }
+                    // In the Browser a playlist opens to its items; the show grid stays on what it browses.
+                    if model.mode == .edit { model.expand(playlist: row.playlist, option: option) } else { model.choose(playlist: row.playlist, option: option) }
+                }
                 view.makeMenu = { [weak self, weak view] in self?.playlistMenu(row, over: view) }
                 // "onto a playlist in the Playlists window inserts it there".
                 view.planDrop = { [weak model] payload, _ in model?.plan(payload, onto: .playlist(row.playlist)) ?? .none }
             case .item, .header:
                 if row.kind == .item {
                     view.onClick = { [weak self] _ in
-                        self?.model.browse(.playlist(row.playlist))
-                        if let item = row.itemUuid { self?.onShowItem?(item) }
+                        guard let self else { return }
+                        if self.model.mode == .edit {
+                            // "A click on a linked item ... makes it the list the Cues and Text pages edit".
+                            if let list = row.listUuid { self.model.editing.choose(list: list, from: .playlist(row.playlist), item: row.itemUuid) }
+                            return
+                        }
+                        self.model.browse(.playlist(row.playlist))
+                        if let item = row.itemUuid { self.onShowItem?(item) }
+                    }
+                    if editing, let list = row.listUuid {
+                        // "a double-click opens the Cues page on it from any page".
+                        view.onDoubleClick = { [weak model] in
+                            model?.editing.choose(list: list, from: .playlist(row.playlist), item: row.itemUuid, opening: true)
+                        }
                     }
                 }
                 view.makeMenu = { [weak self, weak view] in self?.itemMenu(row, over: view) }
@@ -472,7 +502,7 @@ final class LeftColumnView: Surface {
                 let number = row.number.map(String.init) ?? ""
                 // "the matches as a flat list with their folders".
                 content.trailing = searching && !row.path.isEmpty ? "\(row.path) · \(number)" : number
-                content.isSelected = row.uuid.map { model.browse.shown == .list($0) } ?? false
+                content.isSelected = row.uuid.map { editing ? edited.source == .list($0) : model.browse.shown == .list($0) } ?? false
                 content.isRevealed = row.uuid != nil && row.uuid == model.revealedList
                 content.spoken = [row.title, number].joined(separator: ", ")
             }
@@ -498,7 +528,14 @@ final class LeftColumnView: Surface {
                     return MenuBuilder.menu(entries) { [weak self, weak view] entry in self?.perform(entry, folder: row.path, over: view) }
                 }
             case .list:
-                view.onClick = { [weak model] _ in if let uuid = row.uuid { model?.browse(.list(uuid)) } }
+                view.onClick = { [weak model] _ in
+                    guard let model, let uuid = row.uuid else { return }
+                    // "A click ... on a library list makes it the list the Cues and Text pages edit".
+                    if model.mode == .edit { model.editing.choose(list: uuid, from: .list(uuid), item: nil) } else { model.browse(.list(uuid)) }
+                }
+                if editing, let uuid = row.uuid {
+                    view.onDoubleClick = { [weak model] in model?.editing.choose(list: uuid, from: .list(uuid), item: nil, opening: true) }
+                }
                 view.makeMenu = { [weak self, weak view] in self?.listMenu(row, over: view) }
             }
             return view
@@ -646,6 +683,25 @@ final class LeftColumnView: Surface {
     override func layout() {
         super.layout()
         let w = bounds.width
+        // Spec 11 §2 — in the Browser one window shows, at the tab's full height; the tab names it, so its title doesn't.
+        for view in [playlistsTitle, newPlaylist, playlists] as [NSView] { view.isHidden = tab != nil && tab != .playlists }
+        for view in [libraryTitle, search, library] as [NSView] { view.isHidden = tab != nil && tab != .library }
+        self.split.isHidden = tab != nil
+        if let tab {
+            let noticeHeight = notice.height(width: w - 28)
+            notice.frame = NSRect(x: 14, y: bounds.height - noticeHeight - 8, width: w - 28, height: noticeHeight)
+            let foot = bounds.height - (noticeHeight > 0 ? noticeHeight + 14 : 0)
+            playlistsTitle.isHidden = true
+            libraryTitle.isHidden = true
+            if tab == .playlists {
+                newPlaylist.frame = NSRect(x: w - 34, y: 6, width: 24, height: 24)
+                playlists.frame = NSRect(x: 0, y: 34, width: w, height: max(0, foot - 34))
+            } else if tab == .library {
+                search.frame = NSRect(x: 12, y: 10, width: w - 24, height: 24)
+                library.frame = NSRect(x: 0, y: 42, width: w, height: max(0, foot - 42))
+            }
+            return
+        }
         let split = floor(bounds.height * CGFloat(model.settings.leftSplit))
         playlistsTitle.frame = NSRect(x: 14, y: 12, width: w - 60, height: 14)
         newPlaylist.frame = NSRect(x: w - 34, y: 6, width: 24, height: 24)
@@ -661,6 +717,8 @@ final class LeftColumnView: Surface {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        // In the Browser the panel draws its own edge.
+        guard tab == nil else { return }
         Palette.hairline.setFill()
         NSRect(x: bounds.width - 1, y: 0, width: 1, height: bounds.height).fill()
         NSRect(x: 0, y: floor(bounds.height * CGFloat(model.settings.leftSplit)), width: bounds.width - 1, height: 1).fill()

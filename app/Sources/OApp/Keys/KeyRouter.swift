@@ -86,8 +86,10 @@ public struct KeyContext: Equatable, Sendable {
     public var dialog = false
     /// 4. The kind of text field that has the focus, or nil with none.
     public var field: FieldKind?
-    /// 5. In edit mode, a filmstrip, canvas or list has the focus (Spec 11 §2; Area 14 sets it).
+    /// 5. In edit mode, a cue grid, canvas or list in the workspace or the inspector has the focus (Spec 11 §2).
     public var editFocus = false
+    /// Edit mode is open: plain Escape, with nothing else to close, leaves it (Spec 11 §2).
+    public var editMode = false
     /// 6. A sheet or popover is open.
     public var sheet = false
     /// The keys overlay is up.
@@ -98,7 +100,8 @@ public struct KeyContext: Equatable, Sendable {
     public var goToEnabled = true
 
     public init(recorder: Bool = false, menu: Bool = false, dialog: Bool = false, field: FieldKind? = nil, editFocus: Bool = false,
-                sheet: Bool = false, overlay: Bool = false, digitsWaiting: Bool = false, goToEnabled: Bool = true) {
+                sheet: Bool = false, overlay: Bool = false, digitsWaiting: Bool = false, goToEnabled: Bool = true, editMode: Bool = false) {
+        self.editMode = editMode
         self.recorder = recorder
         self.menu = menu
         self.dialog = dialog
@@ -133,6 +136,8 @@ public enum KeyRoute: Equatable, Sendable {
         case digits
         /// It closes the keys overlay.
         case overlay
+        /// Spec 11 §2 — with nothing else to close, it leaves edit mode.
+        case editMode
     }
 }
 
@@ -178,7 +183,7 @@ public enum KeyRouter {
                 return .passed
             }
         } else {
-            // 5. "In edit mode, a focused filmstrip, canvas, or list in the center or the right column takes the
+            // 5. "In edit mode, a focused cue grid, canvas, or list in the workspace or the inspector takes the
             //    arrows, with ⇧ or ⌥, and Delete and Forward Delete (Spec 11 §2)."
             if context.editFocus {
                 if name.isArrow && !name.ctrl { return .passed }
@@ -192,6 +197,9 @@ public enum KeyRouter {
         if isEscape(name) {
             if context.digitsWaiting { return .escape(.digits) }
             if context.overlay { return .escape(.overlay) }
+            // Spec 11 §2 — "Escape leaves a field first, then closes a popover, a sheet or the keys overlay, then
+            // clears waiting digits, then leaves edit mode."
+            if context.editMode { return .escape(.editMode) }
             return .nothing
         }
         // "While digits are waiting, Return completes them whatever Return is bound to."

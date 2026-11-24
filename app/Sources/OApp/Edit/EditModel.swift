@@ -39,6 +39,10 @@ public enum EditNotice: Equatable, Sendable {
     case warnings([String])
     /// Spec 11 §4, "Multi-cue editing" — ""This cue only" ... skips the rest, saying how many it skipped".
     case skipped(Int)
+    /// Spec 11 §2 — "The first edit in a run to something on air says so in
+    /// the inspector's notice line (below), naming where it shows: "On air
+    /// on outputs 1 and 2: this shows at once."" The outputs, by number.
+    case onAir(outputs: [Int])
 }
 
 /// Spec 11 §4, "The Preview monitor" — the engine's picture of the selected
@@ -78,6 +82,11 @@ public final class EditModel {
 
     private var standing: EditNotice?
     private var triedLeaving = false
+    /// The edits sent that the engine hasn't answered, and whether edit mode leaves once it has applied them.
+    private var pending = 0
+    private var leavesWhenAnswered = false
+    /// The selection the on-air note was last said for.
+    private var saidOnAir: Set<String> = []
     private var pendingSelect: String?
     private var previewPixels = 0
     private var previewAsked = 0
@@ -160,6 +169,7 @@ public final class EditModel {
         selection = CueGridSelection(cue: nil, channel: nil)
         preview = PreviewPicture()
         previewSubject = nil
+        if case .playlist(let playlist)? = source { model.showItems(ofPlaylist: playlist) }
         model.holdEditLists()
         rebuild()
         let order = grid.headers.map(\.uuid)
@@ -190,12 +200,20 @@ public final class EditModel {
             triedLeaving = true
             return false
         }
+        // The field's edit is with the engine and not answered yet: edit mode waits for the answer, leaves when
+        // it is applied and stays, with the reason, when it is refused.
+        if pending > 0, !triedLeaving {
+            triedLeaving = true
+            leavesWhenAnswered = true
+            return false
+        }
         close()
         return true
     }
 
     private func close() {
         triedLeaving = false
+        leavesWhenAnswered = false
         model.mode = .show
         let cue = selection.first(in: grid.headers.map(\.uuid))
         if let source { model.browse(source) }
@@ -284,6 +302,19 @@ public final class EditModel {
         return model.cannotEdit(listUuid: listUuid)
     }
 
+    /// Spec 11 §2, "Other clients" — "A page whose object is deleted under it
+    /// says "Deleted", with Undo while that delete is the history's top group."
+    public var isListDeleted: Bool {
+        guard let listUuid, let catalog = store.catalog else { return false }
+        return catalog.list(uuid: listUuid) == nil
+    }
+
+    /// Whether the history's top group is a delete, which Undo would take back.
+    public var canUndoDelete: Bool {
+        guard isListDeleted, let step = model.undoStep else { return false }
+        return HistoryKind.of(text: step.text) == .remove
+    }
+
     /// Brings the grid up to date with the store. The selection follows the
     /// list: cues deleted elsewhere leave it, and a cue this page inserted
     /// is selected when it arrives.
@@ -363,6 +394,12 @@ public final class EditModel {
         } else {
             selection.click(cue: order[index], row: row)
         }
+        selectionChanged()
+    }
+
+    /// A click on a row's name: the row is selected, and the cues stay.
+    public func select(row: CueGridSelection.Row) {
+        selection.set(row)
         selectionChanged()
     }
 
@@ -478,16 +515,66 @@ public final class EditModel {
             model.say(.notSent(cannot), at: .inspector)
             return cannot
         }
-        let cannot = model.commit(sending, master: true, at: .inspector) { [weak self] outcome in
+        // The lock, a read-only library or an engine that is away: nothing is sent, and the line says why.
+        let unavailable = store.cannotEdit(master: true) ?? store.cannotSend
+        guard unavailable == nil, let transmit = model.transmit, let request = sending.request else {
+            let cannot = CannotEdit.unavailable(unavailable ?? .engineAway)
+            model.say(.notSent(cannot), at: .inspector)
+            return cannot
+        }
+        noteOnAir()
+        pending += 1
+        transmit(request) { [weak self] reply in
+            guard let self else { return }
+            self.pending = max(0, self.pending - 1)
+            guard let outcome = reply?.outcome else {
+                self.leavesWhenAnswered = false
+                return
+            }
+            if outcome.kind == .rejected {
+                // "If the engine refuses that commit, edit mode stays on the field with the reason".
+                self.leavesWhenAnswered = false
+                self.model.say(.rejected(outcome.rejection ?? EngineRejection(code: "", message: "")), at: .inspector)
+                return
+            }
             if !outcome.warnings.isEmpty {
-                self?.standing = .warnings(outcome.warnings)
-                self?.model.changed([.edit])
+                self.standing = .warnings(outcome.warnings)
+                self.model.changed([.edit])
             }
             done?(outcome)
+            if self.leavesWhenAnswered, self.pending == 0, self.model.mode == .edit { self.close() }
         }
-        if let cannot { model.say(.notSent(cannot), at: .inspector) }
         model.changed([.edit])
-        return cannot
+        return nil
+    }
+
+    /// "The first edit in a run to something on air says so": an edit to a
+    /// cue the confidence screen shows ahead of time is on air at once, on
+    /// the outputs that look ahead. Said once for a selection, until another is made.
+    private func noteOnAir() {
+        guard let catalog = store.catalog, let listUuid, let list else { return }
+        let live = store.live
+        let liveList = live.listUuid.flatMap { store.lists[$0]?.list }
+        let liveIndex = live.cue.flatMap { cue in liveList?.cues.firstIndex { $0.uuid.uuidString.lowercased() == cue } }
+        // The list where it is live: the live item of the live playlist, or the list fired from the library.
+        var isLive = live.listUuid == listUuid
+        var isNext = false
+        if case .playlist(let playlist)? = source, let entry = catalog.playlist(uuid: playlist)?.playlist {
+            isLive = isLive && live.playlist == playlist && live.item == itemUuid
+            if live.playlist == playlist, let at = entry.items.firstIndex(where: { $0.uuid.uuidString.lowercased() == live.item }) {
+                let after = entry.items[(at + 1)...].first { GridModel.listUuid(of: $0, catalog: catalog) != nil }
+                isNext = after.map { $0.uuid.uuidString.lowercased() == itemUuid } ?? false
+            }
+        } else {
+            isLive = isLive && live.isLibraryList
+        }
+        let ahead = EditOnAir.lookahead(isLive: isLive, isNext: isNext, liveIndex: liveIndex, liveCount: liveList?.cues.count ?? 0)
+        let edited = list.cues.indices.filter { ahead.contains($0) && selection.cues.contains(list.cues[$0].uuid.uuidString.lowercased()) }
+        guard !edited.isEmpty, saidOnAir != selection.cues else { return }
+        let outputs = EditOnAir.lookaheadOutputs(catalog: catalog, dots: model.outputDots)
+        guard !outputs.isEmpty else { return }
+        saidOnAir = selection.cues
+        standing = .onAir(outputs: outputs)
     }
 
     /// The cell the Channel column edits: the first selected cue, on the inspector's channel.
@@ -528,6 +615,19 @@ public final class EditModel {
         let grade = store.media.first { $0.id == id }?.entry.defaults.grade
         model.settings.used(media: id)
         send(CueEdits.pick(media: id, defaultGrade: grade, channel: channel, cue: list.cues[index], list: list.number))
+    }
+
+    /// The content popover commits a media item, with its trim and loop.
+    /// The item the cell writes already is that write edited, and keeps
+    /// every rider; another item is a new pick, as a drop is.
+    public func pick(_ content: MediaContent) {
+        guard let target, !selection.isMulti else { return }
+        if case .write(.media(let before), _) = CueSays.about(target.channel, in: target.cue).state, before.ref == content.ref {
+            return write(.media(content))
+        }
+        let grade = store.media.first { $0.id == content.ref }?.entry.defaults.grade
+        model.settings.used(media: content.ref)
+        send(CueEdits.pick(content, defaultGrade: grade, channel: target.channel, cue: target.cue, list: target.list))
     }
 
     /// A chip's popover commits, over the selected cues.
@@ -697,6 +797,18 @@ public final class EditModel {
     }
 
     // MARK: - The list (Spec 11 §4, "The list")
+
+    /// Spec 11 §4 — "the other's opens read-only, offering to renumber the
+    /// first, after which each has a number of its own." An edit by the
+    /// shared number reaches the list that comes first (Spec 7 §2), which is
+    /// the one this renumbers.
+    public func renumberOther(to number: Int) {
+        guard let list, cannotEdit == .renumberToEdit, number != list.number else { return }
+        acted()
+        if let cannot = model.commit(CueEdits.renumber(list: list.number, to: number), master: true, at: .inspector) {
+            model.say(.notSent(cannot), at: .inspector)
+        }
+    }
 
     /// "Renumber… (`edit list N renumber M`, or Swap for a taken number)".
     public func renumber(to number: Int) {

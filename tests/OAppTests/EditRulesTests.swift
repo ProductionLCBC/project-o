@@ -118,7 +118,10 @@ final class MenusTests: XCTestCase {
     func test_aCuesMenu() throws {
         let text = Menus.cue(.init(hasText: true))
         XCTAssertEqual(kinds(text), [.fire, .editText, .editCue, .note, .triggerMenu, .duplicateSection])
-        XCTAssertEqual(try entry(.editCue, in: text).reason, .later, "edit mode is Area 14's")
+        // Spec 11 §2 — Edit Cue "opens the Cues page on that cue", and under the lock is "disabled with the reason".
+        XCTAssertNil(try entry(.editCue, in: text).reason)
+        let locked = Menus.cue(Menus.CueContext(hasText: true, editCue: .unavailable(.locked)))
+        XCTAssertEqual(try entry(.editCue, in: locked).reason, .unavailable(.locked))
         let trigger = try entry(.triggerMenu, in: text).children
         XCTAssertEqual(kinds(trigger), [.triggerGo, .triggerTime, .advanceAfter])
         XCTAssertEqual(trigger.filter(\.isOn).map(\.kind), [.triggerGo], "the cue's trigger is ticked")

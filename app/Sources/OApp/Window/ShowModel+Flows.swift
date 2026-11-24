@@ -186,7 +186,7 @@ extension ShowModel {
         let cannotFire: CannotEdit? = store.cannotSend.map(CannotEdit.unavailable) ?? section.refusal.map(CannotEdit.fire) ?? (section.isRemoved ? .removed : nil)
         return Menus.CueContext(fire: cannotFire, edit: section.isRemoved ? .removed : cannotEdit(listUuid: section.listUuid),
                                 hasText: textBody(of: cell, in: section) != nil, trigger: cell.trigger, advanceAfterMs: cell.advanceAfterMs,
-                                isArmed: cell.isArmed, cannotSend: store.cannotSend)
+                                isArmed: cell.isArmed, cannotSend: store.cannotSend, editCue: editing.cannotOpen.map(CannotEdit.unavailable))
     }
 
     private func cueEdit(_ cell: CueCell, _ section: GridSection, _ make: (Cue, Int) -> Sending?) -> CannotEdit? {

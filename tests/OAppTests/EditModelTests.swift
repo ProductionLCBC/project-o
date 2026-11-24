@@ -115,6 +115,73 @@ final class EditModelTests: XCTestCase {
         XCTAssertTrue(rig.model.editing.leave(committing: { true }))
     }
 
+    func test_leavingWaitsForTheEnginesAnswerToAnEditAndStaysWhenItIsRefused() throws {
+        let rig = try Rig()
+        rig.model.editing.open()
+        // A field committed on the way out: its edit is with the engine. Applied, edit mode leaves.
+        rig.model.editing.setLabel("Opening")
+        XCTAssertFalse(rig.model.editing.leave(), "it waits for the answer")
+        XCTAssertEqual(rig.model.mode, .edit)
+        ok(rig)
+        XCTAssertEqual(rig.model.mode, .show)
+        // Refused, "edit mode stays on the field with the reason, and a second try leaves without it".
+        rig.model.editing.open()
+        rig.model.editing.setLabel("Again")
+        XCTAssertFalse(rig.model.editing.leave())
+        rig.answers[rig.answers.count - 1](.result(CommandOutcome(kind: .rejected, rejection: EngineRejection(code: "readOnlyLibrary", message: "no"))))
+        XCTAssertEqual(rig.model.mode, .edit)
+        XCTAssertEqual(rig.model.editing.notice, .rejected(EngineRejection(code: "readOnlyLibrary", message: "no")))
+        XCTAssertTrue(rig.model.editing.leave())
+        XCTAssertEqual(rig.model.mode, .show)
+        // An edit the engine never answers doesn't hold the operator: the second try leaves.
+        rig.model.editing.open()
+        rig.model.editing.setLabel("Once more")
+        XCTAssertFalse(rig.model.editing.leave())
+        XCTAssertTrue(rig.model.editing.leave())
+    }
+
+    // MARK: - What is live (Spec 11 §2)
+
+    func test_theThreeCuesAfterTheLiveCueShowAtOnceWhereAnOutputLooksAhead() throws {
+        // "the three cues after the live cue, in playlist order; near a song's end they are the next song's first cues".
+        XCTAssertEqual(EditOnAir.lookahead(isLive: true, isNext: false, liveIndex: 0, liveCount: 4), 1..<4)
+        XCTAssertEqual(EditOnAir.lookahead(isLive: false, isNext: true, liveIndex: 2, liveCount: 4), 0..<2, "one cue is left of the live song")
+        XCTAssertEqual(EditOnAir.lookahead(isLive: false, isNext: true, liveIndex: 0, liveCount: 4), 0..<0, "three are left: none of the next song's")
+        XCTAssertEqual(EditOnAir.lookahead(isLive: false, isNext: false, liveIndex: 3, liveCount: 4), 0..<0)
+        XCTAssertEqual(EditOnAir.lookahead(isLive: true, isNext: false, liveIndex: nil, liveCount: 0), 0..<0, "nothing is live")
+        // The fixture's Preset 1 draws the next cue's text on stack 2, the confidence stack; output 1 shows stack 1.
+        let catalog = try Recorded.catalog()
+        let main = OutputDot(number: 1, label: "Main", stack: 1, state: .presenting, isBlackedOut: false)
+        XCTAssertEqual(EditOnAir.lookaheadOutputs(catalog: catalog, dots: [main]), [])
+        var confidence = OutputDot(number: 2, label: "Confidence", stack: 2, state: .presenting, isBlackedOut: false)
+        XCTAssertEqual(EditOnAir.lookaheadOutputs(catalog: catalog, dots: [main, confidence]), [2])
+        confidence.state = .lost
+        XCTAssertEqual(EditOnAir.lookaheadOutputs(catalog: catalog, dots: [main, confidence]), [], "an output that isn't presenting shows nothing")
+    }
+
+    func test_theFirstEditToACueTheConfidenceScreenShowsSaysWhereItIsOnAir() throws {
+        let rig = try Rig()
+        // Output 1 switches to the confidence stack, whose layout draws the next cue's text.
+        var output = try XCTUnwrap(try RecordedAPI.load("state").items("events")?.compactMap(\.objectValue).first { $0.text("topic") == "outputs" && $0["output"] != nil })
+        output["stack"] = .number(2)
+        rig.store.apply(event: "outputs", output, now: rig.clock.now)
+        rig.model.editing.open()
+        // The live cue itself shows its edit "at the cue's next fire (L3)": no note.
+        rig.model.editing.setLabel("Opening")
+        XCTAssertNil(rig.model.editing.notice)
+        // Cue 2 is one of the three after it: "On air on outputs 1 and 2: this shows at once."
+        rig.model.editing.click(cue: 1, row: .channel(2))
+        rig.model.editing.setLabel("Next up")
+        XCTAssertEqual(rig.model.editing.notice, .onAir(outputs: [1]))
+        rig.model.editing.setNote("again")
+        XCTAssertNil(rig.model.editing.notice, "only the first edit in a run says so")
+        // A list that isn't live says nothing.
+        rig.model.editing.choose(list: Recorded.list7, from: .list(Recorded.list7), item: nil)
+        rig.model.editing.click(cue: 1, row: .header)
+        rig.model.editing.setLabel("Elsewhere")
+        XCTAssertNil(rig.model.editing.notice)
+    }
+
     // MARK: - The lock (Spec 11 §2)
 
     func test_theLockDisablesEveryWayInAndClosesEditMode() throws {
@@ -376,5 +443,27 @@ final class EditModelTests: XCTestCase {
         rig.model.editing.setLabel("x")
         XCTAssertEqual(rig.sent.count, before, "nothing is sent for a list that can't be edited")
         XCTAssertEqual(rig.model.editing.notice, .notSent(.localCopy))
+    }
+
+    func test_ofTwoListsSharingANumberTheSecondIsReadOnlyAndOffersToRenumberTheFirst() throws {
+        let rig = try Rig()
+        // Another master takes Doxology's number 7; edits by that number reach the one that comes first (Spec 7 §2).
+        var catalog = try RecordedAPI.load("catalog")
+        var lists = try XCTUnwrap(catalog["lists"]?.arrayValue)
+        let index = try XCTUnwrap(lists.firstIndex { $0["uuid"] == .string(Recorded.list7) })
+        var doxology = try XCTUnwrap(lists[index].objectValue)
+        doxology["named"] = .bool(false)
+        lists[index] = .object(doxology)
+        catalog["lists"] = .array(lists)
+        rig.store.apply(catalog: catalog)
+        rig.model.editing.open()
+        rig.model.editing.choose(list: Recorded.list7, from: .list(Recorded.list7), item: nil)
+        // "the other's opens read-only, offering to renumber the first".
+        XCTAssertEqual(rig.model.editing.cannotEdit, .renumberToEdit)
+        let before = rig.sent.count
+        rig.model.editing.setLabel("x")
+        XCTAssertEqual(rig.sent.count, before)
+        rig.model.editing.renumberOther(to: 70)
+        XCTAssertEqual(rig.commands.last, ["edit list 7 renumber 70"], "by the shared number, which names the first")
     }
 }

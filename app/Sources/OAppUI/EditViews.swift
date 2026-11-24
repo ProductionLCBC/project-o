@@ -272,9 +272,13 @@ final class PromptView: Surface {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    func addRow(_ label: String, _ control: NSView, none: NSButton? = nil) {
+    /// Each row's height: one line of controls, or more for a row that holds a text's body or a list to pick from (Spec 11 §4).
+    private var heights: [CGFloat] = []
+
+    func addRow(_ label: String, _ control: NSView, none: NSButton? = nil, height: CGFloat = 24) {
         let name = Kit.label(label, size: 11.5, color: Palette.dimText)
         rows.append((name, control, none))
+        heights.append(height)
         addSubview(name)
         addSubview(control)
         if let none { addSubview(none) }
@@ -339,7 +343,15 @@ final class PromptView: Surface {
         heading.frame = NSRect(x: 14, y: y, width: inner, height: headingHeight)
         y += headingHeight + 10
         let labelWidth = min(inner * 0.4, (rows.map { Kit.width(of: $0.label) }.max() ?? 0) + 6)
-        for row in rows {
+        for (index, row) in rows.enumerated() {
+            let height = index < heights.count ? heights[index] : 24
+            // A row with no label gives its control the panel's whole width.
+            if row.label.stringValue.isEmpty {
+                row.label.frame = .zero
+                row.control.frame = NSRect(x: 14, y: y, width: inner, height: height)
+                y += height + 8
+                continue
+            }
             row.label.frame = NSRect(x: 14, y: y + 4, width: labelWidth, height: 16)
             var controlWidth = inner - labelWidth - 6
             if let none = row.none {
@@ -347,8 +359,8 @@ final class PromptView: Surface {
                 none.frame.origin = NSPoint(x: 14 + inner - none.frame.width, y: y + 3)
                 controlWidth -= none.frame.width + 8
             }
-            row.control.frame = NSRect(x: 14 + labelWidth + 6, y: y, width: controlWidth, height: 24)
-            y += 32
+            row.control.frame = NSRect(x: 14 + labelWidth + 6, y: y, width: controlWidth, height: height)
+            y += height + 8
         }
         if !problem.isHidden {
             let height = ceil(problem.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: inner, height: 100)).height ?? 16)

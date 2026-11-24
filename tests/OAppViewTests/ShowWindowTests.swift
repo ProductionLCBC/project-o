@@ -144,7 +144,9 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(bar.shownTags, ["Audio lost", "Popup 1"],
                        "each shown only while it applies: the recorded engine has no audio device, so the output channel 1 routes to is silent")
         XCTAssertTrue(bar.backToLive.isHidden, "Back to Live only while browsing")
-        XCTAssertFalse(bar.edit.isEnabled, "edit mode is a later area's")
+        XCTAssertTrue(bar.edit.isEnabled, "Edit in the top bar opens edit mode (Spec 11 §2)")
+        XCTAssertTrue(bar.show.isOn)
+        XCTAssertTrue(bar.pagePicker.isHidden, "the page picker is edit mode's")
         rig.model.browse(.list(Self.list7))
         XCTAssertFalse(bar.backToLive.isHidden)
         bar.backToLive.press()

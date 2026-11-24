@@ -179,6 +179,8 @@ final class FlatButton: NSControl {
         case amber
         /// No background until the pointer is over it.
         case bare
+        /// Red in a tint with a red edge: edit mode's Clear All and Fire, "red and set apart" among quiet controls (Spec 11 §2).
+        case dangerTint
     }
 
     var style = Style.plain { didSet { needsDisplay = true } }
@@ -326,6 +328,10 @@ final class FlatButton: NSControl {
             fill = Palette.browsing.withAlphaComponent(isDown ? 0.32 : 0.2)
             text = Palette.browsing
         case .bare: fill = isHovered || isDown ? Palette.raised : nil
+        case .dangerTint:
+            fill = Palette.live.withAlphaComponent(isDown ? 0.30 : (isHovered ? 0.22 : 0.14))
+            text = NSColor(srgbRed: 1, green: 0x8D / 255, blue: 0x87 / 255, alpha: 1)
+            outline = Palette.live.withAlphaComponent(0.5)
         }
         if isOn {
             // Blue for selection (Spec 10 §4) on a cell; a step lighter for the chosen one of a set.

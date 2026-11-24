@@ -280,12 +280,16 @@ public enum EditModeWording {
     }
 
     /// Spec 11 §2, "Rejections and warnings" — what the notice line says.
-    public static func notice(_ notice: EditNotice) -> String {
+    public static func notice(_ notice: EditNotice, locale: Locale = .current) -> String {
         switch notice {
         case .rejected(let rejection): return EditWording.rejection(rejection)
         case .notSent(let reason): return readOnly(reason)
         case .warnings(let warnings): return warnings.joined(separator: " · ")
         case .skipped(let count): return Strings.counted(.editNoticeSkipped, count)
+        case .onAir(let outputs):
+            // "On air on outputs 1 and 2: this shows at once."
+            let numbers = EditWording.joined(outputs.map(String.init), locale: locale)
+            return Strings.text(outputs.count == 1 ? .editNoticeOnAirOne : .editNoticeOnAirMany, numbers)
         }
     }
 }

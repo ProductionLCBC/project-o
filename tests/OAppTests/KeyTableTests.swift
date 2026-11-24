@@ -247,6 +247,20 @@ final class KeyRouterTests: XCTestCase {
         XCTAssertEqual(fires(route("left")), .previous, "and outside edit mode the arrows are the show's too")
     }
 
+    /// Spec 11 §2 — "Escape leaves a field first, then closes a popover, a
+    /// sheet or the keys overlay, then clears waiting digits, then leaves edit mode."
+    func test_escapeLeavesEditModeLastOfAll() {
+        XCTAssertEqual(route("escape", KeyContext(editMode: true)), .escape(.editMode))
+        XCTAssertEqual(route("escape", KeyContext(editFocus: true, editMode: true)), .escape(.editMode))
+        XCTAssertEqual(route("escape", KeyContext(field: .edit, editMode: true)), .escape(.field(.edit)), "a field first")
+        XCTAssertEqual(route("escape", KeyContext(sheet: true, editMode: true)), .passed, "a popover or a sheet takes it")
+        XCTAssertEqual(route("escape", KeyContext(overlay: true, editMode: true)), .escape(.overlay))
+        XCTAssertEqual(route("escape", KeyContext(digitsWaiting: true, editMode: true)), .escape(.digits))
+        XCTAssertEqual(route("escape"), .nothing, "in show mode it has nothing left to do")
+        // It still "never sends a command".
+        XCTAssertNil(fires(route("escape", KeyContext(editMode: true))))
+    }
+
     // MARK: 6, a sheet or popover
 
     /// "⇧⎋ fires with a sheet, a popover or a field open"; "A sheet or popover takes Return and plain Escape."

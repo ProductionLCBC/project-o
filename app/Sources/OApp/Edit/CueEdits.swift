@@ -107,6 +107,20 @@ public enum CueEdits {
         Edits.write(media: id, defaultGrade: defaultGrade, on: channel, cue: cue, list: list)
     }
 
+    /// The same pick with the popover's overrides on it: "for the chosen
+    /// item its trim (in and out) and loop as overrides on the write (choice
+    /// A-6)". Nil when the cue writes exactly that already.
+    public static func pick(_ content: MediaContent, defaultGrade: Int?, channel: Int, cue: Cue, list: Int) -> Sending? {
+        let says = CueSays.about(channel, in: cue)
+        var riders = Riders()
+        if case .write(_, let before) = says.state {
+            riders.transition = before.transition
+            riders.audioTransition = before.audioTransition
+        }
+        riders.grade = defaultGrade.map { GradeRider(ref: $0, scope: .once) }
+        return cueChannel(channel, .write(.media(content), riders), says.attributes, cue: cue, list: list)
+    }
+
     /// "Loop only turns looping on, since a write can't refuse an item's own
     /// loop (Spec 3 §4)": off is no override, and the item's own loop stands.
     public static func loop(_ on: Bool, on content: MediaContent) -> MediaContent {

@@ -2329,6 +2329,102 @@
         }
       }
     },
+    "edit.chipForm.duration" : {
+      "comment" : "A label in a chip's small form: empty uses the transition's own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration (s)"
+          }
+        }
+      }
+    },
+    "edit.chipForm.gain" : {
+      "comment" : "A label in the gain chip's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain (dB)"
+          }
+        }
+      }
+    },
+    "edit.chipForm.none" : {
+      "comment" : "A choice in the grade chip's form: no grade.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "edit.chipForm.own" : {
+      "comment" : "The placeholder of a chip's duration field: the transition's own duration.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its own"
+          }
+        }
+      }
+    },
+    "edit.chipForm.range" : {
+      "comment" : "Under the gain chip's field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A gain is between -60 and 60 dB."
+          }
+        }
+      }
+    },
+    "edit.chipForm.remove" : {
+      "comment" : "A button in a chip's small form: the cue stops writing this attribute.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        }
+      }
+    },
+    "edit.chipForm.scope" : {
+      "comment" : "A label in a chip's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scope"
+          }
+        }
+      }
+    },
+    "edit.chipForm.value" : {
+      "comment" : "A label in a chip's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Value"
+          }
+        }
+      }
+    },
     "edit.column.channel" : {
       "comment" : "The heading of the inspector's fourth column: the selected row's channel.",
       "extractionState" : "manual",
@@ -2409,6 +2505,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Changes the library when fired"
+          }
+        }
+      }
+    },
+    "edit.commands.discard" : {
+      "comment" : "The other button when commands as text is left with an error in it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard Changes"
+          }
+        }
+      }
+    },
+    "edit.commands.error" : {
+      "comment" : "Under the commands-as-text area: a line that doesn't read as a command, and why.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line %1$lld: %2$@"
+          }
+        }
+      }
+    },
+    "edit.commands.errors.title" : {
+      "comment" : "Asked when the commands-as-text area is left with an error in it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A line isn’t a command yet, so nothing was sent."
+          }
+        }
+      }
+    },
+    "edit.commands.keepEditing" : {
+      "comment" : "The default button when commands as text is left with an error in it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Editing"
           }
         }
       }
@@ -2541,6 +2685,162 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "—"
+          }
+        }
+      }
+    },
+    "edit.contentForm.addField" : {
+      "comment" : "A menu in the content popover: adds another field to the text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Field"
+          }
+        }
+      }
+    },
+    "edit.contentForm.body" : {
+      "comment" : "A label in the content popover: the text's main field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Body"
+          }
+        }
+      }
+    },
+    "edit.contentForm.custom" : {
+      "comment" : "In the Add Field menu: a field with a name of the operator's.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom…"
+          }
+        }
+      }
+    },
+    "edit.contentForm.fieldName" : {
+      "comment" : "Asked for a custom field's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field name"
+          }
+        }
+      }
+    },
+    "edit.contentForm.heading" : {
+      "comment" : "The heading of the popover that edits what a cue writes on a channel. %3$@ is the channel's label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld · channel %2$lld %3$@"
+          }
+        }
+      }
+    },
+    "edit.contentForm.in" : {
+      "comment" : "A label in the content popover: where the media starts.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In (s)"
+          }
+        }
+      }
+    },
+    "edit.contentForm.item" : {
+      "comment" : "A label in the content popover: the media item picked.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        }
+      }
+    },
+    "edit.contentForm.loop" : {
+      "comment" : "A checkbox in the content popover.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loop"
+          }
+        }
+      }
+    },
+    "edit.contentForm.media" : {
+      "comment" : "The content popover's choice of kind.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "edit.contentForm.out" : {
+      "comment" : "A label in the content popover: where the media ends.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Out (s)"
+          }
+        }
+      }
+    },
+    "edit.contentForm.pick" : {
+      "comment" : "In the content popover while no media item is picked.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick an item below"
+          }
+        }
+      }
+    },
+    "edit.contentForm.text" : {
+      "comment" : "The content popover's choice of kind.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "edit.contentForm.variables" : {
+      "comment" : "A menu in the content popover: inserts a variable's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variables"
           }
         }
       }
@@ -2821,6 +3121,18 @@
         }
       }
     },
+    "edit.deleted" : {
+      "comment" : "In the workspace of a page whose list or object was deleted under it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted"
+          }
+        }
+      }
+    },
     "edit.engine" : {
       "comment" : "Edit mode's top bar: the pill that says how the engine is.",
       "extractionState" : "manual",
@@ -2953,6 +3265,210 @@
         }
       }
     },
+    "edit.form.add" : {
+      "comment" : "The button of a command's small form: adds the command to the cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "edit.form.channel" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "edit.form.clearAfter" : {
+      "comment" : "A label in the popup form: a number of seconds, or empty to stay.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear after (s)"
+          }
+        }
+      }
+    },
+    "edit.form.command" : {
+      "comment" : "The label of the field that edits a command as text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command"
+          }
+        }
+      }
+    },
+    "edit.form.countsUp" : {
+      "comment" : "A checkbox in the timer form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Counts up"
+          }
+        }
+      }
+    },
+    "edit.form.duration" : {
+      "comment" : "A label in a command's small form: a number of seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration (s)"
+          }
+        }
+      }
+    },
+    "edit.form.invalid" : {
+      "comment" : "Under a command's text field. %@ is why.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That isn’t a command: %@"
+          }
+        }
+      }
+    },
+    "edit.form.number" : {
+      "comment" : "Under a form's field that needs seconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a number of seconds."
+          }
+        }
+      }
+    },
+    "edit.form.off" : {
+      "comment" : "A choice in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        }
+      }
+    },
+    "edit.form.on" : {
+      "comment" : "A choice in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        }
+      }
+    },
+    "edit.form.output" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output"
+          }
+        }
+      }
+    },
+    "edit.form.popup" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popup"
+          }
+        }
+      }
+    },
+    "edit.form.stack" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack"
+          }
+        }
+      }
+    },
+    "edit.form.state" : {
+      "comment" : "A label in a command's small form: on, off or toggle.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "State"
+          }
+        }
+      }
+    },
+    "edit.form.text" : {
+      "comment" : "A label in the popup form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "edit.form.timer" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timer"
+          }
+        }
+      }
+    },
+    "edit.form.toggle" : {
+      "comment" : "A choice in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggle"
+          }
+        }
+      }
+    },
     "edit.goTo" : {
       "comment" : "The placeholder of the Program panel's field that takes a cue number of the live list.",
       "extractionState" : "manual",
@@ -2997,6 +3513,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld cues of %2$lld"
+          }
+        }
+      }
+    },
+    "edit.macro.bindKey" : {
+      "comment" : "A macro tile's menu: opens the key bindings on a new row for the macro.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bind a Key…"
+          }
+        }
+      }
+    },
+    "edit.macro.edit" : {
+      "comment" : "A macro tile's menu: opens the macro in edit mode.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        }
+      }
+    },
+    "edit.macro.run" : {
+      "comment" : "A macro tile's menu: runs the macro.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run"
           }
         }
       }
@@ -3205,6 +3757,30 @@
         }
       }
     },
+    "edit.notice.onAir.many" : {
+      "comment" : "The same notice for several outputs. %@ is their numbers, such as 1 and 2.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On air on outputs %@: this shows at once."
+          }
+        }
+      }
+    },
+    "edit.notice.onAir.one" : {
+      "comment" : "The inspector's notice at the first edit to a cue one output shows ahead of time. %@ is the output's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On air on output %@: this shows at once."
+          }
+        }
+      }
+    },
     "edit.notice.skipped" : {
       "comment" : "The inspector's notice after a this-cue-only chip was set on several cues.",
       "extractionState" : "manual",
@@ -3321,6 +3897,186 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Edit pages"
+          }
+        }
+      }
+    },
+    "edit.palette.blackout" : {
+      "comment" : "A command a cue can run: opens a small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black Out a Stack…"
+          }
+        }
+      }
+    },
+    "edit.palette.macro" : {
+      "comment" : "A macro a cue can run: its number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "edit.palette.macros" : {
+      "comment" : "A group of the commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macros"
+          }
+        }
+      }
+    },
+    "edit.palette.mute" : {
+      "comment" : "A command a cue can run: opens a small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute a Channel in a Stack…"
+          }
+        }
+      }
+    },
+    "edit.palette.outputStack" : {
+      "comment" : "A command a cue can run: opens a small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch an Output’s Stack…"
+          }
+        }
+      }
+    },
+    "edit.palette.popupClear" : {
+      "comment" : "A command a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Popup %lld"
+          }
+        }
+      }
+    },
+    "edit.palette.popupSet" : {
+      "comment" : "A command a cue can run: opens a small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a Popup…"
+          }
+        }
+      }
+    },
+    "edit.palette.popups" : {
+      "comment" : "A group of the commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popups"
+          }
+        }
+      }
+    },
+    "edit.palette.stacks" : {
+      "comment" : "A group of the commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stacks and outputs"
+          }
+        }
+      }
+    },
+    "edit.palette.system" : {
+      "comment" : "A group of the commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        }
+      }
+    },
+    "edit.palette.timerPause" : {
+      "comment" : "A command a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause Timer %lld"
+          }
+        }
+      }
+    },
+    "edit.palette.timerReset" : {
+      "comment" : "A command a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Timer %lld"
+          }
+        }
+      }
+    },
+    "edit.palette.timerSet" : {
+      "comment" : "A command a cue can run: opens a small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a Timer…"
+          }
+        }
+      }
+    },
+    "edit.palette.timerStart" : {
+      "comment" : "A command a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Timer %lld"
+          }
+        }
+      }
+    },
+    "edit.palette.timers" : {
+      "comment" : "A group of the commands a cue can run.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timers"
           }
         }
       }

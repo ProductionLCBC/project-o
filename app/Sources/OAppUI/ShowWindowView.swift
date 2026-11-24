@@ -24,6 +24,15 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     let nextRow: NextRowView
     let tabs: TabsView
     let strip: StripView
+    // Spec 11 §2 — edit mode's regions, which take the window under the top bar while it is in edit mode: the
+    // Browser (whose Playlists and Library tabs are `left`, laid over it), the workspace, the monitors and the inspector.
+    let browser: BrowserView
+    let workspace: WorkspaceView
+    let previewPanel: PreviewPanelView
+    let programPanel: ProgramPanelView
+    let inspector: InspectorView
+    /// Spec 11 §2, "The lock" — "an open field's unsent text is offered in a sheet with Copy": what was offered last.
+    private(set) var unsentText: String?
     /// Spec 10 §4 — the columns' widths, "200 to 360" and "340 to 480"; Spec 10 §6 — the pool's divider.
     let leftDivider = DividerView(axis: .columns, label: Strings.text(.dividerLeft))
     let rightDivider = DividerView(axis: .columns, label: Strings.text(.dividerRight))
@@ -40,6 +49,10 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         didSet {
             grid.machineRoot = machineRoot
             pool.machineRoot = machineRoot
+            browser.machineRoot = machineRoot
+            workspace.machineRoot = machineRoot
+            previewPanel.machineRoot = machineRoot
+            inspector.machineRoot = machineRoot
         }
     }
     /// Spec 10 §9 — the keys' model, the command bar "across the top of the center when on", and the keys overlay while it is up.
@@ -80,11 +93,31 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         tabs = TabsView(model: model)
         strip = StripView(model: model, mach: mach)
         commandBar = CommandBarView(keys: keys)
+        browser = BrowserView(model: model)
+        workspace = WorkspaceView(model: model)
+        previewPanel = PreviewPanelView(model: model)
+        programPanel = ProgramPanelView(model: model, keys: keys, mach: mach)
+        inspector = InspectorView(model: model)
         super.init(frame: .zero)
         fill = Palette.window
-        for view in [grid, commandBar, pool, left, preview, nextRow, tabs, strip, topBar, banner, leftDivider, rightDivider, poolDivider] as [NSView] {
+        for view in [grid, commandBar, pool, browser, left, workspace, previewPanel, programPanel, inspector, preview, nextRow, tabs, strip, topBar, banner,
+                     leftDivider, rightDivider, poolDivider] as [NSView] {
             addSubview(view)
         }
+        for view in [browser, workspace, previewPanel, programPanel, inspector] as [NSView] { view.isHidden = true }
+        browser.host = self
+        workspace.host = self
+        inspector.host = self
+        workspace.grid.onEditContent = { [weak self] in self?.inspector.editContent() }
+        // Spec 11 §2 — Show and Edit in the top bar, and its page picker.
+        topBar.onShow = { [weak self] in self?.leaveEdit() }
+        topBar.onEdit = { [weak self] in self?.enterEdit() }
+        topBar.onPage = { [weak self] page in self?.model.editing.show(page: page) }
+        // "Edit on a macro tile opens Objects on that macro (Spec 10 §7)"; the page itself comes with the small editors.
+        tabs.onEditMacro = { [weak self] _ in self?.enterEdit(page: .objects) }
+        // "the grid browses where its list came from ... and scrolls to it, firing nothing".
+        model.onRevealCue = { [weak self] item, list, cue in self?.grid.scrollTo(cue: cue, item: item, list: list) }
+        model.editing.onLocked = { [weak self] in self?.offerUnsentText() }
         commandBar.isHidden = !keys.showsCommandBar
         // The window opens the fields in place and the panels the regions' edits ask for (Spec 10 §10).
         left.host = self
@@ -171,8 +204,10 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
 
     private func keysChanged() {
         nextRow.refresh()
+        if model.mode == .edit { programPanel.refresh() }
         commandBar.refresh()
-        if commandBar.isHidden == keys.showsCommandBar {
+        // The command bar is show mode's: edit mode's layout has no place for it.
+        if model.mode == .show, commandBar.isHidden == keys.showsCommandBar {
             commandBar.isHidden = !keys.showsCommandBar
             needsLayout = true
         }
@@ -462,8 +497,108 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         topBar.fieldHint = KeyTap.fieldKind(window?.firstResponder).map { KeyWording.hint($0.hint) }
     }
 
+    // MARK: - Edit mode (Spec 11 §2)
+
+    /// "Mode ▸ Edit (⌘2) or Edit in the top bar opens the last page on what
+    /// show mode had in hand". A field open in place commits first (Spec 10 §10).
+    func enterEdit() {
+        guard model.mode == .show, commitOpenField() else { return }
+        closePrompt()
+        model.editing.open()
+    }
+
+    /// "a double-click on a cue that isn't a text cue, or Edit Cue in a cue's menu, opens the Cues page on that cue".
+    func enterEdit(cue: CueCell, in section: GridSection) {
+        guard model.mode == .show, commitOpenField() else { return }
+        closePrompt()
+        model.editing.open(cue: cue, in: section)
+    }
+
+    /// Opens edit mode on one of its pages, as Edit on a macro tile and Edit in Stack Editor do.
+    func enterEdit(page: EditPage) {
+        guard commitOpenField() else { return }
+        closePrompt()
+        if model.mode == .edit { model.editing.show(page: page) } else { model.editing.open(page: page) }
+    }
+
+    /// "Show in the top bar, Escape with nothing else to close (below), or
+    /// Mode ▸ Show (⌘1) returns to show mode ... An open field commits first".
+    func leaveEdit() {
+        guard model.mode == .edit else { return }
+        closePrompt()
+        let left = model.editing.leave { [weak self] in
+            guard let self else { return true }
+            guard self.commitOpenField() else { return false }
+            // A field of edit mode's commits as the cursor leaves it; what can't be sent keeps edit mode open.
+            if let editor = self.window?.firstResponder as? NSText, editor.isDescendant(of: self.inspector) || editor.isFieldEditor {
+                self.window?.makeFirstResponder(self)
+            }
+            if case .notSent? = self.model.editing.notice { return false }
+            return true
+        }
+        if left { window?.makeFirstResponder(self) }
+    }
+
+    /// "When it comes on from elsewhere, edit mode closes to show mode on
+    /// the same cue, and an open field's unsent text is offered in a sheet
+    /// with Copy, since the engine would refuse it."
+    private func offerUnsentText() {
+        closePrompt()
+        guard let editor = window?.firstResponder as? NSText, editor.isDescendant(of: inspector) || (editor.isFieldEditor && (editor.delegate as? NSView)?.isDescendant(of: inspector) == true) else { return }
+        let text = editor.string
+        guard !text.isEmpty else { return }
+        unsentText = text
+        window?.makeFirstResponder(self)
+        guard let window, window.isVisible, window.attachedSheet == nil else { return }
+        let alert = NSAlert()
+        alert.messageText = UnavailableWording.sentence(for: .locked)
+        alert.informativeText = text
+        alert.addButton(withTitle: Strings.text(.fieldCopy))
+        alert.addButton(withTitle: Strings.text(.cancel))
+        alert.beginSheetModal(for: window) { response in
+            MainActor.assumeIsolated {
+                guard response == .alertFirstButtonReturn else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            }
+        }
+    }
+
+    /// Shows or hides each mode's regions, and tells the left column which tab of the Browser it is.
+    private func placeModes() {
+        let editing = model.mode == .edit
+        for view in [grid, pool, preview, nextRow, tabs, strip, leftDivider, rightDivider, poolDivider] as [NSView] { view.isHidden = editing }
+        commandBar.isHidden = editing || !keys.showsCommandBar
+        for view in [browser, workspace, previewPanel, programPanel, inspector] as [NSView] { view.isHidden = !editing }
+        fill = editing ? Palette.gut : Palette.window
+        let tab = editing ? model.settings.browserTab : nil
+        left.isHidden = tab == .media
+        if left.tab != tab { left.tab = tab }
+    }
+
+    private func refreshEdit() {
+        browser.refresh()
+        left.refresh()
+        workspace.refresh()
+        previewPanel.refresh()
+        programPanel.refresh()
+        inspector.refresh()
+    }
+
     /// Redraws the regions a change touches.
     func refresh(_ changes: Set<ShowModel.Change>) {
+        let editing = model.mode == .edit
+        if changes.contains(.layout) || changes.contains(.edit) { placeModes() }
+        if editing {
+            if changes.contains(.edit) {
+                refreshEdit()
+                topBar.refresh()
+            } else {
+                // Show mode's changes that edit mode's regions show too: the pool's items, what is live, the outputs.
+                if changes.contains(.pool) { browser.refresh() }
+                if !changes.isDisjoint(with: [.right, .top, .grid]) { programPanel.refresh() }
+            }
+        }
         if changes.contains(.top) { topBar.refresh() }
         if changes.contains(.left) { left.refresh() }
         if changes.contains(.grid) {
@@ -514,6 +649,11 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     /// What counts on the app's clock between events (Spec 10 §3).
     func tick() {
         topBar.refresh()
+        if model.mode == .edit {
+            // The armed countdown under the Program picture counts on the app's clock too.
+            programPanel.refresh()
+            return
+        }
         grid.tick()
         strip.tick()
         if case .one = model.transport, tabs.tab == .transport, !tabs.isCollapsed { tabs.refresh() }
@@ -521,6 +661,10 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
 
     func drawPictures() {
         mach?.poll()
+        if model.mode == .edit {
+            programPanel.draw()
+            return
+        }
         preview.draw()
         strip.draw()
     }
@@ -532,6 +676,23 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         let w = bounds.width
         let bannerHeight = banner.isHidden ? 0 : banner.fittingSize.height
         banner.frame = NSRect(x: 0, y: 0, width: w, height: bannerHeight)
+        if model.mode == .edit {
+            // Spec 11 §2 — "Edit mode keeps the main window and lays it out its own way".
+            let frame = EditFrame.make(width: Double(w), height: Double(bounds.height), top: Double(bannerHeight))
+            func rect(_ box: EditFrame.Box) -> NSRect { NSRect(x: box.x, y: box.y, width: box.width, height: box.height) }
+            topBar.frame = rect(frame.topBar)
+            browser.frame = rect(frame.browser)
+            workspace.frame = rect(frame.workspace)
+            previewPanel.frame = rect(frame.preview)
+            programPanel.frame = rect(frame.program)
+            inspector.frame = rect(frame.inspector)
+            // The Playlists and Library tabs are show mode's own two windows, laid over the Browser's body.
+            left.frame = browser.frame.insetBy(dx: 1, dy: 1).offsetBy(dx: 0, dy: 0)
+            left.frame.origin.y += PanelView.headerHeight
+            left.frame.size.height -= PanelView.headerHeight
+            keysOverlay?.frame = bounds
+            return
+        }
         topBar.frame = NSRect(x: 0, y: bannerHeight, width: w, height: TopBarView.height)
         let top = bannerHeight + TopBarView.height
         let height = max(0, bounds.height - top)
@@ -574,6 +735,8 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        // Edit mode's panels draw themselves, on the darker ground.
+        guard model.mode == .show else { return }
         // The right column's panel.
         let rightWidth = CGFloat(ViewSettings.clampedRight(model.settings.rightColumnWidth))
         Palette.panel.setFill()
@@ -661,6 +824,19 @@ final class MenuBar: NSObject, NSMenuDelegate {
         return item
     }
 
+    /// Spec 11 §2 — "The pages are picked in the top bar's page picker, and
+    /// in the View menu with ⌥⌘1 to ⌥⌘6"; each opens edit mode on it from show mode.
+    private func editPages() -> [NSMenuItem] {
+        let keys: [EditPage: StringKey] = [.cues: .editPageCues, .text: .editPageText, .stacks: .editPageStacks, .channels: .editPageChannels,
+                                           .presets: .editPagePresets, .objects: .editPageObjects]
+        return EditPage.allCases.compactMap { page in
+            guard let key = keys[page] else { return nil }
+            return item(key, key: String(page.shortcut), modifiers: [.option, .command],
+                        state: { [weak self] in self?.model?.mode == .edit && self?.model?.editing.page == page },
+                        enabled: { [weak self] in page.isBuilt && self?.model?.editing.cannotOpen == nil }) { [weak self] in self?.view?.enterEdit(page: page) }
+        }
+    }
+
     /// The field being typed in, whose own typing ⌘Z undoes (Spec 10 §10).
     private var typingField: NSTextView? {
         NSApplication.shared.keyWindow?.firstResponder as? NSTextView ?? controller?.windowController.window.firstResponder as? NSTextView
@@ -744,20 +920,30 @@ final class MenuBar: NSObject, NSMenuDelegate {
             item(.menuResetLayout) { [weak self] in self?.model?.resetLayout() },
             .separator(),
             item(.menuFullScreen) { [weak self] in self?.controller?.windowController.window.toggleFullScreen(nil) },
-        ])
+            .separator(),
+        ] + editPages())
         add(.menuGo, to: [
-            item(.menuBackToLive, key: "l", enabled: { [weak self] in self?.model?.store.live.isSomethingLive ?? false }) { [weak self] in self?.model?.backToLive() },
+            item(.menuBackToLive, key: "l", enabled: { [weak self] in self?.model?.store.live.isSomethingLive ?? false && self?.model?.mode == .show }) { [weak self] in
+                self?.model?.backToLive()
+            },
             item(.menuGoToCue, key: "j", enabled: { [weak self] in self?.model?.nextRow.goToEnabled ?? false }) { [weak self] in
-                guard let row = self?.view?.nextRow else { return }
-                row.window?.makeFirstResponder(row.goTo)
+                guard let view = self?.view else { return }
+                // The go-to field is under the Program monitor in edit mode (Spec 11 §2).
+                let field = view.model.mode == .edit ? view.programPanel.goTo : view.nextRow.goTo
+                field.window?.makeFirstResponder(field)
             },
             item(.menuHoldAutoAdvance, enabled: { [weak self] in self?.model?.nextRow.showsHold ?? false }) { [weak self] in self?.model?.send(Actions.hold()) },
             // "The command bar, off by default (`commandBar`) ... ⌘K focuses it."
-            item(.menuCommandBar, key: "k", enabled: { [weak self] in self?.view?.keys.showsCommandBar ?? false }) { [weak self] in self?.view?.focusCommandBar() },
+            item(.menuCommandBar, key: "k", enabled: { [weak self] in (self?.view?.keys.showsCommandBar ?? false) && self?.model?.mode == .show }) { [weak self] in
+                self?.view?.focusCommandBar()
+            },
         ])
+        // Spec 10 §4 — "Mode: Show ⌘1; Edit ⌘2 (choice U-13)"; Spec 11 §2 — "While operator lock is on, Mode ▸ Edit
+        // ... [is] disabled with the reason".
         add(.menuMode, to: [
-            item(.menuShow, key: "1", state: { true }) {},
-            later(.menuEditMode, key: "2"),
+            item(.menuShow, key: "1", state: { [weak self] in self?.model?.mode != .edit }) { [weak self] in self?.view?.leaveEdit() },
+            item(.menuEditMode, key: "2", state: { [weak self] in self?.model?.mode == .edit },
+                 enabled: { [weak self] in self?.model?.editing.cannotOpen == nil }) { [weak self] in self?.view?.enterEdit() },
         ])
         add(.menuHelp, to: [
             // "The keys overlay (Help ▸ Keys, ⌘/, or ? in the top bar)".

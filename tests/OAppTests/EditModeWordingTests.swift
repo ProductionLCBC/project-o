@@ -117,6 +117,9 @@ final class EditModeWordingTests: XCTestCase {
     func test_theNoticeLineAndTheReadOnlyReasons() {
         XCTAssertEqual(EditModeWording.notice(.skipped(2)), "Skipped 2 cues that hold or clear this channel: there it would stay from here on")
         XCTAssertEqual(EditModeWording.notice(.warnings(["a", "b"])), "a · b")
+        // "naming where it shows: "On air on outputs 1 and 2: this shows at once."".
+        XCTAssertEqual(EditModeWording.notice(.onAir(outputs: [1, 2]), locale: english), "On air on outputs 1 and 2: this shows at once.")
+        XCTAssertEqual(EditModeWording.notice(.onAir(outputs: [3]), locale: english), "On air on output 3: this shows at once.")
         XCTAssertEqual(EditModeWording.notice(.notSent(.localCopy)), "Local copies are edited from v1.5")
         XCTAssertEqual(EditModeWording.notice(.notSent(.unavailable(.locked))), EditWording.reason(.unavailable(.locked)))
         XCTAssertEqual(EditModeWording.notice(.rejected(EngineRejection(code: "readOnlyLibrary", message: "x"))),

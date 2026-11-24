@@ -81,6 +81,15 @@ final class CueEditTableTests: XCTestCase {
         XCTAssertEqual(sent.outMs, 1500)
         XCTAssertTrue(sent.loop, "the fixture's write loops, and stays so")
         XCTAssertEqual(riders.transition?.ref, 2, "the same item: its riders stay")
+        // Another item picked with a trim is a new pick with those overrides, and the item's default grade for this cue only.
+        let ocean = try XCTUnwrap(try Recorded.media().first { $0.id.hasPrefix("sha256:9f2c") })
+        let picked = try XCTUnwrap(CueEdits.pick(MediaContent(ref: ocean.id, inMs: 2000, loop: true), defaultGrade: 1, channel: 1, cue: verse, list: 42))
+        guard case .edit(let pick) = picked.commands[0], case .cueChannel(let other) = pick.action,
+              case .write(.media(let item2), let riders2) = other.state else { return XCTFail("one edit.cueChannel") }
+        XCTAssertEqual(text(picked).count, 1)
+        XCTAssertEqual(item2.inMs, 2000)
+        XCTAssertEqual(riders2.transition?.ref, 2, "the transition rider stays, as on a drop")
+        XCTAssertEqual(riders2.grade, GradeRider(ref: 1, scope: .once))
         // "Loop only turns looping on, since a write can't refuse an item's own loop".
         XCTAssertTrue(CueEdits.loop(true, on: MediaContent(ref: "sha256:x")).loop)
         XCTAssertFalse(CueEdits.loop(false, on: MediaContent(ref: "sha256:x", loop: true)).loop)

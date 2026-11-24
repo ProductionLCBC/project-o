@@ -362,6 +362,21 @@ public final class ShowModel {
         browse(.playlist(uuid))
     }
 
+    /// Spec 11 §2 — in edit mode's Browser a click on a playlist opens it
+    /// to its items by §5's rule, and the show grid stays on what it browses.
+    public func expand(playlist uuid: String, option: Bool) {
+        expandedPlaylists = PlaylistTree.expanding(uuid, in: expandedPlaylists, option: option)
+        changed([.left])
+    }
+
+    /// Edit mode's list came from this playlist: the Browser's tree opens it
+    /// to its items, so the row of the list being edited shows (Spec 11 §2).
+    func showItems(ofPlaylist uuid: String) {
+        guard !expandedPlaylists.contains(uuid) else { return }
+        expandedPlaylists = [uuid]
+        changed([.left])
+    }
+
     public func toggle(folder path: String) {
         var open = Set(settings.openFolders)
         if open.contains(path) { open.remove(path) } else { open.insert(path) }

@@ -261,9 +261,12 @@ public enum Menus {
         /// "Hold, on the armed cue".
         public var isArmed: Bool
         public var cannotSend: Unavailable?
+        /// Why Edit Cue can't open edit mode: Spec 11 §2 — "While operator lock is on ... every entry above [is] disabled with the reason".
+        public var editCue: CannotEdit?
 
         public init(fire: CannotEdit? = nil, edit: CannotEdit? = nil, hasText: Bool = false, trigger: CueTrigger.Kind = .go, advanceAfterMs: Int? = nil,
-                    isArmed: Bool = false, cannotSend: Unavailable? = nil) {
+                    isArmed: Bool = false, cannotSend: Unavailable? = nil, editCue: CannotEdit? = nil) {
+            self.editCue = editCue
             self.fire = fire
             self.edit = edit
             self.hasText = hasText
@@ -287,7 +290,7 @@ public enum Menus {
                        MenuEntry(.triggerTime, reason: context.edit, isOn: isTime),
                        .separator,
                        MenuEntry(.advanceAfter, reason: context.edit, isOn: context.advanceAfterMs != nil)]
-        entries += [MenuEntry(.editCue, reason: .later), .separator, MenuEntry(.note, reason: context.edit),
+        entries += [MenuEntry(.editCue, reason: context.editCue), .separator, MenuEntry(.note, reason: context.edit),
                     MenuEntry(.triggerMenu, children: trigger), MenuEntry(.duplicateSection, reason: context.edit)]
         if context.isArmed { entries += [.separator, MenuEntry(.hold, reason: reason(context.cannotSend))] }
         return entries

@@ -312,6 +312,8 @@ final class TabsView: Surface {
     private(set) var labels: [NSTextField] = []
     private var drafts: [Int: String] = [:]
     private var clearAfter: [Int: Int?] = [:]
+    /// Spec 10 §7 — a macro tile's Edit: "edit mode's macro editor, which also makes, renames and removes macros, Spec 11 §9".
+    var onEditMacro: ((Int) -> Void)?
     private var durations: [Int: String] = [:]
     private var counting: [Int: Bool] = [:]
     static let barHeight: CGFloat = 34
@@ -477,11 +479,34 @@ final class TabsView: Surface {
             let made = button(title, frame: frame) { Actions.macro(macro.number) }
             made.fontSize = 11.5
             made.setAccessibilityLabel(Strings.text(.macrosTile, macro.number, macro.label))
+            made.menu = macroMenu(macro.number)
             let stripe = Surface(frame: NSRect(x: frame.minX + 6, y: frame.maxY - 7, width: frame.width - 12, height: 3))
             stripe.radius = 1.5
             stripe.fill = NSColor(srgbRed: macro.color.r, green: macro.color.g, blue: macro.color.b, alpha: 1)
             content.addSubview(stripe)
         }
+    }
+
+    /// Spec 10 §7 — "A tile's menu: Run; Bind a Key… (Settings ▸ Key bindings
+    /// with a new row for it); Edit (edit mode's macro editor ...)". Key
+    /// bindings are Area 17's, so Bind a Key… waits; Edit is disabled under
+    /// the lock with the reason (Spec 11 §2).
+    func macroMenu(_ number: Int) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let run = ClosureMenuItem(title: Strings.text(.editMacroRun)) { [weak model] in model?.send(Actions.macro(number)) }
+        run.isEnabled = model.store.cannotSend == nil
+        menu.addItem(run)
+        let bind = ClosureMenuItem(title: Strings.text(.editMacroBindKey)) {}
+        bind.isEnabled = false
+        bind.toolTip = Strings.text(.unavailableLater)
+        menu.addItem(bind)
+        let edit = ClosureMenuItem(title: Strings.text(.editMacroEdit)) { [weak self] in self?.onEditMacro?(number) }
+        let cannot = model.editing.cannotOpen
+        edit.isEnabled = cannot == nil
+        edit.toolTip = cannot.map(UnavailableWording.sentence)
+        menu.addItem(edit)
+        return menu
     }
 
     // "Popups, one row per popup slot ... Below, the timers (P9): one row per timer slot".

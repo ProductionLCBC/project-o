@@ -311,7 +311,7 @@ final class EditsViewTests: XCTestCase {
         let c = cell.cell.uuid
         let menu = rig.view.grid.cueMenu(for: cell)
         XCTAssertEqual(menu.titles, ["Fire", "Edit Text", "Edit Cue", "Note…", "Trigger", "  Go", "  Time after Previous…", "  Advance After…", "Duplicate Section"])
-        XCTAssertEqual(menu.items.first { $0.title == "Edit Cue" }?.isEnabled, false, "edit mode is Area 14's")
+        XCTAssertEqual(menu.items.first { $0.title == "Edit Cue" }?.isEnabled, true, "it opens edit mode's Cues page on the cue (Spec 11 §2)")
         XCTAssertEqual(menu.items.first { $0.title == "Trigger" }?.submenu?.items.first?.state, .on, "its trigger, Go, is ticked")
         try XCTUnwrap(menu.entry("Note…")).choose()
         let note = try XCTUnwrap(rig.view.prompt)
