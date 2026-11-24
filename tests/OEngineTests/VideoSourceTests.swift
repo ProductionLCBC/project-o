@@ -85,6 +85,40 @@ final class VideoSourceTests: XCTestCase {
         XCTAssertTrue(indices.contains(29) && indices.contains(0), "the loop went through the out-point and back to the in-point")
     }
 
+    /// Adam's try of 2026-11-24 — a clip looping back to an in point froze for about 0.2 s at every wrap: the reader
+    /// waiting at the in point decoded its run from the keyframe only when the out point came, while the queue's six
+    /// frames played out. Spec 4 §6 — "Seamless loops need the in-point ready before the out-point arrives." Read in
+    /// real time, as the render thread reads, without waiting on the decoder.
+    func test_aLoopBackToAnInPointMidGOPShowsNoFreeze() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "read in real time: hosted CI's machines keep no time")
+        let url = try ClipFixtures.url(for: ClipFixtures.h264LongGOP)
+        // In at 1.5 s, out at 2 s: each pass decodes 45 frames from the keyframe at 0 before its first, here 6 ms each.
+        let source = VideoFileSource(url: url, inMs: 1500, outMs: 2000, loop: true, device: nil,
+                                     demuxer: SlowPrerollDemuxer(msPerSample: 6), log: EngineLog(category: "test-video"))
+        source.start()
+        defer { source.release() }
+        XCTAssertTrue(waitUntil(15) { source.isReady }, "the first frame arrives")
+        _ = waitUntil(5) { source.queueDepth >= 5 }
+        var runs: [Int] = []   // how many ticks each frame stayed up
+        var last: Int?
+        var run = 0
+        let start = Date()
+        for tick in 0..<150 {
+            let wait = start.addingTimeInterval(Double(tick) / 60).timeIntervalSinceNow
+            if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+            let frame = index(source, at: 1500 + Double(tick) * 1000 / 60).1
+            if frame == last {
+                run += 1
+            } else {
+                if last != nil { runs.append(run) }
+                run = 1
+                last = frame
+            }
+        }
+        XCTAssertGreaterThanOrEqual(source.loops, 4)
+        XCTAssertLessThanOrEqual(runs.max() ?? 0, 3, "a 30 fps frame stays up two ticks, three at a clock's edge; a freeze stays longer: \(runs)")
+    }
+
     func test_everyCodecDecodesToItsNativeLayout() throws {
         let expectations: [(FixtureMedia.Clip, SourceLayout)] = [
             (ClipFixtures.hevc, .nv12),
@@ -243,5 +277,41 @@ final class FixtureMediaTests: XCTestCase {
         XCTAssertEqual(samples[Int(47_999) * 2], 0)
         XCTAssertNotEqual(samples[48_000 * 2], 0)
         XCTAssertEqual(samples.count, 2 * 48_000 * 2)
+    }
+}
+
+/// A demuxer whose reader takes `msPerSample` over each sample before the point it was opened at: the run from the
+/// keyframe that a long-GOP pre-roll decodes and drops (Spec 4 §6), made slow enough to outlast the frame queue.
+final class SlowPrerollDemuxer: Demuxer, @unchecked Sendable {
+    let name = "slow-preroll"
+    private let inner = AVAssetReaderDemuxer()
+    private let msPerSample: Double
+
+    init(msPerSample: Double) { self.msPerSample = msPerSample }
+
+    func open(_ url: URL, startMs: Double) throws -> any DemuxSession {
+        Session(inner: try inner.open(url, startMs: startMs), startMs: startMs, msPerSample: msPerSample)
+    }
+
+    final class Session: DemuxSession, @unchecked Sendable {
+        private let inner: any DemuxSession
+        private let startMs: Double
+        private let msPerSample: Double
+
+        init(inner: any DemuxSession, startMs: Double, msPerSample: Double) {
+            self.inner = inner
+            self.startMs = startMs
+            self.msPerSample = msPerSample
+        }
+
+        var description: DemuxedStream { inner.description }
+
+        func nextVideoSample() -> CompressedSample? {
+            let sample = inner.nextVideoSample()
+            if let sample, sample.presentationMs < startMs - 0.5 { Thread.sleep(forTimeInterval: msPerSample / 1000) }
+            return sample
+        }
+
+        func close() { inner.close() }
     }
 }
