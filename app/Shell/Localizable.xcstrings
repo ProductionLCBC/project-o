@@ -2029,6 +2029,30 @@
         }
       }
     },
+    "edit.blind" : {
+      "comment" : "Edit mode's top bar, the Blind and Live switch: moving the cue grid's selection only selects, nothing goes to air.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blind"
+          }
+        }
+      }
+    },
+    "edit.blindLive" : {
+      "comment" : "VoiceOver: the Blind and Live switch in edit mode's top bar.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blind or Live: what the arrow keys do in the cue grid"
+          }
+        }
+      }
+    },
     "edit.browser" : {
       "comment" : "VoiceOver: edit mode's left column, with its three tabs.",
       "extractionState" : "manual",
@@ -3513,6 +3537,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld cues of %2$lld"
+          }
+        }
+      }
+    },
+    "edit.live" : {
+      "comment" : "Edit mode's top bar, the Blind and Live switch: the arrow keys fire each cue they move the selection onto.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live"
           }
         }
       }

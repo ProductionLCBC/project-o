@@ -122,6 +122,15 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(bar.pagePicker.segments.map(\.title), ["Cues", "Text", "Stacks", "Channels", "Presets", "Objects"])
         XCTAssertEqual(bar.pagePicker.selected, 0)
         XCTAssertEqual(bar.pagePicker.segments.map(\.isEnabled), [true, false, true, true, true, true])
+        // "Beside it, Blind and Live": Blind, "which edit mode always opens in".
+        XCTAssertEqual(bar.blindLive.segments.map(\.title), ["Blind", "Live"])
+        XCTAssertEqual(bar.blindLive.selected, 0)
+        XCTAssertFalse(bar.blindLive.isHidden)
+        bar.blindLive.segments[1].press()
+        XCTAssertTrue(rig.model.editing.isLive)
+        XCTAssertEqual(bar.blindLive.selected, 1)
+        bar.blindLive.segments[0].press()
+        XCTAssertFalse(rig.model.editing.isLive)
         // "Right: the time of day; the saving pill, which reads "Saved" ...; and the engine pill".
         XCTAssertEqual(bar.saved.title, "Saved")
         XCTAssertEqual(bar.engine.title, "Engine")
