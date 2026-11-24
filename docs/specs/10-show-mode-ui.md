@@ -162,12 +162,12 @@ LAN clients also have `preview`, which the app doesn't use: a JPEG of each stack
 
 | Region | Contents | Size |
 | --- | --- | --- |
-| Top bar | Status, and a few buttons (§8) | 38 points high |
+| Top bar | Status, and a few buttons (§8) | 44 points high |
 | Left column | Playlists window over Library window (§5) | 248 points wide by default, 200 to 360 |
 | Center | Cue grid over the Media pool panel (§6) | The rest |
 | Right column | Preview, next row, tabbed panel, channel strip (§7) | 380 points wide by default, 340 to 480 |
 
-Edit mode lays the window out its own way, with the same top bar taller (Spec 11 §2).
+Edit mode lays the window out its own way, with the same top bar (Spec 11 §2). Both modes draw their regions alike (Adam, 2026-11-24, for one look across the app): each a panel with a hairline outline and rounded corners, on the darker ground between panels, 4 points apart, as Adam's drawing of edit mode has them.
 
 The window is at least 1440 by 900 points, or the screen's visible area where that is smaller, as on a 1440-by-900 laptop under its menu bar (S9), and it can go full screen. While it is less than 1000 points high the tabbed panel collapses to its tab bar, at launch and on resize, whatever `view.json` says, and the strip takes the space; above that, `view.json`'s state applies.
 
@@ -211,7 +211,7 @@ P is the playlist's uuid and I the item's, as Spec 7 §3 has them. The menus sho
 - **Folders** expand and collapse, and the open ones are remembered (§4). Double-click or the menu renames one in place (`edit folder "A" rename "B"`). New Folder opens a name field and sends `edit folder "PATH" create` with the name typed. Delete Folder is enabled only for an empty folder (`… delete`).
 - **Dragging** a list onto a folder moves it (`edit list N folder "PATH"`), onto the tree's empty space moves it to the top (`""`), and onto a playlist in the Playlists window inserts it there. A folder dragged onto another moves into it (a rename with the new parent).
 - **A list's menu:** Add to Playlist ▸ (the playlists, appending a linked item); Rename (in place; the list's `title`); Duplicate (`edit list N duplicate`); Open in Text Editor (Spec 11 §5); Restore a Version… (§14); Delete… (`edit list N delete`, after a confirmation naming the playlists that link it, from `listUse`); New List Here.
-- **New List** (⇧⌘N, or New List Here) sends `edit list create folder "PATH"` for the selected folder, or `edit list create` at the top, and browses the new, empty list, which its result names (§3) and which edit mode's Cues page or text editor then fills (Spec 11 §4, §5).
+- **New List** (⇧⌘N, or New List Here) opens a title field in the tree, in the selected folder or at the top, holding "New List", selected, as New Playlist opens one (Adam, 2026-11-24). Return sends `edit list create folder "PATH" {"title": "TITLE"}`, or `edit list create {"title": "TITLE"}` at the top, the field's text or "New List" if it was emptied, and Escape makes no list. The app browses the new, empty list, which its result names (§3) and which edit mode's Cues page or text editor then fills (Spec 11 §4, §5).
 
 ## 6. The center
 
@@ -301,7 +301,7 @@ Status, with a few buttons. This section is show mode's bar; edit mode's holds S
 2. **An open menu** takes every key until it closes, ⇧⎋ included, as macOS has it; the keys overlay says so.
 3. **A file dialog**, or a list that has the focus in a sheet or popover, takes every key but ⇧⎋.
 4. **A text field** takes every key but ⇧⎋, a binding that includes `ctrl`, and the function keys `f1` to `f20` (the UX spec's focus rule, made exact). So a `shift+` or `alt+` binding on a character key doesn't fire while someone types, which the Key bindings page says when one is made.
-5. **In edit mode, a focused cue grid, canvas, or list in the workspace or the inspector** takes the arrows, with ⇧ or ⌥, and Delete and Forward Delete (Spec 11 §2).
+5. **In edit mode, a focused cue grid, canvas, or list in the workspace or the inspector** takes the arrows, with ⇧ or ⌥, Return, and Delete and Forward Delete (Spec 11 §2).
 6. **A sheet or popover** takes Return and plain Escape.
 
 So ⇧⎋ sends `system clearall` everywhere but in the recorder and an open menu (R1), and only plain Escape closes or cancels. A button that deletes, restores or quits is never a sheet's default, so Return can't press it.
