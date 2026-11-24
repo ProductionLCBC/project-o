@@ -43,6 +43,39 @@ final class EditFrameTests: XCTestCase {
         XCTAssertEqual(wide.browser.height, 1080 - 48 - 4)
     }
 
+    /// Spec 11 §2 as corrected 2026-11-24 — "The gaps beside the Browser, the monitors and the inspector drag to resize
+    /// them: the Browser from 200 to 420 points wide, the monitors from 260 to 560, the inspector from 180 to 420 points
+    /// high, the workspace keeping at least 360 by 200".
+    func test_thePanelsResizeWithinTheirLimitsAndTheWorkspaceKeepsItsRoom() {
+        let sized = EditFrame.make(width: 1440, height: 900, browser: 320, monitors: 420, inspector: 300)
+        XCTAssertEqual(sized.browser.width, 320)
+        XCTAssertEqual(sized.preview.width, 420)
+        XCTAssertEqual(sized.program.width, 420)
+        XCTAssertEqual(sized.inspector.height, 300)
+        XCTAssertEqual(sized.inspector.y, 900 - 4 - 300)
+        XCTAssertEqual(sized.workspace.x, 4 + 320 + 4)
+        XCTAssertEqual(sized.workspace.width, 1440 - 4 * 4 - 320 - 420)
+        XCTAssertEqual(sized.inspector.x, sized.workspace.x)
+        // Each held to its limits.
+        let limits = EditFrame.make(width: 1920, height: 1080, browser: 100, monitors: 900, inspector: 50)
+        XCTAssertEqual(limits.browser.width, 200)
+        XCTAssertEqual(limits.preview.width, 560)
+        XCTAssertEqual(limits.inspector.height, 180)
+        // The workspace keeps 360 points: the monitors give way first, down to theirs, then the Browser.
+        let tight = EditFrame.make(width: 1100, height: 900, browser: 420, monitors: 560)
+        XCTAssertEqual(tight.workspace.width, 360)
+        XCTAssertEqual(tight.browser.width, 420)
+        XCTAssertEqual(tight.preview.width, 1100 - 16 - 420 - 360)
+        let tighter = EditFrame.make(width: 900, height: 900, browser: 420, monitors: 560)
+        XCTAssertEqual(tighter.workspace.width, 360)
+        XCTAssertEqual(tighter.preview.width, 260)
+        XCTAssertEqual(tighter.browser.width, 900 - 16 - 260 - 360)
+        // And 200 points of height: the inspector gives way.
+        let short = EditFrame.make(width: 1440, height: 650, inspector: 420)
+        XCTAssertEqual(short.workspace.height, 200)
+        XCTAssertEqual(short.inspector.height, 650 - 48 - 200 - 4 - 4)
+    }
+
     func test_aBannerOverTheBarPushesEveryRegionDown() {
         // Spec 10 §2's banner stands over the top bar in both modes.
         let frame = EditFrame.make(width: 1440, height: 900, top: 30)
@@ -78,8 +111,15 @@ final class EditFrameTests: XCTestCase {
         settings.editPage = .stacks
         settings.browserTab = .media
         settings.mediaView = .list
-        settings.gridZoom = 64
+        settings.gridZoom = 88
         settings.foldedRows = [1: true, 3: false]
+        // "`view.json` keeps the sizes" (corrected 2026-11-24); nil monitors are a quarter of the window.
+        XCTAssertEqual(settings.editBrowserWidth, 260)
+        XCTAssertNil(settings.editMonitorsWidth)
+        XCTAssertEqual(settings.editInspectorHeight, 250)
+        settings.editBrowserWidth = 300
+        settings.editMonitorsWidth = 400
+        settings.editInspectorHeight = 320
         settings.editPlaylist = Recorded.sunday
         settings.editItem = "ae3aafe3-0000-4000-8000-000000000000"
         settings.editList = Recorded.list42
@@ -96,7 +136,7 @@ final class EditFrameTests: XCTestCase {
         let settings = ViewSettingsFile.settings(from: Data(text.utf8))
         XCTAssertEqual(settings.editPage, .cues, "a page this build doesn't know")
         XCTAssertEqual(settings.browserTab, .playlists)
-        XCTAssertEqual(settings.gridZoom, 240, "held inside the zoom's range")
+        XCTAssertEqual(settings.gridZoom, 480, "held inside the zoom's range")
         XCTAssertEqual(settings.mediaView, .list)
         XCTAssertEqual(settings.foldedRows, [:], "a map that doesn't read whole is left out")
     }

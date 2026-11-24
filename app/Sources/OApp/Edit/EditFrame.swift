@@ -74,13 +74,37 @@ public struct EditFrame: Equatable, Sendable {
     public var program: Box
     public var inspector: Box
 
+    /// Spec 11 §2 — "the Browser from 200 to 420 points wide, the monitors
+    /// from 260 to 560, the inspector from 180 to 420 points high, the
+    /// workspace keeping at least 360 by 200" (corrected 2026-11-24).
+    public static let browserRange: ClosedRange<Double> = 200...420
+    public static let monitorsRange: ClosedRange<Double> = 260...560
+    public static let inspectorRange: ClosedRange<Double> = 180...420
+    public static let workspaceMinimum = (width: 360.0, height: 200.0)
+
     /// The regions of a window `width` by `height`, with `top` points taken
-    /// above the top bar by the banner (Spec 10 §2).
-    public static func make(width: Double, height: Double, top: Double = 0) -> EditFrame {
+    /// above the top bar by the banner (Spec 10 §2), at the sizes the
+    /// operator dragged the panels to: each held to its limits, then the
+    /// monitors giving way to the workspace's width before the Browser, and
+    /// the inspector to its height. Nil monitors are a quarter of the window.
+    public static func make(width: Double, height: Double, top: Double = 0, browser: Double = browserWidth, monitors: Double? = nil,
+                            inspector: Double = inspectorHeight) -> EditFrame {
+        func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double { min(range.upperBound, max(range.lowerBound, value)) }
         let gap = Self.gap
         let bodyTop = top + topBarHeight + gap
         let bottom = height - gap
-        let monitors = monitorsWidth(window: width)
+        var browserWidth = clamp(browser, browserRange)
+        var monitors = clamp(monitors ?? monitorsWidth(window: width), monitorsRange)
+        var short = workspaceMinimum.width - (width - 4 * gap - browserWidth - monitors)
+        if short > 0 {
+            let given = min(short, monitors - monitorsRange.lowerBound)
+            monitors -= given
+            short -= given
+            browserWidth -= max(0, min(short, browserWidth - browserRange.lowerBound))
+        }
+        var inspectorHeight = clamp(inspector, inspectorRange)
+        let low = workspaceMinimum.height - (bottom - inspectorHeight - gap - bodyTop)
+        if low > 0 { inspectorHeight -= max(0, min(low, inspectorHeight - inspectorRange.lowerBound)) }
         let centerX = gap + browserWidth + gap
         let monitorsX = width - gap - monitors
         let inspectorY = bottom - inspectorHeight

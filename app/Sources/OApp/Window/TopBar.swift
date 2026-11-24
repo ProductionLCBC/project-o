@@ -222,6 +222,13 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var gridZoom = CueGridZoom.standard
     /// Spec 11 §4 — "a row the operator folds or opens stays so for every list, by channel number".
     public var foldedRows: [Int: Bool] = [:]
+    /// Spec 11 §2 — "The gaps beside the Browser, the monitors and the
+    /// inspector drag to resize them ... `view.json` keeps the sizes"
+    /// (corrected 2026-11-24). Nil monitors are "a quarter of the window's
+    /// width, from 300 to 380 points".
+    public var editBrowserWidth = EditFrame.browserWidth
+    public var editMonitorsWidth: Double?
+    public var editInspectorHeight = EditFrame.inspectorHeight
 
     public init() {}
 
@@ -273,13 +280,25 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)
         read(.foldedRows, into: &foldedRows)
+        read(.editBrowserWidth, into: &editBrowserWidth)
+        read(.editMonitorsWidth, into: &editMonitorsWidth)
+        read(.editInspectorHeight, into: &editInspectorHeight)
         gridZoom = CueGridZoom.clamped(gridZoom)
+        clampEditSizes()
         // What was read is held to what the window allows.
         leftColumnWidth = Self.clampedLeft(leftColumnWidth)
         rightColumnWidth = Self.clampedRight(rightColumnWidth)
         leftSplit = min(0.8, max(0.2, leftSplit))
         if recentMedia.count > 20 { recentMedia.removeLast(recentMedia.count - 20) }
         if let frame = windowFrame, frame.count != 4 || frame.contains(where: { !$0.isFinite }) || frame[2] <= 0 || frame[3] <= 0 { windowFrame = nil }
+    }
+
+    /// Edit mode's sizes held to Spec 11 §2's limits.
+    public mutating func clampEditSizes() {
+        func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double { value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : range.lowerBound }
+        editBrowserWidth = clamp(editBrowserWidth, EditFrame.browserRange)
+        editMonitorsWidth = editMonitorsWidth.map { clamp($0, EditFrame.monitorsRange) }
+        editInspectorHeight = clamp(editInspectorHeight, EditFrame.inspectorRange)
     }
 
     /// "the last thing browsed", as the grid names what it shows.

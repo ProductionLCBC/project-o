@@ -650,6 +650,7 @@ public final class ShowModel {
         settings.leftColumnWidth = ViewSettings.clampedLeft(settings.leftColumnWidth)
         settings.rightColumnWidth = ViewSettings.clampedRight(settings.rightColumnWidth)
         settings.leftSplit = min(0.8, max(0.2, settings.leftSplit))
+        settings.clampEditSizes()
         changed([.layout])
     }
 

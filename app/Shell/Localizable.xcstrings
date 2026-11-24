@@ -3133,6 +3133,42 @@
         }
       }
     },
+    "edit.divider.browser" : {
+      "comment" : "VoiceOver: the divider between edit mode's Browser and the workspace.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width of the Browser"
+          }
+        }
+      }
+    },
+    "edit.divider.inspector" : {
+      "comment" : "VoiceOver: the divider above edit mode's inspector.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Height of the inspector"
+          }
+        }
+      }
+    },
+    "edit.divider.monitors" : {
+      "comment" : "VoiceOver: the divider between edit mode's workspace and the Preview and Program monitors.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width of the monitors"
+          }
+        }
+      }
+    },
     "edit.engine" : {
       "comment" : "Edit mode's top bar: the pill that says how the engine is.",
       "extractionState" : "manual",

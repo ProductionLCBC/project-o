@@ -37,6 +37,10 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     let leftDivider = DividerView(axis: .columns, label: Strings.text(.dividerLeft))
     let rightDivider = DividerView(axis: .columns, label: Strings.text(.dividerRight))
     let poolDivider = DividerView(axis: .rows, label: Strings.text(.dividerPool))
+    /// Spec 11 §2 — "The gaps beside the Browser, the monitors and the inspector drag to resize them".
+    let browserDivider = DividerView(axis: .columns, label: Strings.text(.editDividerBrowser))
+    let monitorsDivider = DividerView(axis: .columns, label: Strings.text(.editDividerMonitors))
+    let inspectorDivider = DividerView(axis: .rows, label: Strings.text(.editDividerInspector))
     /// What a divider's column or panel measured when its drag began.
     private var dragStart = 0.0
     /// The pool's height while its divider is being dragged; it snaps to a state when the drag ends.
@@ -101,7 +105,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         super.init(frame: .zero)
         fill = Palette.window
         for view in [grid, commandBar, pool, browser, left, workspace, previewPanel, programPanel, inspector, preview, nextRow, tabs, strip, topBar, banner,
-                     leftDivider, rightDivider, poolDivider] as [NSView] {
+                     leftDivider, rightDivider, poolDivider, browserDivider, monitorsDivider, inspectorDivider] as [NSView] {
             addSubview(view)
         }
         for view in [browser, workspace, previewPanel, programPanel, inspector] as [NSView] { view.isHidden = true }
@@ -162,6 +166,25 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             self.model.change { $0.panel = PoolDivider.snap(height: Double(height), center: center, collapsed: Double(PoolView.collapsedHeight)) }
         }
         poolDivider.onDoubleClick = { [weak self] in self?.model.change { $0.panel = PoolDivider.toggled($0.panel) } }
+        // Edit mode's: each starts from the size the panel has now, as laid out, and `view.json` keeps where it ends.
+        browserDivider.onBegin = { [weak self] in self?.dragStart = Double(self?.browser.frame.width ?? 0) }
+        browserDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            let start = self.dragStart
+            self.model.resize { $0.editBrowserWidth = start + Double(delta) }
+        }
+        monitorsDivider.onBegin = { [weak self] in self?.dragStart = Double(self?.previewPanel.frame.width ?? 0) }
+        monitorsDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            let start = self.dragStart
+            self.model.resize { $0.editMonitorsWidth = start - Double(delta) }
+        }
+        inspectorDivider.onBegin = { [weak self] in self?.dragStart = Double(self?.inspector.frame.height ?? 0) }
+        inspectorDivider.onDrag = { [weak self] delta in
+            guard let self else { return }
+            let start = self.dragStart
+            self.model.resize { $0.editInspectorHeight = start - Double(delta) }
+        }
         left.onShowItem = { [weak self] item in self?.grid.scrollTo(item: item) }
         topBar.onOutput = { [weak self] dot, anchor in self?.showOutput(dot, at: anchor) }
         model.onChange = { [weak self] changes in self?.refresh(changes) }
@@ -588,7 +611,9 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         let editing = model.mode == .edit
         for view in [grid, pool, preview, nextRow, tabs, strip, leftDivider, rightDivider, poolDivider] as [NSView] { view.isHidden = editing }
         commandBar.isHidden = editing || !keys.showsCommandBar
-        for view in [browser, workspace, previewPanel, programPanel, inspector] as [NSView] { view.isHidden = !editing }
+        for view in [browser, workspace, previewPanel, programPanel, inspector, browserDivider, monitorsDivider, inspectorDivider] as [NSView] {
+            view.isHidden = !editing
+        }
         fill = editing ? Palette.gut : Palette.window
         let tab = editing ? model.settings.browserTab : nil
         left.isHidden = tab == .media
@@ -697,7 +722,9 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         banner.frame = NSRect(x: 0, y: 0, width: w, height: bannerHeight)
         if model.mode == .edit {
             // Spec 11 §2 — "Edit mode keeps the main window and lays it out its own way".
-            let frame = EditFrame.make(width: Double(w), height: Double(bounds.height), top: Double(bannerHeight))
+            let settings = model.settings
+            let frame = EditFrame.make(width: Double(w), height: Double(bounds.height), top: Double(bannerHeight), browser: settings.editBrowserWidth,
+                                       monitors: settings.editMonitorsWidth, inspector: settings.editInspectorHeight)
             func rect(_ box: EditFrame.Box) -> NSRect { NSRect(x: box.x, y: box.y, width: box.width, height: box.height) }
             topBar.frame = rect(frame.topBar)
             browser.frame = rect(frame.browser)
@@ -705,6 +732,13 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             previewPanel.frame = rect(frame.preview)
             programPanel.frame = rect(frame.program)
             inspector.frame = rect(frame.inspector)
+            // The dividers sit in the gaps, a few points either side of each.
+            let thick = DividerView.thickness
+            let gap = CGFloat(EditFrame.gap)
+            browserDivider.frame = NSRect(x: browser.frame.maxX + gap / 2 - thick / 2, y: browser.frame.minY, width: thick, height: browser.frame.height)
+            monitorsDivider.frame = NSRect(x: previewPanel.frame.minX - gap / 2 - thick / 2, y: workspace.frame.minY, width: thick,
+                                           height: workspace.frame.height)
+            inspectorDivider.frame = NSRect(x: inspector.frame.minX, y: inspector.frame.minY - gap / 2 - thick / 2, width: inspector.frame.width, height: thick)
             // The Playlists and Library tabs are show mode's own two windows, laid over the Browser's body.
             left.frame = browser.frame.insetBy(dx: 1, dy: 1).offsetBy(dx: 0, dy: 0)
             left.frame.origin.y += PanelView.headerHeight

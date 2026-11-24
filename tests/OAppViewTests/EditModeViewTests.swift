@@ -410,6 +410,31 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["item 2 cue 3"])
     }
 
+    /// Spec 11 §2 as corrected 2026-11-24 — "The gaps beside the Browser, the monitors and the inspector drag to resize
+    /// them ... `view.json` keeps the sizes."
+    func test_theGapsDragToResizeTheBrowserTheMonitorsAndTheInspector() throws {
+        let rig = try editing()
+        let view = rig.view
+        XCTAssertFalse(view.browserDivider.isHidden)
+        let (browser, monitors, inspector) = (view.browser.frame.width, view.previewPanel.frame.width, view.inspector.frame.height)
+        view.browserDivider.onBegin?()
+        view.browserDivider.onDrag?(40)
+        view.monitorsDivider.onBegin?()
+        view.monitorsDivider.onDrag?(-30)
+        view.inspectorDivider.onBegin?()
+        view.inspectorDivider.onDrag?(-20)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.browser.frame.width, browser + 40)
+        XCTAssertEqual(view.previewPanel.frame.width, monitors + 30, "dragged left, the monitors widen")
+        XCTAssertEqual(view.inspector.frame.height, inspector + 20, "dragged up, the inspector grows")
+        XCTAssertEqual(rig.model.settings.editBrowserWidth, Double(browser + 40))
+        XCTAssertEqual(rig.model.settings.editMonitorsWidth, Double(monitors + 30))
+        XCTAssertEqual(rig.model.settings.editInspectorHeight, Double(inspector + 20))
+        // Show mode has none of them.
+        rig.model.editing.leave()
+        XCTAssertTrue(view.browserDivider.isHidden && view.monitorsDivider.isHidden && view.inspectorDivider.isHidden)
+    }
+
     /// Spec 11 §4 as corrected 2026-11-24 — "A click on a band selects its run's cues", and "A drag that starts on a
     /// selected header, or on a band, moves every selected cue, in their order, as one group".
     func test_aBandSelectsItsCuesAndADragMovesEverySelectedCue() throws {
