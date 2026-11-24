@@ -29,7 +29,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | merged | Adam's `approved` on 2026-11-18 as built, with every reading in the brief and its recommended answers; the Spec 10 §14, §15 and §18 corrections applied on the branch (51abfca), `area/show` merged into `main` with `--no-ff` (02bff6f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. He went over the app himself that day and found it generally ok, with problems pausing and seeking to track down later (Needs Adam, Decisions). The last stage's checks on a screen and the system's accessibility audit are still owed; Adam lifted his pause on display tests on 2026-11-18, in the Area 14 session, and neither has been run yet. Edit mode's entries wait for Area 14, Open in Text Editor for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. |
-| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress | In progress on `area/edit` since 2026-11-18: Adam approved the plan that day and lifted the bench-run gate for this area (cabc1ab; Spec 4 §15, Spec 11 §11, `docs/build-order.md` and `app/README.md` say so since that day, and Areas 10, 17 and 18 and Area 7's bench verification still wait). His four answers with the plan: the gate; a stack is drawn at the size of the output showing it, at a live switch too, so the engine is brought to Spec 4 §5 and a stack switched onto an output of another size is rebuilt on that tick (the larger of the choices offered, and not the one recommended); a box keeps its previous lines until the new raster is ready, for a look edit and for a variable's new value alike, counting nothing late, which also answers the soak's once-a-minute blank clock; and a channel sounding on an audio output is on air, so it can't be deleted, renumbered or swapped until it is cleared. With the plan he approved the spec corrections those take, to go on the branch first (Spec 5 §1 and §2, a channel or stack that is made or deleted gains or loses its ShowState entry; Spec 9 §6, the channel-list bullet goes; Spec 4 §5, §8 and §9; Spec 5 §6, check 7), and the plan's readings: the engine refuses a transition's `create` and `duplicate` and keeps its `type` and `color` read-only; a macro that would leave the machine root on a `readOnlyMasters` machine is `readOnlyLibrary`; a stack's mute of a channel goes with that channel's slot; Edit in Stack Editor's menu entry comes with Area 17's Settings, its way in built here; the Text page shows disabled until Area 10. The order: the engine side first (the `core/` fix of a machine-level renumber, wider than Housekeeping recorded; the edits with their checks, warnings and inverses; resources rebuilt between ticks; `render` and `uses`), then a stop for review with a mockup of the edit bar and the Cues page; the frame and the Cues page, and a stop; the stack editor, the channel sheet and the preset editor, and a stop; then the small editors and the brief. It changes the frame path, so a green soak is owed before its merge, in a window Adam sets. **At its first review stop since 2026-11-21:** the engine side is on the branch (74e98f9, fifteen commits, `swift test` green at 2178 tests with 2 skipped, hosted CI green), and the session waits on Adam before it starts the app. On the branch: the spec corrections; the machine-level renumber fix; the edits of channels, stacks and slots, presets, text styles, grades, transitions, audio transitions, macros and an output's default stack and transitions, with their checks, warnings and inverses and their files; the textures made again between ticks, at a live switch too; the hold of previous lines; a snapshot with another channel list restoring; `render` and `uses`; the thumbnail job following an edit of its stack; and an editing client for the soak. Three faults found on `main` are fixed there with tests (Needs Adam). On Adam's word of 2026-11-21 the engine side was then run on the real engine that day: two three-hour soaks with an editing client, the second holding every display, GPU, text, audio and watchdog line and failing only the two memory lines `main` fails (Now). The app's stages wait for his changes to the mockup. |
+| 14 | Edit mode, minimal: the Cues page with the inspector and palette, stack editor, channel sheet, preset editor with text styles, small editors for grades, transitions, audio transitions and macros; the render and uses queries | `specs/11-edit-mode.md` | in progress | In progress on `area/edit` since 2026-11-18: Adam approved the plan that day and lifted the bench-run gate for this area (cabc1ab; Spec 4 §15, Spec 11 §11, `docs/build-order.md` and `app/README.md` say so since that day, and Areas 10, 17 and 18 and Area 7's bench verification still wait). His four answers with the plan: the gate; a stack is drawn at the size of the output showing it, at a live switch too, so the engine is brought to Spec 4 §5 and a stack switched onto an output of another size is rebuilt on that tick (the larger of the choices offered, and not the one recommended); a box keeps its previous lines until the new raster is ready, for a look edit and for a variable's new value alike, counting nothing late, which also answers the soak's once-a-minute blank clock; and a channel sounding on an audio output is on air, so it can't be deleted, renumbered or swapped until it is cleared. With the plan he approved the spec corrections those take, to go on the branch first (Spec 5 §1 and §2, a channel or stack that is made or deleted gains or loses its ShowState entry; Spec 9 §6, the channel-list bullet goes; Spec 4 §5, §8 and §9; Spec 5 §6, check 7), and the plan's readings: the engine refuses a transition's `create` and `duplicate` and keeps its `type` and `color` read-only; a macro that would leave the machine root on a `readOnlyMasters` machine is `readOnlyLibrary`; a stack's mute of a channel goes with that channel's slot; Edit in Stack Editor's menu entry comes with Area 17's Settings, its way in built here; the Text page shows disabled until Area 10. The order: the engine side first (the `core/` fix of a machine-level renumber, wider than Housekeeping recorded; the edits with their checks, warnings and inverses; resources rebuilt between ticks; `render` and `uses`), then a stop for review with a mockup of the edit bar and the Cues page; the frame and the Cues page, and a stop; the stack editor, the channel sheet and the preset editor, and a stop; then the small editors and the brief. It changes the frame path, so a green soak is owed before its merge, in a window Adam sets. **At its first review stop since 2026-11-21:** the engine side is on the branch (74e98f9, fifteen commits, `swift test` green at 2178 tests with 2 skipped, hosted CI green), and the session waits on Adam before it starts the app. On the branch: the spec corrections; the machine-level renumber fix; the edits of channels, stacks and slots, presets, text styles, grades, transitions, audio transitions, macros and an output's default stack and transitions, with their checks, warnings and inverses and their files; the textures made again between ticks, at a live switch too; the hold of previous lines; a snapshot with another channel list restoring; `render` and `uses`; the thumbnail job following an edit of its stack; and an editing client for the soak. Three faults found on `main` are fixed there with tests (Needs Adam). On Adam's word of 2026-11-21 the engine side was then run on the real engine that day: two three-hour soaks with an editing client, the second holding every display, GPU, text, audio and watchdog line and failing only the two memory lines `main` fails (Now). On 2026-11-22 Adam drew edit mode himself: a cue grid like a video editor's timeline, a Browser, Preview and Program monitors, and the inspector across the bottom. He asked that it be kept as far as possible and answered seven questions about it; Spec 11 §2 and §4 were rewritten from it on the branch before any app code (6178bab), with his answers (G-1 to G-7) and the session's readings of what they left open (G-8 to G-23) in its §14. **At its second review stop since 2026-11-24:** the frame and the Cues page are built on the branch (b76e83b; `swift test` green at 2263 tests with 2 skipped), and the session waits on Adam for a look at the renders, a try of the app and the readings. The Stacks, Channels, Presets and Objects pages show an empty workspace until their stages. |
 | 15 | Macros, basic: command lists without guards, the clears tab | `specs/2-commands.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief; `area/macros` merged into `main` with `--no-ff` (8ae03ef), with its Spec 2 §3, §5, §6, §9 and Spec 1 §2 corrections (1894f17); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 16 | Audio, basic: routing to numbered outputs, gain | `specs/4-render-pipeline.md` §11 | merged | Adam's `approved` on 2026-11-04 with every reading as built; `area/audio` merged into `main` with `--no-ff` (89641e9), branch and worktree removed, task `shipped`. The hardware path (a real device unplugged, a card) waits for the bench. |
 | 17 | Settings: outputs, audio outputs, key bindings, media, startup and backup, the lock page, variables, tracking, thumbnails and engine, network, command bar | `specs/10-show-mode-ui.md` | not started | Spec 10 accepted 2026-11-08, its prompt block in `docs/build-order.md`, to start after Areas 13 and 14. Its `edit machine mediaRoot` refuses a root where media may not live with the check Area 8 built (`MediaPlaces`, on `main`; Adam's answer to Area 8's plan). Area 19 left it these: an edit of the campus name or the API port reaches Bonjour and the listener only at the next launch, a screen's mode change moves only the output's window (its render size and rate stay its `format`), and the Mach channel sends a stack's surfaces again through one entry point when its size changes. |
@@ -106,15 +106,39 @@ pushed; `swift test` not yet run whole on the branch, the suites touched are gre
 2026-11-18 and lifted the bench-run gate for this area, on his word and with the date, in
 each place the gate is written (Spec 4 §15, Spec 11 §11, `docs/build-order.md`,
 `app/README.md`; cabc1ab). His four answers with the plan are in row 14 above. **The
-session is at its first review stop, since 2026-11-21:** the engine side is built on the
-branch (74e98f9; `swift test` green there at 2178 tests, 2 skipped; hosted CI green on
-every push), and nothing of the app is started. The stop's report is the session's last
-message, with a mockup of the edit bar and the Cues page
-(`nimbalyst-local/mockups/edit-mode-cues-page.mockup.html`, in the main folder,
-uncommitted). Adam read the stop on 2026-11-21 and has changes to the mockup, which he
-gives later; the app's stages wait for them. Meanwhile, on his word that day ("free to do
-any testing for any amount of time"), the engine side ran on the real engine, a release
-build of the branch, sound into BlackHole, the LAN off:
+session is at its second review stop, since 2026-11-24:** the frame and the Cues page are
+built on the branch (b76e83b; `swift test` green there at 2263 tests, 2 skipped). The
+stop's report is the session's last message, with three offscreen renders, and the app
+is built from the branch for Adam's try on his try-out roots
+(`.claude/worktrees/area-edit/.build/xcode/Build/Products/Debug/Project O.app`).
+
+Adam drew edit mode himself on 2026-11-22, in place of the session's mockup
+(`docs/mockups/edit-mode-cue-grid.mockup.html` on the branch): a cue grid like a video
+editor's timeline, cues across and channels down; a Browser with Playlists, Library and
+Media tabs; Preview over Program; the inspector across the bottom; the page picker in
+the top bar. He asked that it be kept as far as possible, "even if this means rewriting
+the original show mode at a later point to be consistent", and answered seven questions
+about it. Spec 11 §2 and §4 were rewritten from the drawing before any app code
+(6178bab), and its §14 holds his answers (G-1 to G-7) and the session's readings of what
+they left open (G-8 to G-23), which wait for him (Needs Adam).
+
+What is built of the app: the ways in (Mode ▸ Edit, Edit in the top bar, Edit Cue, a
+double-click on a cue that isn't text, Edit on a macro tile) and out, the lock closing
+it, and Escape leaving it last; the top bar with the page picker, "Saved" and the engine
+pill; the Browser, its Media tab the pool as a grid or a list; the cue grid with its
+section band, thumbnails, tiles, hold bars and clear caps, the zoom, folding rows,
+headers dragged to a new place and drops on a cell; Preview from the engine's `render`
+and Program with the go-to field, Next and Clear All; the inspector's four columns with
+the content popover, the chips, the palette's forms and commands as text; multi-cue
+editing; the notice line; and `view.json` keeping the page, the selection, the zoom and
+the folds. Not built yet: the Stacks, Channels, Presets and Objects pages, which show an
+empty workspace; VoiceOver listened to and the strings under the pseudolanguages, which
+are the last stage's; the Text page, which is Area 10's. Edit mode has been drawn
+offscreen and driven by tests only: nobody has yet used it on a screen.
+
+The engine side was at its first stop on 2026-11-21. On Adam's word that day ("free to
+do any testing for any amount of time") it ran on the real engine, a release build of
+the branch, sound into BlackHole, the LAN off:
 
 - **Two three-hour soaks** in the configuration of 2026-11-16 (both screens, both outputs
   1920 by 1080), each with the soak's new editing client making and removing a stack and a
@@ -181,12 +205,29 @@ the same day: approved as built, with its recommended answers, merged (02bff6f).
 
 ### Decisions
 
-- **Area 14's first review stop** (2026-11-21; the report is the session's last message).
-  - *The readings and the mockup.* The engine side's readings are listed in the report,
-    with what was chosen and the alternative; the mockup is the edit bar and the Cues page
-    in the approved dark look. A word on either changes what the app's stages build.
-  - *The mockup.* Adam has changes to it and gives them later; the frame and the Cues
-    page wait for them.
+- **Area 14's second review stop** (2026-11-24; the report is the session's last message).
+  - *The renders and a try.* Three offscreen renders of edit mode are in the report, and
+    the app is built from the branch on his try-out roots. A word on the look changes
+    what the next stages draw.
+  - *The readings of his drawing, G-8 to G-23* (Spec 11 §14 on the branch): what the
+    drawing and his seven answers left open, each with what was chosen and the
+    alternative. The ones most worth a look: a cue's header keeps its number, trigger and
+    label round the thumbnail (G-8); the zoom runs from 24 to 240 points (G-9); Delete
+    on a channel's row returns the cells to Hold, and on the header row deletes the cues
+    (G-11); Program shows the stack Preview's picker names (G-13); the top bar shows
+    "Saved" and the engine pill at rest and anything wrong beside them (G-14); the
+    panels' sizes are fixed (G-17); nothing in the Browser writes live (G-18).
+  - *Readings from building it,* not yet in the spec: a command's Edit… opens it as one
+    line of canonical text, where the palette's Add has forms with pickers; leaving edit
+    mode waits for the engine's answer to an edit just sent, which is how a refused
+    commit keeps it open, and a second try leaves; the on-air note is said for a cue
+    among the three after the live cue while an output shows a stack that draws a box at
+    +1 to +3, once for a selection; the engine pill has a third look, hollow and amber,
+    while it is connected and an output isn't presenting or a badge stands; in the grade
+    chip None is a value (grade 0) and Remove takes the chip away; a click on a playlist
+    in the Browser opens it to its items without moving what show mode browses.
+  - *The engine side's readings* from the first stop (2026-11-21) still wait: they are
+    in that stop's report, with what was chosen and the alternative.
   - *The soak.* Run on his word of 2026-11-21, twice (Now). The second holds every line
     but the two memory lines, which `main` fails for the same cause. Whether that counts
     as the green soak the merge wants is his to say: it does once the command log's size
@@ -542,8 +583,8 @@ his answers at the stops (70ce361, 8fa5340, a73e9ce, dc2859e).
 
 ## Next
 
-**Area 14 — Edit mode** (branch `area/edit`) is in progress, at its first review stop
-with the engine side built; the bench-run gate was lifted for it on Adam's word,
+**Area 14 — Edit mode** (branch `area/edit`) is in progress, at its second review stop
+with the engine side, the frame and the Cues page built; the bench-run gate was lifted for it on Adam's word,
 2026-11-18, and Area 13, which it follows, is merged. It runs in its own session from the
 common preamble in `docs/build-order.md` and its own block there, verbatim:
 
@@ -582,9 +623,9 @@ notInV1 Area 12's snapshot restore answers for a snapshot with another channel l
 (Spec 9 §6, Adam's answer of 2026-11-14); then the
 render query on the thumbnail job's queue, with its canvases, files and errors, on the
 local socket only, and the uses query over both roots (§3). Then the app: the frame with
-the edit bar, the ways in and out, the lock and the keys (§2), turning on the ways in
-that Area 13 left disabled (Spec 10 §16); the Cues page with the filmstrip, Fire, the
-canvas, the channel rows and their chips, the inspector, the palette, commands as text
+its regions, the ways in and out, the lock and the keys (§2), turning on the ways in
+that Area 13 left disabled (Spec 10 §16); the Cues page with the cue grid, Fire, the
+Preview monitor, the cells and their chips, the inspector, the palette, commands as text
 and multi-cue editing (§4); the stack editor (§6); the channel sheet (§7); the preset
 editor with its canvas, sample, boxes and text styles (§8); and the small editors (§9),
 with VoiceOver and the string catalog as §10 says. Open in Text Editor stays disabled

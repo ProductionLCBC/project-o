@@ -374,9 +374,9 @@ notInV1 Area 12's snapshot restore answers for a snapshot with another channel l
 (Spec 9 §6, Adam's answer of 2026-11-14); then the
 render query on the thumbnail job's queue, with its canvases, files and errors, on the
 local socket only, and the uses query over both roots (§3). Then the app: the frame with
-the edit bar, the ways in and out, the lock and the keys (§2), turning on the ways in
-that Area 13 left disabled (Spec 10 §16); the Cues page with the filmstrip, Fire, the
-canvas, the channel rows and their chips, the inspector, the palette, commands as text
+its regions, the ways in and out, the lock and the keys (§2), turning on the ways in
+that Area 13 left disabled (Spec 10 §16); the Cues page with the cue grid, Fire, the
+Preview monitor, the cells and their chips, the inspector, the palette, commands as text
 and multi-cue editing (§4); the stack editor (§6); the channel sheet (§7); the preset
 editor with its canvas, sample, boxes and text styles (§8); and the small editors (§9),
 with VoiceOver and the string catalog as §10 says. Open in Text Editor stays disabled
