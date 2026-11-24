@@ -52,11 +52,11 @@ The pages are picked in the top bar's page picker, and in the View menu with ⌥
 **The top bar** in edit mode:
 
 - **Left:** Show and Edit, one control with Edit chosen (⌘1, ⌘2); then what the page edits. For the Cues and Text pages that is where the list came from and its title, "Sunday 9:00 › Amazing Grace", or "Library › Amazing Grace"; for the other pages, the selected object's number and label. While a text field has the focus, what its keys do follows it, in Spec 10 §8's words.
-- **Center:** the page picker: Cues, Text, Stacks, Channels, Presets, Objects. Text is disabled until Area 10 lands (§11). Beside it, Blind and Live (below).
+- **Center:** the page picker: Cues, Text, Stacks, Channels, Presets, Objects. Text is disabled until Area 10 lands (§11). Beside it, the Live toggle (below).
 - **Right:** the time of day; the saving pill, which reads "Saved" while nothing waits to be written and is otherwise show mode's saving tag, with its click (Spec 10 §14); and the engine pill, a green dot and "Engine" while the engine is connected, every output is presenting and no badge stands. Before them, an output that isn't presenting or is blacked out shows as its show-mode dot, and each of show mode's tags shows while it applies (Spec 10 §8), so nothing show mode's bar reports is missed here. A click on the engine pill lists every output as show mode's dots do, each with its details and its Stack ▸ menu. While the engine isn't connected the pill is hollow and red, and the banner says why (Spec 10 §2).
 - While another app is active the whole bar says so, as in show mode.
 
-**Blind and Live** (Adam, 2026-11-24), a two-way switch beside the page picker, says what moving the cue grid's selection with the arrow keys does. Blind, which edit mode always opens in, only selects: nothing goes to air. Live also fires each cue the arrows move the selection onto, as Fire does (§4), so a change can be checked on the outputs as it is made; the switch is drawn in the live red while Live is on. A click in the grid only selects, in both.
+**Live** (Adam, 2026-11-24), one toggle beside the page picker, says what moving the cue grid's selection with the arrow keys does. Off, which edit mode always opens with, the arrows only select: nothing goes to air. On, they also fire each cue they move the selection onto, as Fire does (§4), so a change can be checked on the outputs as it is made; the toggle is drawn in the live red while it is on. A click in the grid only selects, on or off.
 
 **The Browser** stands where show mode's left column does and holds what edit mode picks from.
 
@@ -513,7 +513,7 @@ What the drawing and those answers left open, the session settled in the drawing
 | G-21 | Drops on a cue's header | None: a cell names the channel | The header takes a drop with show mode's channel popover |
 | G-22 | Which chips a channel shows | All four on every channel | Only those the channel's kind uses, as the drawing's sample data had it |
 | G-23 | The stack editor, the channel sheet, the preset editor and the small editors in this frame | Their center is the workspace and their right column the inspector (§2); each is settled when its stage begins | Each drawn anew first |
-| G-24 | Blind and Live | Edit mode always opens in Blind; in Live only the arrow keys fire, a click only selects | Edit mode reopens in the last one chosen; a click fires too |
+| G-24 | The Live toggle | One toggle named Live, as Adam chose over a Blind and Live switch (2026-11-24); edit mode always opens with it off; while it is on only the arrow keys fire, a click only selects | Edit mode reopens with it as it was left; a click fires too |
 | G-25 | Which cues a section carries forward to | The cues after it that had the same section as the cue set, up to the first that differs | The cues after it up to the next with any section, empty ones only |
 | G-26 | How far the panels resize | The Browser 200 to 420 points, the monitors 260 to 560, the inspector 180 to 420 high, the workspace at least 360 by 200 | No limits but the window's |
 | G-27 | A new list's title | The tree opens a title field holding "New List", selected; Return with it emptied still names the list "New List" | An empty field, and Return with nothing typed makes no list |
