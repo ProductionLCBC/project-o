@@ -44,6 +44,26 @@ final class CueGridSelectionTests: XCTestCase {
         XCTAssertEqual(selection.first(in: order), "b")
     }
 
+    /// Spec 11 §4 as corrected 2026-11-24 — "A click on a band selects its run's cues, ⇧ and ⌘ extending the
+    /// selection as on a header".
+    func test_aClickOnABandSelectsItsRunAndShiftOrCommandExtendIt() {
+        var selection = CueGridSelection()
+        selection.click(cue: "a", row: .channel(1))
+        selection.select(run: ["b", "c"], in: order)
+        XCTAssertEqual(selection.ordered(in: order), ["b", "c"])
+        XCTAssertEqual(selection.row, .header, "a band's cues, as their headers would be")
+        XCTAssertEqual(selection.channel, 1, "the inspector keeps the channel it showed")
+        // ⇧ takes everything from where the range began to the far end of the run.
+        selection.select(run: ["e"], in: order, extend: true)
+        XCTAssertEqual(selection.ordered(in: order), ["b", "c", "d", "e"])
+        // ⌘ adds a run, and takes one away when it is all selected already.
+        selection.click(cue: "a", row: .header)
+        selection.select(run: ["d", "e"], in: order, add: true)
+        XCTAssertEqual(selection.ordered(in: order), ["a", "d", "e"])
+        selection.select(run: ["d", "e"], in: order, add: true)
+        XCTAssertEqual(selection.ordered(in: order), ["a"])
+    }
+
     func test_theArrowsMoveThroughCuesAndRowsWithTheHeaderRowAtTheTop() {
         var selection = CueGridSelection()
         selection.click(cue: "b", row: .channel(2))

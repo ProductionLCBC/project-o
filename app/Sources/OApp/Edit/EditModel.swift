@@ -397,6 +397,16 @@ public final class EditModel {
         selectionChanged()
     }
 
+    /// Spec 11 §4 — "A click on a band selects its run's cues, ⇧ and ⌘
+    /// extending the selection as on a header", by the place of a cue under it.
+    public func clickBand(cue index: Int, shift: Bool = false, command: Bool = false) {
+        guard let run = grid.runs.first(where: { index >= $0.first && index < $0.first + $0.count }) else { return }
+        let order = grid.headers.map(\.uuid)
+        let cues = (run.first..<min(order.count, run.first + run.count)).map { order[$0] }
+        selection.select(run: cues, in: order, extend: shift, add: command)
+        selectionChanged()
+    }
+
     /// A click on a row's name: the row is selected, and the cues stay.
     public func select(row: CueGridSelection.Row) {
         selection.set(row)

@@ -47,6 +47,18 @@ final class EditModeViewTests: XCTestCase {
         grid.mouseUp(with: event)
     }
 
+    /// A press, a drag and a release on the cue grid.
+    private func drag(_ grid: CueGridView, from: (x: Double, y: Double), to: (x: Double, y: Double)) throws {
+        func event(_ type: NSEvent.EventType, _ at: (x: Double, y: Double)) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: grid.convert(NSPoint(x: at.x, y: at.y), to: nil), modifierFlags: [], timestamp: 0,
+                                             windowNumber: grid.window?.windowNumber ?? 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        }
+        grid.mouseDown(with: try event(.leftMouseDown, from))
+        grid.mouseDragged(with: try event(.leftMouseDragged, ((from.x + to.x) / 2, to.y)))
+        grid.mouseDragged(with: try event(.leftMouseDragged, to))
+        grid.mouseUp(with: try event(.leftMouseUp, to))
+    }
+
     /// The middle of a cell, or of a cue's header for a nil row.
     private func middle(_ grid: CueGridView, cue: Int, row: Int?) -> (x: Double, y: Double) {
         let g = grid.geometry
@@ -384,6 +396,32 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(inspector.title.stringValue, "Cue 3 of 4")
         inspector.fire.press()
         XCTAssertEqual(last(rig), ["item 2 cue 3"])
+    }
+
+    /// Spec 11 §4 as corrected 2026-11-24 — "A click on a band selects its run's cues", and "A drag that starts on a
+    /// selected header, or on a band, moves every selected cue, in their order, as one group".
+    func test_aBandSelectsItsCuesAndADragMovesEverySelectedCue() throws {
+        let rig = try editing()
+        let grid = rig.view.workspace.grid
+        let g = grid.geometry
+        // The band over cues 1 to 3, "Verse 1".
+        try click(grid, x: g.x(cue: 1) + g.column / 2, y: CueGridGeometry.band / 2)
+        XCTAssertEqual(rig.model.editing.selection.ordered(in: c), [c[0], c[1], c[2]])
+        XCTAssertEqual(rig.model.editing.selection.row, .header)
+        // A drag from one of the selected headers to the end moves all three, as one group.
+        try drag(grid, from: middle(grid, cue: 1, row: nil), to: (g.x(cue: 3) + g.column - 1, CueGridGeometry.band + g.header / 2))
+        let moved = try XCTUnwrap(last(rig))
+        XCTAssertTrue(moved.allSatisfy { $0.contains(" move ") }, "\(moved)")
+        for cue in c[0...2] { XCTAssertTrue(moved.contains { $0.contains(cue) }, "cue \(cue) moves with the others: \(moved)") }
+        // A drag that starts on the band moves its cues too.
+        let before = count(rig)
+        try drag(grid, from: (g.x(cue: 0) + g.column / 2, CueGridGeometry.band / 2), to: (g.x(cue: 3) + g.column - 1, CueGridGeometry.band / 2))
+        XCTAssertEqual(count(rig), before + 1)
+        // A plain click on one of several selected headers, with no drag, selects it alone.
+        rig.model.editing.clickBand(cue: 0)
+        let one = middle(grid, cue: 1, row: nil)
+        try click(grid, x: one.x, y: one.y)
+        XCTAssertEqual(rig.model.editing.selection.ordered(in: c), [c[1]])
     }
 
     /// Spec 11 §2 and §4 as corrected 2026-11-24 — "Return opens the selected cell's content", the popover "hangs from

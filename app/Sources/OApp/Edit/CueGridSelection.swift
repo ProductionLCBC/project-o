@@ -88,6 +88,38 @@ public struct CueGridSelection: Equatable, Sendable {
         }
     }
 
+    /// Spec 11 §4 — "A click on a band selects its run's cues, ⇧ and ⌘
+    /// extending the selection as on a header" (corrected 2026-11-24). The
+    /// header row is selected, as a click on their headers would; ⇧ reaches
+    /// from where the range began to the run's far end; ⌘ adds the run, or
+    /// takes it away when it is all selected already, the last cue staying.
+    public mutating func select(run: [String], in order: [String], extend: Bool = false, add: Bool = false) {
+        let positions = run.compactMap { order.firstIndex(of: $0) }
+        guard let low = positions.min(), let high = positions.max() else { return }
+        if extend, let start = anchor.flatMap({ order.firstIndex(of: $0) }) {
+            cues = Set(order[min(start, low)...max(start, high)])
+            lead = start <= low ? order[high] : order[low]
+        } else if add {
+            if run.allSatisfy(cues.contains) {
+                let left = cues.subtracting(run)
+                guard !left.isEmpty else { return }
+                cues = left
+                let next = first(in: order)
+                anchor = next
+                lead = next
+                return
+            }
+            cues.formUnion(run)
+            anchor = order[low]
+            lead = order[high]
+        } else {
+            cues = Set(run)
+            anchor = order[low]
+            lead = order[high]
+        }
+        row = .header
+    }
+
     /// "← and → move to the cue before and after, ⇧ with them extends the
     /// selection, and ↑ and ↓ move through the rows, the header row at the top".
     public mutating func move(_ direction: Direction, extend: Bool, order: [String], channels: [Int]) {

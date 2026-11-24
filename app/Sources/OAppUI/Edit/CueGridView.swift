@@ -118,13 +118,25 @@ final class CueGridView: Surface, EditFocus {
         if event.modifierFlags.contains(.control) { return showMenu(event) }
         let flags = event.modifierFlags
         pressed = nil
+        selectOnUp = nil
         switch hit(event) {
         case .cell(let cue, let row):
             model.editing.click(cue: cue, row: .channel(grid.rows[row].channel), shift: flags.contains(.shift), command: flags.contains(.command))
             // "A double-click on a cell opens the popover too".
             if event.clickCount == 2, !flags.contains(.shift), !flags.contains(.command) { onEditContent?() }
         case .header(let cue):
-            model.editing.click(cue: cue, row: .header, shift: flags.contains(.shift), command: flags.contains(.command))
+            // "A drag that starts on a selected header ... moves every selected cue": a plain press on one of several
+            // selected headers keeps them, and selects that cue alone only when it comes up without a drag.
+            let plain = !flags.contains(.shift) && !flags.contains(.command)
+            if plain, selection.isMulti, selection.cues.contains(grid.headers[cue].uuid) {
+                selectOnUp = cue
+            } else {
+                model.editing.click(cue: cue, row: .header, shift: flags.contains(.shift), command: flags.contains(.command))
+            }
+            pressed = (convert(event.locationInWindow, from: nil), cue)
+        case .band(let cue):
+            // "A click on a band selects its run's cues ... and a band drags as its headers do".
+            model.editing.clickBand(cue: cue, shift: flags.contains(.shift), command: flags.contains(.command))
             pressed = (convert(event.locationInWindow, from: nil), cue)
         case .add:
             model.editing.newCue(atEnd: true)
@@ -132,10 +144,13 @@ final class CueGridView: Surface, EditFocus {
             model.editing.toggleFold(row: row)
         case .channel(let row):
             model.editing.select(row: .channel(grid.rows[row].channel))
-        case .band, .corner, .nothing:
+        case .corner, .nothing:
             break
         }
     }
+
+    /// A selected header pressed among several: selected alone if the press ends without a drag.
+    private var selectOnUp: Int?
 
     /// "Headers drag to a new place".
     override func mouseDragged(with event: NSEvent) {
@@ -149,8 +164,15 @@ final class CueGridView: Surface, EditFocus {
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { pressed = nil }
-        guard let drop = reorder else { return }
+        let alone = selectOnUp
+        defer {
+            pressed = nil
+            selectOnUp = nil
+        }
+        guard let drop = reorder else {
+            if let alone { model.editing.click(cue: alone, row: .header) }
+            return
+        }
         reorder = nil
         model.editing.drop(cue: drop.cue, before: drop.before)
     }
