@@ -28,7 +28,9 @@ extension Fold {
     /// arm the next trigger." Spec 3 §8 — the cue's commands run with
     /// `source.kind` `cue`, so lock applies to them whatever fired the cue.
     /// `nesting` is the cue's commands' own (Spec 2 §5, "Macro depth").
-    mutating func fire(_ position: CuePosition, nesting: Nesting) {
+    /// `withState` — Spec 3 §5, "Firing with `state` ... takes up, between the
+    /// boundary and the cue's commands, the state its list leaves before it".
+    mutating func fire(_ position: CuePosition, withState: Bool = false, nesting: Nesting) {
         let list = position.list
         let cue = position.cue
         let old = state.pointer
@@ -43,6 +45,7 @@ extension Fold {
             if !list.trackThrough { resetAllAttributes() }
             effects.append(.boundary(list: list.uuid, reset: !list.trackThrough))
         }
+        if withState, !context.firesPlainly { takeUpState(before: position) }
 
         let source = CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid, playlist: position.playlist?.uuid)
         // Spec 1 §6 — a `when` guard on a cue command is reserved: "the field
@@ -83,12 +86,12 @@ extension Fold {
     /// Fires a position if there is one and a level is left for it (Spec 2
     /// §5: the group's own navigation uses none, any other uses one);
     /// otherwise `noop`.
-    mutating func fire(_ position: CuePosition?, command: Command, nesting: Nesting) {
+    mutating func fire(_ position: CuePosition?, withState: Bool = false, command: Command, nesting: Nesting) {
         guard let position, let cueNesting = nesting.firingCue else {
             effects.append(.noop(command))
             return
         }
-        fire(position, nesting: cueNesting)
+        fire(position, withState: withState, nesting: cueNesting)
     }
 
     // MARK: - Navigation commands
@@ -114,7 +117,7 @@ extension Fold {
     /// Spec 2 §3 — `cue N`: "Fires cue N of the live list." Spec 7 §4 — the
     /// live list as it is now, or its kept copy once it is gone; the pointer
     /// keeps its item.
-    mutating func fireCue(_ number: Int, command: Command, nesting: Nesting) {
+    mutating func fireCue(_ number: Int, withState: Bool = false, command: Command, nesting: Nesting) {
         let placement = placer.placement(of: state.pointer)
         guard let list = placement.liveList, number >= 1, number <= list.cues.count else {
             effects.append(.noop(command))
@@ -123,7 +126,7 @@ extension Fold {
         var item: Int?
         if case .placed(let place) = placement { item = place.itemPosition }
         fire(CuePosition(playlist: placement.livePlaylist, item: item, itemUuid: state.pointer?.itemUuid, list: list, cueIndex: number - 1),
-             command: command, nesting: nesting)
+             withState: withState, command: command, nesting: nesting)
     }
 
     /// The list at item `item` of the live playlist, as it is now or its kept
@@ -135,12 +138,12 @@ extension Fold {
     }
 
     /// Spec 2 §3 — `item N cue M`: "Fires that cue and makes its item live."
-    mutating func fireItem(_ item: Int, cue number: Int, command: Command, nesting: Nesting) {
+    mutating func fireItem(_ item: Int, cue number: Int, withState: Bool = false, command: Command, nesting: Nesting) {
         guard let (playlist, list) = livePlaylistItem(item), number >= 1, number <= list.cues.count else {
             effects.append(.noop(command))
             return
         }
-        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: number - 1), command: command, nesting: nesting)
+        fire(CuePosition(playlist: playlist, item: item, list: list, cueIndex: number - 1), withState: withState, command: command, nesting: nesting)
     }
 
     /// Spec 3 §5 — "Section jumps (`item N section "chorus"`) fire the first
@@ -158,12 +161,12 @@ extension Fold {
 
     /// Spec 2 §3 — `list N cue M`: "Fires that cue in a library master; the
     /// list becomes live with lookahead confined to it."
-    mutating func fireList(_ list: Int, cue number: Int, command: Command, nesting: Nesting) {
+    mutating func fireList(_ list: Int, cue number: Int, withState: Bool = false, command: Command, nesting: Nesting) {
         guard let master = context.library.list(number: list), number >= 1, number <= master.cues.count else {
             effects.append(.noop(command))
             return
         }
-        fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), command: command, nesting: nesting)
+        fire(CuePosition(playlist: nil, item: nil, list: master, cueIndex: number - 1), withState: withState, command: command, nesting: nesting)
     }
 
     /// Spec 7 §4 — "`disarm` is a new runtime command (Spec 2 §3, corrected in

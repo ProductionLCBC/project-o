@@ -96,9 +96,10 @@ public enum CueView {
         for (position, cue) in list.cues.enumerated() {
             if let index, position > index { break }
             let before = state
-            let context = ProjectionContext(frame: 0, library: library, machine: machine, missing: missing,
+            var context = ProjectionContext(frame: 0, library: library, machine: machine, missing: missing,
                                             source: CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid),
                                             variables: { name in variables(name, before) })
+            context.firesPlainly = true
             let commands = cue.commands.map(\.command)
             let (after, effects) = project(before, commands, context: context)
             state = after

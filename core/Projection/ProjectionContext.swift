@@ -46,6 +46,10 @@ public struct ProjectionContext: Sendable {
     /// Spec 3 §6 as Spec 7 §9 corrects it — "`kept` (the engine's copies of
     /// the list and playlist the pointer names, Spec 7 §4)".
     public var kept: KeptCopies
+    /// Spec 3 §7's cue view folds a list with every fire plain: a `state` its
+    /// cues hold takes nothing up there, so taking up a state (§5, "Firing
+    /// with `state`"), which folds the cues before, never folds itself again.
+    public var firesPlainly = false
 
     public init(frame: Int, rate: FrameRate = .fps60, library: Library, machine: Machine,
                 missing: Set<String> = [], source: CommandSource,

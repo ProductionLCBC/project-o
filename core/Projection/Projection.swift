@@ -143,14 +143,14 @@ struct Fold {
             fireFollowing(command: command, nesting: nesting)
         case .previous:
             firePreceding(command: command, nesting: nesting)
-        case .cue(let position):
-            fireCue(position, command: command, nesting: nesting)
-        case .itemCue(let item, let position):
-            fireItem(item, cue: position, command: command, nesting: nesting)
+        case .cue(let position, let withState):
+            fireCue(position, withState: withState, command: command, nesting: nesting)
+        case .itemCue(let item, let position, let withState):
+            fireItem(item, cue: position, withState: withState, command: command, nesting: nesting)
         case .itemSection(let item, let section):
             fireSection(item, section, command: command, nesting: nesting)
-        case .listCue(let list, let position):
-            fireList(list, cue: position, command: command, nesting: nesting)
+        case .listCue(let list, let position, let withState):
+            fireList(list, cue: position, withState: withState, command: command, nesting: nesting)
         case .playlistLoad(let title):
             loadPlaylist(title, command: command)
         case .disarm:

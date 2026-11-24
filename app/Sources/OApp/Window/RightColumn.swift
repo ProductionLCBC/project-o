@@ -45,7 +45,7 @@ public enum WhyLine {
         switch command {
         case .next: return live.isLibraryList ? .endOfLibraryList : .endOfPlaylist
         case .previous: return .startOfPlaylist
-        case .cue(let number): return .noCue(number: number, title: live.listTitle)
+        case .cue(let number, _): return .noCue(number: number, title: live.listTitle)
         default: return nil
         }
     }

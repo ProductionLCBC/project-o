@@ -54,10 +54,10 @@ public enum KeyWording {
         switch command {
         case .next: return Strings.text(.commandNext)
         case .previous: return Strings.text(.commandPrevious)
-        case .cue(let cue): return Strings.text(.commandCue, cue)
-        case .itemCue(let item, let cue): return Strings.text(.commandItemCue, item, cue)
+        case .cue(let cue, _): return Strings.text(.commandCue, cue)
+        case .itemCue(let item, let cue, _): return Strings.text(.commandItemCue, item, cue)
         case .itemSection(let item, let section): return Strings.text(.commandItemSection, item, section)
-        case .listCue(let list, let cue): return Strings.text(.commandListCue, list, cue)
+        case .listCue(let list, let cue, _): return Strings.text(.commandListCue, list, cue)
         case .playlistLoad(let title): return Strings.text(.commandPlaylist, title)
         case .disarm: return Strings.text(.commandDisarm)
         case .systemClearAll: return Strings.text(.commandClearAll)

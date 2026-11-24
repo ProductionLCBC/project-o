@@ -107,10 +107,10 @@ public enum Command: Codable, Equatable, Sendable {
     // Playlist and library navigation
     case next
     case previous
-    case cue(Int)
-    case itemCue(item: Int, cue: Int)
+    case cue(Int, state: Bool = false)
+    case itemCue(item: Int, cue: Int, state: Bool = false)
     case itemSection(item: Int, section: String)
-    case listCue(list: Int, cue: Int)
+    case listCue(list: Int, cue: Int, state: Bool = false)
     /// Spec 2 §3 as Spec 7 §3 corrected it — `playlist "TITLE"`, by title alone.
     case playlistLoad(title: String)
     /// Spec 2 §3, Spec 7 §4 — "Clears the armed trigger, so nothing fires on its own".
@@ -336,10 +336,14 @@ public enum Command: Codable, Equatable, Sendable {
                               state: try c.decode(SwitchState.self, forKey: Key("state")))
         case "playlist.next", "next": self = .next
         case "playlist.previous", "previous": self = .previous
-        case "playlist.cue", "cue": self = .cue(try int("cue"))
-        case "playlist.goto": self = .itemCue(item: try int("item"), cue: try int("cue"))
+        // Spec 2 §3 — `[state]`, written only when true, as a timer's `up` is (Spec 3 §5, "Firing with `state`").
+        case "playlist.cue", "cue":
+            self = .cue(try int("cue"), state: try c.decodeIfPresent(Bool.self, forKey: Key("state")) ?? false)
+        case "playlist.goto":
+            self = .itemCue(item: try int("item"), cue: try int("cue"), state: try c.decodeIfPresent(Bool.self, forKey: Key("state")) ?? false)
         case "playlist.section": self = .itemSection(item: try int("item"), section: try string("section"))
-        case "list.goto": self = .listCue(list: try int("list"), cue: try int("cue"))
+        case "list.goto":
+            self = .listCue(list: try int("list"), cue: try int("cue"), state: try c.decodeIfPresent(Bool.self, forKey: Key("state")) ?? false)
         case "playlist.load":
             // Spec 7 §3 — "A `playlist.load` stored with a `date`, from before
             // this spec, loads by its title and ignores the date": the date
@@ -435,17 +439,20 @@ public enum Command: Codable, Equatable, Sendable {
             try c.encode(state, forKey: Key("state"))
         case .next, .previous, .disarm, .undo, .redo, .systemClearAll, .systemPreflight, .systemSnapshot, .unknown, .invalid:
             break
-        case .cue(let n):
+        case .cue(let n, let state):
             try c.encode(n, forKey: Key("cue"))
-        case .itemCue(let item, let cue):
+            if state { try c.encode(true, forKey: Key("state")) }
+        case .itemCue(let item, let cue, let state):
             try c.encode(item, forKey: Key("item"))
             try c.encode(cue, forKey: Key("cue"))
+            if state { try c.encode(true, forKey: Key("state")) }
         case .itemSection(let item, let section):
             try c.encode(item, forKey: Key("item"))
             try c.encode(section, forKey: Key("section"))
-        case .listCue(let list, let cue):
+        case .listCue(let list, let cue, let state):
             try c.encode(list, forKey: Key("list"))
             try c.encode(cue, forKey: Key("cue"))
+            if state { try c.encode(true, forKey: Key("state")) }
         case .playlistLoad(let title):
             try c.encode(title, forKey: Key("title"))
         case .timerSet(let timer, let ms, let up):
@@ -552,7 +559,7 @@ public enum Command: Codable, Equatable, Sendable {
         case .stackBlackout(let stack, let state): return .stackBlackout(stack: target(.stack, stack), state: state)
         case .stackMute(let stack, let channel, let state):
             return .stackMute(stack: transform(.stack, stack), channel: transform(.channel, channel), state: state)
-        case .listCue(let list, let cue): return .listCue(list: transform(.list, list), cue: cue)
+        case .listCue(let list, let cue, let state): return .listCue(list: transform(.list, list), cue: cue, state: state)
         case .audioMute(let audio, let state): return .audioMute(audio: target(.audioOutput, audio), state: state)
         case .macro(let n): return .macro(transform(.macro, n))
         // Spec 9 §6 — "N is the list's number, as edits name lists": a reference like any other.
