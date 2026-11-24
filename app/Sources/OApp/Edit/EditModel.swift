@@ -419,13 +419,14 @@ public final class EditModel {
         let was = selection.lead
         selection.move(direction, extend: extend, order: grid.headers.map(\.uuid), channels: grid.rows.map(\.channel))
         selectionChanged()
-        // Spec 11 §2 — "Live also fires each cue the arrows move the selection onto, as Fire does".
+        // Spec 11 §2 — Live "On, they also fire each cue they move the selection onto, as Fire does".
         if isLive, !extend, !selection.isMulti, selection.lead != was { _ = fire() }
     }
 
-    /// Spec 11 §2 — "Blind and Live ... says what moving the cue grid's
-    /// selection with the arrow keys does. Blind, which edit mode always opens
-    /// in, only selects: nothing goes to air." (Adam, 2026-11-24.)
+    /// Spec 11 §2 — "Live ... one toggle beside the page picker, says what
+    /// moving the cue grid's selection with the arrow keys does. Off, which
+    /// edit mode always opens with, the arrows only select: nothing goes to
+    /// air." (Adam, 2026-11-24.)
     public private(set) var isLive = false
 
     public func setLive(_ on: Bool) {

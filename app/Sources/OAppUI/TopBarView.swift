@@ -57,8 +57,8 @@ final class TopBarView: Surface {
     let crumb = Kit.content(Kit.label(size: 12))
     /// "Center: the page picker: Cues, Text, Stacks, Channels, Presets, Objects."
     let pagePicker = SegmentedView(EditPage.allCases.map { EditModeWording.page($0) })
-    /// Spec 11 §2 — "Blind and Live ... a two-way switch beside the page picker ... drawn in the live red while Live is on".
-    let blindLive = SegmentedView([Strings.text(.editBlind), Strings.text(.editLive)])
+    /// Spec 11 §2 — "Live ... one toggle beside the page picker ... drawn in the live red while it is on".
+    let liveToggle = PillButton(Strings.text(.editLive))
     /// "the saving pill, which reads "Saved" while nothing waits to be written".
     let saved = PillButton()
     /// "the engine pill, a green dot and "Engine"".
@@ -87,9 +87,13 @@ final class TopBarView: Surface {
         crumb.textColor = Palette.dimText
         pagePicker.setAccessibilityLabel(Strings.text(.editPages))
         pagePicker.onSelect = { [weak self] index in self?.onPage?(EditPage.allCases[index]) }
-        blindLive.setAccessibilityLabel(Strings.text(.editBlindLive))
-        blindLive.onSelect = { [weak self] index in self?.model.editing.setLive(index == 1) }
-        addSubview(blindLive)
+        liveToggle.onPress = { [weak self] in
+            guard let self else { return }
+            self.model.editing.setLive(!self.model.editing.isLive)
+        }
+        liveToggle.setAccessibilityLabel(Strings.text(.editLiveSpoken))
+        liveToggle.setAccessibilityRole(.checkBox)
+        addSubview(liveToggle)
         saved.onPress = { [weak self] in
             guard let self else { return }
             self.popUp(self.savingMenu, at: self.saved)
@@ -242,9 +246,11 @@ final class TopBarView: Surface {
         liveDot.isHidden = inactive || editing || !model.store.live.isSomethingLive
 
         // Edit mode's own (Spec 11 §2).
-        for view in [modeWell, crumb, pagePicker, blindLive, saved, engine] as [NSView] { view.isHidden = inactive || !editing }
-        blindLive.selected = model.editing.isLive ? 1 : 0
-        blindLive.fill = model.editing.isLive ? Palette.live.withAlphaComponent(0.45) : Palette.well
+        for view in [modeWell, crumb, pagePicker, liveToggle, saved, engine] as [NSView] { view.isHidden = inactive || !editing }
+        let live = model.editing.isLive
+        liveToggle.style = live ? .live : .quiet
+        liveToggle.dot = live ? .filled(Palette.text) : .hollow(Palette.dimText, square: false)
+        liveToggle.setAccessibilityValue(live ? 1 : 0)
         if let status {
             let page = model.editing.page
             crumb.stringValue = page == .cues || page == .text ? EditModeWording.crumb(model.editing.crumb) : EditModeWording.page(page)
@@ -368,8 +374,8 @@ final class TopBarView: Surface {
         x = modeWell.frame.maxX + 12
         let picker = pagePicker.fitting
         pagePicker.frame = NSRect(x: floor((bounds.width - picker.width) / 2), y: (h - picker.height) / 2, width: picker.width, height: picker.height)
-        let switchSize = blindLive.fitting
-        blindLive.frame = NSRect(x: pagePicker.frame.maxX + 12, y: (h - switchSize.height) / 2, width: switchSize.width, height: switchSize.height)
+        let toggleSize = liveToggle.fitting
+        liveToggle.frame = NSRect(x: pagePicker.frame.maxX + 12, y: (h - toggleSize.height) / 2, width: toggleSize.width, height: toggleSize.height)
         var right = bounds.width - 12
         for pill in [engine, saved] {
             let size = pill.fitting

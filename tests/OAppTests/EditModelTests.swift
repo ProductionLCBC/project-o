@@ -272,17 +272,17 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.model.settings.gridZoom, 480)
     }
 
-    // MARK: - Blind and Live (Spec 11 §2, corrected 2026-11-24)
+    // MARK: - The Live toggle (Spec 11 §2, corrected 2026-11-24)
 
-    /// "Blind, which edit mode always opens in, only selects: nothing goes to air. Live also fires each cue the arrows
-    /// move the selection onto, as Fire does (§4) ... A click in the grid only selects, in both."
-    func test_inLiveTheArrowsFireTheCueTheyLandOnAndEditModeOpensBlind() throws {
+    /// "Off, which edit mode always opens with, the arrows only select: nothing goes to air. On, they also fire each cue
+    /// they move the selection onto, as Fire does (§4) ... A click in the grid only selects, on or off."
+    func test_withLiveOnTheArrowsFireTheCueTheyLandOnAndEditModeOpensWithItOff() throws {
         let rig = try Rig()
         rig.model.editing.open()
         XCTAssertFalse(rig.model.editing.isLive)
         rig.model.editing.click(cue: 1, row: .channel(1))
         rig.model.editing.move(.right, extend: false)
-        XCTAssertEqual(rig.commands, [], "Blind: the arrows only select")
+        XCTAssertEqual(rig.commands, [], "off: the arrows only select")
         rig.model.editing.setLive(true)
         rig.model.editing.move(.right, extend: false)
         XCTAssertEqual(rig.commands, [["item 2 cue 4"]], "Live: the cue the selection lands on fires, as Fire does")
@@ -290,7 +290,7 @@ final class EditModelTests: XCTestCase {
         rig.model.editing.move(.right, extend: true)
         rig.model.editing.click(cue: 0, row: .header)
         XCTAssertEqual(rig.commands.count, 1, "a row's step, a ⇧ extension and a click fire nothing")
-        // Leaving and coming back opens Blind again.
+        // Leaving and coming back opens with Live off again.
         rig.model.editing.leave()
         rig.model.editing.open()
         XCTAssertFalse(rig.model.editing.isLive)
