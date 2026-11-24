@@ -47,7 +47,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     private var poolDragHeight: CGFloat?
     private var outputPopover: NSPopover?
     private var slow: Timer?
-    private var fast: Timer?
+    private var pictures: CADisplayLink?
     private var observers: [NSObjectProtocol] = []
     var machineRoot: URL? {
         didSet {
@@ -677,17 +677,25 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     // MARK: - Clocks
 
     /// Starts what moves without an event: the countdowns four times a second, the pictures at the display's pace.
+    /// Spec 10 §2 — the engine sends a stack's newest frame "at most 30 a second" on its own clock. Read on the
+    /// display's refresh, each frame shows within a refresh of its arrival; read on a 30 Hz timer of the app's own,
+    /// the two clocks beat, and some frames showed twice and others never (Adam's try, 2026-11-24).
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         slow?.invalidate()
-        fast?.invalidate()
+        pictures?.invalidate()
+        pictures = nil
         guard window != nil else { return }
         let slowTimer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.tick() } }
-        let fastTimer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.drawPictures() } }
         RunLoop.main.add(slowTimer, forMode: .common)
-        RunLoop.main.add(fastTimer, forMode: .common)
         slow = slowTimer
-        fast = fastTimer
+        let link = displayLink(target: self, selector: #selector(pictureStep(_:)))
+        link.add(to: .main, forMode: .common)
+        pictures = link
+    }
+
+    @objc private func pictureStep(_ link: CADisplayLink) {
+        drawPictures()
     }
 
     /// What counts on the app's clock between events (Spec 10 §3).

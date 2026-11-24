@@ -23,12 +23,12 @@ final class SurfaceView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    /// Spec 10 §2 — "the engine writes the next frame into the oldest of the
+    /// three": each new frame comes in another surface. Read at the display's
+    /// pace (`ShowWindowView`), the same surface comes back only while no
+    /// newer frame has arrived, so nothing is composited again for it.
     func set(_ surface: IOSurfaceRef?) {
-        guard surface !== shown else {
-            // The same surface with a new frame in it: the layer is told its content changed.
-            if surface != nil { layer?.setNeedsDisplay(); layer?.contents = surface }
-            return
-        }
+        guard surface !== shown else { return }
         shown = surface
         layer?.contents = surface
     }
