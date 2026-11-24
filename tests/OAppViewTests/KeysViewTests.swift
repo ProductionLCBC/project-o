@@ -415,7 +415,7 @@ final class KeysViewTests: XCTestCase {
         XCTAssertEqual(bar.frame.minY, gridTop)
         XCTAssertEqual(bar.frame.minX, rig.view.grid.frame.minX)
         XCTAssertEqual(bar.frame.width, rig.view.grid.frame.width)
-        XCTAssertEqual(rig.view.grid.frame.minY, gridTop + CommandBarView.height, "the grid starts under it")
+        XCTAssertEqual(rig.view.grid.frame.minY, gridTop + CommandBarView.height + 4, "the grid starts under it, a gap apart (Spec 10 §4)")
         XCTAssertEqual(Audit.unlabelled(in: bar), [])
         rig.view.focusCommandBar()
         XCTAssertEqual(rig.window.keyTap.context().field, .commandBar)

@@ -774,9 +774,9 @@ final class GridView: Surface {
             addSubview(tag)
             browsing = tag
         }
-        // "the grid's edge ... turn[s] amber".
-        outline = model.isBrowsing ? Palette.browsing : nil
-        outlineWidth = 2
+        // "the grid's edge ... turn[s] amber"; otherwise the hairline every panel has (Spec 10 §4).
+        outline = model.isBrowsing ? Palette.browsing : Palette.hairline
+        outlineWidth = model.isBrowsing ? 2 : 1
         empty.isHidden = grid.context != nil
         scroll.isHidden = grid.context == nil
         view.isHidden = grid.context == nil

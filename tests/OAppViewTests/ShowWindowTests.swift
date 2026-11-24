@@ -108,12 +108,25 @@ final class ShowWindowTests: XCTestCase {
     func test_theWindowHasItsRegionsAtTheSpecsSizes() throws {
         let rig = try Rig()
         let view = rig.view
-        XCTAssertEqual(view.topBar.frame.height, 38, "Top bar: 38 points high")
-        XCTAssertEqual(view.left.frame.width, 248, "Left column: 248 points wide by default")
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 380, "Right column: 380 points wide by default")
-        XCTAssertEqual(view.grid.frame.minX, 248)
+        // Spec 10 §4 as corrected 2026-11-24 — "Top bar ... 44 points high"; "Both modes draw their regions alike: each a
+        // panel with a hairline outline and rounded corners, on the darker ground between panels, 4 points apart".
+        XCTAssertEqual(view.topBar.frame.height, 44, "Top bar: 44 points high")
+        XCTAssertEqual(view.left.frame.minX, 4, "4 points in from the window's edge")
+        XCTAssertEqual(view.left.frame.minY, view.topBar.frame.maxY + 4)
+        XCTAssertEqual(view.left.frame.width, 248 - 4 - 2, "Left column: 248 points wide by default, its panel inside the gaps")
+        XCTAssertEqual(view.grid.frame.minX, 248 + 2, "4 points apart")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 380 + 2, "Right column: 380 points wide by default")
         XCTAssertEqual(view.pool.frame.minX, view.grid.frame.minX, "the Media pool panel under the grid")
-        XCTAssertEqual(view.pool.frame.minY, view.grid.frame.maxY)
+        XCTAssertEqual(view.pool.frame.minY, view.grid.frame.maxY + 4)
+        XCTAssertEqual(view.pool.frame.maxY, view.bounds.height - 4)
+        XCTAssertEqual(view.fill, Palette.gut, "the darker ground")
+        for panel in [view.left, view.grid, view.pool] as [Surface] {
+            XCTAssertEqual(panel.radius, 6)
+            XCTAssertEqual(panel.layer?.cornerRadius, 6)
+            XCTAssertNotNil(panel.outline, "a hairline outline")
+        }
+        XCTAssertEqual(view.grid.outline, Palette.hairline, "the grid's outline turns amber only while it browses")
+        XCTAssertGreaterThanOrEqual(view.preview.frame.minX, view.grid.frame.maxX + 4 + 8, "the right column's parts sit inside its panel")
         XCTAssertLessThan(view.preview.frame.maxY, view.nextRow.frame.minY + 1, "Preview, next row, tabbed panel, channel strip")
         XCTAssertLessThan(view.nextRow.frame.maxY, view.tabs.frame.minY + 1)
         XCTAssertLessThan(view.tabs.frame.maxY, view.strip.frame.minY + 1)
@@ -207,7 +220,7 @@ final class ShowWindowTests: XCTestCase {
 
     func test_browsingTurnsTheGridsEdgeAmberAndItsHeaderSaysSo() throws {
         let rig = try Rig()
-        XCTAssertNil(rig.view.grid.outline)
+        XCTAssertEqual(rig.view.grid.outline, Palette.hairline, "the hairline every panel has (Spec 10 §4)")
         rig.model.browse(.list(Self.list7))
         XCTAssertEqual(rig.view.grid.outline, Palette.browsing)
         XCTAssertEqual(Audit.all(TagView.self, in: rig.view.grid).map(\.text).contains("Browsing"), true)
@@ -333,16 +346,17 @@ final class ShowWindowTests: XCTestCase {
         let view = rig.view
         view.leftDivider.drag(by: 60)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.left.frame.width, 308)
+        // A column's width counts its gaps: its panel is 6 points narrower, and the grid ends half a gap before the right column.
+        XCTAssertEqual(view.left.frame.width, 308 - 6)
         view.leftDivider.drag(by: 400)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.left.frame.width, 360, "Left column: 200 to 360")
+        XCTAssertEqual(view.left.frame.width, 360 - 6, "Left column: 200 to 360")
         view.rightDivider.drag(by: 30)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 350, "dragged right, the right column narrows")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 350 + 2, "dragged right, the right column narrows")
         view.rightDivider.drag(by: 500)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 340, "Right column: 340 to 480")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 340 + 2, "Right column: 340 to 480")
         let before = rig.model.settings.leftSplit
         view.left.split.drag(by: 80)
         XCTAssertGreaterThan(rig.model.settings.leftSplit, before, "dragged down, the Playlists window grows")

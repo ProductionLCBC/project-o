@@ -103,7 +103,9 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         programPanel = ProgramPanelView(model: model, keys: keys, mach: mach)
         inspector = InspectorView(model: model)
         super.init(frame: .zero)
-        fill = Palette.window
+        fill = Palette.gut
+        for panel in [grid, commandBar, pool] as [Surface] { dress(panel, asPanel: true) }
+        dress(left, asPanel: true)
         for view in [grid, commandBar, pool, browser, left, workspace, previewPanel, programPanel, inspector, preview, nextRow, tabs, strip, topBar, banner,
                      leftDivider, rightDivider, poolDivider, browserDivider, monitorsDivider, inspectorDivider] as [NSView] {
             addSubview(view)
@@ -614,7 +616,10 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         for view in [browser, workspace, previewPanel, programPanel, inspector, browserDivider, monitorsDivider, inspectorDivider] as [NSView] {
             view.isHidden = !editing
         }
-        fill = editing ? Palette.gut : Palette.window
+        // Spec 10 §4 — "Both modes draw their regions alike ... on the darker ground between panels". In edit mode the
+        // left column is laid over the Browser's panel, which draws the chrome itself.
+        fill = Palette.gut
+        dress(left, asPanel: !editing)
         let tab = editing ? model.settings.browserTab : nil
         left.isHidden = tab == .media
         if left.tab != tab { left.tab = tab }
@@ -755,30 +760,39 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             return
         }
         topBar.frame = NSRect(x: 0, y: bannerHeight, width: w, height: TopBarView.height)
-        let top = bannerHeight + TopBarView.height
-        let height = max(0, bounds.height - top)
+        // Spec 10 §4 — "each a panel ... on the darker ground between panels, 4 points apart". A column's width is its
+        // share of the window, gaps included: its panel stands 4 points in from the window's edge and half a gap in
+        // from the divider's line, so the dividers sit in the gaps.
+        let gap = CGFloat(EditFrame.gap)
+        let top = bannerHeight + TopBarView.height + gap
+        let height = max(0, bounds.height - gap - top)
         // "Left column ... 248 points wide by default, 200 to 360"; "Right column ... 380 points wide by default, 340 to 480".
         let leftWidth = CGFloat(ViewSettings.clampedLeft(model.settings.leftColumnWidth))
         let rightWidth = CGFloat(ViewSettings.clampedRight(model.settings.rightColumnWidth))
-        left.frame = NSRect(x: 0, y: top, width: leftWidth, height: height)
+        left.frame = NSRect(x: gap, y: top, width: leftWidth - gap - gap / 2, height: height)
         let centerWidth = max(200, w - leftWidth - rightWidth)
+        let centerX = leftWidth + gap / 2
+        let centerInner = centerWidth - gap
         // "The grid keeps at least its header and one row of cues".
         let wanted = poolDragHeight ?? CGFloat(PoolDivider.height(model.settings.panel, center: Double(height), collapsed: Double(PoolView.collapsedHeight)))
-        // "The command bar ... is a field across the top of the center when on."
+        // "The command bar ... is a field across the top of the center when on", a panel of its own.
         let barHeight = commandBar.isHidden ? 0 : CommandBarView.height
-        commandBar.frame = NSRect(x: leftWidth, y: top, width: centerWidth, height: barHeight)
-        let poolHeight = min(wanted, max(PoolView.headerHeight, height - barHeight - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
-        grid.frame = NSRect(x: leftWidth, y: top + barHeight, width: centerWidth, height: height - barHeight - poolHeight)
-        pool.frame = NSRect(x: leftWidth, y: top + height - poolHeight, width: centerWidth, height: poolHeight)
+        commandBar.frame = NSRect(x: centerX, y: top, width: centerInner, height: barHeight)
+        let gridTop = top + (barHeight > 0 ? barHeight + gap : 0)
+        let poolHeight = min(wanted, max(PoolView.headerHeight, top + height - gridTop - gap - GridView.headerHeight - CueCellView.height(settings: model.settings) - 70))
+        pool.frame = NSRect(x: centerX, y: top + height - poolHeight, width: centerInner, height: poolHeight)
+        grid.frame = NSRect(x: centerX, y: gridTop, width: centerInner, height: max(0, pool.frame.minY - gap - gridTop))
 
         let half = DividerView.thickness / 2
         leftDivider.frame = NSRect(x: leftWidth - half, y: top, width: DividerView.thickness, height: height)
         rightDivider.frame = NSRect(x: leftWidth + centerWidth - half, y: top, width: DividerView.thickness, height: height)
-        poolDivider.frame = NSRect(x: leftWidth + half, y: pool.frame.minY - half, width: centerWidth - DividerView.thickness, height: DividerView.thickness)
+        poolDivider.frame = NSRect(x: centerX, y: pool.frame.minY - gap / 2 - half, width: centerInner, height: DividerView.thickness)
 
-        let rx = leftWidth + centerWidth + 12
-        let rw = rightWidth - 24
-        var y = top + 12
+        // The right column's panel, drawn by `draw(_:)`; its parts sit inside it.
+        rightPanel = NSRect(x: leftWidth + centerWidth + gap / 2, y: top, width: rightWidth - gap / 2 - gap, height: height)
+        let rx = rightPanel.minX + 10
+        let rw = rightPanel.width - 20
+        var y = top + 10
         let previewHeight = model.settings.multiviewer ? min(height * 0.42, rw * 0.9) : rw * 9 / 16 + 30
         preview.frame = NSRect(x: rx, y: y, width: rw, height: previewHeight)
         y += previewHeight + 10
@@ -790,20 +804,34 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         let tabsHeight = tabs.wantedHeight
         tabs.frame = NSRect(x: rx, y: y, width: rw, height: tabsHeight)
         y += tabsHeight + 10
-        strip.frame = NSRect(x: rx, y: y, width: rw, height: max(0, bounds.height - y - 10))
+        strip.frame = NSRect(x: rx, y: y, width: rw, height: max(0, rightPanel.maxY - y - 10))
         keysOverlay?.frame = bounds
+        needsDisplay = true
+    }
+
+    /// Show mode's right column, as a panel the window draws under its parts.
+    private var rightPanel = NSRect.zero
+
+    /// Spec 10 §4 — "Both modes draw their regions alike: each a panel with a hairline outline and rounded corners".
+    /// The grid keeps its own outline, which turns amber while it browses.
+    private func dress(_ view: Surface, asPanel: Bool) {
+        view.radius = asPanel ? 6 : 0
+        view.wantsLayer = true
+        view.layer?.cornerRadius = asPanel ? 6 : 0
+        view.layer?.masksToBounds = asPanel
+        if view !== grid { view.outline = asPanel ? Palette.hairline : nil }
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         // Edit mode's panels draw themselves, on the darker ground.
-        guard model.mode == .show else { return }
-        // The right column's panel.
-        let rightWidth = CGFloat(ViewSettings.clampedRight(model.settings.rightColumnWidth))
+        guard model.mode == .show, !rightPanel.isEmpty else { return }
+        let path = NSBezierPath(roundedRect: rightPanel.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
         Palette.panel.setFill()
-        NSRect(x: bounds.width - rightWidth, y: topBar.frame.maxY, width: rightWidth, height: bounds.height - topBar.frame.maxY).fill()
-        Palette.hairline.setFill()
-        NSRect(x: bounds.width - rightWidth, y: topBar.frame.maxY, width: 1, height: bounds.height - topBar.frame.maxY).fill()
+        path.fill()
+        Palette.hairline.setStroke()
+        path.lineWidth = 1
+        path.stroke()
     }
 
     // MARK: - An output's details (Spec 10 §8)

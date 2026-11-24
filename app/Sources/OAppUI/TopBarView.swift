@@ -10,8 +10,8 @@ import OCore
 /// bar is a control".
 @MainActor
 final class TopBarView: Surface {
-    /// Spec 10 §4 — "Top bar ... 38 points high".
-    static let height: CGFloat = 38
+    /// Spec 10 §4 — "Top bar ... 44 points high", in both modes (corrected 2026-11-24).
+    static let height = CGFloat(EditFrame.topBarHeight)
 
     private let model: ShowModel
     let show = FlatButton(style: .bare)
@@ -68,10 +68,8 @@ final class TopBarView: Surface {
     var onEdit: (() -> Void)?
     var onPage: ((EditPage) -> Void)?
 
-    /// The bar's height in each mode: Spec 10 §4's 38 points, and Spec 11 §2's 44 in edit mode.
-    static func height(_ mode: WindowMode) -> CGFloat {
-        mode == .edit ? CGFloat(EditFrame.topBarHeight) : height
-    }
+    /// The bar's height in each mode: 44 points in both (Spec 10 §4, Spec 11 §2).
+    static func height(_ mode: WindowMode) -> CGFloat { height }
 
     init(model: ShowModel) {
         self.model = model
