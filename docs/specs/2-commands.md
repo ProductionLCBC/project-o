@@ -110,10 +110,10 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | Text form | Object | Effect | Lock | Undo |
 | --- | --- | --- | --- | --- |
 | `next`, `previous` | `playlist.next`, `playlist.previous` | Fires the next or previous cue; crosses item boundaries; nothing past the end | passes (the cue's writes obey lock) | runtime |
-| `cue N` | `playlist.cue` | Fires cue N of the live list | passes | runtime |
-| `item N cue M` | `playlist.goto` | Fires that cue and makes its item live | passes | runtime |
+| `cue N [state]` | `playlist.cue` | Fires cue N of the live list; with `state`, after taking up the state its list leaves before it (Spec 3 §5) | passes | runtime |
+| `item N cue M [state]` | `playlist.goto` | Fires that cue and makes its item live; `state` as for `cue` | passes | runtime |
 | `item N section "NAME"` | `playlist.section` | Fires the first cue of that section in item N | passes | runtime |
-| `list N cue M` | `list.goto` | Fires that cue in a library master; the list becomes live with lookahead confined to it | passes | runtime |
+| `list N cue M [state]` | `list.goto` | Fires that cue in a library master; the list becomes live with lookahead confined to it; `state` as for `cue` | passes | runtime |
 | `playlist "TITLE"` | `playlist.load` | Makes a playlist live with no cue fired; the first `next` fires its first cue (Spec 7 §3–§4) | passes | none |
 | `disarm` | `playlist.disarm` | Clears the armed trigger, so nothing fires on its own; the engine sends it when a trigger's cue is no longer next at its time (Spec 7 §4) | passes | none |
 
@@ -220,7 +220,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `next` | `/o/next` |
 | `cue 7` | `/o/cue` `i:7` |
 | `item 4 cue 3` | `/o/item/4/cue` `i:3` |
-| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds); `up` follows as `s:"up"` |
+| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds); `up` follows as `s:"up"`, as a cue's `state` does (`/o/list/42/cue` `i:3` `s:"state"`) |
 | `popup 3 set "text" clearafter 30` | `/o/popup/3/set` `s:"text"` `i:30` |
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |

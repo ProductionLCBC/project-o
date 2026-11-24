@@ -47,7 +47,7 @@ The pages are picked in the top bar's page picker, and in the View menu with ⌥
 
 **Where a page's parts sit.** A page puts its editing space in the workspace, the engine's picture of what it has selected in the Preview monitor, and the selected thing's fields in the inspector's columns. §5 to §9 name a center and a right column: their center is the workspace and their right column the inspector.
 
-`view.json` (Spec 10 §4) also keeps the last page, each page's selection, the Browser's tab and its media view, and the cue grid's zoom and folded rows (§4), so edit mode reopens where it was left.
+`view.json` (Spec 10 §4) also keeps the last page, each page's selection, the Browser's tab and its media view, and the cue grid's zoom and its folded and hidden rows (§4), so edit mode reopens where it was left.
 
 **The top bar** in edit mode:
 
@@ -56,7 +56,7 @@ The pages are picked in the top bar's page picker, and in the View menu with ⌥
 - **Right:** the time of day; the saving pill, which reads "Saved" while nothing waits to be written and is otherwise show mode's saving tag, with its click (Spec 10 §14); and the engine pill, a green dot and "Engine" while the engine is connected, every output is presenting and no badge stands. Before them, an output that isn't presenting or is blacked out shows as its show-mode dot, and each of show mode's tags shows while it applies (Spec 10 §8), so nothing show mode's bar reports is missed here. A click on the engine pill lists every output as show mode's dots do, each with its details, its Stack ▸ menu and, for an output on a screen, Release This Screen or Put Back on This Screen (Spec 10 §8). While the engine isn't connected the pill is hollow and red, and the banner says why (Spec 10 §2).
 - While another app is active the whole bar says so, as in show mode.
 
-**Live** (Adam, 2026-11-24), one toggle beside the page picker, says what moving the cue grid's selection with the arrow keys does. Off, which edit mode always opens with, the arrows only select: nothing goes to air. On, they also fire each cue they move the selection onto, as Fire does (§4), so a change can be checked on the outputs as it is made; the toggle is drawn in the live red while it is on. A click in the grid only selects, on or off.
+**Live** (Adam, 2026-11-24), one toggle beside the page picker, says what moving the cue grid's selection does. Off, which edit mode always opens with, it only selects: nothing goes to air. On, each cue the selection moves onto, by the arrow keys or a click, is fired with `state` where Fire would fire it (§4): its list's state before it is taken up and the cue fires (Spec 3 §5), so the outputs show what its thumbnail shows, wherever in the list the editor goes. A change can then be checked on the outputs as it is made. ⇧ and ⌘ with a click or an arrow only select; the toggle is drawn in the live red while it is on.
 
 **The Browser** stands where show mode's left column does and holds what edit mode picks from.
 
@@ -65,7 +65,7 @@ The pages are picked in the top bar's page picker, and in the View menu with ⌥
 
 **The monitors.**
 
-- **Preview** is the engine's picture of what the page has selected (choice A-1), outlined in the selection's blue: on the Cues page, the selected cue's projected state (§4). Its header holds the stack picker, which is show mode's preview stack (Spec 10 §7): one choice for both modes, starting on the thumbnail stack.
+- **Preview** is the engine's picture of what the page has selected (choice A-1), outlined in the selection's blue: on the Cues page, the selected cue's projected state (§4), without the channels whose rows are hidden. Its header holds the stack picker, and a pill while channels are hidden ("Hiding 2 channels"), which is show mode's preview stack (Spec 10 §7): one choice for both modes, starting on the thumbnail stack.
 - **Program** keeps the show running while editing (UX spec). It shows the live picture of the same stack, from its preview surface (Spec 10 §2), outlined in the live red while an output shows it, with a pill naming those outputs, "On air · Out 1, 2"; when none does, the outline is plain and the pill says "Preview only". A blacked-out stack is dimmed and labelled as in show mode's preview. Under the picture, a line gives the live position in the top bar's words (Spec 10 §8) and, in amber, the armed countdown; for three seconds it says instead why a command did nothing (Spec 10 §7). Under that: the go-to field, which takes digit entry as in show mode and fires cue N of the live list, whatever the page shows, showing the live list's title while digits wait (Spec 10 §7, §9); Next (`next`), disabled while nothing is live (choice U-15); and Clear All (`system clearall`), red and set apart.
 
 Next and the go-to field fire within what is live; Fire, on the Cues page, is the one control that fires a cue of any list (§4). Nothing in edit mode applies an edit to live: a change shows when Spec 5 §2 says it does.
@@ -114,7 +114,7 @@ Edit mode reads the documents Spec 10 §3's queries return (`catalog`, `list`, `
 
 | `subject.kind` | Fields | Draws |
 | --- | --- | --- |
-| `cue` | `listUuid` (or `local`), `cue`, `stack` | The cue's projected state on that stack, Spec 3 §7's cue view, as the thumbnail job draws it (Spec 4 §10) |
+| `cue` | `listUuid` (or `local`), `cue`, `stack`, optionally `hide` | The cue's projected state on that stack, Spec 3 §7's cue view, as the thumbnail job draws it (Spec 4 §10); the channels `hide` lists by number draw nothing (§4's hidden rows; a number no channel has is ignored) |
 | `layout` | `preset`, `layout` (`"*"` or a stack number), `stack` (for `*` only), `sample` | The layout with the sample standing in for the slot's channel (below): a stack's own layout at that stack's size and number, the `*` layout at the size and number of the stack `stack` names |
 | `grade` | `grade` (or null), `media` | The item's poster or still through the grade, or as it is when `grade` is null, over black |
 
@@ -148,7 +148,7 @@ Edit mode reads the documents Spec 10 §3's queries return (`catalog`, `list`, `
 
 - **The section band:** over each run of cues that share a section, the section's name under a rule of its colour (Spec 10 §6's palette). A click on a band selects its run's cues, ⇧ and ⌘ extending the selection as on a header, and a band drags as its headers do (Moving, below) (Adam, 2026-11-24).
 - **The cue headers,** one per cue. On one line, its number, the live dot on the live cue, and its trigger as Spec 10 §6 words it ("Go", "+8 s", "adv 12 s"). Under that, the cue's thumbnail on the thumbnail stack, the engine's file (Spec 10 §6), which stands where a title would. Under the thumbnail, the label, on one line. The live cue's header is underlined in red; a selected cue's is underlined in blue, and its column is washed in blue. After the last cue, a + header adds a cue at the end.
-- **The channel rows,** one per channel in number order, then one for each channel number the list's cues write that no channel has (E7), named "No channel 7". At a row's left are its number, its label and a control that folds it to a thin strip. This column, the band and the headers stay in place while the grid scrolls. At first the rows of the channels the list writes content to are open and the rest are folded; a row the operator folds or opens stays so for every list, by channel number, in `view.json`. Nothing in the grid adds a channel: channels are made in the Channels page (§7).
+- **The channel rows,** one per channel in number order, then one for each channel number the list's cues write that no channel has (E7), named "No channel 7". At a row's left are its number, its label, a control that folds it to a thin strip, and an eye that hides the channel from the Preview monitor's picture alone, as a timeline hides a track (Adam, 2026-11-24): its cells dim, the monitor's header says how many are hidden ("Hiding 2 channels"), and Program, the outputs and the thumbnails are untouched. Hidden rows are kept by channel number for every list, in `view.json`, as folded ones are. This column, the band and the headers stay in place while the grid scrolls. At first the rows of the channels the list writes content to are open and the rest are folded; a row the operator folds or opens stays so for every list, by channel number, in `view.json`. Nothing in the grid adds a channel: channels are made in the Channels page (§7).
 
 **A cell** is one cue on one channel. It shows which of the UX spec's three states the cue has there, from the app's own fold of the list (Spec 10 §6):
 
@@ -513,7 +513,9 @@ What the drawing and those answers left open, the session settled in the drawing
 | G-21 | Drops on a cue's header | None: a cell names the channel | The header takes a drop with show mode's channel popover |
 | G-22 | Which chips a channel shows | All four on every channel | Only those the channel's kind uses, as the drawing's sample data had it |
 | G-23 | The stack editor, the channel sheet, the preset editor and the small editors in this frame | Their center is the workspace and their right column the inspector (§2); each is settled when its stage begins | Each drawn anew first |
-| G-24 | The Live toggle | One toggle named Live, as Adam chose over a Blind and Live switch (2026-11-24); edit mode always opens with it off; while it is on only the arrow keys fire, a click only selects | Edit mode reopens with it as it was left; a click fires too |
+| G-24 | The Live toggle | One toggle named Live, as Adam chose over a Blind and Live switch (2026-11-24); edit mode always opens with it off; while it is on, the arrows and a plain click fire with `state`, and ⇧ or ⌘ only select (his OK of 2026-11-24) | Edit mode reopens with it as it was left; only the arrows fire |
+| G-28 | What firing with `state` takes up | The channels the list touched before the cue, with cuts; a clip already playing the same media keeps playing; a locked channel and a channel the list never touched keep what is live; the earlier cues' other commands don't run (his OK of 2026-11-24) | Every channel to the thumbnail's state, untouched ones cleared; earlier cues' stack and output commands run too |
+| G-29 | What a hidden row hides | The channel in the Preview monitor's picture alone, kept by channel number for every list | Also in Program and the cue thumbnails, or kept per list |
 | G-25 | Which cues a section carries forward to | The cues after it that had the same section as the cue set, up to the first that differs | The cues after it up to the next with any section, empty ones only |
 | G-26 | How far the panels resize | The Browser 200 to 420 points, the monitors 260 to 560, the inspector 180 to 420 high, the workspace at least 360 by 200 | No limits but the window's |
 | G-27 | A new list's title | The tree opens a title field holding "New List", selected; Return with it emptied still names the list "New List" | An empty field, and Return with nothing typed makes no list |
