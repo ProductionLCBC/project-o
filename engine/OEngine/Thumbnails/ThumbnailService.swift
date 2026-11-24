@@ -91,6 +91,11 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// poster was found and "a change under `.posters/` ... redraws the tiles
     /// and thumbnails that went without it".
     private var posterFiles: Set<MediaLocation>
+    /// Moves on with every hand-over of the roots, so the versions worked out before it are dropped.
+    private var generation = 0
+    /// The cue versions of the list last asked about: the `thumbnails` query asks cue by cue, and each answer
+    /// would otherwise hash the documents again.
+    private var remembered: (generation: Int, list: List, versions: [String])?
     private var scratch: TextureHandle
     private var pool: [TextureHandle]
     private let poolSize: Int
@@ -212,6 +217,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         if let size { sized = size }
         if let missing { self.missing = missing }
         if let posters { posterFiles = posters }
+        generation += 1
+        remembered = nil
         lock.unlock()
     }
 
@@ -222,13 +229,32 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         return missing
     }
 
-    /// Spec 4 §10 — the library version of a list now: the roots, the
-    /// missing set and the poster files as last handed over.
-    func version(of list: List) -> String {
+    /// Spec 4 §10 — each cue's library version now, in list order: the roots,
+    /// the missing set and the poster files as last handed over, and as many
+    /// cues ahead as the thumbnail stack's boxes look. Worked out once for a
+    /// list and kept until the list or the roots change.
+    func versions(of list: List) -> [String] {
         lock.lock()
-        let (roots, missing, posters) = (self.roots, self.missing, self.posterFiles)
+        if let remembered, remembered.generation == generation, remembered.list == list {
+            lock.unlock()
+            return remembered.versions
+        }
+        let (roots, missing, posters, generation) = (self.roots, self.missing, self.posterFiles, self.generation)
         lock.unlock()
-        return LibraryVersion.hash(library: roots.library, machine: roots.machine, list: list, missing: missing, posters: posters)
+        let lookAhead = roots.machine.stack(roots.machine.settings.thumbnailStack).map { furthestOffset(of: $0, library: roots.library) } ?? 0
+        let versions = LibraryVersion.versions(library: roots.library, machine: roots.machine, list: list, missing: missing,
+                                               posters: posters, lookAhead: lookAhead)
+        lock.lock()
+        if generation == self.generation { remembered = (generation, list, versions) }
+        lock.unlock()
+        return versions
+    }
+
+    /// The library version of the cue `uuid` of `list`, if the list has it.
+    func version(ofCue uuid: UUID, in list: List) -> String? {
+        guard let index = list.cues.firstIndex(where: { $0.uuid == uuid }) else { return nil }
+        let versions = versions(of: list)
+        return index < versions.count ? versions[index] : nil
     }
 
     public var statistics: Statistics {
@@ -246,12 +272,14 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
 
     /// The file of a cue's thumbnail at the current library version, if it exists.
     public func thumbnailURL(forCue cue: UUID, in list: List) -> URL? {
-        cache.lookup(ThumbnailKey(cue: cue, stack: stack, version: version(of: list)))?.url
+        guard let version = version(ofCue: cue, in: list) else { return nil }
+        return cache.lookup(ThumbnailKey(cue: cue, stack: stack, version: version))?.url
     }
 
     /// The PNG of a cue's thumbnail, from memory or disk, if it exists.
     public func thumbnailData(forCue cue: UUID, in list: List) -> Data? {
-        cache.data(for: ThumbnailKey(cue: cue, stack: stack, version: version(of: list)))
+        guard let version = version(ofCue: cue, in: list) else { return nil }
+        return cache.data(for: ThumbnailKey(cue: cue, stack: stack, version: version))
     }
 
     // MARK: - Rendering
@@ -266,7 +294,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         let stack = roots.machine.settings.thumbnailStack
         // Spec 11 §6 — the thumbnail stack as the edits left it; one that was deleted draws nothing.
         guard let stackObject = roots.machine.stack(stack) else { throw ThumbnailError.noSuchStack(stack) }
-        let version = self.version(of: list)
+        let versions = self.versions(of: list)
+        guard position <= versions.count else { throw ThumbnailError.noSuchCue(position) }
+        let version = versions[position - 1]
         let key = ThumbnailKey(cue: cue.uuid, stack: stack, version: version)
         if let found = cache.lookup(key) {
             lock.lock()
@@ -346,7 +376,9 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
                 let cue = list.cues[position - 1]
                 // Spec 11 §3 — the `render` query's pictures are drawn "ahead of thumbnails".
                 runAhead()
-                if cache.lookup(ThumbnailKey(cue: cue.uuid, stack: stack, version: version(of: list))) != nil { continue }
+                if let version = version(ofCue: cue.uuid, in: list), cache.lookup(ThumbnailKey(cue: cue.uuid, stack: stack, version: version)) != nil {
+                    continue
+                }
                 // Spec 4 §4 — "skipped first under pressure".
                 while auxBlocked() { Thread.sleep(forTimeInterval: 0.05) }
                 // Spec 4 §3 — "rate-limited to 30 Hz".
