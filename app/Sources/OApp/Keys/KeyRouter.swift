@@ -184,10 +184,12 @@ public enum KeyRouter {
             }
         } else {
             // 5. "In edit mode, a focused cue grid, canvas, or list in the workspace or the inspector takes the
-            //    arrows, with ⇧ or ⌥, and Delete and Forward Delete (Spec 11 §2)."
+            //    arrows, with ⇧ or ⌥, Return, and Delete and Forward Delete (Spec 11 §2)." Digits waiting in the
+            //    go-to field keep Return for themselves.
             if context.editFocus {
                 if name.isArrow && !name.ctrl { return .passed }
                 if name.isPlain && (name.key == "delete" || name.key == "forwarddelete") { return .passed }
+                if isReturn(name) && !context.digitsWaiting { return .passed }
             }
             // 6. "A sheet or popover takes Return and plain Escape."
             if context.sheet, isReturn(name) || isEscape(name) { return .passed }

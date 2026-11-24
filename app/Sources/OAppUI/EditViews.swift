@@ -397,8 +397,10 @@ final class PromptView: Surface {
 
     var shownProblem: String { problem.isHidden ? "" : problem.stringValue }
 
-    /// The first field, for the cursor when the panel opens.
-    var firstField: NSView? { rows.first?.control }
+    /// The view the cursor goes to when the panel opens: `focus` when the
+    /// panel names one, else its first row's control.
+    var firstField: NSView? { focus ?? rows.first?.control }
+    var focus: NSView?
 }
 
 /// The small panels of Spec 10 §5 and §6, each built over the model's edit

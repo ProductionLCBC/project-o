@@ -492,11 +492,12 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
     /// Opens the content popover on the selected cell.
     func editContent() {
         guard !inspector.isMulti, inspector.number != nil, inspector.channelExists, model.editing.cannotEdit == nil else { return }
+        // Spec 11 §4 — the popover "hangs from that cell in the grid, scrolled into view".
         let panel = EditPopovers.content(model: model, machineRoot: machineRoot) { [weak self] again in
             guard let self else { return }
-            self.host?.present(again, at: self.contentButton)
+            self.host?.presentAtSelectedCell(again, fallback: self.contentButton)
         }
-        host?.present(panel, at: contentButton)
+        host?.presentAtSelectedCell(panel, fallback: contentButton)
     }
 
     private func showChip(_ kind: CueAttribute.Kind, at anchor: NSView?) {
@@ -873,9 +874,20 @@ final class CommandsTextView: NSTextView {
         setAccessibilityLabel(Strings.text(.editCommandsAsText))
     }
 
+    /// The content popover's text: "Return commits and closes the popover, ⇧Return makes a line" (Spec 11 §4,
+    /// corrected 2026-11-24). Elsewhere, as in Commands as Text, Return makes a line and ⌘Return sends.
+    var returnCommits = false
+
     override func keyDown(with event: NSEvent) {
-        // ⌘Return sends; Return alone makes a line.
-        if (event.keyCode == 36 || event.keyCode == 76), event.modifierFlags.contains(.command) { onCommit?() } else { super.keyDown(with: event) }
+        let isReturn = event.keyCode == 36 || event.keyCode == 76
+        guard isReturn, !hasMarkedText() else { return super.keyDown(with: event) }
+        if event.modifierFlags.contains(.command) {
+            onCommit?()
+        } else if returnCommits {
+            if event.modifierFlags.contains(.shift) { insertNewline(nil) } else { onCommit?() }
+        } else {
+            super.keyDown(with: event)
+        }
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {

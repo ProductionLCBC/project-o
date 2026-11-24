@@ -64,8 +64,22 @@ final class CueGridView: Surface, EditFocus {
 
     func refresh() {
         clampScroll()
-        keepSelectionInView()
+        // "The grid scrolls to keep the selection in view" when the selection moves; an engine event that leaves it
+        // where it was leaves the grid scrolled where the operator put it.
+        if selection != scrolledFor {
+            scrolledFor = selection
+            keepSelectionInView()
+        }
         rebuildAccessibility()
+        needsDisplay = true
+    }
+
+    /// The selection the grid last scrolled to show.
+    private var scrolledFor: CueGridSelection?
+
+    /// Spec 11 §4 — a popover that hangs from the selected cell shows it first.
+    func scrollSelectionIntoView() {
+        keepSelectionInView()
         needsDisplay = true
     }
 
@@ -235,10 +249,11 @@ final class CueGridView: Surface, EditFocus {
         case 51, 117: model.editing.delete()
         case 36, 76:
             // ⌃Return opens the selected thing's menu, and ⌥Return activates it (Spec 10 §15).
+            // Spec 11 §2 — "Return opens the selected cell's content (§4)".
             if flags.contains(.control) {
                 menuNow.popUp(positioning: nil, at: selectionAnchor, in: self)
-            } else if flags.contains(.option) {
-                if case .channel = selection.row { onEditContent?() }
+            } else if case .channel = selection.row {
+                onEditContent?()
             } else {
                 super.keyDown(with: event)
             }

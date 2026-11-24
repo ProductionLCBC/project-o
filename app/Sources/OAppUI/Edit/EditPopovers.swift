@@ -438,11 +438,14 @@ enum EditPopovers {
 
         switch draft.kind {
         case .text:
-            // "the body in a multi-line field (Return makes a line, ⌘Return commits, Escape discards)".
+            // "the body in a multi-line field with the cursor at its end (Return commits and closes the popover,
+            // ⇧Return makes a line, Escape discards)".
             let body = CommandsTextView()
+            body.returnCommits = true
             body.font = .systemFont(ofSize: 12.5)
             body.string = draft.fields.first?.value ?? ""
             body.setAccessibilityLabel(Strings.text(.editContentFormBody))
+            panel.focus = body
             body.onCommit = { [weak panel] in panel?.commit() }
             body.onDiscard = { [weak panel] in panel?.onClose?() }
             let scroll = NSScrollView()

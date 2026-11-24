@@ -239,9 +239,11 @@ final class KeyRouterTests: XCTestCase {
 
     func test_inEditModeAFocusedEditorTakesTheArrowsAndTheDeleteKeys() {
         let editing = KeyContext(editFocus: true)
-        for key in ["left", "right", "up", "down", "shift+left", "alt+shift+up", "delete", "forwarddelete"] {
+        for key in ["left", "right", "up", "down", "shift+left", "alt+shift+up", "return", "padenter", "delete", "forwarddelete"] {
             XCTAssertEqual(route(key, editing), .passed, key)
         }
+        // "Return opens the selected cell's content" (corrected 2026-11-24), unless digits wait for it in the go-to field.
+        XCTAssertNotEqual(route("return", KeyContext(editFocus: true, digitsWaiting: true)), .passed)
         XCTAssertEqual(fires(route("space", editing)), .next, "every other key is the show's")
         XCTAssertEqual(fires(route("shift+escape", editing)), .systemClearAll)
         XCTAssertEqual(fires(route("left")), .previous, "and outside edit mode the arrows are the show's too")

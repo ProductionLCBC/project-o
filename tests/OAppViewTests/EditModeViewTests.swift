@@ -386,6 +386,34 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["item 2 cue 3"])
     }
 
+    /// Spec 11 §2 and §4 as corrected 2026-11-24 — "Return opens the selected cell's content", the popover "hangs from
+    /// that cell in the grid", the text has "the cursor at its end", and there "Return commits and closes the popover,
+    /// ⇧Return makes a line".
+    func test_returnOnACellOpensItsContentBesideItAndReturnInTheTextCommits() throws {
+        let rig = try editing()
+        let grid = rig.view.workspace.grid
+        rig.window.window.makeFirstResponder(grid)
+        rig.model.editing.click(cue: 0, row: .channel(2))
+        let enter = try key(36)
+        XCTAssertFalse(rig.window.keyTap.take(enter), "the focused grid takes Return")
+        grid.keyDown(with: enter)
+        let content = try XCTUnwrap(rig.view.prompt, "the content popover")
+        XCTAssertTrue(rig.view.promptAnchor === grid, "it hangs from the cell, not from the inspector")
+        let body = try XCTUnwrap(content.firstField as? CommandsTextView, "the text takes the focus")
+        let typed = body.string
+        XCTAssertFalse(typed.isEmpty)
+        let before = count(rig)
+        body.keyDown(with: try key(36, .shift))
+        XCTAssertEqual(count(rig), before, "⇧Return makes a line and sends nothing")
+        XCTAssertEqual(body.string.filter { $0 == "\n" }.count, typed.filter { $0 == "\n" }.count + 1)
+        body.keyDown(with: try key(36))
+        XCTAssertEqual(count(rig), before + 1, "Return commits")
+        XCTAssertNil(rig.view.prompt, "and closes the popover")
+        // The inspector's Content button opens it at the cell too.
+        rig.view.inspector.contentButton.press()
+        XCTAssertTrue(rig.view.promptAnchor === grid)
+    }
+
     /// Adam's try of 2026-11-24: a label committed with Return was sent again as the old text a moment later, when the
     /// field lost the focus, because the window redrew from the library before the engine's answer came back.
     func test_aFieldSendsWhatWasTypedOnceAndNeverTheOldTextBack() throws {

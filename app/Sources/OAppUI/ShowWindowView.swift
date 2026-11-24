@@ -255,12 +255,29 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     }
 
     /// Shows a small panel in a popover beside `anchor`.
-    func present(_ panel: PromptView, at anchor: NSView?) {
+    func present(_ panel: PromptView, at anchor: NSView?, rect: NSRect? = nil) {
         closePrompt()
         panel.finish()
         panel.onClose = { [weak self] in self?.closePrompt() }
         prompt = panel
-        popUp(panel, at: anchor, focus: panel.firstField)
+        promptAnchor = anchor
+        popUp(panel, at: anchor, rect: rect, focus: panel.firstField)
+    }
+
+    /// The view the open panel hangs from, for the tests: a popover can't be seen offscreen.
+    private(set) weak var promptAnchor: NSView?
+
+    /// Spec 11 §4 — the content popover "hangs from that cell in the grid,
+    /// scrolled into view, so what is edited sits beside its cue"; with no
+    /// cell in view, from `fallback`.
+    func presentAtSelectedCell(_ panel: PromptView, fallback: NSView?) {
+        let grid = workspace.grid
+        grid.scrollSelectionIntoView()
+        if let rect = grid.selectionRect, grid.bounds.intersects(rect) {
+            present(panel, at: grid, rect: rect)
+        } else {
+            present(panel, at: fallback)
+        }
     }
 
     /// A window that is on no screen shows no popover; the panel is the same
@@ -268,7 +285,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     /// from the window's own view: a cell or a tile is made again whenever
     /// the engine says something changed, and a panel hung from one would
     /// close under the operator's hands.
-    private func popUp(_ panel: NSView, at anchor: NSView?, focus: NSView?) {
+    private func popUp(_ panel: NSView, at anchor: NSView?, rect: NSRect? = nil, focus: NSView?) {
         guard let anchor, anchor.window === window, window?.isVisible == true else { return }
         let controller = NSViewController()
         controller.view = panel
@@ -278,9 +295,11 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         popover.behavior = .semitransient
         popover.appearance = NSAppearance(named: .darkAqua)
         popover.delegate = self
-        popover.show(relativeTo: convert(anchor.bounds, from: anchor), of: self, preferredEdge: .maxX)
+        popover.show(relativeTo: convert(rect ?? anchor.bounds, from: anchor), of: self, preferredEdge: .maxX)
         promptPopover = popover
         if let focus { panel.window?.makeFirstResponder(focus) }
+        // Spec 11 §4 — text opens "with the cursor at its end".
+        if let text = focus as? NSTextView { text.setSelectedRange(NSRange(location: (text.string as NSString).length, length: 0)) }
     }
 
     func closePrompt() {
