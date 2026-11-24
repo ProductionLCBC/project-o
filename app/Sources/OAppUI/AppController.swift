@@ -59,6 +59,10 @@ final class AppController {
         model.confirm = { [weak self] confirmation, answer in self?.ask(confirmation, answer) }
         windowController.regions.chooseFiles = { [weak self] choice, answer in self?.chooseFiles(choice, answer) }
         windowController.regions.reveal = { url in NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        // Spec 10 §8, §9 — an output's menu releases its screen as ⌃⌥⌘⎋ does, and puts it back.
+        windowController.regions.onScreen = { [weak self] screen, putBack in
+            if putBack { self?.releaser.putBack(screen: screen) } else { self?.releaser.release(screen: screen) }
+        }
         releaser.onRaised = { [weak self] raised in self?.raiseWindow(raised) }
         // "If the engine doesn't answer within two seconds, the window stays raised with the not-responding banner (§2)".
         releaser.onSilent = { [weak self] in self?.supervisor?.engineIsSilent() }

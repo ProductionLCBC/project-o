@@ -7921,6 +7921,18 @@
         }
       }
     },
+    "output.putBackScreen" : {
+      "comment" : "A button in a released screen output's details: puts its outputs back on that screen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Put Back on This Screen"
+          }
+        }
+      }
+    },
     "output.reference" : {
       "comment" : "A row of an output's details: its sync reference.",
       "extractionState" : "manual",
@@ -7965,6 +7977,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "none"
+          }
+        }
+      }
+    },
+    "output.releaseScreen" : {
+      "comment" : "A button in a screen output's details: takes the outputs off that screen for a while.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release This Screen"
           }
         }
       }

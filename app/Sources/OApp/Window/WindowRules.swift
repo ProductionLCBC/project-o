@@ -89,11 +89,16 @@ public struct OutputDetails: Equatable, Sendable {
     public var presented: Int?
     public var late: Int?
     public var dropped: Int?
+    /// Spec 10 §8 — "for an output on a screen, Release This Screen ... or Put
+    /// Back on This Screen while they are released": the screen as
+    /// `display:<uuid>`, or nil for an output on a card or the network.
+    public var screen: String?
 
     public static func make(output: Output, dot: OutputDot, status: OutputStatus?, devices: DetectedDevices?, metrics: [String: JSONValue]?) -> OutputDetails {
         let name = devices?.screens.first { $0.device == output.device }?.name ?? devices?.ports.first { $0.device == output.device }?.name
         var details = OutputDetails(number: output.number, label: output.label, device: name ?? output.device, format: output.format,
                                     reference: status?.reference, state: dot.state, stack: dot.stack, isBlackedOut: dot.isBlackedOut)
+        if output.device.lowercased().hasPrefix("display:") { details.screen = output.device }
         for value in metrics?.items("outputs") ?? [] {
             guard let counts = value.objectValue, counts.integer("output") == output.number else { continue }
             details.presented = counts.integer("presented")

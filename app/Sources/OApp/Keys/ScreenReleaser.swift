@@ -54,6 +54,18 @@ public final class ScreenReleaser {
         send(screen)
     }
 
+    /// Spec 10 §9 — "Put Back on This Screen sends `retakeScreen` with it:
+    /// the engine opens those outputs' windows again ... and the app forgets
+    /// the screen" (corrected 2026-11-24). A release of it still unanswered
+    /// no longer keeps the window raised.
+    public func putBack(screen: String) {
+        released.removeAll { $0.caseInsensitiveCompare(screen) == .orderedSame }
+        let wasRaised = isRaised
+        waiting = waiting.filter { $0.caseInsensitiveCompare(screen) != .orderedSame }
+        if wasRaised, !isRaised { onRaised?(false) }
+        transmit?(.retakeScreen(screen)) { _ in }
+    }
+
     /// An engine connected: "sends `releaseScreen` again to any engine it connects to".
     public func connected() {
         for screen in released { send(screen) }

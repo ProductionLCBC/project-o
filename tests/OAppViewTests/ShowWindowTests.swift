@@ -385,6 +385,20 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(rig.commands, [["output 1 stack 2"]])
         XCTAssertEqual(Audit.unlabelled(in: details), [])
         for row in details.rows { XCTAssertFalse(Audit.isCutOff(row.name), row.name.stringValue) }
+        // Spec 10 §8 as corrected 2026-11-24 — "for an output on a screen, Release This Screen ... or Put Back on This
+        // Screen while they are released".
+        let screen = try XCTUnwrap(rig.model.store.catalog?.outputs.first?.device)
+        var asked: [String] = []
+        rig.view.onScreen = { asked.append(($1 ? "put back " : "release ") + $0) }
+        let release = try XCTUnwrap(details.screenButton, "output 1 is on a screen")
+        XCTAssertEqual(release.title, "Release This Screen")
+        release.press()
+        var released = dot
+        released.state = .released
+        let back = try XCTUnwrap(rig.view.outputDetails(for: released)?.screenButton)
+        XCTAssertEqual(back.title, "Put Back on This Screen")
+        back.press()
+        XCTAssertEqual(asked, ["release " + screen, "put back " + screen])
     }
 
     func test_showInLibraryOpensTheFolderAndMarksTheListsRow() throws {

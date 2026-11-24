@@ -95,6 +95,8 @@ public enum StringKey: String, CaseIterable, Sendable {
     case outputStateReleased = "output.state.released"
     case outputStateAbsent = "output.state.absent"
     case outputStack = "output.stack"
+    case outputReleaseScreen = "output.releaseScreen"
+    case outputPutBackScreen = "output.putBackScreen"
     case outputPresented = "output.presented"
     case outputLate = "output.late"
     case outputDropped = "output.dropped"

@@ -815,11 +815,19 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         guard let output = model.store.catalog?.outputs.first(where: { $0.number == dot.number }) else { return nil }
         let details = OutputDetails.make(output: output, dot: dot, status: model.store.outputs[dot.number], devices: model.store.devices,
                                          metrics: model.store.metrics)
-        return OutputDetailsView(details, stacks: model.store.catalog?.stacks ?? [], cannotSend: model.store.cannotSend) { [weak self] stack in
+        return OutputDetailsView(details, stacks: model.store.catalog?.stacks ?? [], cannotSend: model.store.cannotSend, onStack: { [weak self] stack in
             self?.model.send(Actions.outputStack(output: dot.number, stack: stack))
             self?.outputPopover?.close()
-        }
+        }, onScreen: { [weak self] screen, putBack in
+            self?.onScreen?(screen, putBack)
+            self?.outputPopover?.close()
+        })
     }
+
+    /// Spec 10 §8 — an output's Release This Screen and Put Back on This
+    /// Screen: the screen, and whether it is put back. The app's controller
+    /// holds the released screens (§9), so it takes them.
+    var onScreen: ((String, Bool) -> Void)?
 
     private func showOutput(_ dot: OutputDot, at anchor: NSView) {
         guard let view = outputDetails(for: dot) else { return }

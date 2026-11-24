@@ -103,7 +103,7 @@ public final class StockEngine: @unchecked Sendable {
             return [.object(["id": id, "type": .string("pong")])]
         case "stop":
             return [result(["result": .string("ok"), "unsaved": .array([])])]
-        case "releaseScreen":
+        case "releaseScreen", "retakeScreen":
             return [result(["result": .string("ok"), "outputs": .array([])])]
         default:
             return [result(["result": .string("rejected"), "reason": .string("badValue: there is no \(type) request")])]

@@ -335,6 +335,8 @@ ENTRIES = [
     ("output.state.released", "released", "An output taken off its screen on purpose."),
     ("output.state.absent", "absent", "An output whose device isn't connected."),
     ("output.stack", "Stack", "A row of an output's details: the stack it shows, with a menu to switch it."),
+    ("output.releaseScreen", "Release This Screen", "A button in a screen output's details: takes the outputs off that screen for a while."),
+    ("output.putBackScreen", "Put Back on This Screen", "A button in a released screen output's details: puts its outputs back on that screen."),
     ("output.presented", "Presented", "A row of an output's details: frames shown since the engine started."),
     ("output.late", "Late", "A row of an output's details: frames shown late."),
     ("output.dropped", "Dropped", "A row of an output's details: frames dropped."),

@@ -77,19 +77,32 @@ final class DividerView: NSView {
 /// Spec 10 §8 — "A click opens the output's details (its device, format,
 /// reference, state, and its presented, late and dropped counts from
 /// `metrics`) with a Stack ▸ menu that switches its live stack (`output N
-/// stack M`)."
+/// stack M`), and, for an output on a screen, Release This Screen ... or Put
+/// Back on This Screen while they are released" (corrected 2026-11-24).
 @MainActor
 final class OutputDetailsView: Surface {
     let title = Kit.content(Kit.label(size: 13, weight: .semibold))
     private(set) var rows: [(name: NSTextField, value: NSTextField)] = []
     private let stackName = Kit.label(Strings.text(.outputStack), size: 12)
     let stack = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// The screen's button, under the Stack menu; nil for an output on a card or the network.
+    private(set) var screenButton: FlatButton?
     private let onStack: (Int) -> Void
     static let width: CGFloat = 320
 
-    init(_ details: OutputDetails, stacks: [Stack], cannotSend: Unavailable?, onStack: @escaping (Int) -> Void) {
+    /// `onScreen` takes the screen and whether it is put back (true) or released (false).
+    init(_ details: OutputDetails, stacks: [Stack], cannotSend: Unavailable?, onStack: @escaping (Int) -> Void,
+         onScreen: ((String, Bool) -> Void)? = nil) {
         self.onStack = onStack
         super.init(frame: .zero)
+        if let screen = details.screen, let onScreen {
+            // Release and put back are the window's, not commands: they go however the lock stands, as ⌃⌥⌘⎋ does (§9).
+            let putBack = details.state == .released
+            let button = FlatButton(Strings.text(putBack ? .outputPutBackScreen : .outputReleaseScreen), style: .plain)
+            button.onPress = { onScreen(screen, putBack) }
+            addSubview(button)
+            screenButton = button
+        }
         fill = Palette.panel
         title.stringValue = Strings.text(.outputTitle, details.number, details.label)
         addSubview(title)
@@ -119,7 +132,7 @@ final class OutputDetailsView: Surface {
         stack.action = #selector(picked)
         addSubview(stackName)
         addSubview(stack)
-        frame = NSRect(x: 0, y: 0, width: Self.width, height: 46 + CGFloat(rows.count) * 22 + 44)
+        frame = NSRect(x: 0, y: 0, width: Self.width, height: 46 + CGFloat(rows.count) * 22 + 44 + (screenButton == nil ? 0 : 38))
     }
 
     @available(*, unavailable)
@@ -149,5 +162,6 @@ final class OutputDetailsView: Surface {
         let stackWidth = Kit.width(of: stackName)
         stackName.frame = NSRect(x: 16, y: y + 9, width: stackWidth, height: 16)
         stack.frame = NSRect(x: 16 + stackWidth + 8, y: y + 4, width: max(80, w - 32 - stackWidth - 8), height: 26)
+        screenButton?.frame = NSRect(x: 16, y: y + 42, width: w - 32, height: 28)
     }
 }
