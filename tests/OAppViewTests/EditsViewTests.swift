@@ -589,15 +589,22 @@ final class EditMenuTests: XCTestCase {
         newPlaylist.choose()
         XCTAssertEqual(rig.controller.windowController.regions.inlineEditor?.field.placeholderString, "Playlist title", "⌘N opens the title field in the tree")
         rig.controller.windowController.regions.inlineEditor?.close()
-        // "New List (⇧⌘N ...) sends ... `edit list create` at the top".
+        // Spec 10 §5 as corrected 2026-11-24 — "New List (⇧⌘N ...) opens a title field in the tree ... holding "New
+        // List"", and Return sends "`edit list create {"title": "TITLE"}` at the top".
         let newList = try rig.entry("File", 1)
         XCTAssertEqual(newList.keyEquivalentModifierMask, [.shift, .command])
         newList.choose()
-        XCTAssertEqual(rig.commands, ["edit list create"])
+        let field = try XCTUnwrap(rig.controller.windowController.regions.inlineEditor?.field)
+        XCTAssertEqual(field.stringValue, "New List")
+        XCTAssertEqual(rig.commands, [], "nothing is made until Return")
+        field.sendAction(field.action, to: field.target)
+        XCTAssertEqual(rig.commands, ["edit list create { \"title\": \"New List\" }"])
         // The selected folder is the one the browsed library list is in.
         rig.controller.model.browse(.list(EditsViewTests.list42))
         try rig.entry("File", 1).choose()
-        XCTAssertEqual(rig.commands.last, "edit list create folder \"Hymns\"")
+        let second = try XCTUnwrap(rig.controller.windowController.regions.inlineEditor?.field)
+        second.sendAction(second.action, to: second.target)
+        XCTAssertEqual(rig.commands.last, "edit list create folder \"Hymns\" { \"title\": \"New List\" }")
     }
 
     /// Spec 10 §10 — "⌘Q, ⌘2 and Lock Station commit an open field first."
