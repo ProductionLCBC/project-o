@@ -56,7 +56,7 @@ final class TopBarView: Surface {
     /// "then what the page edits".
     let crumb = Kit.content(Kit.label(size: 12))
     /// "Center: the page picker: Cues, Text, Stacks, Channels, Presets, Objects."
-    let pagePicker = SegmentedView(EditPage.allCases.map(EditModeWording.page))
+    let pagePicker = SegmentedView(EditPage.allCases.map { EditModeWording.page($0) })
     /// "the saving pill, which reads "Saved" while nothing waits to be written".
     let saved = PillButton()
     /// "the engine pill, a green dot and "Engine"".

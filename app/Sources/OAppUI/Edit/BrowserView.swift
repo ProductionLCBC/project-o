@@ -103,12 +103,12 @@ private final class FlippedDocument: NSView {
 @MainActor
 final class BrowserView: PanelView {
     private let model: ShowModel
-    let tabs = SegmentedView(BrowserTab.allCases.map(EditModeWording.tab), small: true)
+    let tabs = SegmentedView(BrowserTab.allCases.map { EditModeWording.tab($0) }, small: true)
     // The Media tab.
     let search = Kit.search(placeholder: Strings.text(.poolSearch))
     let filter = NSPopUpButton(frame: .zero, pullsDown: true)
     let count = Kit.label(size: 11)
-    let views = SegmentedView(MediaListView.allCases.map(EditModeWording.mediaView), small: true)
+    let views = SegmentedView(MediaListView.allCases.map { EditModeWording.mediaView($0) }, small: true)
     private let scroll = NSScrollView()
     private let document = FlippedDocument()
     private(set) var tiles: [PoolTileView] = []

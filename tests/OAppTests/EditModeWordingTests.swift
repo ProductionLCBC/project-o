@@ -17,8 +17,8 @@ final class EditModeWordingTests: XCTestCase {
         // "where the list came from and its title, "Sunday 9:00 › Amazing Grace", or "Library › Amazing Grace"".
         XCTAssertEqual(EditModeWording.crumb(EditCrumb(source: "Sunday 9:00", title: "Amazing Grace")), "Sunday 9:00 › Amazing Grace")
         XCTAssertEqual(EditModeWording.crumb(EditCrumb(source: nil, title: "Amazing Grace")), "Library › Amazing Grace")
-        XCTAssertEqual(EditPage.allCases.map(EditModeWording.page), ["Cues", "Text", "Stacks", "Channels", "Presets", "Objects"])
-        XCTAssertEqual(BrowserTab.allCases.map(EditModeWording.tab), ["Playlists", "Library", "Media"])
+        XCTAssertEqual(EditPage.allCases.map { EditModeWording.page($0) }, ["Cues", "Text", "Stacks", "Channels", "Presets", "Objects"])
+        XCTAssertEqual(BrowserTab.allCases.map { EditModeWording.tab($0) }, ["Playlists", "Library", "Media"])
         // "with a pill naming those outputs, "On air · Out 1, 2"; ... the pill says "Preview only"".
         XCTAssertEqual(EditModeWording.pill(ProgramPanel(stack: 1, outputs: [1, 2], isBlackedOut: false), locale: english), "On air · Out 1, 2")
         XCTAssertEqual(EditModeWording.pill(ProgramPanel(stack: 3, outputs: [], isBlackedOut: false), locale: english), "Preview only")
