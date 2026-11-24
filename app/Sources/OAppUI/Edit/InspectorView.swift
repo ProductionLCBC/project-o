@@ -36,20 +36,47 @@ final class EditField: ShowField {
         action = #selector(committed)
     }
 
+    /// The model's value last shown, or the text last sent: a commit with
+    /// nothing typed since (the focus leaving after Return) sends nothing.
+    private var shown = ""
+    /// Text sent and not yet seen back from the engine: a redraw before the
+    /// answer keeps it, so the old value never shows, nor is sent back.
+    private var pending: String?
+    /// What the field edits (the selected cues): another subject drops `pending`.
+    private var subject: AnyHashable?
+
     @objc private func committed() {
-        onCommit?(stringValue)
+        let text = stringValue
+        guard text != shown else { return }
+        shown = text
+        pending = text
+        onCommit?(text)
     }
 
     /// Shows the model's value, unless the cursor is in the field: "a field
-    /// that has the focus ... keeps its text until it commits" (Spec 11 §2).
-    func show(_ text: String, placeholder: String? = nil) {
+    /// that has the focus ... keeps its text until it commits" (Spec 11 §2);
+    /// and unless the field's own edit is still on its way to the engine.
+    func show(_ text: String, placeholder: String? = nil, subject: AnyHashable? = nil) {
         if let placeholder { placeholderString = placeholder }
+        if subject != self.subject {
+            self.subject = subject
+            pending = nil
+        }
+        if let pending {
+            guard text == pending else { return }
+            self.pending = nil
+        }
+        shown = text
         if currentEditor() == nil, stringValue != text { stringValue = text }
     }
 
-    /// Outlined in red while its last edit stands refused (Spec 11 §2, "Rejections and warnings").
+    /// Outlined in red while its last edit stands refused (Spec 11 §2, "Rejections and warnings");
+    /// the refused text is dropped, and the next redraw puts the model's value back.
     var isRefused = false {
-        didSet { layer?.borderColor = (isRefused ? Palette.live : Palette.hairline).cgColor }
+        didSet {
+            if isRefused { pending = nil }
+            layer?.borderColor = (isRefused ? Palette.live : Palette.hairline).cgColor
+        }
     }
 }
 
@@ -527,12 +554,17 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
 
         // The Cue column: "the Cue column keeps only the section" for several cues.
         let mixed = Strings.text(.editChipMixed)
-        if case .same(let label)? = inspector.label { labelField.show(label, placeholder: "") } else { labelField.show("", placeholder: any ? mixed : "") }
+        let subject = AnyHashable([AnyHashable(editing.listUuid), AnyHashable(editing.selection.cues)])
+        if case .same(let label)? = inspector.label {
+            labelField.show(label, placeholder: "", subject: subject)
+        } else {
+            labelField.show("", placeholder: any ? mixed : "", subject: subject)
+        }
         var section = ""
         if case .same(let name)? = inspector.section { section = name }
-        sectionField.show(section, placeholder: inspector.section == .mixed ? mixed : "")
+        sectionField.show(section, placeholder: inspector.section == .mixed ? mixed : "", subject: subject)
         sectionSwatch.fill = section.isEmpty ? nil : Palette.section(SectionHue.index(for: section))
-        noteField.show(inspector.note)
+        noteField.show(inspector.note, subject: subject)
         labelField.isEnabled = canEdit && one
         noteField.isEnabled = canEdit && one
         sectionField.isEnabled = canEdit
@@ -547,10 +579,11 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
         let typingTime = timeField.currentEditor() != nil
         timeRadio.state = timeMs != nil || (typingTime && kind != .go) ? .on : .off
         if case .timecode? = kind { timecodeRadio.state = .on } else { timecodeRadio.state = .off }
-        timeField.show(SecondsText.text(ms: timeMs), placeholder: inspector.trigger == .mixed ? mixed : Strings.text(.editTriggerSeconds))
+        timeField.show(SecondsText.text(ms: timeMs), placeholder: inspector.trigger == .mixed ? mixed : Strings.text(.editTriggerSeconds), subject: subject)
         var advance: Int?
         if case .same(let same)? = inspector.advanceAfterMs { advance = same }
-        advanceField.show(SecondsText.text(ms: advance), placeholder: inspector.advanceAfterMs == .mixed ? mixed : Strings.text(.editTriggerNone))
+        advanceField.show(SecondsText.text(ms: advance), placeholder: inspector.advanceAfterMs == .mixed ? mixed : Strings.text(.editTriggerNone),
+                          subject: subject)
         for control in [goRadio, timeRadio, timeField, advanceField] as [NSControl] { control.isEnabled = canEdit }
         pairLabel.stringValue = inspector.pairWarnings.map { EditModeWording.pair($0, selected: one ? inspector.number : nil) }.joined(separator: "\n")
         pairLabel.isHidden = pairLabel.stringValue.isEmpty

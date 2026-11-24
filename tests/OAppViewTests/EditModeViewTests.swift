@@ -386,6 +386,30 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["item 2 cue 3"])
     }
 
+    /// Adam's try of 2026-11-24: a label committed with Return was sent again as the old text a moment later, when the
+    /// field lost the focus, because the window redrew from the library before the engine's answer came back.
+    func test_aFieldSendsWhatWasTypedOnceAndNeverTheOldTextBack() throws {
+        let rig = try editing()
+        let inspector = rig.view.inspector
+        rig.model.editing.click(cue: 3, row: .channel(1))
+        inspector.labelField.stringValue = "Refrain"
+        inspector.labelField.sendAction(inspector.labelField.action, to: inspector.labelField.target)
+        XCTAssertEqual(last(rig), ["edit list 42 cue \(c[3]) label \"Refrain\""])
+        let sent = count(rig)
+        // A redraw before the engine's answer: the library still says "Chorus".
+        inspector.refresh()
+        XCTAssertEqual(inspector.labelField.stringValue, "Refrain", "the field keeps what it sent until the engine answers")
+        // The field loses the focus with nothing typed since: nothing is sent.
+        inspector.labelField.sendAction(inspector.labelField.action, to: inspector.labelField.target)
+        XCTAssertEqual(count(rig), sent, "\(rig.commands)")
+        // Another cue shows its own label.
+        rig.model.editing.click(cue: 2, row: .channel(1))
+        XCTAssertNotEqual(inspector.labelField.stringValue, "Refrain")
+        // And a field left alone sends nothing when it loses the focus.
+        inspector.noteField.sendAction(inspector.noteField.action, to: inspector.noteField.target)
+        XCTAssertEqual(count(rig), sent, "\(rig.commands)")
+    }
+
     func test_theCommandsColumnThePaletteAndCommandsAsText() throws {
         let rig = try editing()
         let inspector = rig.view.inspector
