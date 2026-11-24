@@ -325,7 +325,7 @@ public final class EngineProcess: @unchecked Sendable {
     }
 
     /// Spec 10 §2 — the local socket: each connection that passes the peer check joins the API's hub, which greets
-    /// it with `hello`. Spec 10 §3 — the requests that reach past the engine: `stop` and `releaseScreen`.
+    /// it with `hello`. Spec 10 §3 — the requests that reach past the engine: `stop`, `releaseScreen` and `retakeScreen`.
     private func openSocket() {
         let hub = engine.api
         hub.identify(ApiHub.Identity(machine: roots.machine.settings.uuid, run: engine.run, mach: MachServiceName.engine(run: engine.run)))
@@ -333,6 +333,10 @@ public final class EngineProcess: @unchecked Sendable {
         let outputs = displayOutputs
         hub.releaseScreen = { uuid, done in
             DispatchQueue.main.async { MainActor.assumeIsolated { done(outputs.release(screen: uuid)) } }
+        }
+        // Spec 10 §9 — "Put Back on This Screen sends `retakeScreen` with it".
+        hub.retakeScreen = { uuid, done in
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(outputs.retake(screen: uuid)) } }
         }
         let socket = LocalSocket(url: LocalSocket.url(machineRoot: roots.machineRoot), log: log) { transport in
             let connection = hub.accept(transport, origin: .local)

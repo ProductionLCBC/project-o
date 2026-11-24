@@ -66,9 +66,20 @@ public struct DisplaySinkState: Equatable, Sendable {
     }
 
     /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
-    /// `released`": from any phase, and no change of screens brings it back.
+    /// `released`": from any phase, and no change of screens brings it back;
+    /// only `retakeScreen` does (`retaken()`).
     public mutating func released() {
         phase = .released
+    }
+
+    /// Spec 10 §9 — "Put Back on This Screen sends `retakeScreen` with it: the
+    /// engine opens those outputs' windows again, reports them `presenting`"
+    /// (corrected 2026-11-24). A released sink waits for its screen again,
+    /// `absent`, and its screen opens it as one that appears does, from the
+    /// newest frame; a sink that isn't released is left as it is.
+    public mutating func retaken() {
+        guard phase == .released else { return }
+        phase = .absent
     }
 
     /// Spec 10 §3 — the output's state as the `outputs` topic reports it.
@@ -281,7 +292,19 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     }
 
     /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
-    /// `released`": for the rest of the run, whatever the screens do.
+    /// `released`": until `retakeScreen` puts them back, or for the rest of
+    /// the run, whatever the screens do.
+    @MainActor
+    public func retake() {
+        lock.lock()
+        state.retaken()
+        let phase = state.phase
+        lock.unlock()
+        if phase == .absent { log.info("display sink \(output): put back; waiting for its screen") }
+    }
+
+    /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
+    /// `released`": until `retakeScreen` puts them back (`retake()`).
     @MainActor
     public func release() {
         detach()

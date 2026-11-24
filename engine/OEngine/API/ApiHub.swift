@@ -55,7 +55,7 @@ public final class ApiHub: @unchecked Sendable {
 
     /// Spec 10 §3 — the requests "the local socket takes ... On the LAN they
     /// are rejected with `localOnly`."
-    static let localOnly: Set<String> = ["ping", "stop", "releaseScreen", "passcode", "unlock", "resetPasscode", "token", "newToken"]
+    static let localOnly: Set<String> = ["ping", "stop", "releaseScreen", "retakeScreen", "passcode", "unlock", "resetPasscode", "token", "newToken"]
 
     /// Spec 10 §12 — the requests Area 18 builds; until then the local socket refuses them.
     static let later: Set<String> = ["passcode", "unlock", "resetPasscode", "token", "newToken"]
@@ -118,6 +118,9 @@ public final class ApiHub: @unchecked Sendable {
     /// this uuid and reports the outputs released; AppKit's work, so it
     /// answers through its completion from the main thread.
     public var releaseScreen: (@Sendable (String, @escaping @Sendable ([Int]) -> Void) -> Void)?
+    /// Spec 10 §3, `retakeScreen` — "Puts back on the named screen every
+    /// output released from it in this run"; answers as `releaseScreen` does.
+    public var retakeScreen: (@Sendable (String, @escaping @Sendable ([Int]) -> Void) -> Void)?
 
     init(publisher: EnginePublisher, log: EngineLog) {
         self.publisher = publisher
@@ -367,7 +370,9 @@ public final class ApiHub: @unchecked Sendable {
         case "stop":
             stop(request, engine: engine)
         case "releaseScreen":
-            release(request, engine: engine)
+            screen(request, engine: engine, putBack: false)
+        case "retakeScreen":
+            screen(request, engine: engine, putBack: true)
         case "auth":
             // Spec 10 §2 — "No token is sent" on the local socket; a LAN connection that is here has given its own already.
             connection.send(Self.rejected(request.id, Rejection(reason: .badValue, message: connection.origin == .local
@@ -565,15 +570,18 @@ public final class ApiHub: @unchecked Sendable {
 
     /// Spec 10 §9 — `releaseScreen`: "the engine closes those outputs'
     /// windows, reports them `released` (§3) and logs a `screenReleased`
-    /// note". The answer's place is taken now; the windows are AppKit's, so
-    /// the work and the answer come from the main thread.
-    private func release(_ request: Request, engine: Engine) {
+    /// note"; `retakeScreen`: "the engine opens those outputs' windows again,
+    /// reports them `presenting` and logs a `screenRetaken` note" (corrected
+    /// 2026-11-24). The answer's place is taken now; the windows are
+    /// AppKit's, so the work and the answer come from the main thread.
+    private func screen(_ request: Request, engine: Engine, putBack: Bool) {
+        let type = putBack ? "retakeScreen" : "releaseScreen"
         guard let device = request.members["screen"]?.stringValue, let uuid = DetectedScreen.uuid(ofDevice: device) else {
-            request.connection.send(Self.rejected(request.id, Rejection(reason: .badValue, message: "releaseScreen names its screen as \"screen\": \"display:<uuid>\"")))
+            request.connection.send(Self.rejected(request.id, Rejection(reason: .badValue, message: "\(type) names its screen as \"screen\": \"display:<uuid>\"")))
             return
         }
-        guard let releaseScreen else {
-            request.connection.send(Self.rejected(request.id, Rejection(reason: .conflict, message: "this engine has no screens to release")))
+        guard let act = putBack ? retakeScreen : releaseScreen else {
+            request.connection.send(Self.rejected(request.id, Rejection(reason: .conflict, message: "this engine has no screens to \(putBack ? "put back" : "release")")))
             return
         }
         let place = request.connection.reserve()
@@ -581,12 +589,16 @@ public final class ApiHub: @unchecked Sendable {
         let id = request.id
         let source = CommandSource(kind: sourceKind(of: request))
         let control = engine.control
-        releaseScreen(uuid) { outputs in
+        act(uuid) { outputs in
             // Spec 9 §2 as Spec 10 adds — "the notes its local requests write, with the requester's source".
             let numbers = outputs.map { JSONValue.number(Double($0)) }
-            _ = control.commandLog.note(["event": .string("screenReleased"), "screen": .string(DetectedScreen.devicePrefix + uuid), "outputs": .array(numbers)],
-                                        text: outputs.isEmpty ? "Released a screen with no outputs on it" : "Took output \(outputs.map(String.init).joined(separator: ", ")) off its screen",
-                                        source: source, ts: control.variables.timestamp())
+            let listed = outputs.map(String.init).joined(separator: ", ")
+            let text = putBack
+                ? (outputs.isEmpty ? "Put back a screen with no outputs released from it" : "Put output \(listed) back on its screen")
+                : (outputs.isEmpty ? "Released a screen with no outputs on it" : "Took output \(listed) off its screen")
+            _ = control.commandLog.note(["event": .string(putBack ? "screenRetaken" : "screenReleased"), "screen": .string(DetectedScreen.devicePrefix + uuid),
+                                         "outputs": .array(numbers)],
+                                        text: text, source: source, ts: control.variables.timestamp())
             connection.fill(place, with: .object(["id": id, "type": .string("result"), "result": .string("ok"), "outputs": .array(numbers)]))
         }
     }

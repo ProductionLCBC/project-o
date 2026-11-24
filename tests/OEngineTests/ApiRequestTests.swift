@@ -22,7 +22,7 @@ final class ApiRequestTests: XCTestCase {
     func test_everyLocalRequestOnTheLanIsLocalOnly() throws {
         let api = try ApiFixture()
         let client = api.lan()
-        let local = ["ping", "stop", "releaseScreen", "passcode", "unlock", "resetPasscode", "token", "newToken"]
+        let local = ["ping", "stop", "releaseScreen", "retakeScreen", "passcode", "unlock", "resetPasscode", "token", "newToken"]
         let ids = local.map { client.send($0, ["screen": .string("display:AAAAAAAA-0000-4000-8000-000000000001")]) }
         let render = client.send("query", ["what": .string("render")])
         api.tick()
@@ -227,6 +227,37 @@ final class ApiRequestTests: XCTestCase {
         XCTAssertEqual(note.note["outputs"], .array([.number(2), .number(3)]))
 
         let bad = client.send("releaseScreen", ["screen": .string("the big one")])
+        api.tick()
+        XCTAssertTrue(reason(client.answer(to: bad)).hasPrefix("badValue: "))
+    }
+
+    /// Spec 10 §9 as corrected 2026-11-24 — "Put Back on This Screen sends `retakeScreen` with it: the engine opens
+    /// those outputs' windows again, reports them `presenting` and logs a `screenRetaken` note".
+    func test_retakeScreenAnswersWithTheOutputsPutBackAndWritesItsNote() throws {
+        let api = try ApiFixture()
+        let client = api.local()
+        let asked = LockedList()
+        api.hub.retakeScreen = { uuid, done in
+            asked.append(uuid)
+            DispatchQueue.global().async { done([2]) }
+        }
+        let id = client.send("retakeScreen", ["screen": .string("display:37d8832a-2d66-02ca-b9f7-8f30a301b230"), "source": .string("ui")])
+        api.tick()
+        let deadline = Date(timeIntervalSinceNow: 5)
+        var answer = client.answer(to: id)
+        while answer == nil, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+            answer = client.answer(to: id)
+        }
+        XCTAssertEqual(answer?["result"], .string("ok"))
+        XCTAssertEqual(answer?["outputs"], .array([.number(2)]), "the outputs put back")
+        XCTAssertEqual(asked.values, ["37D8832A-2D66-02CA-B9F7-8F30A301B230"])
+        api.engine.settleLogs()
+        let note = try XCTUnwrap(api.disk.notes("screenRetaken").last)
+        XCTAssertEqual(note.source.kind, .ui)
+        XCTAssertEqual(note.note["screen"], .string("display:37D8832A-2D66-02CA-B9F7-8F30A301B230"))
+        XCTAssertEqual(note.note["outputs"], .array([.number(2)]))
+        let bad = client.send("retakeScreen", ["screen": .string("the big one")])
         api.tick()
         XCTAssertTrue(reason(client.answer(to: bad)).hasPrefix("badValue: "))
     }

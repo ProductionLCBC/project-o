@@ -129,6 +129,30 @@ final class OutputPlacementTests: XCTestCase {
         XCTAssertEqual(early.phase, .released)
     }
 
+    /// Spec 10 §9 as corrected 2026-11-24 — "Put Back on This Screen sends `retakeScreen` with it: the engine opens those
+    /// outputs' windows again, reports them `presenting`". A released sink is `absent` again, and its screen opens it.
+    func test_aReleasedSinkPutBackOpensOnItsScreenAgain() {
+        var state = DisplaySinkState()
+        state.started(screenPresent: true)
+        _ = state.refresh(newestPublished: 3, elapsedTicks: 1, isComplete: { _ in true })
+        state.released()
+        state.retaken()
+        XCTAssertEqual(state.phase, .absent)
+        state.screenChanged(available: true)
+        XCTAssertEqual(state.standing, .presenting)
+        XCTAssertEqual(state.refresh(newestPublished: 900, elapsedTicks: 1, isComplete: { _ in true }), .present(899),
+                       "from the newest frame, one behind, as a screen that comes back")
+        // Only a released sink is put back: a running one stays as it is.
+        var running = DisplaySinkState()
+        running.started(screenPresent: true)
+        running.retaken()
+        XCTAssertEqual(running.phase, .running)
+        // OutputPlacement places it on its screen once the screen is no longer released.
+        let outputs = [display(1, Self.wall)]
+        XCTAssertEqual(OutputPlacement.places(outputs: outputs, screens: screens(Self.wall), released: [Self.wall])[1], .released)
+        XCTAssertEqual(OutputPlacement.places(outputs: outputs, screens: screens(Self.wall), released: [])[1], .screen(Self.wall))
+    }
+
     /// The real sink, with no screen to give it: it starts, is `absent`, and
     /// opens no window. Needs a Metal device for its command queue.
     @MainActor
@@ -145,6 +169,11 @@ final class OutputPlacementTests: XCTestCase {
         XCTAssertEqual(sink.standing, .absent)
         sink.release()
         XCTAssertEqual(sink.standing, .released)
+        // Put back, with still no screen: `absent`, waiting for it, and no window.
+        sink.retake()
+        XCTAssertEqual(sink.standing, .absent)
+        sink.place(on: nil)
+        XCTAssertFalse(NSApplication.shared.windows.contains { $0 is OutputPanel })
         sink.stop()
     }
 }
