@@ -266,10 +266,10 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.model.editing.grid.rows.map(\.isFolded), [true, false, false])
         XCTAssertEqual(rig.model.settings.foldedRows, [1: true, 3: false])
         // The zoom, by slider and by pinch.
-        rig.model.editing.zoom(to: 60)
-        XCTAssertEqual(rig.model.settings.gridZoom, 60)
+        rig.model.editing.zoom(to: 80)
+        XCTAssertEqual(rig.model.settings.gridZoom, 80)
         rig.model.editing.pinch(by: 10)
-        XCTAssertEqual(rig.model.settings.gridZoom, 240)
+        XCTAssertEqual(rig.model.settings.gridZoom, 480)
     }
 
     // MARK: - Fire (Spec 11 §4)

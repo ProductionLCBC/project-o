@@ -184,6 +184,26 @@ final class CueEditTableTests: XCTestCase {
         XCTAssertNil(CueEdits.section("Chorus", cue: list.cues[3], list: 42))
     }
 
+    /// Spec 11 §4 as corrected 2026-11-24 — "A section carries forward in the editor alone: set on one cue, it is set
+    /// too on the cues after it whose section was the same as that cue's, up to the first that differs, all as one group".
+    func test_aSectionCarriesOnToTheCuesAfterItThatSharedItsOldOne() throws {
+        var list = try list42()
+        XCTAssertEqual(list.cues.count, 4)
+        for (index, name) in ["Verse", "Verse", "Verse", "Chorus"].enumerated() { list.cues[index].section = name }
+        // Set on cue 2: cue 3 was Verse with it; cue 4 had another.
+        XCTAssertEqual(text(CueEdits.sectionRun("Bridge", from: list.cues[1], in: list)),
+                       ["edit list 42 cue \(id(list.cues[1])) section \"Bridge\"", "edit list 42 cue \(id(list.cues[2])) section \"Bridge\""])
+        // The last cue of its run: that cue alone.
+        XCTAssertEqual(text(CueEdits.sectionRun("Bridge", from: list.cues[2], in: list)), ["edit list 42 cue \(id(list.cues[2])) section \"Bridge\""])
+        // Cues with no section carry one on, up to the first that has any.
+        var bare = list
+        for index in 0..<3 { bare.cues[index].section = nil }
+        XCTAssertEqual(text(CueEdits.sectionRun("Verse 1", from: bare.cues[0], in: bare)),
+                       (0..<3).map { "edit list 42 cue \(id(bare.cues[$0])) section \"Verse 1\"" })
+        // As it is: nothing to send.
+        XCTAssertNil(CueEdits.sectionRun("Verse", from: list.cues[0], in: list))
+    }
+
     func test_deleteAsksOnlyForEditsTheLiveCueOrTheArmedOne() throws {
         var list = try list42()
         // "Deleting cues asks first only when the cues hold edits, or include the live cue or the armed one (choice A-11)".

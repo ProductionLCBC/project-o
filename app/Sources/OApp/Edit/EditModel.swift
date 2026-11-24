@@ -659,9 +659,16 @@ public final class EditModel {
         each { CueEdits.label(label, cue: $0, list: $1) }
     }
 
-    /// The section, over the selected cues: "`edit.set` for the section and the trigger".
+    /// The section, over the selected cues: "`edit.set` for the section and the trigger". One cue carries it on
+    /// to the cues after it that shared its old one (Spec 11 §4, "A section carries forward in the editor alone");
+    /// "With several cues selected it is set on those alone."
     public func setSection(_ section: String) {
-        each { CueEdits.section(section, cue: $0, list: $1) }
+        guard let list else { return }
+        if !selection.isMulti, let cue = selectedCues.first {
+            send(CueEdits.sectionRun(section, from: cue, in: list))
+        } else {
+            each { CueEdits.section(section, cue: $0, list: $1) }
+        }
     }
 
     public func setNote(_ note: String) {

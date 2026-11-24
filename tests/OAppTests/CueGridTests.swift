@@ -183,11 +183,11 @@ final class CueGridTests: XCTestCase {
 
     // MARK: - Zoom and geometry (Spec 11 §4, "Zoom")
 
-    func test_theZoomRunsFrom24To240PointsAndDropsTextBelow96() {
-        // "from 24 to 240 points, 140 at first".
+    func test_theZoomRunsFrom72To480PointsAndDropsTextBelow96() {
+        // "from 72 to 480 points, 140 at first" (Adam, 2026-11-24).
         XCTAssertEqual(CueGridZoom.standard, 140)
-        XCTAssertEqual(CueGridZoom.clamped(10), 24)
-        XCTAssertEqual(CueGridZoom.clamped(500), 240)
+        XCTAssertEqual(CueGridZoom.clamped(10), 72)
+        XCTAssertEqual(CueGridZoom.clamped(500), 480)
         XCTAssertEqual(CueGridZoom.clamped(118.6), 119)
         // "Below 96 points a header drops its trigger and its label, and a tile its name, its text and its badge".
         XCTAssertTrue(CueGridZoom.showsText(column: 96))
@@ -196,8 +196,9 @@ final class CueGridTests: XCTestCase {
         XCTAssertEqual(CueGridZoom.rowHeight(column: 140), (140 - 12) * 9 / 16 + 12)
         // A pinch scales the column, within the range.
         XCTAssertEqual(CueGridZoom.pinched(140, by: 0.5), 210)
-        XCTAssertEqual(CueGridZoom.pinched(140, by: -0.9), 24)
-        XCTAssertEqual(CueGridZoom.pinched(200, by: 1), 240)
+        XCTAssertEqual(CueGridZoom.pinched(140, by: -0.9), 72)
+        XCTAssertEqual(CueGridZoom.pinched(200, by: 1), 400)
+        XCTAssertEqual(CueGridZoom.pinched(300, by: 1), 480)
     }
 
     func test_theGridsGeometryFindsWhatIsUnderAPoint() {

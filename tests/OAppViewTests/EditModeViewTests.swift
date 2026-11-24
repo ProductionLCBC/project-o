@@ -240,11 +240,11 @@ final class EditModeViewTests: XCTestCase {
         try click(grid, x: plus, y: CueGridGeometry.band + 20)
         XCTAssertTrue(last(rig)?.first?.hasPrefix("edit list 42 insert cues 4 {") ?? false, "\(rig.commands)")
         // The zoom: the header's slider, held to its range; below 96 points the headers' and tiles' text is dropped.
-        rig.view.workspace.zoom.doubleValue = 60
+        rig.view.workspace.zoom.doubleValue = 80
         rig.view.workspace.zoom.sendAction(rig.view.workspace.zoom.action, to: rig.view.workspace.zoom.target)
-        XCTAssertEqual(rig.model.settings.gridZoom, 60)
+        XCTAssertEqual(rig.model.settings.gridZoom, 80)
         XCTAssertFalse(grid.geometry.showsText)
-        XCTAssertEqual(grid.geometry.column, 60)
+        XCTAssertEqual(grid.geometry.column, 80)
     }
 
     func test_theArrowsAndDeleteAreTheGridsWhileItHasTheFocusAndEverythingElseIsTheShows() throws {

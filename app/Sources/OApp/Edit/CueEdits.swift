@@ -255,6 +255,21 @@ public enum CueEdits {
         return edit(.cue(list: list, cue: cue.uuid), .set(path: "section", value: name.isEmpty ? .null : .string(name)))
     }
 
+    /// Spec 11 §4 — "A section carries forward in the editor alone (Adam,
+    /// 2026-11-24): set on one cue, it is set too on the cues after it whose
+    /// section was the same as that cue's, up to the first that differs, all
+    /// as one group". Nil when the cue has that section already.
+    public static func sectionRun(_ section: String, from cue: Cue, in list: List) -> Sending? {
+        guard let start = list.cues.firstIndex(where: { $0.uuid == cue.uuid }) else { return nil }
+        let old = cue.section ?? ""
+        var run: [Sending?] = []
+        for next in list.cues[start...] {
+            guard (next.section ?? "") == old else { break }
+            run.append(Self.section(section, cue: next, list: list.number))
+        }
+        return group(run)
+    }
+
     /// "Headers drag to a new place: `edit list L cue C move K`, several in
     /// their order as one group." `before` is the place in the list as it
     /// stands, from 0 to its count, that the cues are dropped ahead of. Each

@@ -311,10 +311,10 @@ extension Command {
 }
 
 /// Spec 11 §4, "Zoom" — "The header's slider sets the width of a cue's
-/// column, from 24 to 240 points, 140 at first, and a pinch on the grid does
+/// column, from 72 to 480 points, 140 at first, and a pinch on the grid does
 /// the same."
 public enum CueGridZoom {
-    public static let range: ClosedRange<Double> = 24...240
+    public static let range: ClosedRange<Double> = 72...480
     public static let standard: Double = 140
     /// "Below 96 points a header drops its trigger and its label, and a tile its name, its text and its badge".
     public static let textFloor: Double = 96
