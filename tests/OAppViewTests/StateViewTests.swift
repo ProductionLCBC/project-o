@@ -240,7 +240,7 @@ final class StateViewTests: XCTestCase {
         defer { controller.supervisor?.leaveEngineRunning() }
         XCTAssertEqual(controller.model.settings, saved, "the file's settings take the defaults' place")
         controller.windowController.regions.layoutSubtreeIfNeeded()
-        XCTAssertEqual(controller.windowController.regions.left.frame.width, 300)
+        XCTAssertEqual(controller.windowController.regions.left.frame.width, 300 - 6, "the column view.json names, its panel inside the gaps (Spec 10 §4)")
         // A change is written, here at once as the app does before it quits.
         controller.model.change { $0.showsNotes = true }
         XCTAssertEqual(ViewSettingsFile.read(machineRoot: roots.machine), saved, "not before its second is up")
