@@ -551,15 +551,15 @@ public final class ShowModel {
     /// The same for a list shown from `context`, which edit mode's Fire
     /// uses: "sends what a click on that cue sends where the page's list
     /// came from" (Spec 11 §4).
-    func fire(_ cell: CueCell, in section: GridSection, context: GridContext?) -> Sending? {
+    func fire(_ cell: CueCell, in section: GridSection, context: GridContext?, withState: Bool = false) -> Sending? {
         guard section.refusal == nil, !section.isRemoved, let catalog = store.catalog else { return nil }
         switch context {
         case .playlist(let uuid):
             guard let playlist = catalog.playlist(uuid: uuid), let item = section.item else { return nil }
-            return try? GridFire.playlistCue(playlist, item: item, cue: cell.number, live: store.live).get()
+            return try? GridFire.playlistCue(playlist, item: item, cue: cell.number, live: store.live, state: withState).get()
         case .list(let uuid):
             guard let list = catalog.list(uuid: uuid) else { return nil }
-            return try? GridFire.libraryCue(list, cue: cell.number).get()
+            return try? GridFire.libraryCue(list, cue: cell.number, state: withState).get()
         case nil:
             return nil
         }

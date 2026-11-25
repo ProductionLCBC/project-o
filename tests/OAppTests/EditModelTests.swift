@@ -285,11 +285,17 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.commands, [], "off: the arrows only select")
         rig.model.editing.setLive(true)
         rig.model.editing.move(.right, extend: false)
-        XCTAssertEqual(rig.commands, [["item 2 cue 4"]], "Live: the cue the selection lands on fires, as Fire does")
-        rig.model.editing.move(.up, extend: false)
-        rig.model.editing.move(.right, extend: true)
+        // Spec 11 §2 as corrected 2026-11-24 — "each cue the selection moves onto, by the arrow keys or a click, is
+        // fired with `state` where Fire would fire it".
+        XCTAssertEqual(rig.commands, [["item 2 cue 4 state"]], "Live: the cue the selection lands on, with its list's state before it")
         rig.model.editing.click(cue: 0, row: .header)
-        XCTAssertEqual(rig.commands.count, 1, "a row's step, a ⇧ extension and a click fire nothing")
+        XCTAssertEqual(rig.commands.last, ["item 2 cue 1 state"], "a click goes there too, wherever in the list")
+        rig.model.editing.click(cue: 0, row: .channel(2))
+        rig.model.editing.move(.down, extend: false)
+        rig.model.editing.move(.right, extend: true)
+        rig.model.editing.click(cue: 3, row: .header, shift: true)
+        rig.model.editing.click(cue: 2, row: .header, command: true)
+        XCTAssertEqual(rig.commands.count, 2, "the same cue's other row, a row's step, and ⇧ or ⌘ fire nothing")
         // Leaving and coming back opens with Live off again.
         rig.model.editing.leave()
         rig.model.editing.open()

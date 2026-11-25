@@ -386,6 +386,7 @@ public final class EditModel {
     public func click(cue index: Int, row: CueGridSelection.Row, shift: Bool = false, command: Bool = false) {
         guard grid.headers.indices.contains(index) else { return }
         let order = grid.headers.map(\.uuid)
+        let was = selection.lead
         if shift {
             selection.extend(to: order[index], in: order)
             selection.set(row)
@@ -396,6 +397,9 @@ public final class EditModel {
             selection.click(cue: order[index], row: row)
         }
         selectionChanged()
+        // Spec 11 §2 — Live: "each cue the selection moves onto, by the arrow keys or a click, is fired with
+        // `state` ... ⇧ and ⌘ with a click or an arrow only select".
+        if isLive, !shift, !command, selection.lead != was { _ = fire(withState: true) }
     }
 
     /// Spec 11 §4 — "A click on a band selects its run's cues, ⇧ and ⌘
@@ -419,14 +423,13 @@ public final class EditModel {
         let was = selection.lead
         selection.move(direction, extend: extend, order: grid.headers.map(\.uuid), channels: grid.rows.map(\.channel))
         selectionChanged()
-        // Spec 11 §2 — Live "On, they also fire each cue they move the selection onto, as Fire does".
-        if isLive, !extend, !selection.isMulti, selection.lead != was { _ = fire() }
+        // Spec 11 §2 — Live: "each cue the selection moves onto, by the arrow keys or a click, is fired with `state`".
+        if isLive, !extend, !selection.isMulti, selection.lead != was { _ = fire(withState: true) }
     }
 
     /// Spec 11 §2 — "Live ... one toggle beside the page picker, says what
-    /// moving the cue grid's selection with the arrow keys does. Off, which
-    /// edit mode always opens with, the arrows only select: nothing goes to
-    /// air." (Adam, 2026-11-24.)
+    /// moving the cue grid's selection does. Off, which edit mode always opens
+    /// with, it only selects: nothing goes to air." (Adam, 2026-11-24.)
     public private(set) var isLive = false
 
     public func setLive(_ on: Bool) {
@@ -476,9 +479,11 @@ public final class EditModel {
 
     /// "sends what a click on that cue sends where the page's list came from
     /// (Spec 10 §6) ... Fire is the one control that fires a cue of any list".
+    /// `withState`: Live's fire, "fired with `state` where Fire would fire it" (Spec 11 §2).
     @discardableResult
-    public func fire() -> Bool {
-        guard case .fires = fireNote, let section, let cell = fireCell, let sending = model.fire(cell, in: section, context: source) else { return false }
+    public func fire(withState: Bool = false) -> Bool {
+        guard case .fires = fireNote, let section, let cell = fireCell,
+              let sending = model.fire(cell, in: section, context: source, withState: withState) else { return false }
         return model.send(sending)
     }
 
