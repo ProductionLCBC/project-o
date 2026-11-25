@@ -114,6 +114,15 @@ final class RenderRequestTests: XCTestCase {
         // No sample at all is an empty channel.
         guard case .layout(_, _, _, let none) = try parse(layoutSubject { $0["sample"] = nil }).get().subject else { return XCTFail("a layout") }
         XCTAssertEqual(none, RenderSample())
+
+        // Spec 11 §3 as corrected 2026-11-24 — "the engine's test pattern (`{"kind": "pattern"}`)", for pixel boxes as a
+        // media item would be, at the stack's size.
+        let pattern = parse(layoutSubject {
+            $0["sample"] = .object(["content": .object(["kind": .string("pattern")]), "next": .array([.object(["kind": .string("pattern")])])])
+        })
+        guard case .layout(_, _, _, let drawn) = try pattern.get().subject else { return XCTFail("a layout") }
+        XCTAssertEqual(drawn.content, TestPattern.content)
+        XCTAssertEqual(drawn.next, [TestPattern.content])
     }
 
     func test_aMediaItemThroughAGradeOrAsItIs() throws {

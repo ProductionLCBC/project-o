@@ -94,7 +94,7 @@ public struct LayoutSample: Equatable, Sendable {
     public var listUuid: String?
     public var isLocal = false
     public var cue: String?
-    /// The media sample's item.
+    /// The media sample's item; nil is the engine's test pattern, which the media sample starts on (G-35).
     public var media: String?
 
     public init() {}
@@ -124,10 +124,11 @@ public struct LayoutSample: Equatable, Sendable {
         case .empty:
             sample["content"] = .object(["kind": .string("empty")])
         case .media:
+            // "the engine's test pattern at first (§3), or a pool item chosen after it".
             if let media {
                 sample["content"] = .object(["kind": .string("media"), "ref": .string(media)])
             } else {
-                sample["content"] = .object(["kind": .string("empty")])
+                sample["content"] = .object(["kind": .string("pattern")])
             }
         case .text:
             sample["content"] = content(fields ?? Self.builtIn(verse: 0))

@@ -97,6 +97,8 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     /// would otherwise hash the documents again.
     private var remembered: (generation: Int, list: List, versions: [String])?
     private var scratch: TextureHandle
+    /// Spec 11 §3 — the test pattern at the size last asked for, drawn once for it.
+    private var pattern: (size: PixelSize, handle: TextureHandle)?
     private var pool: [TextureHandle]
     private let poolSize: Int
     /// The size the scratch and the pool were made at; they are made again, on the job's own thread, when `sized` moves on.
@@ -527,6 +529,24 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     }
 
     /// Spec 4 §5 — "Poster frame ... For offset boxes and thumbnails".
+    /// Spec 11 §3 as corrected 2026-11-24 — "the test pattern, which the engine draws itself at the stack's size": made
+    /// on the thumbnail queue the first time a size is asked for, and kept for the next picture of that size.
+    func patternSource(_ size: PixelSize) -> SlotResolver.PixelSource? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        if let pattern, pattern.size == size {
+            return SlotResolver.PixelSource(texture: pattern.handle, content: .full, contentPixels: size)
+        }
+        if let old = pattern {
+            backend.resources.release(old.handle)
+            pattern = nil
+        }
+        let handle = backend.makeTexture(TextureDescriptor(role: .poster, size: size, label: "test pattern"))
+        guard !handle.isNone else { return nil }
+        backend.upload(bgra8: TestPattern.bgra(width: size.width, height: size.height), bytesPerRow: size.width * 4, into: handle)
+        pattern = (size, handle)
+        return SlotResolver.PixelSource(texture: handle, content: .full, contentPixels: size)
+    }
+
     func posterSource(for content: ContentInstance?, roots: (library: Library, machine: Machine)) -> SlotResolver.PixelSource? {
         guard let media = content?.media, !media.missing,
               let resolved = MediaResolver.resolve(media.ref, library: roots.library, machine: roots.machine),

@@ -247,6 +247,28 @@ final class RenderPictureTests: XCTestCase {
         XCTAssertEqual(try Picture(gone.png).lit(0, 1), 0)
     }
 
+    /// Spec 11 §3 as corrected 2026-11-24 — "the test pattern, which the engine draws itself at the stack's size, so a
+    /// box's fit, crop and place read at once"; "it ships in the engine's code".
+    func test_thePatternSampleFillsAPixelBoxAtTheStacksSize() throws {
+        let preset = S.preset(24, "Pattern", boxes: [S.pixels(0)])
+        library.presets.append(preset)
+        let service = try service()
+        let stack = try XCTUnwrap(machine.stack(1))
+        let drawn = try draw(service, .layout(preset: preset, layout: .any, stack: stack, sample: RenderSample(content: TestPattern.content)), width: 640)
+        XCTAssertFalse(drawn.missing, "the pattern is never a missing file")
+        let picture = try Picture(drawn.png)
+        XCTAssertGreaterThan(picture.lit(0, 1), 1000, "the pattern fills the box")
+        // The colour bars across its middle: a saturated yellow and a saturated blue among them.
+        func some(_ test: (Int, Int, Int) -> Bool) -> Bool {
+            stride(from: 0, to: picture.bytes.count, by: 4).contains { test(Int(picture.bytes[$0]), Int(picture.bytes[$0 + 1]), Int(picture.bytes[$0 + 2])) }
+        }
+        XCTAssertTrue(some { r, g, b in r > 150 && g > 150 && b < 60 }, "a yellow bar")
+        XCTAssertTrue(some { r, g, b in r < 60 && g < 60 && b > 150 }, "a blue bar")
+        // A second picture of the same size draws the same.
+        let again = try Picture(try draw(service, .layout(preset: preset, layout: .any, stack: stack, sample: RenderSample(content: TestPattern.content)), width: 640).png)
+        XCTAssertEqual(again.differs(from: picture), 0)
+    }
+
     // MARK: - A grade
 
     /// "The item's poster or still through the grade, or as it is when `grade` is null, over black"; "the item's for a grade".

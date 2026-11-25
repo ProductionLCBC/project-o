@@ -865,7 +865,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     case editPresetSampleField = "edit.preset.sampleField"
     case editPresetSampleFromCue = "edit.preset.sampleFromCue"
     case editPresetSampleBuiltIn = "edit.preset.sampleBuiltIn"
-    case editPresetSampleNoMedia = "edit.preset.sampleNoMedia"
+    case editPresetSamplePattern = "edit.preset.samplePattern"
     case editPresetHeading = "edit.preset.heading"
     case editPresetNumber = "edit.preset.number"
     case editPresetBuiltIn = "edit.preset.builtIn"

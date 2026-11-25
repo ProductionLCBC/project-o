@@ -85,6 +85,7 @@ final class PresetPageTests: XCTestCase {
         sample.kind = .empty
         XCTAssertEqual(sample.value, .object(["content": .object(["kind": .string("empty")])]))
         sample.kind = .media
+        XCTAssertEqual(sample.value, .object(["content": .object(["kind": .string("pattern")])]), "the engine's test pattern at first")
         sample.media = "sha256:55"
         XCTAssertEqual(sample.value, .object(["content": .object(["kind": .string("media"), "ref": .string("sha256:55")])]))
     }

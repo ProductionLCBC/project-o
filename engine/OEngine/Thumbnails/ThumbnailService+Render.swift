@@ -173,7 +173,11 @@ extension ThumbnailService {
         var tabular: [Int: Bool] = [:]
         let results = SlotResolver.resolve(inputs, slot: slot,
                                            state: { offset in offset >= 0 && offset < states.count ? states[offset] : nil },
-                                           pixels: { _, _, content in self.posterSource(for: content, roots: (library, roots.machine)) },
+                                           pixels: { _, _, content in
+                                               // The test pattern, at the stack's size; anything else, its poster or still.
+                                               if content?.media?.ref == TestPattern.ref { return self.patternSource(size) }
+                                               return self.posterSource(for: content, roots: (library, roots.machine))
+                                           },
                                            text: { key, _, template, shown in
                                                let resolved = variables.resolve(template.raw, state: shown, scope: template.scope, roots: variableRoots, clock: clock)
                                                tabular[key.box] = resolved.tabular

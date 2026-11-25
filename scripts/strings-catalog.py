@@ -922,7 +922,7 @@ ENTRIES = [
     ("edit.preset.sampleField", "Sample text", "VoiceOver: the sample's own text field."),
     ("edit.preset.sampleFromCue", "Cue %1$lld of %2$@", "Where the sample text comes from: the cue selected on the Cues page."),
     ("edit.preset.sampleBuiltIn", "Built-in: Great Is Thy Faithfulness", "Where the sample text comes from: the built-in hymn."),
-    ("edit.preset.sampleNoMedia", "No video or image in the pool", "The media sample when the pool has none."),
+    ("edit.preset.samplePattern", "Test pattern", "The media sample the engine draws itself: a grid, centre lines, safe areas and colour bars."),
     ("edit.preset.heading", "Preset", "The heading of the preset's own fields."),
     ("edit.preset.number", "Number", "The preset's number field."),
     ("edit.preset.builtIn", "Preset 1 is built in: it can be edited, not deleted or renumbered.", "Under Preset 1's number."),

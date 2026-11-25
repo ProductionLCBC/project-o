@@ -52,7 +52,7 @@ final class PresetWorkspaceView: NSView {
     required init?(coder: NSCoder) { nil }
 
     @objc private func pickedMedia() {
-        if let id = sampleMedia.selectedItem?.representedObject as? String { model.editing.setSampleMedia(id) }
+        model.editing.setSampleMedia(sampleMedia.selectedItem?.representedObject as? String)
     }
 
     /// "Any stack: 1 Main, 3 Side"; "2 Confidence"; with the live dot on those an output shows.
@@ -119,16 +119,17 @@ final class PresetWorkspaceView: NSView {
             }
         case .media:
             let items = model.store.media.filter { [.video, .image].contains($0.entry.kind) && $0.presence == "ok" }
-            let titles = items.map { ($0.entry.path as NSString).lastPathComponent }
+            // The engine's test pattern first, then the pool's videos and images.
+            let titles = [Strings.text(.editPresetSamplePattern)] + items.map { ($0.entry.path as NSString).lastPathComponent }
             if sampleMedia.itemTitles != titles {
                 sampleMedia.removeAllItems()
-                for (item, title) in zip(items, titles) {
+                for (index, title) in titles.enumerated() {
                     sampleMedia.addItem(withTitle: title)
-                    sampleMedia.lastItem?.representedObject = item.entry.id
+                    sampleMedia.lastItem?.representedObject = index == 0 ? nil : items[index - 1].entry.id
                 }
             }
-            if let index = items.firstIndex(where: { $0.entry.id == sample.media }) { sampleMedia.selectItem(at: index) }
-            sampleSource.stringValue = items.isEmpty ? Strings.text(.editPresetSampleNoMedia) : ""
+            sampleMedia.selectItem(at: (items.firstIndex { $0.entry.id == sample.media }).map { $0 + 1 } ?? 0)
+            sampleSource.stringValue = ""
         case .empty:
             sampleSource.stringValue = ""
         }

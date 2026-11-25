@@ -5773,14 +5773,14 @@
         }
       }
     },
-    "edit.preset.sampleNoMedia" : {
-      "comment" : "The media sample when the pool has none.",
+    "edit.preset.samplePattern" : {
+      "comment" : "The media sample the engine draws itself: a grid, centre lines, safe areas and colour bars.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No video or image in the pool"
+            "value" : "Test pattern"
           }
         }
       }

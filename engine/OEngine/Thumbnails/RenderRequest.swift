@@ -177,11 +177,14 @@ struct RenderRequest: Equatable, Sendable {
                 let known = MediaResolver.knownIds(library: library.mediaIndex, machine: machine.mediaLocal)
                 func content(_ value: JSONValue) -> Result<ContentExpression, Rejection> {
                     guard case .object(let object) = value, let kind = object["kind"]?.stringValue else {
-                        return .failure(Rejection(reason: .badValue, message: "a sample's content is an object with its kind: text, media or empty"))
+                        return .failure(Rejection(reason: .badValue, message: "a sample's content is an object with its kind: text, media, pattern or empty"))
                     }
                     switch kind {
                     case "empty":
                         return .success(.empty)
+                    case "pattern":
+                        // Spec 11 §3 as corrected 2026-11-24 — "the engine's test pattern (`{"kind": "pattern"}`)".
+                        return .success(TestPattern.content)
                     case "text":
                         guard case .object(let given)? = object["fields"] else {
                             return .failure(Rejection(reason: .badValue, message: "a text sample carries its fields"))
@@ -203,7 +206,7 @@ struct RenderRequest: Equatable, Sendable {
                         }
                         return .success(.media(MediaContent(ref: ref)))
                     default:
-                        return .failure(Rejection(reason: .badValue, message: "a sample is text, media or empty, not \(kind)"))
+                        return .failure(Rejection(reason: .badValue, message: "a sample is text, media, the test pattern or empty, not \(kind)"))
                     }
                 }
                 if let value = members["content"] {

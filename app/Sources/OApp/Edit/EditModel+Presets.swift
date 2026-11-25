@@ -159,7 +159,8 @@ extension EditModel {
         askLayout()
     }
 
-    public func setSampleMedia(_ id: String) {
+    /// A pool item, or nil for the engine's test pattern.
+    public func setSampleMedia(_ id: String?) {
         presetState.sample.media = id
         presetState.sample.kind = .media
         model.changed([.edit])
@@ -167,8 +168,8 @@ extension EditModel {
     }
 
     /// The sample as it is drawn: "the fields of the cue selected in the Cues page when it writes text, with that cue
-    /// as the sample's `listUuid` and `cue` ...; else a built-in sample"; for media, "at first the pool's first video
-    /// or image".
+    /// as the sample's `listUuid` and `cue` ...; else a built-in sample"; for media, "the engine's test pattern at
+    /// first ..., or a pool item chosen after it".
     public var layoutSample: LayoutSample {
         var sample = presetState.sample
         sample.fields = nil
@@ -187,9 +188,6 @@ extension EditModel {
             fields["body"] = text
             sample.fields = fields
             if sample.next.isEmpty { sample.next = (1...3).map { LayoutSample.builtIn(verse: $0) } }
-        }
-        if sample.kind == .media, sample.media == nil {
-            sample.media = model.store.media.first { [.video, .image].contains($0.entry.kind) && $0.presence == "ok" }?.entry.id
         }
         return sample
     }
