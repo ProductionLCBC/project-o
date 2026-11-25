@@ -129,7 +129,7 @@ final class PreviewPanelView: PanelView {
         caption.isHidden = true
         if page == .channels, let channel = editing.sheetChannel {
             let content = model.store.channels[channel]?.content
-            frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + (editing.channelPage.channel.map(EditModel.name(of:)) ?? String(channel)))
+            frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + (editing.channelPage.channel.map { EditModel.name(of: $0) } ?? String(channel)))
             if case .text(let fields)? = content?.kind {
                 caption.stringValue = fields["body"] ?? fields.values.sorted().first ?? content?.label ?? ""
                 caption.textColor = Palette.text

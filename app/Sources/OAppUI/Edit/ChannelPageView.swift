@@ -112,7 +112,7 @@ final class ChannelWorkspaceView: NSView {
     private let decoderCost = Kit.label(Strings.text(.editChannelDecoderCost), size: 11, color: Palette.faintText)
     private(set) var audioBoxes: [ChoiceBox] = []
     let thumbnail = SegmentedView([Strings.text(.editChannelBody), Strings.text(.editChannelFirstLine)], small: true)
-    let usual = SegmentedView(ChannelWorkspaceView.usualOrder.map(ChannelWorkspaceView.usualTitle), small: true)
+    let usual = SegmentedView(ChannelWorkspaceView.usualOrder.map { ChannelWorkspaceView.usualTitle($0) }, small: true)
     let renderSize = SegmentedView([Strings.text(.editChannelLargest), Strings.text(.editChannelCustom)], small: true)
     let width = EditField()
     let height = EditField()
