@@ -130,6 +130,36 @@ final class FireWithStateTests: XCTestCase {
         XCTAssertEqual(after.channels[1]?.content.media?.ref, F.mediaA)
     }
 
+    // MARK: - Through the runner, as the engine runs it
+
+    /// Adam's try of 2026-11-24: Live sent `item 1 cue 4 state` and the background held from cue 1 never came up. The
+    /// runner logs a fire as its own line and the cue's commands as theirs, rebuilding each line's effects, and the
+    /// state's cuts were on none of them, so the engine, which acts on the lines' effects, never put them on air.
+    /// Spec 3 §5 — the state is taken up "between the boundary and the cue's commands": the fire's own line carries it.
+    func test_theRunnerPutsTheTakenStateOnTheFiresOwnLine() throws {
+        let group = CommandGroup(id: GroupID("g-1"), source: CommandSource(kind: .ui), commands: [.listCue(list: 8, cue: 3, state: true)])
+        var counter = 1
+        let outcome = try CommandRunner.run(group, state: F.fresh(), context: context(frame: 100), makeGroupID: {
+            counter += 1
+            return GroupID("g-\(counter)")
+        }).get()
+        XCTAssertEqual(outcome.executed.map(\.command), [.listCue(list: 8, cue: 3, state: true), F.write(2, text: "verse 2",
+                       riders: Riders(transition: TransitionRider(ref: 2, scope: .once)))])
+        let fire = outcome.executed[0]
+        XCTAssertEqual(transitions(fire.effects, channel: 1).map(\.ms), [0], "the clip held from cue 1, cut up on the fire's own line")
+        XCTAssertEqual(transitions(fire.effects, channel: 1).first?.to.media?.ref, F.mediaA)
+        XCTAssertTrue(fire.effects.contains { if case .attribute(1, .gain, _, .gain(-6), _) = $0 { return true } else { return false } },
+                      "and its tracked gain")
+        // The cue's own write runs over the state taken up, from what is on air, with its own transition.
+        let write = outcome.executed[1]
+        XCTAssertEqual(transitions(write.effects, channel: 2).first?.from, .empty)
+        XCTAssertGreaterThan(transitions(write.effects, channel: 2).first?.ms ?? 0, 0)
+        XCTAssertEqual(outcome.state.channels[1]?.content.media?.ref, F.mediaA)
+        // Every change the state shows is on some line, so the engine acts on all of it.
+        let all = outcome.executed.flatMap(\.effects)
+        XCTAssertEqual(transitions(all, channel: 1).count, 1)
+    }
+
     // MARK: - Spec 2 — the text and object forms
 
     func parse(_ text: String) throws -> Command {

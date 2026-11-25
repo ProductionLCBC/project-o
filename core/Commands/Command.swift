@@ -232,6 +232,15 @@ public enum Command: Codable, Equatable, Sendable {
         }
     }
 
+    /// Spec 2 §3 — `cue N state`, `item N cue M state`, `list N cue M state`:
+    /// a fire that takes up its list's state first (Spec 3 §5).
+    public var firesWithState: Bool {
+        switch self {
+        case .cue(_, let state), .itemCue(_, _, let state), .listCue(_, _, let state): return state
+        default: return false
+        }
+    }
+
     public var isInvalid: Bool {
         if case .invalid = self { return true }
         return false

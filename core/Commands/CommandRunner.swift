@@ -402,6 +402,14 @@ struct Runner {
             if boundary, !position.list.trackThrough { replay.resetAllAttributes() }
             var own = replay.effects
             if boundary { own.append(.boundary(list: position.list.uuid, reset: !position.list.trackThrough)) }
+            // Spec 3 §5 — "Firing with `state` ... takes up, between the boundary and the cue's commands, the state its
+            // list leaves before it": its cuts and attribute changes are the fire's own, on its line, so the engine acts
+            // on them, and the cue's commands run over the state taken up.
+            if command.firesWithState, !projectionContext.firesPlainly {
+                let start = replay.effects.count
+                replay.takeUpState(before: position)
+                own.append(contentsOf: replay.effects[start...])
+            }
             own.append(pointer)
             executed.append(ExecutedCommand(group: group, source: source, command: command, result: .ok, effects: own, fire: fire))
             state = replay.state
