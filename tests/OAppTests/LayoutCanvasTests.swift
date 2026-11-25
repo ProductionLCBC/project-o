@@ -35,6 +35,21 @@ final class LayoutCanvasTests: XCTestCase {
         near(LayoutCanvasMath.snapped(Frame(x: 0.33, y: 0.33, w: 0.1, h: 0.1), handle: .move, others: [], threshold: 0.01).frame, Frame(x: 0.33, y: 0.33, w: 0.1, h: 0.1))
     }
 
+    /// Spec 11 §8, "Frame" (G-34) — "X and Y say where that point of the box sits, and a new width or height keeps it
+    /// in place."
+    func test_theReferencePointPlacesTheBoxAndHoldsStillWhenItResizes() {
+        let frame = Frame(x: 0.2, y: 0.1, w: 0.4, h: 0.2)
+        XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .topLeft).x, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .center).x, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .bottomRight).y, 0.3, accuracy: 1e-9)
+        // The centre placed at the stack's middle.
+        near(LayoutCanvasMath.typed(frame, anchor: .center, x: 0.5, y: 0.5), Frame(x: 0.3, y: 0.4, w: 0.4, h: 0.2))
+        // A new width about the centre grows both ways; about the right edge, to the left.
+        near(LayoutCanvasMath.typed(frame, anchor: .center, w: 0.6), Frame(x: 0.1, y: 0.1, w: 0.6, h: 0.2))
+        near(LayoutCanvasMath.typed(frame, anchor: .right, w: 0.6), Frame(x: 0.0, y: 0.1, w: 0.6, h: 0.2))
+        near(LayoutCanvasMath.typed(frame, anchor: .topLeft, h: 0.5), Frame(x: 0.2, y: 0.1, w: 0.4, h: 0.5))
+    }
+
     func test_aNudgeIsAPixelOfTheStackAndAFrameStaysOnIt() {
         near(LayoutCanvasMath.nudged(Frame(x: 0.5, y: 0.5, w: 0.1, h: 0.1), dx: 10, dy: -1, width: 1920, height: 1080),
              Frame(x: 0.5 + 10.0 / 1920, y: 0.5 - 1.0 / 1080, w: 0.1, h: 0.1))

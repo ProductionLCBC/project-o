@@ -224,6 +224,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     /// The Presets page's selection (Spec 11 §8): the preset, and its layout's tab, a stack's number or nil for `*`.
     public var editPreset: Int?
     public var editLayout: Int?
+    /// Spec 11 §8, "Frame" (G-34) — the box's reference point the Frame fields read, "kept in `view.json`".
+    public var boxAnchor = FrameAnchor.topLeft
     public var browserTab = BrowserTab.playlists
     public var mediaView = MediaListView.grid
     /// Spec 11 §4, "Zoom" — "The zoom is one setting for every list".
@@ -292,6 +294,7 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editSheetChannel, into: &editSheetChannel)
         read(.editPreset, into: &editPreset)
         read(.editLayout, into: &editLayout)
+        read(.boxAnchor, into: &boxAnchor)
         read(.browserTab, into: &browserTab)
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)

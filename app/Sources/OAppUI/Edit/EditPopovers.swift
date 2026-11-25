@@ -137,14 +137,14 @@ enum EditPopovers {
         return names.map(\.label)
     }
 
-    private static func variablesMenu(catalog: Catalog?, insert: @escaping @MainActor (String) -> Void) -> NSPopUpButton {
-        let popup = NSPopUpButton(frame: .zero, pullsDown: true)
-        popup.font = .systemFont(ofSize: 12)
+    /// "a Variables ▸ menu": a button whose menu lists the names alone.
+    private static func variablesMenu(catalog: Catalog?, insert: @escaping @MainActor (String) -> Void) -> FlatButton {
+        let button = FlatButton(Strings.text(.editContentFormVariables), style: .plain)
+        button.fontSize = 12
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: Strings.text(.editContentFormVariables), action: nil, keyEquivalent: ""))
         for name in variableNames(catalog: catalog) { menu.addItem(ClosureMenuItem(title: name) { insert(name) }) }
-        popup.menu = menu
-        return popup
+        button.dropMenu = menu
+        return button
     }
 
     // MARK: - The palette (Spec 11 §4, "The palette (E4)")
@@ -464,10 +464,9 @@ enum EditPopovers {
                 for (index, other) in others.enumerated() where index + 1 < draft.fields.count { draft.fields[index + 1].value = other.field.stringValue }
             }
             // "with Add Field for `title`, `reference`, `copyright` or a custom name, and a Variables ▸ menu".
-            let addField = NSPopUpButton(frame: .zero, pullsDown: true)
-            addField.font = .systemFont(ofSize: 12)
+            let addField = FlatButton(Strings.text(.editContentFormAddField), style: .plain)
+            addField.fontSize = 12
             let fieldMenu = NSMenu()
-            fieldMenu.addItem(NSMenuItem(title: Strings.text(.editContentFormAddField), action: nil, keyEquivalent: ""))
             for name in knownFields where !draft.fields.contains(where: { $0.name == name }) {
                 fieldMenu.addItem(ClosureMenuItem(title: name.prefix(1).uppercased() + name.dropFirst()) {
                     keep()
@@ -489,7 +488,7 @@ enum EditPopovers {
                 asking.finish()
                 represent?(asking)
             })
-            addField.menu = fieldMenu
+            addField.dropMenu = fieldMenu
             panel.addRow(" ", addField)
             panel.addRow(" ", variablesMenu(catalog: model.store.catalog) { [weak body] name in body?.insertText(name, replacementRange: body?.selectedRange() ?? NSRange(location: 0, length: 0)) })
             kinds.onSelect = { index in

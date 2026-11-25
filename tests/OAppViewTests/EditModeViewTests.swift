@@ -219,7 +219,8 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertFalse(titles.contains { $0.hasPrefix("Fire") }, "\(titles)")
         XCTAssertTrue(titles.contains("Reveal in Finder"), "\(titles)")
         // The filter menu holds show mode's kinds, its folders, Used in This List, Replaced and the sort.
-        let filter = try XCTUnwrap(browser.filter.menu).items.map(\.title)
+        let filter = try XCTUnwrap(browser.filter.dropMenu).items.map(\.title)
+        XCTAssertEqual(browser.filter.title, "All", "the button says what is filtered by; the menu lists only the choices")
         for word in ["All", "Video", "Image", "Audio", "All Media", "Used in this list", "Replaced", "Name", "Date Added"] {
             XCTAssertTrue(filter.contains(word), "\(word) in \(filter)")
         }
@@ -668,94 +669,114 @@ final class EditModeViewTests: XCTestCase {
 
     // MARK: - The Stacks page (Spec 11 §6)
 
-    /// Spec 11 §6 and G-30 — the slots and the stack's fields in the workspace, the outputs, the selected output, the
-    /// channels and the audio routing in the inspector; each control sends its edit.
+    /// Spec 11 §2 and §6, G-30 as corrected 2026-11-24 — the stacks in the page's list with New Stack as its + row; the
+    /// workspace's two tall columns, the slots with Add Channel and the stack's fields, then the outputs and the audio
+    /// routing; no inspector.
     func test_theStacksPageShowsTheStackAndEachControlSendsItsEdit() throws {
         let rig = try editing()
         let view = rig.view
         rig.model.editing.show(page: .stacks)
         view.layoutSubtreeIfNeeded()
-        XCTAssertTrue(view.inspector.isHidden, "the Cues page's inspector")
-        XCTAssertFalse(view.stackInspector.isHidden)
-        let workspace = view.workspace
-        XCTAssertTrue(workspace.grid.isHidden)
-        XCTAssertFalse(workspace.stacks.isHidden)
-        XCTAssertEqual(workspace.objectPicker.titleOfSelectedItem, "1 Main", "the stack output 1 shows")
-        XCTAssertEqual(workspace.objectPicker.itemTitles, ["1 Main", "2 Confidence"])
-        // The slots, top first: stack 1 holds 1 then 2, bottom first.
-        let stacks = workspace.stacks
+        // "The Stacks, Channels, Presets and Objects pages put their own list in its place"; "the Stacks and Channels
+        // pages have none" (an inspector).
+        XCTAssertTrue(view.browser.isHidden)
+        XCTAssertFalse(view.pageList.isHidden)
+        XCTAssertTrue(view.inspector.isHidden)
+        XCTAssertTrue(view.presetInspector.isHidden)
+        XCTAssertTrue(view.inspectorDivider.isHidden)
+        XCTAssertEqual(view.workspace.frame.maxY, view.programPanel.frame.maxY, accuracy: 0.5, "the workspace runs to the window's foot")
+        let list = view.pageList
+        XCTAssertEqual(list.title.stringValue, "Stacks")
+        let rows = try XCTUnwrap(list.sections.first?.rows)
+        XCTAssertEqual(rows.map(\.name.stringValue), ["Main", "Confidence"])
+        XCTAssertEqual(rows.map(\.isLive), [true, false], "the live dot on what is on air")
+        XCTAssertEqual(rows.map(\.isSelected), [true, false], "the stack output 1 shows")
+        XCTAssertEqual(list.sections.first?.add.title, "+  New Stack")
+        XCTAssertEqual(view.workspace.title.stringValue, "1 Main")
+        // A row's ⋯ lists only its choices: Delete is refused while an output shows the stack.
+        let rowMenu = try XCTUnwrap(rows[0].more.dropMenu)
+        XCTAssertEqual(rowMenu.items.filter { !$0.isSeparatorItem }.map(\.title), ["Duplicate", "Renumber…", "Delete…"])
+        XCTAssertEqual(rowMenu.items.last?.isEnabled, false)
+        // The slots, top first, the opacity's slider with a field beside it.
+        let stacks = view.workspace.stacks
         XCTAssertEqual(stacks.rows.map(\.name.stringValue), ["Foreground", "Background"])
-        XCTAssertEqual(stacks.rows.first?.preset.titleOfSelectedItem, "None")
         XCTAssertEqual(stacks.rows.first?.percent.stringValue, "100%")
-        XCTAssertEqual(stacks.label.stringValue, "Main")
-        // A slot's preset and opacity.
         stacks.rows[0].preset.choose(tag: 1)
         XCTAssertEqual(last(rig), ["edit stack 1 slot 2 preset 1"])
-        stacks.rows[1].opacity.doubleValue = 0.5
-        stacks.rows[1].opacity.sendAction(stacks.rows[1].opacity.action, to: stacks.rows[1].opacity.target)
+        stacks.rows[1].percent.stringValue = "50"
+        stacks.rows[1].percent.sendAction(stacks.rows[1].percent.action, to: stacks.rows[1].percent.target)
         XCTAssertEqual(last(rig), ["edit stack 1 slot 1 opacity 0.5"])
+        stacks.rows[1].opacity.doubleValue = 0.25
+        stacks.rows[1].opacity.sendAction(stacks.rows[1].opacity.action, to: stacks.rows[1].opacity.target)
+        XCTAssertEqual(last(rig), ["edit stack 1 slot 1 opacity 0.25"])
+        XCTAssertEqual(stacks.rows[0].more.dropMenu?.items.first?.title, "Move Up", "a slot's ⋯ lists only its choices")
         // The stack's own fields.
         stacks.base.segments[1].press()
         XCTAssertEqual(last(rig), ["edit stack 1 base \"transparent\""])
         stacks.gamma.toggle()
         XCTAssertEqual(last(rig), ["edit stack 1 gammaBlend true"])
-        // A channel the stack holds is refused at the drop; one it doesn't asks first, the stack being on air.
+        // "Add Channel, offers the library's channels the stack doesn't hold"; one chosen adds a slot at the top, asking
+        // first on a stack an output shows.
+        let add = try XCTUnwrap(stacks.addChannel.dropMenu)
+        XCTAssertEqual(add.items.map(\.title), ["3 Clock"])
         var asked: [Confirmation] = []
         rig.model.confirm = { confirmation, answer in
             asked.append(confirmation)
             answer(true)
         }
-        XCTAssertFalse(stacks.accept(channel: 2, atRow: 0))
-        XCTAssertTrue(stacks.accept(channel: 3, atRow: 0))
+        add.performActionForItem(at: 0)
         XCTAssertEqual(asked, [.slotOnAir(channel: 3, label: "Clock", outputs: [1], adding: true)])
         XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
-        // The inspector: the outputs, then the stacks none shows; the selected output; the channels; the audio routing.
-        let inspector = view.stackInspector
-        XCTAssertEqual(inspector.outputRows.map(\.title), ["1 Main · stack 1"], "as the top bar's outputs menu says it")
-        XCTAssertEqual(inspector.stackRows.map(\.title), ["2 Confidence"])
-        XCTAssertEqual(inspector.outputHeading.stringValue.uppercased(), "OUTPUT 1")
-        XCTAssertEqual(inspector.defaultStack.titleOfSelectedItem, "1 Main")
-        inspector.defaultStack.choose(tag: 2)
+        // The second column: the outputs, then the stacks none shows; the selected output; the audio routing.
+        let outputs = stacks.outputs
+        XCTAssertEqual(outputs.outputRows.map(\.title), ["1 Main · stack 1"], "as the top bar's outputs menu says it")
+        XCTAssertEqual(outputs.stackRows.map(\.title), ["2 Confidence"])
+        XCTAssertEqual(outputs.defaultStack.titleOfSelectedItem, "1 Main")
+        outputs.defaultStack.choose(tag: 2)
         XCTAssertEqual(last(rig), ["edit output 1 defaultStack 2"])
-        XCTAssertEqual(inspector.channelRows.map(\.mark.stringValue), ["✓", "✓", ""])
-        XCTAssertEqual(inspector.audioBoxes.map { $0.map(\.state) }.first, [.on, .off])
-        inspector.audioBoxes[0][1].toggle()
+        XCTAssertEqual(outputs.audioBoxes.map { $0.map(\.state) }.first, [.on, .off])
+        outputs.audioBoxes[0][1].toggle()
         XCTAssertEqual(last(rig), ["edit channel 1 audioOutputs [1, 2]"])
-        // A stack no output shows: a click selects it, and the header's picker follows.
-        inspector.stackRows[0].press()
-        XCTAssertEqual(workspace.objectPicker.titleOfSelectedItem, "2 Confidence")
+        // A click on a row selects its stack; the + row adds one.
+        rows[1].onSelect?()
+        XCTAssertEqual(view.workspace.title.stringValue, "2 Confidence")
         XCTAssertEqual(stacks.rows.map(\.name.stringValue), ["Clock", "Foreground"])
-        workspace.objectPicker.choose(tag: 1)
-        XCTAssertEqual(rig.model.editing.stackNumber, 1)
-        // Back to the Cues page: its own inspector.
+        list.sections[0].add.press()
+        XCTAssertEqual(last(rig), ["edit stack create"])
+        // Back to the Cues page: the Browser, and its inspector under the workspace.
         rig.model.editing.show(page: .cues)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertFalse(view.browser.isHidden)
+        XCTAssertTrue(view.pageList.isHidden)
         XCTAssertFalse(view.inspector.isHidden)
-        XCTAssertTrue(view.stackInspector.isHidden)
-        XCTAssertTrue(workspace.stacks.isHidden)
-        XCTAssertFalse(workspace.grid.isHidden)
+        XCTAssertTrue(view.workspace.stacks.isHidden)
+        XCTAssertFalse(view.workspace.grid.isHidden)
     }
 
     // MARK: - The Channels page (Spec 11 §7)
 
-    /// Spec 11 §7 and G-31 — the channel list with the stacks that hold each, the selected channel's form whose fields
-    /// each send an `edit.set`, the number's popover, and the stacks that hold it in the inspector.
+    /// Spec 11 §7 and G-31 as corrected 2026-11-24 — the channels in the page's list with New Channel as its + row; the
+    /// channel's form in one tall column, the stacks that hold it beside it; no inspector.
     func test_theChannelsPageListsTheChannelsAndTheFormSendsEachField() throws {
         let rig = try editing()
         let view = rig.view
         rig.model.editing.show(page: .channels)
         view.layoutSubtreeIfNeeded()
-        XCTAssertFalse(view.channelInspector.isHidden)
+        XCTAssertFalse(view.pageList.isHidden)
         XCTAssertTrue(view.inspector.isHidden)
-        XCTAssertTrue(view.stackInspector.isHidden)
+        let list = view.pageList
+        let rows = try XCTUnwrap(list.sections.first?.rows)
+        XCTAssertEqual(rows.map(\.name.stringValue), ["Background", "Foreground", "Clock"])
+        XCTAssertEqual(rows.map(\.detail.stringValue), ["Media · stacks 1", "Text · stacks 1, 2", "Any · stacks 2"])
+        XCTAssertEqual(rows.map(\.isLive), [true, true, false], "channels 1 and 2 hold content in stack 1, on output 1")
+        XCTAssertEqual(list.sections.first?.add.title, "+  New Channel")
         let sheet = view.workspace.channels
         XCTAssertFalse(sheet.isHidden)
-        XCTAssertTrue(view.workspace.stacks.isHidden)
-        XCTAssertEqual(sheet.rows.map(\.name.stringValue), ["Background", "Foreground", "Clock"])
-        XCTAssertEqual(sheet.rows.map(\.stacks.stringValue), ["1", "1, 2", "2"])
         // A click on a row selects its channel; the Preview's picker follows.
-        sheet.rows[2].onSelect?()
+        rows[2].onSelect?()
         XCTAssertEqual(rig.model.editing.sheetChannel, 3)
-        XCTAssertEqual(sheet.rows.map(\.isSelected), [false, false, true])
+        XCTAssertEqual(rows.map(\.isSelected), [false, false, true])
+        XCTAssertEqual(view.workspace.title.stringValue, "3 Clock")
         XCTAssertEqual(view.previewPanel.picker.titleOfSelectedItem, "3 Clock")
         XCTAssertEqual(sheet.label.stringValue, "Clock")
         XCTAssertEqual(sheet.number.stringValue, "3")
@@ -788,35 +809,42 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(panel.save.title, "Renumber")
         panel.commit()
         XCTAssertEqual(last(rig), ["edit channel 3 renumber 7"])
-        // The inspector: the stacks that hold it, with Remove; Add to Stack offers the others, at their top.
-        let inspector = view.channelInspector
-        XCTAssertEqual(inspector.holderNames.map(\.stringValue), ["2 Confidence"])
-        XCTAssertEqual(inspector.addToStack.itemTitles, ["Add to Stack", "1 Main"])
+        // Beside the form: the stacks that hold it, with Remove; Add to Stack, the + row, offers the others at their top.
+        let holders = sheet.holders
+        XCTAssertEqual(holders.holderNames.map(\.stringValue), ["2 Confidence"])
+        let add = try XCTUnwrap(holders.addToStack.dropMenu)
+        XCTAssertEqual(add.items.map(\.title), ["1 Main"], "the menu lists only its choices")
         var asked: [Confirmation] = []
         rig.model.confirm = { confirmation, answer in
             asked.append(confirmation)
             answer(true)
         }
-        inspector.addToStack.menu?.performActionForItem(at: 1)
+        add.performActionForItem(at: 0)
         XCTAssertEqual(asked, [.slotOnAir(channel: 3, label: "Clock", outputs: [1], adding: true)], "stack 1 is on output 1")
         XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
-        inspector.removeButtons[0].press()
+        holders.removeButtons[0].press()
         XCTAssertEqual(last(rig), ["edit stack 2 slot 3 remove"])
-        // Channel 1 holds dawn.mp4 on output 1: its number is refused before anything is asked, and the line says why.
-        sheet.rows[0].onSelect?()
+        // Channel 1 holds dawn.mp4 on output 1: its row's Delete is refused, and its number is refused before anything
+        // is asked, the header's notice line saying why.
+        XCTAssertEqual(rows[0].more.dropMenu?.items.last?.isEnabled, false)
+        rows[0].onSelect?()
         let sent = count(rig)
         sheet.number.stringValue = "9"
         sheet.number.sendAction(sheet.number.action, to: sheet.number.target)
         XCTAssertEqual(count(rig), sent)
-        XCTAssertFalse(inspector.notice.isHidden)
-        XCTAssertEqual(inspector.notice.stringValue, EditWording.rejection(code: "onAir"))
+        XCTAssertFalse(view.workspace.notice.isHidden)
+        XCTAssertEqual(view.workspace.notice.stringValue, EditWording.rejection(code: "onAir"))
         XCTAssertEqual(sheet.number.stringValue, "1", "the field is put back")
+        // The + row adds a channel.
+        list.sections[0].add.press()
+        XCTAssertEqual(last(rig), ["edit channel create"])
     }
 
     // MARK: - The Presets page (Spec 11 §8)
 
-    /// Spec 11 §8 and G-32 — the layout tabs, the canvas whose boxes select, nudge and drag, the box list, the box's
-    /// properties and its text style, each sending its edit.
+    /// Spec 11 §8 and G-32 as corrected 2026-11-24 — the presets and the boxes in the page's list, each with its + row;
+    /// the layout tabs and the canvas, whose boxes select, nudge and drag; the inspector's three columns, the box's
+    /// properties with its reference point, its text style, and the preset.
     func test_thePresetsPageShowsTheLayoutAndEachControlSendsItsEdit() throws {
         let rig = try editing()
         let view = rig.view
@@ -824,10 +852,15 @@ final class EditModeViewTests: XCTestCase {
         view.layoutSubtreeIfNeeded()
         XCTAssertFalse(view.presetInspector.isHidden)
         XCTAssertTrue(view.inspector.isHidden)
-        let workspace = view.workspace
-        XCTAssertEqual(workspace.objectPicker.itemTitles, ["1 Default", "2 Clock", "3 Lower third", "4 Credits"])
-        let page = workspace.presets
+        XCTAssertFalse(view.pageList.isHidden)
+        let list = view.pageList
+        XCTAssertEqual(list.sections.count, 2)
+        XCTAssertEqual(list.sections[0].rows.map(\.name.stringValue), ["Default", "Clock", "Lower third", "Credits"])
+        XCTAssertEqual(list.sections[0].add.title, "+  New Preset")
+        XCTAssertEqual(list.sections[0].rows[0].more.dropMenu?.items.last?.isEnabled, false, "Preset 1 can't be deleted")
+        let page = view.workspace.presets
         XCTAssertFalse(page.isHidden)
+        XCTAssertEqual(view.workspace.title.stringValue, "1 Default")
         // "a tab for the `*` layout and one per stack this machine has, each naming the stacks it draws on this machine
         // ..., with the live dot on those an output shows".
         XCTAssertEqual(page.tabs.map(\.title), ["● Any stack: 1 Main", "● 1 Main", "2 Confidence"])
@@ -840,9 +873,9 @@ final class EditModeViewTests: XCTestCase {
         canvas.press(at: middle)
         canvas.release()
         XCTAssertEqual(rig.model.editing.presetState.box, 1)
-        let inspector = view.presetInspector
-        XCTAssertEqual(inspector.boxList.rows.map(\.name.stringValue), ["body", "pixels"])
-        XCTAssertEqual(inspector.boxList.rows.map(\.isSelected), [true, false])
+        let boxes = list.sections[1]
+        XCTAssertEqual(boxes.rows.map(\.name.stringValue), ["body", "pixels"])
+        XCTAssertEqual(boxes.rows.map(\.isSelected), [true, false])
         // ⇧→ nudges by ten pixels of the stack, sent once when the key is released.
         let before = count(rig)
         canvas.keyDown(with: try key(124, .shift))
@@ -853,15 +886,26 @@ final class EditModeViewTests: XCTestCase {
         canvas.keyUp(with: up)
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.9, \"x\": 0.0604, \"y\": 0.1 }"])
         // The box's properties.
+        let inspector = view.presetInspector
         inspector.offset.segments[1].press()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.offset 1"])
         inspector.frameW.stringValue = "50"
         inspector.frameW.sendAction(inspector.frameW.action, to: inspector.frameW.target)
-        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.5, \"x\": 0.05, \"y\": 0.1 }"])
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.5, \"x\": 0.05, \"y\": 0.1 }"], "about the top left")
+        // The reference point: X and Y say where the centre sits, and a new width keeps it in place.
+        inspector.anchor.choose(.center)
+        XCTAssertEqual(rig.model.settings.boxAnchor, .center)
+        XCTAssertEqual(inspector.frameX.stringValue, "50")
+        XCTAssertEqual(inspector.frameY.stringValue, "50")
+        inspector.frameW.stringValue = "60"
+        inspector.frameW.sendAction(inspector.frameW.action, to: inspector.frameW.target)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.6, \"x\": 0.2, \"y\": 0.1 }"], "about the centre")
+        inspector.anchor.choose(.topLeft)
         inspector.fallback.toggle()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.fallback false"])
         // Its text style.
         XCTAssertTrue(inspector.fromStyle.stringValue.hasPrefix("From 1 Body"), inspector.fromStyle.stringValue)
+        XCTAssertEqual(inspector.applyStyle.dropMenu?.items.map(\.title), ["1 Body", "2 Caption"], "the menu lists only its choices")
         inspector.allCaps.toggle()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.allCaps true"])
         inspector.size.stringValue = "60"
@@ -878,17 +922,22 @@ final class EditModeViewTests: XCTestCase {
         canvas.release()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.9, \"x\": 0.1, \"y\": 0.1 }"])
         // The pixel box has no text style.
-        inspector.boxList.rows[1].onSelect?()
+        boxes.rows[1].onSelect?()
         XCTAssertFalse(inspector.noStyle.isHidden)
         XCTAssertTrue(inspector.size.isHidden)
-        // Add Box ▸ Pixels inserts at the top.
-        inspector.addBox.menu?.performActionForItem(at: 1)
+        // The boxes' + row, Add Box, offers Pixels, Field ▸ and Static Text, and inserts at the top.
+        let addBox = try XCTUnwrap(boxes.add.dropMenu)
+        XCTAssertEqual(addBox.items.map(\.title), ["Pixels", "Field", "Static Text"])
+        addBox.performActionForItem(at: 0)
         XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 insert layouts.*.boxes 2 {"), true)
+        // A box row dropped above the top moves it there: the pixel box, at the bottom, to the top of two.
+        list.drop(0, inList: 1, atRow: 0)
+        XCTAssertEqual(last(rig), ["edit preset 1 move layouts.*.boxes 0 1"])
         // Stack 1's tab uses the * layout, and offers Copy from *.
         page.tabs[1].press()
         XCTAssertEqual(page.layoutNote.stringValue, "Uses the * layout")
         XCTAssertFalse(page.copyFromAny.isHidden)
-        XCTAssertFalse(inspector.addBox.isEnabled)
+        XCTAssertFalse(list.sections[1].add.isEnabled)
         page.copyFromAny.press()
         XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 layouts.1 { \"boxes\": ["), true)
         // The sample: Empty asks for the picture again with nothing in the channel.
@@ -896,10 +945,11 @@ final class EditModeViewTests: XCTestCase {
         page.sampleKind.segments[2].press()
         let empty = try XCTUnwrap(rig.sent.last { $0.fields["what"] == .string("render") })
         XCTAssertEqual(empty.fields["subject"]?.objectValue?["sample"], .object(["content": .object(["kind": .string("empty")])]))
-        // The header's picker picks the preset.
-        workspace.objectPicker.choose(tag: 2)
+        // A click on a preset in the list picks it.
+        list.sections[0].rows[1].onSelect?()
+        XCTAssertEqual(view.workspace.title.stringValue, "2 Clock")
         XCTAssertEqual(page.tabs.map(\.title), ["● Any stack: 1 Main, 2 Confidence", "● 1 Main", "2 Confidence"])
-        XCTAssertEqual(inspector.boxList.rows.map(\.name.stringValue), ["static · [Time]"])
+        XCTAssertEqual(list.sections[1].rows.map(\.name.stringValue), ["static · [Time]"])
     }
 
     // MARK: - A picture of it

@@ -21,18 +21,14 @@ final class WorkspaceView: PanelView {
     /// "A page whose object is deleted under it says "Deleted", with Undo while that delete is the history's top group."
     let undo = FlatButton(Strings.text(.menuUndo), style: .plain)
     let grid: CueGridView
-    /// Spec 11 §6 — the Stacks page's workspace (G-30), and its header's picker of the stack and the stack's menu.
+    /// Spec 11 §6 — the Stacks page's workspace (G-30).
     let stacks: StackWorkspaceView
     /// Spec 11 §7 — the Channels page's workspace (G-31).
     let channels: ChannelWorkspaceView
     /// Spec 11 §8 — the Presets page's workspace (G-32).
     let presets: PresetWorkspaceView
-    let objectPicker = ChoicePopUp(label: Strings.text(.editStackPicker))
-    let objectMenu = NSPopUpButton(frame: .zero, pullsDown: true)
-    /// The header's ⋯ menu for each page that has one.
-    private var stackMenu_ = NSMenu()
-    private var channelMenu_ = NSMenu()
-    private var presetMenu_ = NSMenu()
+    /// Spec 11 §2, "Rejections and warnings" — on a page with no inspector, the notice line stands in this header.
+    let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
     var machineRoot: URL? {
         didSet {
             grid.machineRoot = machineRoot
@@ -74,71 +70,9 @@ final class WorkspaceView: PanelView {
         message.lineBreakMode = .byWordWrapping
         message.cell?.wraps = true
         undo.onPress = { [weak model] in model?.undo() }
-        objectPicker.isBordered = false
-        // The header's picker is the page's: the stack on the Stacks page, the preset on the Presets page.
-        objectPicker.onChoose = { [weak model] number in
-            guard let editing = model?.editing else { return }
-            if editing.page == .presets { editing.selectPreset(number) } else { editing.selectStack(number) }
-        }
-        objectMenu.isBordered = false
-        stackMenu_ = stackMenu()
-        channelMenu_ = channelMenu()
-        presetMenu_ = presetMenu()
-        objectMenu.menu = stackMenu_
-        for view in [meta, zoom, openText, renumber, grid, stacks, channels, presets, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
+        notice.isHidden = true
+        for view in [meta, zoom, openText, renumber, grid, stacks, channels, presets, notice, message, undo] as [NSView] { addSubview(view) }
         refresh()
-    }
-
-    /// Spec 11 §8 — "New Preset (`edit preset create`, with an empty `*` layout), Duplicate (...) and Delete"; and its
-    /// number's Renumber, with swap for a taken number.
-    private func presetMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editPresetNew)) { [weak model] in model?.editing.newPreset() })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicatePreset() })
-        menu.addItem(.separator())
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deletePreset() })
-        return menu
-    }
-
-    /// Spec 11 §7 — "Its menu: New Channel ...; Duplicate ...; Delete".
-    private func channelMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editChannelNew)) { [weak model] in model?.editing.newChannel() })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicateChannel() })
-        menu.addItem(.separator())
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deleteChannel() })
-        return menu
-    }
-
-    /// Spec 11 §6 — "Its menu: New Stack ...; Duplicate ...; Renumber…, with swap for a taken number ...; and Delete".
-    private func stackMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackNew)) { [weak model] in model?.editing.newStack() })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicateStack() })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editCuesRenumber)) { [weak self] in self?.askStackNumber() })
-        menu.addItem(.separator())
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deleteStack() })
-        return menu
-    }
-
-    /// "Renumber…, with swap for a taken number": a small panel with the number.
-    private func askStackNumber() {
-        guard let stack = model.editing.stackNumber else { return }
-        let panel = PromptView(heading: Strings.text(.editCuesRenumber), width: 240)
-        let field = panel.text(Strings.text(.editCuesRenumber), String(stack), placeholder: String(stack))
-        panel.onSave = { [weak model] in
-            guard let number = Int(field.stringValue.trimmingCharacters(in: .whitespaces)), number > 0 else { return nil }
-            model?.editing.renumberStack(to: number)
-            return nil
-        }
-        panel.finish()
-        host?.present(panel, at: objectMenu)
     }
 
     @available(*, unavailable)
@@ -180,8 +114,7 @@ final class WorkspaceView: PanelView {
         stacks.isHidden = true
         channels.isHidden = true
         presets.isHidden = true
-        objectPicker.isHidden = true
-        objectMenu.isHidden = true
+        notice.isHidden = true
         let onCues = editing.page == .cues
         let deleted = onCues && editing.isListDeleted
         let hasList = onCues && editing.listUuid != nil && !deleted
@@ -223,19 +156,9 @@ final class WorkspaceView: PanelView {
     private func refreshStacks() {
         let page = model.editing.stackPage
         for view in [meta, zoom, openText, renumber, grid, undo, channels, presets] as [NSView] { view.isHidden = true }
-        title.stringValue = EditModeWording.page(.stacks)
+        title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? EditModeWording.page(.stacks)
         title.isHidden = false
-        objectPicker.isHidden = page.stacks.isEmpty
-        objectPicker.set(page.stacks.map { (EditModel.name(of: $0), $0.number) }, selected: page.stack?.number ?? 0)
-        objectPicker.setAccessibilityLabel(Strings.text(.editStackPicker))
-        objectMenu.menu = stackMenu_
-        objectMenu.setAccessibilityLabel(Strings.text(.editStackMenu))
-        objectMenu.isHidden = false
-        for item in objectMenu.menu?.items ?? [] where item.title == Strings.text(.menuDuplicate) || item.title == Strings.text(.editCuesRenumber) {
-            item.isEnabled = page.stack != nil
-        }
-        // "Delete, refused while an output shows the stack".
-        objectMenu.menu?.items.last?.isEnabled = page.stack != nil && page.shownOn.isEmpty
+        NoticeLine.show(model.editing.notice, in: notice, from: self)
         stacks.isHidden = page.stack == nil
         stacks.refresh()
         message.stringValue = page.stacks.isEmpty ? Strings.text(.editStackNone) : ""
@@ -246,16 +169,11 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
     private func refreshChannels() {
         let page = model.editing.channelPage
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, presets, objectPicker] as [NSView] { view.isHidden = true }
-        title.stringValue = EditModeWording.page(.channels)
+        for view in [meta, zoom, openText, renumber, grid, undo, stacks, presets] as [NSView] { view.isHidden = true }
+        title.stringValue = page.channel.map { EditModel.name(of: $0) } ?? EditModeWording.page(.channels)
         title.isHidden = false
-        objectMenu.menu = channelMenu_
-        objectMenu.setAccessibilityLabel(Strings.text(.editChannelMenu))
-        objectMenu.isHidden = false
-        for item in channelMenu_.items where item.title == Strings.text(.menuDuplicate) { item.isEnabled = page.channel != nil }
-        // "A channel with content on an output's stack ... can't be deleted".
-        channelMenu_.items.last?.isEnabled = page.channel != nil && !page.isOnAir
-        channels.isHidden = page.rows.isEmpty
+        NoticeLine.show(model.editing.notice, in: notice, from: self)
+        channels.isHidden = page.channel == nil
         channels.refresh()
         message.stringValue = page.rows.isEmpty ? Strings.text(.editChannelNone) : ""
         message.isHidden = message.stringValue.isEmpty
@@ -265,18 +183,9 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §8 and G-32 — "a header naming the preset, with a picker of every preset and the preset's menu".
     private func refreshPresets() {
         let page = model.editing.presetPage
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, channels] as [NSView] { view.isHidden = true }
-        title.stringValue = EditModeWording.page(.presets)
+        for view in [meta, zoom, openText, renumber, grid, undo, stacks, channels, notice] as [NSView] { view.isHidden = true }
+        title.stringValue = page.preset.map { EditModel.name(of: $0) } ?? EditModeWording.page(.presets)
         title.isHidden = false
-        objectPicker.isHidden = page.presets.isEmpty
-        objectPicker.set(page.presets.map { (EditModel.name(of: $0), $0.number) }, selected: page.preset?.number ?? 0)
-        objectPicker.setAccessibilityLabel(Strings.text(.editPresetPicker))
-        objectMenu.menu = presetMenu_
-        objectMenu.setAccessibilityLabel(Strings.text(.editPresetMenu))
-        objectMenu.isHidden = false
-        // "Preset 1 can be edited but not deleted, renumbered or swapped".
-        for item in presetMenu_.items where item.title == Strings.text(.menuDuplicate) { item.isEnabled = page.preset != nil }
-        presetMenu_.items.last?.isEnabled = page.preset != nil && page.preset?.number != 1
         presets.isHidden = page.preset == nil
         presets.refresh()
         message.stringValue = page.presets.isEmpty ? Strings.text(.editPresetNone) : ""
@@ -305,10 +214,8 @@ final class WorkspaceView: PanelView {
         let titleWidth = min(Kit.width(of: title), max(0, right - 12 - 40))
         title.frame = NSRect(x: 12, y: (h - 16) / 2, width: titleWidth, height: 16)
         meta.frame = NSRect(x: title.frame.maxX + 10, y: (h - 16) / 2, width: max(0, right - title.frame.maxX - 16), height: 16)
-        // The Stacks page's picker beside the title, its menu at the right.
-        let picked = objectPicker.fittingSize
-        objectPicker.frame = NSRect(x: title.frame.maxX + 10, y: (h - picked.height) / 2, width: min(picked.width + 10, 260), height: picked.height)
-        objectMenu.frame = NSRect(x: bounds.width - 12 - 34, y: (h - 24) / 2, width: 34, height: 24)
+        // The notice line beside the title, on a page with no inspector.
+        notice.frame = NSRect(x: title.frame.maxX + 14, y: (h - 15) / 2, width: max(0, bounds.width - title.frame.maxX - 28), height: 15)
         grid.frame = body
         stacks.frame = body
         channels.frame = body

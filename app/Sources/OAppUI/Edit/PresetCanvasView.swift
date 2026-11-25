@@ -5,6 +5,96 @@ import AppKit
 import OApp
 import OCore
 
+/// Spec 11 §8, "Frame" (G-34) — the box's reference point, "picked from nine: a corner, the middle of an edge, or the
+/// centre": a square of nine dots, the chosen one filled. The choice is the app's, kept in `view.json`.
+@MainActor
+final class AnchorPicker: NSView {
+    static let size: CGFloat = 42
+    private let model: ShowModel
+
+    override var isFlipped: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
+
+    init(model: ShowModel) {
+        self.model = model
+        super.init(frame: .zero)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.radioGroup)
+        setAccessibilityLabel(Strings.text(.editPresetAnchor))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func refresh() {
+        setAccessibilityValue(Strings.text(Self.word(model.settings.boxAnchor)))
+        needsDisplay = true
+    }
+
+    static func word(_ anchor: FrameAnchor) -> StringKey {
+        switch anchor {
+        case .topLeft: .editPresetAnchorTopLeft
+        case .top: .editPresetAnchorTop
+        case .topRight: .editPresetAnchorTopRight
+        case .left: .editPresetAnchorLeft
+        case .center: .editPresetAnchorCenter
+        case .right: .editPresetAnchorRight
+        case .bottomLeft: .editPresetAnchorBottomLeft
+        case .bottom: .editPresetAnchorBottom
+        case .bottomRight: .editPresetAnchorBottomRight
+        }
+    }
+
+    /// The centre of a point's dot.
+    private func centre(of anchor: FrameAnchor) -> NSPoint {
+        let inset: CGFloat = 7
+        let step = (min(bounds.width, bounds.height) - 2 * inset) / 2
+        return NSPoint(x: inset + CGFloat(anchor.rawValue % 3) * step, y: inset + CGFloat(anchor.rawValue / 3) * step)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let box = NSRect(x: 7, y: 7, width: min(bounds.width, bounds.height) - 14, height: min(bounds.width, bounds.height) - 14)
+        Palette.hairline.setStroke()
+        NSBezierPath(rect: box.insetBy(dx: 0.5, dy: 0.5)).stroke()
+        let chosen = model.settings.boxAnchor
+        for anchor in FrameAnchor.allCases {
+            let at = centre(of: anchor)
+            let dot = NSRect(x: at.x - 3.5, y: at.y - 3.5, width: 7, height: 7)
+            if anchor == chosen {
+                Palette.selection.setFill()
+                NSBezierPath(ovalIn: dot.insetBy(dx: -1, dy: -1)).fill()
+            } else {
+                Palette.dimText.setFill()
+                NSBezierPath(ovalIn: dot.insetBy(dx: 1, dy: 1)).fill()
+            }
+        }
+    }
+
+    /// Picks the point nearest a press.
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard let nearest = FrameAnchor.allCases.min(by: { hypot(centre(of: $0).x - point.x, centre(of: $0).y - point.y) < hypot(centre(of: $1).x - point.x, centre(of: $1).y - point.y) }) else { return }
+        choose(nearest)
+    }
+
+    /// The arrows move the choice by keyboard.
+    override func keyDown(with event: NSEvent) {
+        let at = model.settings.boxAnchor.rawValue
+        let (column, row) = (at % 3, at / 3)
+        switch event.keyCode {
+        case 123: choose(FrameAnchor(rawValue: row * 3 + max(0, column - 1)) ?? .topLeft)
+        case 124: choose(FrameAnchor(rawValue: row * 3 + min(2, column + 1)) ?? .topLeft)
+        case 125: choose(FrameAnchor(rawValue: min(2, row + 1) * 3 + column) ?? .topLeft)
+        case 126: choose(FrameAnchor(rawValue: max(0, row - 1) * 3 + column) ?? .topLeft)
+        default: super.keyDown(with: event)
+        }
+    }
+
+    func choose(_ anchor: FrameAnchor) {
+        model.change { $0.boxAnchor = anchor }
+    }
+}
+
 /// Spec 11 §8 — "The canvas is the layout at its stack's size (§3) ... Its picture is the engine's (choice A-1) ...
 /// Over it the app draws each box's outline and handles, labelled with its binding ("body", "pixels", "static") and
 /// its offset when it isn't 0 ("+1")."

@@ -223,8 +223,14 @@ final class FlatButton: NSControl {
     var fitting: NSSize {
         let width = ceil((title as NSString).size(withAttributes: [.font: font_]).width)
         if tagStyle != nil { return NSSize(width: width + 10, height: 16) }
-        return NSSize(width: width + 22, height: max(24, fontSize + 12))
+        return NSSize(width: width + 22 + (dropMenu == nil || title.isEmpty || !chevron ? 0 : 14), height: max(24, fontSize + 12))
     }
+
+    /// Spec 11 §1, "Adding and choosing" — a button that opens a menu of its choices, never its own name among them:
+    /// a press shows the menu under the button, with a chevron beside the title.
+    var dropMenu: NSMenu? { didSet { needsDisplay = true } }
+    /// Whether the chevron shows: not on a row's ⋯, which says it already.
+    var chevron = true { didSet { needsDisplay = true } }
 
     private func drawAsTag(_ tag: TagView.Style) {
         var fill = Palette.raisedHigh
@@ -298,6 +304,10 @@ final class FlatButton: NSControl {
     /// Presses it, as a click or VoiceOver would.
     func press() {
         guard isEnabled else { return }
+        if let dropMenu {
+            dropMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: bounds.height + 2), in: self)
+            return
+        }
         onPress?()
     }
 
@@ -368,8 +378,21 @@ final class FlatButton: NSControl {
         }
         let attributes: [NSAttributedString.Key: Any] = [.font: font_, .foregroundColor: text]
         let size = (title as NSString).size(withAttributes: attributes)
-        let x = leading ? 8 : (bounds.width - size.width) / 2
+        let chevronWidth: CGFloat = dropMenu == nil || title.isEmpty || !chevron ? 0 : 14
+        let x = leading ? 8 : (bounds.width - size.width - chevronWidth) / 2
         (title as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+        if dropMenu != nil, chevron {
+            // The chevron: a menu opens under it.
+            let mid = title.isEmpty ? bounds.midX : min(bounds.width - 10, x + size.width + 9)
+            let y = bounds.midY + 1
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: mid - 3.5, y: y - 2))
+            path.line(to: NSPoint(x: mid, y: y + 1.5))
+            path.line(to: NSPoint(x: mid + 3.5, y: y - 2))
+            path.lineWidth = 1.5
+            text.withAlphaComponent(0.8).setStroke()
+            path.stroke()
+        }
     }
 
     /// Whether the title starts at the left, as a row of a list does, rather than in the middle.

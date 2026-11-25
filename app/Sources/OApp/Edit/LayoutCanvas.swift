@@ -14,6 +14,16 @@ public enum CanvasHandle: CaseIterable, Sendable {
     var movesBottom: Bool { [.bottomLeft, .bottom, .bottomRight].contains(self) }
 }
 
+/// Spec 11 §8, "Frame" (G-34) — a box's reference point, "picked from nine: a corner, the middle of an edge, or the
+/// centre", which X and Y read and a new width or height keeps in place.
+public enum FrameAnchor: Int, CaseIterable, Codable, Sendable {
+    case topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight
+
+    /// Where the point sits across the box and down it, from 0 to 1.
+    public var across: Double { [0, 0.5, 1][rawValue % 3] }
+    public var down: Double { [0, 0.5, 1][rawValue / 3] }
+}
+
 /// Spec 11 §8, "Moving" — "Dragging moves the box and the handles resize it. ... the arrows nudge the selected box by
 /// one pixel of the stack, and with ⇧ by ten. ... Boxes snap to the canvas's edges and centre lines and to other boxes'
 /// edges, not while ⌘ is held."
@@ -93,6 +103,22 @@ public enum LayoutCanvasMath {
         let w = min(1, max(smallest, frame.w))
         let h = min(1, max(smallest, frame.h))
         return Frame(x: min(1 - w, max(0, frame.x)), y: min(1 - h, max(0, frame.y)), w: w, h: h)
+    }
+
+    /// X and Y as the Frame fields show them: where the box's reference point sits, as fractions of the stack.
+    public static func point(of frame: Frame, at anchor: FrameAnchor) -> (x: Double, y: Double) {
+        (frame.x + frame.w * anchor.across, frame.y + frame.h * anchor.down)
+    }
+
+    /// The frame with one of X, Y, W or H typed: X and Y place the reference point; a new width or height keeps it
+    /// where it was. The format's frame stays left, top, width and height (Spec 1 §2).
+    public static func typed(_ frame: Frame, anchor: FrameAnchor, x: Double? = nil, y: Double? = nil, w: Double? = nil, h: Double? = nil) -> Frame {
+        let at = point(of: frame, at: anchor)
+        let width = max(smallest, w ?? frame.w)
+        let height = max(smallest, h ?? frame.h)
+        let px = x ?? at.x
+        let py = y ?? at.y
+        return Frame(x: px - width * anchor.across, y: py - height * anchor.down, w: width, h: height)
     }
 
     /// The box under a point (fractions of the stack), top first: `frames` run bottom to top as the layout's do.

@@ -185,168 +185,8 @@ final class PresetWorkspaceView: NSView {
     }
 }
 
-/// One box in the Boxes column: its binding and its offset, with its menu; it drags to a new place.
-@MainActor
-final class PresetBoxRowView: NSView {
-    static let height: CGFloat = 26
-    let grip = GripView()
-    let name = Kit.label(size: 12)
-    let menuButton = NSPopUpButton(frame: .zero, pullsDown: true)
-    var isSelected = false { didSet { needsDisplay = true } }
-    var onSelect: (() -> Void)?
-    private(set) var index = 0
-
-    override var isFlipped: Bool { true }
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        menuButton.isBordered = false
-        menuButton.setAccessibilityLabel(Strings.text(.editPresetBoxMenu))
-        for view in [grip, name, menuButton] as [NSView] { addSubview(view) }
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
-
-    func show(_ row: PresetBoxRow) {
-        index = row.index
-        var words = LayoutCanvasView.tag(of: row.binding)
-        if case .static(let text) = row.binding { words += " · " + text }
-        if row.offset != 0 { words += "  " + (row.offset > 0 ? "+\(row.offset)" : "\(row.offset)") }
-        name.stringValue = words
-        setAccessibilityLabel(words)
-    }
-
-    override func layout() {
-        super.layout()
-        let h = bounds.height
-        grip.frame = NSRect(x: 4, y: (h - 14) / 2, width: 14, height: 14)
-        menuButton.frame = NSRect(x: bounds.width - 30, y: (h - 22) / 2, width: 26, height: 22)
-        name.frame = NSRect(x: 24, y: (h - 16) / 2, width: max(0, bounds.width - 58), height: 16)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard isSelected else { return }
-        Palette.selection.withAlphaComponent(0.28).setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 0, dy: 1), xRadius: 5, yRadius: 5).fill()
-    }
-
-    override func mouseDown(with event: NSEvent) { onSelect?() }
-    override func accessibilityPerformPress() -> Bool {
-        onSelect?()
-        return true
-    }
-}
-
-/// The box list: the rows top first, which take a drag to a new place.
-@MainActor
-final class PresetBoxListView: NSView {
-    private let model: ShowModel
-    private(set) var rows: [PresetBoxRowView] = []
-    private(set) var dropRow: Int? { didSet { needsDisplay = true } }
-
-    override var isFlipped: Bool { true }
-
-    init(model: ShowModel) {
-        self.model = model
-        super.init(frame: .zero)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
-
-    func refresh(_ page: PresetPage, selected: Int?) {
-        while rows.count < page.boxes.count {
-            let row = PresetBoxRowView()
-            row.onSelect = { [weak self, weak row] in
-                guard let row else { return }
-                self?.model.editing.selectBox(row.index)
-            }
-            row.grip.onDrag = { [weak self, weak row] point, ended in
-                guard let self, let row else { return }
-                self.drag(row.index, to: self.convert(point, from: nil), ended: ended)
-            }
-            row.menuButton.menu = menu(for: row)
-            addSubview(row)
-            rows.append(row)
-        }
-        while rows.count > page.boxes.count { rows.removeLast().removeFromSuperview() }
-        for (row, box) in zip(rows, page.boxes) {
-            row.show(box)
-            row.isSelected = page.ownsLayout && box.index == selected
-            row.grip.isHidden = !page.ownsLayout
-            row.menuButton.isHidden = !page.ownsLayout
-        }
-        needsLayout = true
-    }
-
-    var height: CGFloat { CGFloat(rows.count) * PresetBoxRowView.height }
-
-    private func menu(for row: PresetBoxRowView) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editMenuMoveUp)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.moveBox(row.index, up: true)
-        })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editMenuMoveDown)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.moveBox(row.index, up: false)
-        })
-        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.duplicateBox(row.index)
-        })
-        menu.addItem(.separator())
-        menu.addItem(ClosureMenuItem(title: Strings.text(.confirmRemove)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.removeBox(row.index)
-        })
-        return menu
-    }
-
-    /// The row a point falls above, from 0 at the top to the count below the last.
-    func row(at point: NSPoint) -> Int {
-        min(rows.count, max(0, Int((point.y / PresetBoxRowView.height).rounded())))
-    }
-
-    private func drag(_ index: Int, to point: NSPoint, ended: Bool) {
-        guard ended else {
-            dropRow = row(at: point)
-            return
-        }
-        defer { dropRow = nil }
-        guard let target = dropRow else { return }
-        drop(index, atRow: target)
-    }
-
-    /// A box dropped above the row at `row` (0 = top): its place in `boxes`, which run bottom to top.
-    func drop(_ index: Int, atRow row: Int) {
-        let count = rows.count
-        var place = count - max(0, min(row, count))
-        if index < place { place -= 1 }
-        model.editing.moveBox(index, to: min(max(0, place), count - 1))
-    }
-
-    override func layout() {
-        super.layout()
-        for (index, row) in rows.enumerated() {
-            row.frame = NSRect(x: 0, y: CGFloat(index) * PresetBoxRowView.height, width: bounds.width, height: PresetBoxRowView.height)
-        }
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let row = dropRow else { return }
-        Palette.selection.setFill()
-        NSRect(x: 4, y: CGFloat(row) * PresetBoxRowView.height - 1, width: bounds.width - 8, height: 2).fill()
-    }
-}
-
-/// Spec 11 §8 and G-32 — the Presets page's inspector: "the preset and Used by, Boxes, the box's properties, its text
-/// style", in four columns.
+/// Spec 11 §8 and G-32 — the Presets page's inspector: "the box's properties, its text style, the preset with Used by",
+/// in three columns. The boxes themselves are in the page's list (PageListView).
 @MainActor
 final class PresetInspectorView: PanelView {
     private let model: ShowModel
@@ -360,12 +200,6 @@ final class PresetInspectorView: PanelView {
     let label = EditField()
     let usedHeading = Kit.heading(Strings.text(.editPresetUsedBy))
     let usedBy = Kit.label(size: 11.5, color: Palette.text)
-    // Boxes.
-    let boxColumn = FormColumn()
-    let boxesHeading = Kit.heading(Strings.text(.editPresetBoxes))
-    let boxList: PresetBoxListView
-    let noBoxes = Kit.label(Strings.text(.editPresetNoBoxes), size: 11.5, color: Palette.faintText)
-    let addBox = NSPopUpButton(frame: .zero, pullsDown: true)
     // The box's properties.
     let propertyColumn = FormColumn()
     let propertyHeading = Kit.heading(Strings.text(.editPresetBox))
@@ -373,7 +207,9 @@ final class PresetInspectorView: PanelView {
     let binding = SegmentedView([Strings.text(.editPresetPixels), Strings.text(.editPresetField), Strings.text(.editPresetStatic)], small: true)
     let fieldName = EditField()
     let staticText = EditField()
-    let variables = NSPopUpButton(frame: .zero, pullsDown: true)
+    let variables = FlatButton(Strings.text(.editPresetVariables), style: .plain)
+    /// Spec 11 §8, "Frame" (G-34) — the reference point the X and Y fields read.
+    let anchor: AnchorPicker
     let frameX = EditField()
     let frameY = EditField()
     let frameW = EditField()
@@ -400,10 +236,10 @@ final class PresetInspectorView: PanelView {
     let styleHeading = Kit.heading(Strings.text(.editPresetStyle))
     let noStyle = Kit.label(Strings.text(.editPresetNoStyle), size: 11.5, color: Palette.faintText)
     let fromStyle = Kit.label(size: 11.5, color: Palette.dimText)
-    let applyStyle = NSPopUpButton(frame: .zero, pullsDown: true)
+    let applyStyle = FlatButton(Strings.text(.editPresetApplyStyle), style: .plain)
     let reapply = FlatButton(Strings.text(.editPresetReapply), style: .plain)
     let saveAsStyle = FlatButton(Strings.text(.editPresetSaveAsStyle), style: .plain)
-    let font = NSPopUpButton(frame: .zero, pullsDown: true)
+    let font = FlatButton("", style: .plain)
     let size = EditField()
     let unit = SegmentedView([Strings.text(.editPresetPt), Strings.text(.editPresetPercent)], small: true)
     let weight = EditField()
@@ -424,20 +260,17 @@ final class PresetInspectorView: PanelView {
     private weak var lastField: EditField?
 
     static let fieldNames = ["body", "title", "copyright", "reference"]
-    static let variableNames = ["[Time]", "[Date]", "[Timecode]", "[Service In]", "[Timer 1]", "[Popup 1]", "[Live Title]", "[Next Title]",
-                                "[Section]", "[Cue Note]", "[Copyright]", "[CCLI]"]
 
     init(model: ShowModel) {
         self.model = model
-        boxList = PresetBoxListView(model: model)
+        anchor = AnchorPicker(model: model)
         super.init(title: "")
         notice.isHidden = true
         addSubview(notice)
         buildPresetColumn()
-        buildBoxColumn()
         buildPropertyColumn()
         buildStyleColumn()
-        for column in [presetColumn, boxColumn, propertyColumn, styleColumn] { addSubview(column.scroll) }
+        for column in [propertyColumn, styleColumn, presetColumn] { addSubview(column.scroll) }
     }
 
     @available(*, unavailable)
@@ -484,45 +317,6 @@ final class PresetInspectorView: PanelView {
         c.wide(usedBy, height: 18)
     }
 
-    private func buildBoxColumn() {
-        let c = boxColumn
-        c.wide(boxesHeading, height: 14)
-        c.wide(boxList, height: 0)
-        c.wide(noBoxes, height: 18)
-        addBox.font = .systemFont(ofSize: 12)
-        addBox.setAccessibilityLabel(Strings.text(.editPresetAddBox))
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: Strings.text(.editPresetAddBox), action: nil, keyEquivalent: ""))
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editPresetAddPixels)) { [weak model] in model?.editing.addBox(.pixels) })
-        let fields = NSMenuItem(title: Strings.text(.editPresetAddField), action: nil, keyEquivalent: "")
-        let sub = NSMenu()
-        for name in Self.fieldNames {
-            sub.addItem(ClosureMenuItem(title: name) { [weak model] in model?.editing.addBox(.field(name: name)) })
-        }
-        sub.addItem(.separator())
-        sub.addItem(ClosureMenuItem(title: Strings.text(.editPresetFieldCustom)) { [weak self] in self?.askFieldName() })
-        fields.submenu = sub
-        menu.addItem(fields)
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editPresetAddStatic)) { [weak model] in model?.editing.addBox(.static(text: "")) })
-        addBox.menu = menu
-        c.row(nil, [addBox], widths: [140], height: 24)
-    }
-
-    /// "Field ▸ (body, title, copyright, reference, or a custom name)": the custom name is asked for.
-    private func askFieldName() {
-        let panel = PromptView(heading: Strings.text(.editPresetAddField), width: 260)
-        let field = panel.text(Strings.text(.editPresetFieldName), "", placeholder: "author")
-        panel.onSave = { [weak model] in
-            let name = field.stringValue.trimmingCharacters(in: .whitespaces)
-            guard !name.isEmpty else { return nil }
-            model?.editing.addBox(.field(name: name))
-            return nil
-        }
-        panel.finish()
-        host?.present(panel, at: addBox)
-    }
-
     private func buildPropertyColumn() {
         let c = propertyColumn
         c.wide(propertyHeading, height: 14)
@@ -558,37 +352,30 @@ final class PresetInspectorView: PanelView {
             self?.model.editing.setBinding(.static(text: text))
         }
         // "Static text is a field with a Variables ▸ menu that inserts Spec 6 §5's names ..., sent on commit."
-        variables.isBordered = false
+        variables.fontSize = 11.5
         variables.setAccessibilityLabel(Strings.text(.editPresetVariables))
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: Strings.text(.editPresetVariables), action: nil, keyEquivalent: ""))
-        for name in Self.variableNames {
-            menu.addItem(ClosureMenuItem(title: name) { [weak self] in
-                guard let self else { return }
-                self.staticText.stringValue += name
-                self.staticText.sendAction(self.staticText.action, to: self.staticText.target)
-            })
-        }
-        variables.menu = menu
-        c.row(Strings.text(.editPresetStaticText), [staticText, variables], widths: [nil, 96], height: 26)
+        c.row(Strings.text(.editPresetStaticText), [staticText], height: 26)
+        c.row("", [variables], widths: [110], height: 24)
         // "Frame: x, y, width and height as percentages of the stack".
         for (field, key, name) in [(frameX, "x", StringKey.editPresetX), (frameY, "y", .editPresetY), (frameW, "w", .editPresetW), (frameH, "h", .editPresetH)] {
             numeric(field, Strings.text(.editPresetFrame) + " " + Strings.text(name)) { [weak self] percent in
                 guard let self, let index = self.model.editing.presetState.box, let box = self.model.editing.selectedBox else { return }
-                var frame = box.frame
+                let anchor = self.model.settings.boxAnchor
+                let value = percent / 100
+                let frame: Frame
                 switch key {
-                case "x": frame.x = percent / 100
-                case "y": frame.y = percent / 100
-                case "w": frame.w = percent / 100
-                default: frame.h = percent / 100
+                case "x": frame = LayoutCanvasMath.typed(box.frame, anchor: anchor, x: value)
+                case "y": frame = LayoutCanvasMath.typed(box.frame, anchor: anchor, y: value)
+                case "w": frame = LayoutCanvasMath.typed(box.frame, anchor: anchor, w: value)
+                default: frame = LayoutCanvasMath.typed(box.frame, anchor: anchor, h: value)
                 }
                 self.model.editing.setFrame(LayoutCanvasMath.kept(frame), of: index)
             }
             field.placeholderString = Strings.text(name)
             field.toolTip = Strings.text(.editPresetFrame) + " " + Strings.text(name) + " %"
         }
-        // The four fields' letters over them.
+        // The reference point, then the four fields with their letters over them.
+        c.row(Strings.text(.editPresetAnchor), [anchor], widths: [AnchorPicker.size], height: AnchorPicker.size)
         c.row("", frameLetters, height: 12)
         c.row(Strings.text(.editPresetFrame), [frameX, frameY, frameW, frameH], height: 26)
         pixelFit.onChoose = { [weak self] tag in
@@ -636,14 +423,14 @@ final class PresetInspectorView: PanelView {
         c.wide(styleHeading, height: 14)
         c.wide(noStyle, height: 18)
         c.wide(fromStyle, height: 16)
-        applyStyle.font = .systemFont(ofSize: 11.5)
-        applyStyle.setAccessibilityLabel(Strings.text(.editPresetApplyStyle))
+        applyStyle.fontSize = 11
         reapply.fontSize = 11
         reapply.onPress = { [weak model] in model?.editing.reapplyStyle() }
         saveAsStyle.fontSize = 11
         saveAsStyle.onPress = { [weak self] in self?.askStyleName() }
         c.row(nil, [applyStyle, reapply, saveAsStyle], widths: [nil, nil, nil], height: 24)
-        font.font = .systemFont(ofSize: 12)
+        font.fontSize = 12
+        font.leading = true
         font.setAccessibilityLabel(Strings.text(.editPresetFont))
         c.row(Strings.text(.editPresetFont), [font], height: 24)
         numeric(size, Strings.text(.editPresetSize)) { [weak self] value in self?.model.editing.setStyle("size.value", .number(max(1, value))) }
@@ -726,22 +513,18 @@ final class PresetInspectorView: PanelView {
         usedBy.textColor = uses.isEmpty ? Palette.faintText : Palette.text
         presetColumn.setHeight(CGFloat(max(1, uses.count)) * 17 + 2, of: usedBy)
         // Boxes.
-        boxList.refresh(page, selected: state.box)
-        boxColumn.setHeight(boxList.height, of: boxList)
-        noBoxes.isHidden = !(page.layout?.boxes.isEmpty ?? true)
-        addBox.isEnabled = page.ownsLayout
         // The box.
         let box = editing.selectedBox
         refreshBox(box, catalog: catalog)
         refreshStyle(box, catalog: catalog, fonts: state.fonts)
-        for column in [presetColumn, boxColumn, propertyColumn, styleColumn] { column.needsLayout = true }
+        for column in [propertyColumn, styleColumn, presetColumn] { column.needsLayout = true }
         needsLayout = true
     }
 
     private func refreshBox(_ box: Box?, catalog: Catalog?) {
         selectNote.isHidden = box != nil
         let controls: [NSView] = [binding, fieldName, staticText, variables, frameX, frameY, frameW, frameH, pixelFit, textFit, fitNumber, transition,
-                                  transitionMs, onVariable, fallback, offset, grade] + frameLetters
+                                  transitionMs, onVariable, fallback, offset, grade, anchor] + frameLetters
         for view in controls { view.isHidden = box == nil }
         guard let box else { return }
         let subject = AnyHashable("\(model.editing.presetNumber ?? 0)-\(model.editing.presetTab.string)-\(model.editing.presetState.box ?? -1)")
@@ -760,8 +543,21 @@ final class PresetInspectorView: PanelView {
             binding.selected = 2
             fieldName.isHidden = true
             staticText.show(text, subject: subject)
+            // "Static text is a field with a Variables ▸ menu that inserts Spec 6 §5's names ..., sent on commit."
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            for name in EditPopovers.variableNames(catalog: catalog) {
+                menu.addItem(ClosureMenuItem(title: name) { [weak self] in
+                    guard let self else { return }
+                    self.staticText.stringValue += name
+                    self.staticText.sendAction(self.staticText.action, to: self.staticText.target)
+                })
+            }
+            variables.dropMenu = menu
         }
-        for (field, value) in [(frameX, box.frame.x), (frameY, box.frame.y), (frameW, box.frame.w), (frameH, box.frame.h)] {
+        anchor.refresh()
+        let at = LayoutCanvasMath.point(of: box.frame, at: model.settings.boxAnchor)
+        for (field, value) in [(frameX, at.x), (frameY, at.y), (frameW, box.frame.w), (frameH, box.frame.h)] {
             field.show(FormNumber.text(value * 100), subject: subject)
         }
         switch box.fit {
@@ -814,16 +610,16 @@ final class PresetInspectorView: PanelView {
         reapply.isEnabled = style.fromStyle.map { from in catalog.textStyles.contains { $0.number == from } } ?? false
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: Strings.text(.editPresetApplyStyle), action: nil, keyEquivalent: ""))
         for numbered in catalog.textStyles.sorted(by: { $0.number < $1.number }) {
             let name = numbered.label.isEmpty ? Strings.text(.editPresetStyleUntitled, numbered.number) : "\(numbered.number) \(numbered.label)"
             menu.addItem(ClosureMenuItem(title: name) { [weak model] in model?.editing.applyStyle(numbered.number) })
         }
-        applyStyle.menu = menu
+        applyStyle.dropMenu = menu
         // The font: "from the `fonts` query's families and faces", each drawn in itself.
-        if fonts.count != fontsShown || font.menu?.items.first?.title != style.values.font {
+        if fonts.count != fontsShown || font.title != style.values.font {
             fontsShown = fonts.count
-            font.menu = fontMenu(fonts, current: style.values.font)
+            font.title = style.values.font
+            font.dropMenu = fontMenu(fonts, current: style.values.font)
         }
         let v = style.values
         size.show(FormNumber.text(v.size.value), subject: subject)
@@ -843,11 +639,10 @@ final class PresetInspectorView: PanelView {
         allCaps.state = v.allCaps ? .on : .off
     }
 
-    /// The families, each with its faces drawn in themselves; the pull-down's title is the box's font.
+    /// The families, each with its faces drawn in themselves; the button's title is the box's font.
     private func fontMenu(_ fonts: [FontFace], current: String) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: current, action: nil, keyEquivalent: ""))
         var families: [(String, [FontFace])] = []
         for face in fonts {
             if families.last?.0 == face.family { families[families.count - 1].1.append(face) } else { families.append((face.family, [face])) }
@@ -875,8 +670,8 @@ final class PresetInspectorView: PanelView {
         let h = Self.headerHeight
         let titleRight = title.frame.maxX + 14
         notice.frame = NSRect(x: titleRight, y: (h - 15) / 2, width: max(0, bounds.width - titleRight - 14), height: 15)
-        let column = floor(bounds.width / 4)
-        for (index, form) in [presetColumn, boxColumn, propertyColumn, styleColumn].enumerated() {
+        let column = floor(bounds.width / 3)
+        for (index, form) in [propertyColumn, styleColumn, presetColumn].enumerated() {
             form.scroll.frame = NSRect(x: CGFloat(index) * column + 1, y: h + 2, width: column - 2, height: max(0, bounds.height - h - 4))
             form.place()
         }
@@ -885,8 +680,8 @@ final class PresetInspectorView: PanelView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         Palette.hairline.setFill()
-        let column = floor(bounds.width / 4)
-        for index in 1..<4 {
+        let column = floor(bounds.width / 3)
+        for index in 1..<3 {
             NSRect(x: CGFloat(index) * column, y: Self.headerHeight, width: 1, height: bounds.height - Self.headerHeight).fill()
         }
     }

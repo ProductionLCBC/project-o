@@ -106,7 +106,7 @@ final class BrowserView: PanelView {
     let tabs = SegmentedView(BrowserTab.allCases.map { EditModeWording.tab($0) }, small: true)
     // The Media tab.
     let search = Kit.search(placeholder: Strings.text(.poolSearch))
-    let filter = NSPopUpButton(frame: .zero, pullsDown: true)
+    let filter = FlatButton("", style: .bare)
     let count = Kit.label(size: 11)
     let views = SegmentedView(MediaListView.allCases.map { EditModeWording.mediaView($0) }, small: true)
     private let scroll = NSScrollView()
@@ -127,8 +127,7 @@ final class BrowserView: PanelView {
         tabs.onSelect = { [weak model] index in model?.editing.show(tab: BrowserTab.allCases[index]) }
         search.target = self
         search.action = #selector(searched)
-        filter.font = .systemFont(ofSize: 11)
-        filter.isBordered = false
+        filter.fontSize = 11
         filter.setAccessibilityLabel(Strings.text(.poolKindAll))
         count.textColor = Palette.faintText
         views.onSelect = { [weak model] index in model?.editing.show(mediaView: MediaListView.allCases[index]) }
@@ -154,11 +153,11 @@ final class BrowserView: PanelView {
         let current = model.poolFilter
         let menu = NSMenu()
         menu.autoenablesItems = false
-        // A pull-down's first item is its title: what is filtered by now.
+        // The button's title says what is filtered by now; the menu lists only the choices.
         let kinds: [(ViewSettings.PoolKind, StringKey)] = [(.all, .poolKindAll), (.video, .kindVideo), (.image, .kindImage), (.audio, .kindAudio)]
         var title = Strings.text(kinds.first { $0.0 == current.kind }?.1 ?? .poolKindAll)
         if let folder = current.folder { title = LibraryTreeName.last(folder) + " · " + title }
-        menu.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+        filter.title = title
         func add(_ title: String, on: Bool, indent: Int = 0, _ run: @escaping @MainActor () -> Void) {
             let item = ClosureMenuItem(title: title, run)
             item.state = on ? .on : .off
@@ -181,7 +180,7 @@ final class BrowserView: PanelView {
         menu.addItem(.separator())
         add(Strings.text(.poolSortName), on: current.sort == .name) { [weak model] in model?.setPool { $0.sort = .name } }
         add(Strings.text(.poolSortDate), on: current.sort == .dateAdded) { [weak model] in model?.setPool { $0.sort = .dateAdded } }
-        filter.menu = menu
+        filter.dropMenu = menu
     }
 
     /// "Used in This List": the items the Cues page's list writes.
@@ -273,7 +272,7 @@ final class BrowserView: PanelView {
         y += 24 + 8
         let viewsSize = views.fitting
         views.frame = NSRect(x: w - 12 - viewsSize.width, y: y, width: viewsSize.width, height: viewsSize.height)
-        let filterWidth = min(filter.fittingSize.width, 96)
+        let filterWidth = min(filter.fitting.width, 120)
         filter.frame = NSRect(x: 8, y: y, width: filterWidth, height: viewsSize.height)
         count.frame = NSRect(x: filter.frame.maxX + 4, y: y + (viewsSize.height - 14) / 2, width: max(0, views.frame.minX - filter.frame.maxX - 8), height: 14)
         y += viewsSize.height + 10

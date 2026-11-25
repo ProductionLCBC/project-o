@@ -1,14 +1,10 @@
-// OAppUI — Spec 11 §6, the stack editor: the slots and the stack's own fields in the workspace (G-30), and the
-// outputs, the selected output, the channels and the audio routing in the inspector's four columns.
+// OAppUI — Spec 11 §6 and G-30, the stack editor: in the workspace, two tall columns, the slots with their Add Channel
+// row and the stack's own fields, then the outputs, the selected output and the audio routing. The stacks themselves
+// are the page's list (PageListView).
 
 import AppKit
 import OApp
 import OCore
-
-extension NSPasteboard.PasteboardType {
-    /// A channel dragged from the Stacks page's Channels column into its slots (Spec 11 §6).
-    static let projectOChannel = NSPasteboard.PasteboardType("org.lcbc.projecto.channel")
-}
 
 /// A pop-up of numbered choices that says which was picked: a tag per item.
 @MainActor
@@ -90,18 +86,19 @@ final class GripView: NSView {
     override func mouseUp(with event: NSEvent) { onDrag?(event.locationInWindow, true) }
 }
 
-/// Spec 11 §6 — one slot: "the channel's number and label, its preset and its opacity", with its menu.
+/// Spec 11 §6 — one slot: "the channel's number and label, its preset and its opacity", with its menu. The opacity's
+/// slider has a field beside it that takes a typed percentage (§1).
 @MainActor
 final class SlotRowView: NSView {
-    static let height: CGFloat = 44
+    static let height: CGFloat = 46
     let grip = GripView()
     let number = Kit.label(size: 12, color: Palette.faintText, mono: true)
-    let name = Kit.label(size: 12.5, weight: .medium)
+    let name = Kit.content(Kit.label(size: 12.5, weight: .medium))
     let preset = ChoicePopUp(label: Strings.text(.editStackPreset))
     let resolves = Kit.label(size: 10.5, color: Palette.dimText)
     let opacity = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
-    let percent = Kit.label(size: 11.5, color: Palette.dimText, mono: true)
-    let menuButton = NSPopUpButton(frame: .zero, pullsDown: true)
+    let percent = EditField()
+    let more = FlatButton("⋯", style: .bare)
     private(set) var channel = 0
 
     override var isFlipped: Bool { true }
@@ -111,53 +108,45 @@ final class SlotRowView: NSView {
         opacity.controlSize = .small
         opacity.isContinuous = false
         percent.alignment = .right
-        menuButton.isBordered = false
-        menuButton.setAccessibilityLabel(Strings.text(.editStackSlotMenu))
-        for view in [grip, number, name, preset, resolves, opacity, percent, menuButton] as [NSView] { addSubview(view) }
+        more.chevron = false
+        more.fontSize = 13
+        more.setAccessibilityLabel(Strings.text(.editStackSlotMenu))
+        for view in [grip, number, name, preset, resolves, opacity, percent, more] as [NSView] { addSubview(view) }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    func show(_ row: StackSlotRow, presets: [Preset], canMoveUp: Bool, canMoveDown: Bool) {
+    func show(_ row: StackSlotRow, presets: [Preset]) {
         channel = row.channel
         number.stringValue = String(row.channel)
-        name.stringValue = row.label.isEmpty ? Strings.text(.editCuesNoChannel, row.channel) : row.label
+        name.stringValue = row.label.isEmpty ? Strings.text(.editChannelUntitled, row.channel) : row.label
         var choices = [(Strings.text(.editStackPresetNone), 0)]
         choices += presets.sorted { $0.number < $1.number }.map { (EditModeWording.numbered($0.number, $0.label), $0.number) }
         preset.set(choices, selected: row.preset ?? 0)
         let drawn = presets.first { $0.number == row.resolved }
         resolves.stringValue = Strings.text(.editStackResolves, EditModeWording.numbered(row.resolved, drawn?.label ?? ""))
         opacity.doubleValue = row.opacity
-        percent.stringValue = "\(Int((row.opacity * 100).rounded()))%"
+        percent.show(FormNumber.text(row.opacity * 100, places: 0) + "%", subject: AnyHashable(row.channel))
         opacity.setAccessibilityLabel(Strings.text(.editStackOpacity) + ", " + name.stringValue)
-        menuButton.menu?.items.dropFirst().forEach { item in
-            if item.tag == 1 { item.isEnabled = canMoveUp }
-            if item.tag == 2 { item.isEnabled = canMoveDown }
-        }
+        percent.setAccessibilityLabel(Strings.text(.editStackOpacity) + " %, " + name.stringValue)
         needsLayout = true
     }
-
-    /// Where the preset's pop-up and the opacity's slider start in a row this wide: the columns' headings sit over them.
-    static func presetX(width: CGFloat) -> CGFloat { max(200, width * 0.38) }
-    static func presetWidth(width: CGFloat) -> CGFloat { min(220, max(140, width * 0.28)) }
-    static func sliderX(width: CGFloat) -> CGFloat { presetX(width: width) + presetWidth(width: width) + 20 }
 
     override func layout() {
         super.layout()
         let h = bounds.height
+        let w = bounds.width
         grip.frame = NSRect(x: 8, y: (h - 14) / 2, width: 14, height: 14)
-        number.frame = NSRect(x: 28, y: (h - 16) / 2, width: 22, height: 16)
-        let presetX = Self.presetX(width: bounds.width)
-        name.frame = NSRect(x: 54, y: (h - 16) / 2, width: presetX - 64, height: 16)
-        let presetWidth = Self.presetWidth(width: bounds.width)
-        preset.frame = NSRect(x: presetX, y: 4, width: presetWidth, height: 22)
-        resolves.frame = NSRect(x: presetX + 4, y: 26, width: presetWidth, height: 14)
-        let menuX = bounds.width - 34
-        menuButton.frame = NSRect(x: menuX, y: (h - 22) / 2, width: 26, height: 22)
-        percent.frame = NSRect(x: menuX - 46, y: (h - 16) / 2, width: 40, height: 16)
-        let sliderX = Self.sliderX(width: bounds.width)
-        opacity.frame = NSRect(x: sliderX, y: (h - 18) / 2, width: max(60, percent.frame.minX - 8 - sliderX), height: 18)
+        number.frame = NSRect(x: 28, y: 6, width: 22, height: 16)
+        name.frame = NSRect(x: 50, y: 6, width: max(0, w * 0.42 - 54), height: 17)
+        // The preset under the name; the opacity at the right.
+        preset.frame = NSRect(x: 46, y: 23, width: max(120, w * 0.42 - 46), height: 20)
+        resolves.frame = NSRect(x: preset.frame.maxX + 8, y: 26, width: max(0, w * 0.58 - 100), height: 14)
+        more.frame = NSRect(x: w - 32, y: 4, width: 26, height: 22)
+        percent.frame = NSRect(x: w - 32 - 50, y: 3, width: 44, height: 22)
+        let sliderX = w * 0.42 + 8
+        opacity.frame = NSRect(x: sliderX, y: 5, width: max(40, percent.frame.minX - 8 - sliderX), height: 18)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -166,16 +155,16 @@ final class SlotRowView: NSView {
     }
 }
 
-/// Spec 11 §6 and G-30 — the Stacks page's workspace: "its slots as a vertical list, the bottom slot at the bottom",
-/// rows that drag to a new place and take a channel dragged in, then "The stack's own fields".
+/// Spec 11 §6 and G-30 — the Stacks page's workspace: "two tall columns", the slots ("the bottom slot at the bottom")
+/// with Add Channel as their + row and the stack's own fields under them; then the outputs, the selected output's
+/// properties and the audio routing.
 @MainActor
 final class StackWorkspaceView: NSView {
     private let model: ShowModel
     let slotsHeading = Kit.heading(Strings.text(.editStackSlots))
-    let presetHeading = Kit.heading(Strings.text(.editStackPreset))
-    let opacityHeading = Kit.heading(Strings.text(.editStackOpacity))
     private(set) var rows: [SlotRowView] = []
-    let empty = Kit.label(Strings.text(.editStackNoSlots), size: 12.5, color: Palette.faintText)
+    /// Spec 11 §6 — "Under the rows, the list's + row, Add Channel, offers the library's channels the stack doesn't hold".
+    let addChannel = FlatButton("", style: .bare)
     let fieldsHeading = Kit.heading(Strings.text(.editStackFields))
     private let labelName = Kit.label(Strings.text(.editFieldLabel), size: 12, color: Palette.dimText)
     let label = EditField()
@@ -185,23 +174,34 @@ final class StackWorkspaceView: NSView {
     let defaultPreset = ChoicePopUp(label: Strings.text(.editStackDefaultPreset))
     let gamma = ChoiceBox(Strings.text(.editStackGamma))
     private let gammaNote = Kit.label(Strings.text(.editStackGammaNote), size: 11.5, color: Palette.faintText)
-    /// Where a dragged slot or channel would land, as a row from the top; nil while nothing is dragged.
+    /// The second column.
+    let outputs: StackOutputsView
+    /// Where a dragged slot would land, as a row from the top; nil while nothing is dragged.
     private(set) var dropRow: Int? { didSet { needsDisplay = true } }
-    private var dragging: Int?
+    /// The field committed last: outlined in red while the engine's refusal of it stands.
+    private weak var lastField: EditField?
 
     override var isFlipped: Bool { true }
 
     init(model: ShowModel) {
         self.model = model
+        outputs = StackOutputsView(model: model)
         super.init(frame: .zero)
-        label.onCommit = { [weak self] text in self?.model.editing.setStack("label", .string(text)) }
+        label.onCommit = { [weak self] text in
+            self?.lastField = self?.label
+            self?.model.editing.setStack("label", .string(text))
+        }
         base.onSelect = { [weak self] index in self?.model.editing.setStack("base", .string(index == 1 ? "transparent" : "black")) }
         base.setAccessibilityLabel(Strings.text(.editStackBase))
         defaultPreset.onChoose = { [weak self] tag in self?.model.editing.setStack("defaultPreset", tag == 0 ? .null : .number(Double(tag))) }
         gamma.onToggle = { [weak self] on in self?.model.editing.setStack("gammaBlend", .bool(on)) }
-        for view in [slotsHeading, presetHeading, opacityHeading, empty, fieldsHeading, labelName, label, baseName, base, defaultName,
-                     defaultPreset, gamma, gammaNote] as [NSView] { addSubview(view) }
-        registerForDraggedTypes([.projectOChannel])
+        addChannel.leading = true
+        addChannel.chevron = false
+        addChannel.fontSize = 12.5
+        addChannel.title = "+  " + Strings.text(.editStackAddChannel)
+        addChannel.setAccessibilityLabel(Strings.text(.editStackAddChannel))
+        for view in [slotsHeading, addChannel, fieldsHeading, labelName, label, baseName, base, defaultName, defaultPreset, gamma, gammaNote,
+                     outputs.scroll] as [NSView] { addSubview(view) }
     }
 
     @available(*, unavailable)
@@ -211,6 +211,9 @@ final class StackWorkspaceView: NSView {
         let editing = model.editing
         let page = editing.stackPage
         let presets = model.store.catalog?.presets ?? []
+        var refused = false
+        if case .rejected? = editing.notice { refused = true }
+        label.isRefused = refused && lastField === label
         while rows.count < page.slots.count {
             let row = SlotRowView()
             row.grip.onDrag = { [weak self, weak row] point, ended in
@@ -223,18 +226,39 @@ final class StackWorkspaceView: NSView {
             }
             row.opacity.target = self
             row.opacity.action = #selector(opacityMoved(_:))
-            row.menuButton.menu = slotMenu(for: row)
+            row.percent.onCommit = { [weak self, weak row] text in
+                guard let self, let row else { return }
+                if let value = FormNumber.value(text) {
+                    self.lastField = row.percent
+                    self.model.editing.setSlotOpacity(channel: row.channel, opacity: value / 100)
+                } else {
+                    row.percent.putBack()
+                    self.refresh()
+                }
+            }
             addSubview(row)
             rows.append(row)
         }
         while rows.count > page.slots.count { rows.removeLast().removeFromSuperview() }
         for (index, (row, slot)) in zip(rows, page.slots).enumerated() {
-            row.show(slot, presets: presets, canMoveUp: index > 0, canMoveDown: index < page.slots.count - 1)
+            row.show(slot, presets: presets)
+            row.more.dropMenu = slotMenu(channel: slot.channel, canMoveUp: index > 0, canMoveDown: index < page.slots.count - 1)
+            row.percent.isRefused = refused && lastField === row.percent
         }
-        empty.isHidden = !page.slots.isEmpty || page.stack == nil
+        // Add Channel: the channels the stack doesn't hold, since a channel appears once per stack.
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for channel in page.channels where !channel.isHeld {
+            menu.addItem(ClosureMenuItem(title: EditModeWording.numbered(channel.number, channel.label)) { [weak model] in
+                model?.editing.addSlot(channel: channel.number, atRow: 0)
+            })
+        }
+        addChannel.dropMenu = menu
+        addChannel.isEnabled = page.stack != nil && !menu.items.isEmpty
         let stack = page.stack
-        for view in [fieldsHeading, labelName, label, baseName, base, defaultName, defaultPreset, gamma, gammaNote, slotsHeading, presetHeading,
-                     opacityHeading] as [NSView] { view.isHidden = stack == nil }
+        for view in [fieldsHeading, labelName, label, baseName, base, defaultName, defaultPreset, gamma, gammaNote, slotsHeading, addChannel] as [NSView] {
+            view.isHidden = stack == nil
+        }
         if let stack {
             label.show(stack.label, placeholder: Strings.text(.editStackUntitled, stack.number), subject: AnyHashable(stack.number))
             base.selected = stack.base == .transparent ? 1 : 0
@@ -243,34 +267,26 @@ final class StackWorkspaceView: NSView {
             defaultPreset.set(choices, selected: stack.defaultPreset ?? 0)
             gamma.state = stack.gammaBlend ? .on : .off
         }
+        outputs.refresh()
         needsLayout = true
     }
 
-    private func slotMenu(for row: SlotRowView) -> NSMenu {
+    /// A slot's ⋯: Move Up, Move Down, Edit Preset and Remove from Stack.
+    private func slotMenu(channel: Int, canMoveUp: Bool, canMoveDown: Bool) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
-        let up = ClosureMenuItem(title: Strings.text(.editMenuMoveUp)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.moveSlot(channel: row.channel, up: true)
-        }
-        up.tag = 1
-        let down = ClosureMenuItem(title: Strings.text(.editMenuMoveDown)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.moveSlot(channel: row.channel, up: false)
-        }
-        down.tag = 2
+        let up = ClosureMenuItem(title: Strings.text(.editMenuMoveUp)) { [weak model] in model?.editing.moveSlot(channel: channel, up: true) }
+        up.isEnabled = canMoveUp
+        let down = ClosureMenuItem(title: Strings.text(.editMenuMoveDown)) { [weak model] in model?.editing.moveSlot(channel: channel, up: false) }
+        down.isEnabled = canMoveDown
         menu.addItem(up)
         menu.addItem(down)
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackEditPreset)) { [weak self, weak row] in
-            guard let self, let row, let slot = self.model.editing.stackPage.slots.first(where: { $0.channel == row.channel }) else { return }
-            self.model.editing.editPreset(slot.resolved, stack: self.model.editing.stackNumber)
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackEditPreset)) { [weak model] in
+            guard let editing = model?.editing, let slot = editing.stackPage.slots.first(where: { $0.channel == channel }) else { return }
+            editing.editPreset(slot.resolved, stack: editing.stackNumber)
         })
         menu.addItem(.separator())
-        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackRemove)) { [weak self, weak row] in
-            guard let row else { return }
-            self?.model.editing.removeSlot(channel: row.channel)
-        })
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackRemove)) { [weak model] in model?.editing.removeSlot(channel: channel) })
         return menu
     }
 
@@ -279,9 +295,9 @@ final class StackWorkspaceView: NSView {
         model.editing.setSlotOpacity(channel: row.channel, opacity: slider.doubleValue)
     }
 
-    // MARK: - Dragging (Spec 11 §6)
+    // MARK: - Dragging a slot (Spec 11 §6)
 
-    private var rowsTop: CGFloat { 34 }
+    private var rowsTop: CGFloat { 36 }
 
     /// The row a point falls above, from 0 at the top to the count below the last.
     func row(at point: NSPoint) -> Int {
@@ -292,133 +308,64 @@ final class StackWorkspaceView: NSView {
         if ended {
             if let target = dropRow { model.editing.moveSlot(channel: channel, toRow: target) }
             dropRow = nil
-            dragging = nil
             return
         }
-        dragging = channel
         dropRow = row(at: point)
     }
 
-    /// "A channel dragged in from the right column adds a slot where it lands; a channel the stack already holds is
-    /// refused before the drop lands": what a drop does, reachable without a drag.
-    func accept(channel: Int, atRow row: Int) -> Bool {
-        guard model.editing.canAddSlot(channel: channel) else { return false }
-        model.editing.addSlot(channel: channel, atRow: row)
-        return true
-    }
-
-    private func channel(in info: NSDraggingInfo) -> Int? {
-        info.draggingPasteboard.string(forType: .projectOChannel).flatMap(Int.init)
-    }
-
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { draggingUpdated(sender) }
-
-    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard let channel = channel(in: sender), model.editing.canAddSlot(channel: channel) else {
-            dropRow = nil
-            return []
-        }
-        dropRow = row(at: convert(sender.draggingLocation, from: nil))
-        return .copy
-    }
-
-    override func draggingExited(_ sender: NSDraggingInfo?) { dropRow = nil }
-
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        defer { dropRow = nil }
-        guard let channel = channel(in: sender) else { return false }
-        return accept(channel: channel, atRow: row(at: convert(sender.draggingLocation, from: nil)))
-    }
+    /// The first column's width: the slots and the stack's fields.
+    private var firstWidth: CGFloat { max(300, min(560, (bounds.width - 12) * 0.56)) }
 
     override func layout() {
         super.layout()
         let w = bounds.width
         guard w > 120 else { return }
-        let presetX = SlotRowView.presetX(width: w)
-        slotsHeading.frame = NSRect(x: 14, y: 12, width: presetX - 24, height: 14)
-        presetHeading.frame = NSRect(x: presetX + 4, y: 12, width: 120, height: 14)
-        opacityHeading.frame = NSRect(x: SlotRowView.sliderX(width: w), y: 12, width: 120, height: 14)
-        presetHeading.isHidden = rows.isEmpty || slotsHeading.isHidden
-        opacityHeading.isHidden = presetHeading.isHidden
+        let first = firstWidth
+        slotsHeading.frame = NSRect(x: 14, y: 14, width: first - 28, height: 14)
         var y = rowsTop
         for row in rows {
-            row.frame = NSRect(x: 0, y: y, width: w, height: SlotRowView.height)
+            row.frame = NSRect(x: 0, y: y, width: first, height: SlotRowView.height)
             y += SlotRowView.height
         }
-        empty.frame = NSRect(x: 14, y: y + 10, width: w - 28, height: 18)
-        if rows.isEmpty { y += 40 }
-        y += 22
-        fieldsHeading.frame = NSRect(x: 14, y: y, width: 200, height: 14)
+        addChannel.frame = NSRect(x: 4, y: y + 4, width: first - 8, height: 28)
+        y += 48
+        fieldsHeading.frame = NSRect(x: 14, y: y, width: first - 28, height: 14)
         y += 24
-        let nameWidth = min(w / 3, max(110, [labelName, baseName, defaultName].map { Kit.width(of: $0) }.max() ?? 0) + 14)
+        let nameWidth = min(first / 2.5, max(110, [labelName, baseName, defaultName].map { Kit.width(of: $0) }.max() ?? 0) + 14)
         labelName.frame = NSRect(x: 14, y: y + 5, width: nameWidth, height: 16)
-        label.frame = NSRect(x: 14 + nameWidth, y: y, width: min(320, w - 28 - nameWidth), height: 26)
+        label.frame = NSRect(x: 14 + nameWidth, y: y, width: min(320, first - 28 - nameWidth), height: 26)
         y += 34
         baseName.frame = NSRect(x: 14, y: y + 4, width: nameWidth, height: 16)
         let baseSize = base.fitting
         base.frame = NSRect(x: 14 + nameWidth, y: y, width: baseSize.width, height: baseSize.height)
         y += 34
         defaultName.frame = NSRect(x: 14, y: y + 4, width: nameWidth, height: 16)
-        defaultPreset.frame = NSRect(x: 14 + nameWidth, y: y, width: min(240, w - 28 - nameWidth), height: 24)
+        defaultPreset.frame = NSRect(x: 14 + nameWidth, y: y, width: min(240, first - 28 - nameWidth), height: 24)
         y += 34
         gamma.frame = NSRect(x: 14 + nameWidth - 2, y: y, width: gamma.fittingSize.width + 4, height: 20)
-        gammaNote.frame = NSRect(x: gamma.frame.maxX + 6, y: y + 2, width: max(0, w - gamma.frame.maxX - 20), height: 16)
+        y += 22
+        gammaNote.frame = NSRect(x: 14 + nameWidth, y: y, width: max(0, first - nameWidth - 28), height: 16)
+        // The second column, beyond a hairline.
+        outputs.scroll.frame = NSRect(x: first + 12, y: 0, width: max(0, w - first - 12), height: bounds.height)
+        outputs.place()
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Where a dragged slot or channel would land.
+        Palette.hairline.setFill()
+        NSRect(x: firstWidth + 6, y: 10, width: 1, height: max(0, bounds.height - 20)).fill()
+        // Where a dragged slot would land.
         guard let row = dropRow else { return }
         Palette.selection.setFill()
-        NSRect(x: 8, y: rowsTop + CGFloat(row) * SlotRowView.height - 1, width: bounds.width - 16, height: 2).fill()
+        NSRect(x: 8, y: rowsTop + CGFloat(row) * SlotRowView.height - 1, width: firstWidth - 16, height: 2).fill()
     }
 }
 
-/// A channel in the Channels column, which drags into the slots.
+/// Spec 11 §6 and G-30 — the Stacks page's second column: "Outputs ... then, under "Not on an output", the stacks no
+/// output shows"; "The selected output's properties"; "Audio routing". It scrolls when the window is short.
 @MainActor
-final class DraggableChannelRow: NSView, NSDraggingSource {
-    let name = Kit.label(size: 12)
-    let mark = Kit.label(size: 12, color: Palette.outputting)
-    var channel = 0
-
-    override var isFlipped: Bool { true }
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        addSubview(name)
-        addSubview(mark)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
-
-    override func layout() {
-        super.layout()
-        mark.frame = NSRect(x: 0, y: (bounds.height - 16) / 2, width: 14, height: 16)
-        name.frame = NSRect(x: 18, y: (bounds.height - 16) / 2, width: bounds.width - 18, height: 16)
-    }
-
-    override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
-
-    override func mouseDragged(with event: NSEvent) {
-        let item = NSPasteboardItem()
-        item.setString(String(channel), forType: .projectOChannel)
-        let dragged = NSDraggingItem(pasteboardWriter: item)
-        dragged.setDraggingFrame(bounds, contents: name.attributedStringValue)
-        beginDraggingSession(with: [dragged], event: event, source: self)
-    }
-
-    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        context == .withinApplication ? .copy : []
-    }
-}
-
-/// Spec 11 §6 and G-30 — the Stacks page's inspector: "Outputs ... then, under "Not on an output", the stacks no
-/// output shows"; "The selected output's properties"; "Channels"; "Audio routing".
-@MainActor
-final class StackInspectorView: PanelView {
+final class StackOutputsView: NSView {
     private let model: ShowModel
-    /// Spec 11 §2 — the notice line: why an edit was refused, or its warnings.
-    let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
+    let scroll = NSScrollView()
     let outputsHeading = Kit.heading(Strings.text(.editStackOutputs))
     private(set) var outputRows: [FlatButton] = []
     let unshownHeading = Kit.heading(Strings.text(.editStackUnshown))
@@ -436,27 +383,32 @@ final class StackInspectorView: PanelView {
     private let blackoutName = Kit.label(Strings.text(.editStackBlackout), size: 11.5, color: Palette.dimText)
     let blackoutTransition = ChoicePopUp(label: Strings.text(.editStackBlackout))
     let setDefault = FlatButton(Strings.text(.editStackSetDefault), style: .plain)
-    let channelsHeading = Kit.heading(Strings.text(.editStackChannels))
-    private(set) var channelRows: [DraggableChannelRow] = []
     let audioHeading = Kit.heading(Strings.text(.editStackAudio))
     private(set) var audioNames: [NSTextField] = []
     private(set) var audioColumns: [NSTextField] = []
     private(set) var audioBoxes: [[ChoiceBox]] = []
 
+    override var isFlipped: Bool { true }
+
     init(model: ShowModel) {
         self.model = model
-        super.init(title: "")
+        super.init(frame: .zero)
+        scroll.documentView = self
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.scrollerStyle = .overlay
         changeInSettings.isEnabled = false
         changeInSettings.reason = Strings.text(.unavailableLater)
         changeInSettings.fontSize = 11
         setDefault.fontSize = 11
         setDefault.onPress = { [weak model] in model?.editing.setAsDefault() }
+        device.lineBreakMode = .byTruncatingMiddle
         defaultStack.onChoose = { [weak model] tag in model?.editing.setOutput("defaultStack", tag) }
         switchTransition.onChoose = { [weak model] tag in model?.editing.setOutput("transitions.switch", tag) }
         blackoutTransition.onChoose = { [weak model] tag in model?.editing.setOutput("transitions.blackout", tag) }
-        notice.isHidden = true
-        for view in [notice, outputsHeading, unshownHeading, outputHeading, deviceName, device, formatName, format, changeInSettings, defaultName, defaultStack,
-                     switchName, switchTransition, blackoutName, blackoutTransition, setDefault, channelsHeading, audioHeading] as [NSView] {
+        for view in [outputsHeading, unshownHeading, outputHeading, deviceName, device, formatName, format, changeInSettings, defaultName, defaultStack,
+                     switchName, switchTransition, blackoutName, blackoutTransition, setDefault, audioHeading] as [NSView] {
             addSubview(view)
         }
     }
@@ -468,9 +420,6 @@ final class StackInspectorView: PanelView {
         let editing = model.editing
         let page = editing.stackPage
         let catalog = model.store.catalog
-        title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? ""
-        title.isHidden = page.stack == nil
-        NoticeLine.show(editing.notice, in: notice, from: self)
         // Outputs, then the stacks no output shows.
         rebuild(&outputRows, count: page.outputs.count)
         for (button, output) in zip(outputRows, page.outputs) {
@@ -485,16 +434,14 @@ final class StackInspectorView: PanelView {
             button.onPress = { [weak model] in model?.editing.selectStack(stack.number) }
         }
         unshownHeading.isHidden = page.unshown.isEmpty
-        // The selected output.
+        // The selected output, by the name the Mac gives its device, as the top bar's output details say it.
         let output = editing.outputNumber.flatMap { number in catalog?.outputs.first { $0.number == number } }
         Kit.setHeading(outputHeading, output.map { Strings.text(.editStackOutput, $0.number) } ?? "")
-        // The device by the name the Mac gives it, as the top bar's output details say it; its address when unseen.
         let devices = model.store.devices
         device.stringValue = output.map { output in
             devices?.screens.first { $0.device == output.device }?.name ?? devices?.ports.first { $0.device == output.device }?.name ?? output.device
         } ?? ""
         device.toolTip = output?.device
-        device.lineBreakMode = .byTruncatingMiddle
         format.stringValue = output.map { ShowWording.format($0.format) } ?? ""
         let stacks = (catalog?.stacks ?? []).sorted { $0.number < $1.number }
         defaultStack.set(stacks.map { (EditModel.name(of: $0), $0.number) }, selected: output?.defaultStack ?? 0)
@@ -506,22 +453,7 @@ final class StackInspectorView: PanelView {
         setDefault.isEnabled = live != nil && live != output?.defaultStack
         for view in [outputHeading, deviceName, device, formatName, format, changeInSettings, defaultName, defaultStack, switchName, switchTransition,
                      blackoutName, blackoutTransition, setDefault] as [NSView] { view.isHidden = output == nil }
-        // The channels, those the stack holds marked.
-        while channelRows.count < page.channels.count {
-            let row = DraggableChannelRow()
-            addSubview(row)
-            channelRows.append(row)
-        }
-        while channelRows.count > page.channels.count { channelRows.removeLast().removeFromSuperview() }
-        for (row, channel) in zip(channelRows, page.channels) {
-            row.channel = channel.number
-            row.name.stringValue = EditModeWording.numbered(channel.number, channel.label)
-            row.mark.stringValue = channel.isHeld ? "✓" : ""
-            row.setAccessibilityElement(true)
-            row.setAccessibilityRole(.button)
-            row.setAccessibilityLabel(channel.isHeld ? Strings.text(.editStackHeld, row.name.stringValue) : row.name.stringValue)
-        }
-        // The audio routing table.
+        // The audio routing table: channels down, audio outputs across.
         rebuildLabels(&audioColumns, count: page.audioOutputs.count)
         for (label, audio) in zip(audioColumns, page.audioOutputs) {
             label.stringValue = String(audio.number)
@@ -563,19 +495,15 @@ final class StackInspectorView: PanelView {
         while labels.count > count { labels.removeLast().removeFromSuperview() }
     }
 
-    override func layout() {
-        super.layout()
-        // Not placed while show mode leaves it at no size.
-        guard bounds.width > 120 else { return }
-        let titleRight = title.frame.maxX + 14
-        notice.frame = NSRect(x: titleRight, y: (Self.headerHeight - 15) / 2, width: max(0, bounds.width - titleRight - 14), height: 15)
-        let column = floor(bounds.width / 4)
+    /// Lays the column out top down at the scroll view's width, and sizes itself to it.
+    func place() {
+        let width = max(0, scroll.contentSize.width)
+        guard width > 120 else { return }
         let pad: CGFloat = 14
-        let top = Self.headerHeight + 12
-        let inner = column - 2 * pad
-        // Outputs.
-        outputsHeading.frame = NSRect(x: pad, y: top, width: inner, height: 14)
-        var y = top + 22
+        let inner = width - 2 * pad
+        var y: CGFloat = 14
+        outputsHeading.frame = NSRect(x: pad, y: y, width: inner, height: 14)
+        y += 22
         for button in outputRows {
             button.frame = NSRect(x: pad - 6, y: y, width: inner + 6, height: 24)
             y += 26
@@ -590,58 +518,42 @@ final class StackInspectorView: PanelView {
             y += 26
         }
         // The selected output.
-        var x = column + pad
-        outputHeading.frame = NSRect(x: x, y: top, width: inner, height: 14)
-        // The names' column as wide as its widest name, in any language, up to half the column.
+        y += 14
+        outputHeading.frame = NSRect(x: pad, y: y, width: inner, height: 14)
+        y += 22
         let names = [deviceName, formatName, defaultName, switchName, blackoutName]
         let nameWidth = min(inner / 2, max(80, names.map { Kit.width(of: $0) }.max() ?? 0) + 10)
-        y = top + 22
         for (name, value) in [(deviceName, device), (formatName, format)] {
-            name.frame = NSRect(x: x, y: y, width: nameWidth, height: 16)
-            value.frame = NSRect(x: x + nameWidth, y: y, width: inner - nameWidth, height: 16)
+            name.frame = NSRect(x: pad, y: y, width: nameWidth, height: 16)
+            value.frame = NSRect(x: pad + nameWidth, y: y, width: inner - nameWidth, height: 16)
             y += 20
         }
         for (name, popup) in [(defaultName, defaultStack), (switchName, switchTransition), (blackoutName, blackoutTransition)] {
-            name.frame = NSRect(x: x, y: y + 4, width: nameWidth, height: 16)
-            popup.frame = NSRect(x: x + nameWidth - 4, y: y, width: inner - nameWidth + 4, height: 24)
+            name.frame = NSRect(x: pad, y: y + 4, width: nameWidth, height: 16)
+            popup.frame = NSRect(x: pad + nameWidth - 4, y: y, width: min(260, inner - nameWidth + 4), height: 24)
             y += 28
         }
         let setWidth = setDefault.fitting.width
-        setDefault.frame = NSRect(x: x, y: y + 2, width: setWidth, height: 22)
-        changeInSettings.frame = NSRect(x: x + setWidth + 8, y: y + 2, width: min(changeInSettings.fitting.width, inner - setWidth - 8), height: 22)
-        // Channels.
-        x = 2 * column + pad
-        channelsHeading.frame = NSRect(x: x, y: top, width: inner, height: 14)
-        y = top + 22
-        for row in channelRows {
-            row.frame = NSRect(x: x, y: y, width: inner, height: 22)
-            y += 24
-        }
-        // Audio routing: channels down, audio outputs across.
-        x = 3 * column + pad
-        audioHeading.frame = NSRect(x: x, y: top, width: inner, height: 14)
-        let nameColumn = min(130, inner * 0.55)
-        let cell = min(34, max(22, (inner - nameColumn) / CGFloat(max(1, audioColumns.count))))
+        setDefault.frame = NSRect(x: pad, y: y + 2, width: setWidth, height: 22)
+        changeInSettings.frame = NSRect(x: pad + setWidth + 8, y: y + 2, width: min(changeInSettings.fitting.width, max(0, inner - setWidth - 8)), height: 22)
+        y += 40
+        // Audio routing.
+        audioHeading.frame = NSRect(x: pad, y: y, width: inner, height: 14)
+        y += 20
+        let nameColumn = min(160, inner * 0.55)
+        let cell = min(36, max(24, (inner - nameColumn) / CGFloat(max(1, audioColumns.count))))
         for (index, label) in audioColumns.enumerated() {
             label.alignment = .center
-            label.frame = NSRect(x: x + nameColumn + CGFloat(index) * cell, y: top + 20, width: cell, height: 14)
+            label.frame = NSRect(x: pad + nameColumn + CGFloat(index) * cell, y: y, width: cell, height: 14)
         }
-        y = top + 40
+        y += 20
         for (rowIndex, label) in audioNames.enumerated() {
-            label.frame = NSRect(x: x, y: y + 2, width: nameColumn - 4, height: 16)
+            label.frame = NSRect(x: pad, y: y + 2, width: nameColumn - 4, height: 16)
             for (index, box) in (rowIndex < audioBoxes.count ? audioBoxes[rowIndex] : []).enumerated() {
-                box.frame = NSRect(x: x + nameColumn + CGFloat(index) * cell + (cell - 18) / 2, y: y, width: 18, height: 20)
+                box.frame = NSRect(x: pad + nameColumn + CGFloat(index) * cell + (cell - 18) / 2, y: y, width: 18, height: 20)
             }
             y += 24
         }
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        Palette.hairline.setFill()
-        let column = floor(bounds.width / 4)
-        for index in 1..<4 {
-            NSRect(x: CGFloat(index) * column, y: Self.headerHeight, width: 1, height: bounds.height - Self.headerHeight).fill()
-        }
+        frame = NSRect(x: 0, y: 0, width: width, height: max(y + 14, scroll.contentSize.height))
     }
 }

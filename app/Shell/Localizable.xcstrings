@@ -2425,18 +2425,6 @@
         }
       }
     },
-    "edit.channel.inNone" : {
-      "comment" : "The channel list's In stacks column for a channel no stack holds.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "None"
-          }
-        }
-      }
-    },
     "edit.channel.largest" : {
       "comment" : "Render size: the largest output among the stacks that hold the channel.",
       "extractionState" : "manual",
@@ -2445,18 +2433,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Largest"
-          }
-        }
-      }
-    },
-    "edit.channel.list" : {
-      "comment" : "The heading of the Channels page's list.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channels"
           }
         }
       }
@@ -2481,18 +2457,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Media"
-          }
-        }
-      }
-    },
-    "edit.channel.menu" : {
-      "comment" : "VoiceOver: the Channels page's menu of New, Duplicate and Delete.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channel menu"
           }
         }
       }
@@ -2529,18 +2493,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Number"
-          }
-        }
-      }
-    },
-    "edit.channel.picker" : {
-      "comment" : "VoiceOver: the Channels page's picker of the channel edited.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channel"
           }
         }
       }
@@ -2613,18 +2565,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slide"
-          }
-        }
-      }
-    },
-    "edit.channel.stacks" : {
-      "comment" : "A column of the channel list: the stacks that hold the channel.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In stacks"
           }
         }
       }
@@ -4249,6 +4189,54 @@
         }
       }
     },
+    "edit.list.inStacks" : {
+      "comment" : "A channel's row in the Channels list: the stacks that hold it, by number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "stacks %@"
+          }
+        }
+      }
+    },
+    "edit.list.layouts" : {
+      "comment" : "A preset's row in the Presets list: its layouts, * and stack numbers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layouts %@"
+          }
+        }
+      }
+    },
+    "edit.list.onOutputs" : {
+      "comment" : "A stack's row in the Stacks list: the outputs that show it, by number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Out %@"
+          }
+        }
+      }
+    },
+    "edit.list.rowMenu" : {
+      "comment" : "VoiceOver: a row's ⋯ menu in a page's list (Duplicate, Renumber, Delete).",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More"
+          }
+        }
+      }
+    },
     "edit.live" : {
       "comment" : "Edit mode's top bar, the Live toggle: while on, the cue grid's arrow keys fire each cue they move the selection onto.",
       "extractionState" : "manual",
@@ -4909,6 +4897,126 @@
         }
       }
     },
+    "edit.preset.anchor" : {
+      "comment" : "The point of a box its X and Y fields place, and that a new width or height keeps still.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reference point"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.bottom" : {
+      "comment" : "Reference point: the middle of the box's bottom edge.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bottom"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.bottomLeft" : {
+      "comment" : "Reference point: the box's bottom left corner.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bottom left"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.bottomRight" : {
+      "comment" : "Reference point: the box's bottom right corner.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bottom right"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.center" : {
+      "comment" : "Reference point: the box's centre.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centre"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.left" : {
+      "comment" : "Reference point: the middle of the box's left edge.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Left"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.right" : {
+      "comment" : "Reference point: the middle of the box's right edge.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Right"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.top" : {
+      "comment" : "Reference point: the middle of the box's top edge.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.topLeft" : {
+      "comment" : "Reference point: the box's top left corner.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top left"
+          }
+        }
+      }
+    },
+    "edit.preset.anchor.topRight" : {
+      "comment" : "Reference point: the box's top right corner.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top right"
+          }
+        }
+      }
+    },
     "edit.preset.anyTab" : {
       "comment" : "The * layout's tab, naming the stacks on this Mac it draws.",
       "extractionState" : "manual",
@@ -4989,18 +5097,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Box"
-          }
-        }
-      }
-    },
-    "edit.preset.boxMenu" : {
-      "comment" : "VoiceOver: a box row's menu.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Box menu"
           }
         }
       }
@@ -5341,6 +5437,18 @@
         }
       }
     },
+    "edit.preset.list" : {
+      "comment" : "The heading of the presets in the Presets page's list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Presets"
+          }
+        }
+      }
+    },
     "edit.preset.maxLines" : {
       "comment" : "Text fit: at most this many lines at the style's size.",
       "extractionState" : "manual",
@@ -5349,18 +5457,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lines"
-          }
-        }
-      }
-    },
-    "edit.preset.menu" : {
-      "comment" : "VoiceOver: the Presets page's menu of New, Duplicate, Renumber and Delete.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preset menu"
           }
         }
       }
@@ -5529,18 +5625,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "% height"
-          }
-        }
-      }
-    },
-    "edit.preset.picker" : {
-      "comment" : "VoiceOver: the Presets page's picker of the preset edited.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preset"
           }
         }
       }
@@ -6253,6 +6337,18 @@
         }
       }
     },
+    "edit.stack.addChannel" : {
+      "comment" : "The + row under a stack's slots: adds a channel the stack doesn't hold, at its top.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Channel"
+          }
+        }
+      }
+    },
     "edit.stack.audio" : {
       "comment" : "The Stacks page's inspector: which channels sound on which audio outputs.",
       "extractionState" : "manual",
@@ -6321,30 +6417,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Change in Settings…"
-          }
-        }
-      }
-    },
-    "edit.stack.channel" : {
-      "comment" : "The Stacks page's slot list: the column naming each slot's channel.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channel"
-          }
-        }
-      }
-    },
-    "edit.stack.channels" : {
-      "comment" : "The Stacks page's inspector: the library's channels, to drag into the slots.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Channels"
           }
         }
       }
@@ -6445,30 +6517,6 @@
         }
       }
     },
-    "edit.stack.held" : {
-      "comment" : "VoiceOver: a channel the selected stack already holds.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@, in this stack"
-          }
-        }
-      }
-    },
-    "edit.stack.menu" : {
-      "comment" : "VoiceOver: the Stacks page's menu: new, duplicate, renumber, delete.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stack menu"
-          }
-        }
-      }
-    },
     "edit.stack.new" : {
       "comment" : "The Stacks page's menu: makes a stack at a free number.",
       "extractionState" : "manual",
@@ -6477,18 +6525,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New Stack"
-          }
-        }
-      }
-    },
-    "edit.stack.noSlots" : {
-      "comment" : "The Stacks page: a stack with no slots.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No slots yet. Drag a channel here from Channels."
           }
         }
       }
@@ -6549,18 +6585,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Outputs"
-          }
-        }
-      }
-    },
-    "edit.stack.picker" : {
-      "comment" : "VoiceOver: the Stacks page's picker of the stack it edits.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stack"
           }
         }
       }

@@ -18,6 +18,14 @@ public enum EditPage: String, Codable, CaseIterable, Sendable {
 
     /// "Text is disabled until Area 10 lands (§11)."
     public var isBuilt: Bool { self != .text }
+
+    /// Spec 11 §2, "Where a page's parts sit" — "The Cues and Text pages keep the Browser ...; The Stacks, Channels,
+    /// Presets and Objects pages put their own list in its place".
+    public var usesBrowser: Bool { self == .cues || self == .text }
+
+    /// "the Cues and Presets pages keep the inspector under the workspace and the monitors; the Stacks and Channels
+    /// pages have none". The Objects page's is settled with its stage (§9).
+    public var hasInspector: Bool { self != .stacks && self != .channels }
 }
 
 /// Spec 11 §2, "The Browser" — "Three tabs: Playlists, Library and Media".
@@ -88,7 +96,7 @@ public struct EditFrame: Equatable, Sendable {
     /// monitors giving way to the workspace's width before the Browser, and
     /// the inspector to its height. Nil monitors are a quarter of the window.
     public static func make(width: Double, height: Double, top: Double = 0, browser: Double = browserWidth, monitors: Double? = nil,
-                            inspector: Double = inspectorHeight) -> EditFrame {
+                            inspector: Double = inspectorHeight, hasInspector: Bool = true) -> EditFrame {
         func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double { min(range.upperBound, max(range.lowerBound, value)) }
         let gap = Self.gap
         let bodyTop = top + topBarHeight + gap
@@ -107,8 +115,10 @@ public struct EditFrame: Equatable, Sendable {
         if low > 0 { inspectorHeight -= max(0, min(low, inspectorHeight - inspectorRange.lowerBound)) }
         let centerX = gap + browserWidth + gap
         let monitorsX = width - gap - monitors
+        // A page with no inspector gives its height to the workspace and the monitors.
+        if !hasInspector { inspectorHeight = 0 }
         let inspectorY = bottom - inspectorHeight
-        let upperBottom = inspectorY - gap
+        let upperBottom = hasInspector ? inspectorY - gap : bottom
         // "Preview over Program": Preview holds its header and a 16 by 9 picture; Program takes the rest.
         let previewHeight = min(panelHeader + padding + (monitors - 2 * padding) * 9 / 16 + padding, max(0, upperBottom - bodyTop))
         let programY = bodyTop + previewHeight + gap

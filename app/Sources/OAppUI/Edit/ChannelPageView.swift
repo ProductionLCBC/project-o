@@ -29,75 +29,11 @@ enum NoticeLine {
     }
 }
 
-/// Spec 11 §7 — one row of the channel list: "its number, label, usual content and the stacks that hold it".
-@MainActor
-final class ChannelRowView: NSView {
-    static let height: CGFloat = 30
-    let number = Kit.label(size: 12, color: Palette.faintText, mono: true)
-    let name = Kit.label(size: 12.5, weight: .medium)
-    let usual = Kit.label(size: 11.5, color: Palette.dimText)
-    let stacks = Kit.label(size: 11.5, color: Palette.dimText)
-    var isSelected = false { didSet { needsDisplay = true } }
-    var onSelect: (() -> Void)?
-    private(set) var channel = 0
-
-    override var isFlipped: Bool { true }
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        Kit.content(name)
-        for view in [number, name, usual, stacks] as [NSView] { addSubview(view) }
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
-
-    func show(_ row: ChannelListRow) {
-        channel = row.number
-        number.stringValue = String(row.number)
-        name.stringValue = row.label.isEmpty ? Strings.text(.editChannelUntitled, row.number) : row.label
-        usual.stringValue = ChannelWorkspaceView.usualTitle(row.usualContent)
-        stacks.stringValue = row.stacks.isEmpty ? Strings.text(.editChannelInNone) : row.stacks.map(String.init).joined(separator: ", ")
-        setAccessibilityLabel([EditModeWording.numbered(row.number, row.label), usual.stringValue,
-                               Strings.text(.editChannelStacks) + " " + stacks.stringValue].joined(separator: ", "))
-    }
-
-    override func layout() {
-        super.layout()
-        let h = bounds.height
-        let w = bounds.width
-        number.frame = NSRect(x: 10, y: (h - 16) / 2, width: 24, height: 16)
-        let usualX = max(150, w * 0.5)
-        name.frame = NSRect(x: 38, y: (h - 16) / 2, width: usualX - 46, height: 16)
-        usual.frame = NSRect(x: usualX, y: (h - 15) / 2, width: w * 0.24, height: 15)
-        stacks.frame = NSRect(x: usualX + w * 0.25, y: (h - 15) / 2, width: max(0, w - usualX - w * 0.25 - 8), height: 15)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        if isSelected {
-            Palette.selection.withAlphaComponent(0.28).setFill()
-            NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 1), xRadius: 5, yRadius: 5).fill()
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) { onSelect?() }
-    override func accessibilityPerformPress() -> Bool {
-        onSelect?()
-        return true
-    }
-}
-
-/// Spec 11 §7 and G-31 — the Channels page's workspace: "the channel list, each with its number, label, usual content
-/// and the stacks that hold it, and beside it the selected channel's form".
+/// Spec 11 §7 and G-31 — the Channels page's workspace: "the selected channel's form, one tall column, and beside it
+/// the stacks that hold it". The channels themselves are the page's list (PageListView).
 @MainActor
 final class ChannelWorkspaceView: NSView {
     private let model: ShowModel
-    let listHeading = Kit.heading(Strings.text(.editChannelList))
-    let usualHeading = Kit.heading(Strings.text(.editChannelUsual))
-    let stacksHeading = Kit.heading(Strings.text(.editChannelStacks))
-    private(set) var rows: [ChannelRowView] = []
     let formHeading = Kit.heading(Strings.text(.editChannelForm))
     private var names: [NSTextField] = []
     let number = EditField()
@@ -124,6 +60,8 @@ final class ChannelWorkspaceView: NSView {
     weak var host: ShowWindowView?
     /// The field committed last: outlined in red while the engine's refusal of it stands (Spec 11 §2).
     private weak var lastField: EditField?
+    /// Beside the form: the stacks that hold the channel.
+    let holders: ChannelHoldersView
 
     static let usualOrder: [UsualContent] = [.media, .text, .slide, .live, .any]
 
@@ -141,6 +79,7 @@ final class ChannelWorkspaceView: NSView {
 
     init(model: ShowModel) {
         self.model = model
+        holders = ChannelHoldersView(model: model)
         super.init(frame: .zero)
         for key in [StringKey.editChannelNumber, .editFieldLabel, .editChannelDefaultPreset, .editChannelTransition, .editChannelAudioTransition,
                     .editChannelGain, .editChannelDecoderCap, .editChannelAudioOutputs, .editChannelThumbnail, .editChannelUsual, .editChannelRenderSize] {
@@ -200,7 +139,8 @@ final class ChannelWorkspaceView: NSView {
             note.lineBreakMode = .byWordWrapping
             note.cell?.wraps = true
         }
-        for view in [listHeading, usualHeading, stacksHeading, formHeading, number, label, defaultPreset, transition, audioTransition, gain, gainUnit,
+        addSubview(holders)
+        for view in [formHeading, number, label, defaultPreset, transition, audioTransition, gain, gainUnit,
                      resets, decoderCap, decoderCost, thumbnail, usual, renderSize, width, by, height, sizeProblem] as [NSView] { addSubview(view) }
     }
 
@@ -215,24 +155,9 @@ final class ChannelWorkspaceView: NSView {
         var refused = false
         if case .rejected? = editing.notice { refused = true }
         for field in [number, label, gain, width, height] { field.isRefused = refused && field === lastField }
-        while rows.count < page.rows.count {
-            let row = ChannelRowView()
-            row.onSelect = { [weak self, weak row] in
-                guard let row else { return }
-                self?.model.editing.selectChannel(row.channel)
-            }
-            addSubview(row)
-            rows.append(row)
-        }
-        while rows.count > page.rows.count { rows.removeLast().removeFromSuperview() }
-        for (row, channel) in zip(rows, page.rows) {
-            row.show(channel)
-            row.isSelected = channel.number == page.channel?.number
-        }
         let form: [NSView] = [formHeading, number, label, defaultPreset, transition, audioTransition, gain, gainUnit, resets, decoderCap, decoderCost,
                               thumbnail, usual, renderSize] + names
         for view in form { view.isHidden = page.channel == nil }
-        for view in [listHeading, usualHeading, stacksHeading] as [NSView] { view.isHidden = page.rows.isEmpty }
         if let channel = page.channel {
             if customFor != nil, customFor != channel.number { customFor = nil }
             number.show(String(channel.number), placeholder: String(channel.number), subject: AnyHashable(channel.uuid))
@@ -276,6 +201,7 @@ final class ChannelWorkspaceView: NSView {
         let custom = page.channel != nil && renderSize.selected == 1
         for view in [width, by, height] as [NSView] { view.isHidden = !custom }
         if !custom { sizeProblem.isHidden = true }
+        holders.refresh()
         needsLayout = true
     }
 
@@ -366,25 +292,15 @@ final class ChannelWorkspaceView: NSView {
         super.layout()
         let w = bounds.width
         guard w > 120 else { return }
-        // The list on the left, the form beside it.
-        let listWidth = min(max(260, w * 0.42), w - 340)
-        let rowWidth = listWidth - 8
-        listHeading.frame = NSRect(x: 14, y: 12, width: 160, height: 14)
-        usualHeading.frame = NSRect(x: max(150, rowWidth * 0.5), y: 12, width: rowWidth * 0.24, height: 14)
-        stacksHeading.frame = NSRect(x: max(150, rowWidth * 0.5) + rowWidth * 0.25, y: 12, width: rowWidth * 0.25, height: 14)
-        var y: CGFloat = 32
-        for row in rows {
-            row.frame = NSRect(x: 4, y: y, width: rowWidth, height: ChannelRowView.height)
-            y += ChannelRowView.height
-        }
-        // The form.
-        let x = listWidth + 18
-        let formWidth = w - x - 14
-        formHeading.frame = NSRect(x: x, y: 12, width: 200, height: 14)
+        // The form in one tall column; the stacks that hold the channel beside it.
+        let x: CGFloat = 14
+        let formWidth = formColumn - 28
+        formHeading.frame = NSRect(x: x, y: 14, width: 200, height: 14)
         let nameWidth = min(formWidth / 2.5, max(120, names.map { Kit.width(of: $0) }.max() ?? 0) + 12)
         let field = x + nameWidth
         let fieldWidth = min(300, formWidth - nameWidth)
-        y = 34
+        let right = x + formWidth
+        var y: CGFloat = 36
         func place(_ index: Int, _ control: NSView, height: CGFloat = 24, width: CGFloat? = nil) {
             names[index].frame = NSRect(x: x, y: y + (height - 16) / 2, width: nameWidth - 8, height: 16)
             control.frame = NSRect(x: field, y: y, width: width ?? fieldWidth, height: height)
@@ -405,7 +321,7 @@ final class ChannelWorkspaceView: NSView {
         var boxX = field
         for box in audioBoxes {
             let boxWidth = box.fittingSize.width + 4
-            if boxX + boxWidth > w - 14, boxX > field {
+            if boxX + boxWidth > right, boxX > field {
                 boxX = field
                 y += 24
             }
@@ -419,7 +335,7 @@ final class ChannelWorkspaceView: NSView {
         let sizeWidth = renderSize.fitting.width
         renderSize.frame = NSRect(x: field, y: y, width: sizeWidth, height: renderSize.fitting.height)
         var sizeX = renderSize.frame.maxX + 12
-        if sizeX + 148 > w - 14 {
+        if sizeX + 148 > right {
             y += renderSize.frame.height + 8
             sizeX = field
         }
@@ -428,7 +344,11 @@ final class ChannelWorkspaceView: NSView {
         height.frame = NSRect(x: by.frame.maxX + 4, y: y - 1, width: 64, height: 26)
         y += 32
         sizeProblem.frame = NSRect(x: field, y: y - 4, width: max(0, formWidth - nameWidth), height: 15)
+        holders.frame = NSRect(x: formColumn + 12, y: 0, width: max(0, w - formColumn - 12), height: bounds.height)
     }
+
+    /// The form's column: as wide as its fields want, the holders taking the rest.
+    private var formColumn: CGFloat { max(360, min(560, bounds.width * 0.6)) }
 
     /// A note under a field, on one line or two: the height it takes, with the gap after it.
     private func placeNote(_ note: NSTextField, at x: CGFloat, y: CGFloat, width: CGFloat) -> CGFloat {
@@ -438,32 +358,34 @@ final class ChannelWorkspaceView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // The line between the list and the form.
-        let listWidth = min(max(260, bounds.width * 0.42), bounds.width - 340)
+        // The line between the form and the stacks that hold the channel.
         Palette.hairline.setFill()
-        NSRect(x: listWidth + 4, y: 8, width: 1, height: max(0, bounds.height - 16)).fill()
+        NSRect(x: formColumn + 6, y: 10, width: 1, height: max(0, bounds.height - 20)).fill()
     }
 }
 
-/// Spec 11 §7 and G-31 — the Channels page's inspector: "the stacks that hold the channel, each with Remove from
-/// Stack, and Add to Stack ▸ for the others".
+/// Spec 11 §7 and G-31 — beside the channel's form: "the stacks that hold the channel, each with Remove from Stack, and
+/// Add to Stack ▸ for the others", the + row at the list's foot.
 @MainActor
-final class ChannelInspectorView: PanelView {
+final class ChannelHoldersView: NSView {
     private let model: ShowModel
-    let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
     let holdersHeading = Kit.heading(Strings.text(.editChannelHolders))
     let none = Kit.label(Strings.text(.editChannelHeldNone), size: 12, color: Palette.faintText)
     private(set) var holderNames: [NSTextField] = []
     private(set) var removeButtons: [FlatButton] = []
-    let addToStack = NSPopUpButton(frame: .zero, pullsDown: true)
+    let addToStack = FlatButton("", style: .bare)
+
+    override var isFlipped: Bool { true }
 
     init(model: ShowModel) {
         self.model = model
-        super.init(title: "")
-        notice.isHidden = true
+        super.init(frame: .zero)
+        addToStack.leading = true
+        addToStack.chevron = false
+        addToStack.fontSize = 12.5
+        addToStack.title = "+  " + Strings.text(.editChannelAddToStack)
         addToStack.setAccessibilityLabel(Strings.text(.editChannelAddToStack))
-        addToStack.font = .systemFont(ofSize: 12)
-        for view in [notice, holdersHeading, none, addToStack] as [NSView] { addSubview(view) }
+        for view in [holdersHeading, none, addToStack] as [NSView] { addSubview(view) }
     }
 
     @available(*, unavailable)
@@ -472,9 +394,6 @@ final class ChannelInspectorView: PanelView {
     func refresh() {
         let editing = model.editing
         let page = editing.channelPage
-        title.stringValue = page.channel.map { EditModel.name(of: $0) } ?? ""
-        title.isHidden = page.channel == nil
-        NoticeLine.show(editing.notice, in: notice, from: self)
         while holderNames.count < page.holders.count {
             let name = Kit.label(size: 12.5)
             let remove = FlatButton(Strings.text(.editStackRemove), style: .plain)
@@ -498,11 +417,10 @@ final class ChannelInspectorView: PanelView {
         // "Add to Stack ▸ for the others".
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(NSMenuItem(title: Strings.text(.editChannelAddToStack), action: nil, keyEquivalent: ""))
         for stack in page.others {
             menu.addItem(ClosureMenuItem(title: EditModel.name(of: stack)) { [weak model] in model?.editing.addChannel(toStack: stack.number) })
         }
-        addToStack.menu = menu
+        addToStack.dropMenu = menu
         addToStack.isHidden = page.channel == nil
         addToStack.isEnabled = !page.others.isEmpty
         needsLayout = true
@@ -511,13 +429,9 @@ final class ChannelInspectorView: PanelView {
     override func layout() {
         super.layout()
         guard bounds.width > 120 else { return }
-        let h = Self.headerHeight
-        let titleRight = title.frame.maxX + 14
-        notice.frame = NSRect(x: titleRight, y: (h - 15) / 2, width: max(0, bounds.width - titleRight - 14), height: 15)
-        let column = floor(bounds.width / 4)
         let pad: CGFloat = 14
-        let inner = max(0, min(column * 2, max(column, 360)) - 2 * pad)
-        var y = h + 12
+        let inner = max(0, bounds.width - 2 * pad)
+        var y: CGFloat = 14
         holdersHeading.frame = NSRect(x: pad, y: y, width: inner, height: 14)
         y += 22
         none.frame = NSRect(x: pad, y: y + 2, width: inner, height: 16)
@@ -525,10 +439,10 @@ final class ChannelInspectorView: PanelView {
             let removeWidth = remove.fitting.width
             remove.frame = NSRect(x: pad + inner - removeWidth, y: y, width: removeWidth, height: 22)
             name.frame = NSRect(x: pad, y: y + 3, width: max(0, inner - removeWidth - 8), height: 16)
-            y += 28
+            y += 30
         }
         if !none.isHidden { y += 24 }
-        let size = addToStack.fittingSize
-        addToStack.frame = NSRect(x: pad - 4, y: y + 4, width: min(inner, size.width + 12), height: size.height)
+        // "Add to Stack ▸ for the others": the + row at the list's foot.
+        addToStack.frame = NSRect(x: pad - 10, y: y + 4, width: inner + 10, height: 28)
     }
 }
