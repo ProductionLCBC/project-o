@@ -44,6 +44,11 @@ public enum EditModeWording {
         Strings.text(.editStack, number, label)
     }
 
+    /// A numbered object as a picker names it: "by number and label" (Spec 11 §1), "2 Clock", or its number alone.
+    public static func numbered(_ number: Int, _ label: String) -> String {
+        label.isEmpty ? String(number) : "\(number) \(label)"
+    }
+
     private static func numbers(_ numbers: [Int]) -> String {
         numbers.map(String.init).joined(separator: ", ")
     }

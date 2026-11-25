@@ -4489,6 +4489,438 @@
         }
       }
     },
+    "edit.stack.audio" : {
+      "comment" : "The Stacks page's inspector: which channels sound on which audio outputs.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio routing"
+          }
+        }
+      }
+    },
+    "edit.stack.audioCell" : {
+      "comment" : "VoiceOver: a checkbox of the audio routing table.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld on audio output %2$lld"
+          }
+        }
+      }
+    },
+    "edit.stack.base" : {
+      "comment" : "The stack's base: what shows where no slot draws.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base"
+          }
+        }
+      }
+    },
+    "edit.stack.black" : {
+      "comment" : "A stack's base: black.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black"
+          }
+        }
+      }
+    },
+    "edit.stack.blackout" : {
+      "comment" : "The selected output's blackout transition.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blackout"
+          }
+        }
+      }
+    },
+    "edit.stack.changeInSettings" : {
+      "comment" : "Opens Settings ▸ Outputs on the selected output.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change in Settings…"
+          }
+        }
+      }
+    },
+    "edit.stack.channel" : {
+      "comment" : "The Stacks page's slot list: the column naming each slot's channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "edit.stack.channels" : {
+      "comment" : "The Stacks page's inspector: the library's channels, to drag into the slots.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels"
+          }
+        }
+      }
+    },
+    "edit.stack.defaultPreset" : {
+      "comment" : "The stack's default preset, used by a slot that names none.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default preset"
+          }
+        }
+      }
+    },
+    "edit.stack.defaultStack" : {
+      "comment" : "The selected output's default stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default stack"
+          }
+        }
+      }
+    },
+    "edit.stack.device" : {
+      "comment" : "The selected output's device, read-only on the Stacks page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device"
+          }
+        }
+      }
+    },
+    "edit.stack.editPreset" : {
+      "comment" : "A slot's menu on the Stacks page: opens the preset editor on the preset the slot draws with.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Preset"
+          }
+        }
+      }
+    },
+    "edit.stack.fields" : {
+      "comment" : "The Stacks page: the heading over the stack's own fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack"
+          }
+        }
+      }
+    },
+    "edit.stack.format" : {
+      "comment" : "The selected output's format, read-only on the Stacks page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format"
+          }
+        }
+      }
+    },
+    "edit.stack.gamma" : {
+      "comment" : "The stack's checkbox for blending in gamma space.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gamma blend"
+          }
+        }
+      }
+    },
+    "edit.stack.gammaNote" : {
+      "comment" : "Beside the gamma blend checkbox.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "for matching an older look"
+          }
+        }
+      }
+    },
+    "edit.stack.held" : {
+      "comment" : "VoiceOver: a channel the selected stack already holds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, in this stack"
+          }
+        }
+      }
+    },
+    "edit.stack.menu" : {
+      "comment" : "VoiceOver: the Stacks page's menu: new, duplicate, renumber, delete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack menu"
+          }
+        }
+      }
+    },
+    "edit.stack.new" : {
+      "comment" : "The Stacks page's menu: makes a stack at a free number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Stack"
+          }
+        }
+      }
+    },
+    "edit.stack.noSlots" : {
+      "comment" : "The Stacks page: a stack with no slots.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No slots yet. Drag a channel here from Channels."
+          }
+        }
+      }
+    },
+    "edit.stack.none" : {
+      "comment" : "The Stacks page's workspace on a machine with no stacks.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No stacks yet. Make one from the menu."
+          }
+        }
+      }
+    },
+    "edit.stack.opacity" : {
+      "comment" : "The Stacks page's slot list: the column with each slot's opacity slider.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opacity"
+          }
+        }
+      }
+    },
+    "edit.stack.output" : {
+      "comment" : "The Stacks page's inspector: the heading over the selected output's properties.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output %lld"
+          }
+        }
+      }
+    },
+    "edit.stack.outputRow" : {
+      "comment" : "An output in the Stacks page's list: its number, label and live stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld %2$@ · stack %3$lld"
+          }
+        }
+      }
+    },
+    "edit.stack.outputs" : {
+      "comment" : "The Stacks page's inspector: the outputs, with the stack each shows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outputs"
+          }
+        }
+      }
+    },
+    "edit.stack.picker" : {
+      "comment" : "VoiceOver: the Stacks page's picker of the stack it edits.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack"
+          }
+        }
+      }
+    },
+    "edit.stack.preset" : {
+      "comment" : "The Stacks page's slot list: the column with each slot's preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset"
+          }
+        }
+      }
+    },
+    "edit.stack.presetNone" : {
+      "comment" : "A slot's preset picker: the slot names no preset of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "edit.stack.remove" : {
+      "comment" : "A slot's menu on the Stacks page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Stack"
+          }
+        }
+      }
+    },
+    "edit.stack.resolves" : {
+      "comment" : "Beside a slot's preset picker: the preset it resolves to. %@ is its number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draws with %@"
+          }
+        }
+      }
+    },
+    "edit.stack.setDefault" : {
+      "comment" : "Makes the selected output's live stack its default stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set as Default"
+          }
+        }
+      }
+    },
+    "edit.stack.slotMenu" : {
+      "comment" : "VoiceOver: a slot's menu on the Stacks page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slot menu"
+          }
+        }
+      }
+    },
+    "edit.stack.slots" : {
+      "comment" : "The Stacks page: the heading over the slot list, the stack's top slot first.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slots, top first"
+          }
+        }
+      }
+    },
+    "edit.stack.switch" : {
+      "comment" : "The selected output's switch transition.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch"
+          }
+        }
+      }
+    },
+    "edit.stack.transparent" : {
+      "comment" : "A stack's base: transparent, for a key.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transparent"
+          }
+        }
+      }
+    },
+    "edit.stack.unshown" : {
+      "comment" : "The Stacks page's inspector: the stacks no output shows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not on an output"
+          }
+        }
+      }
+    },
     "edit.stack.untitled" : {
       "comment" : "A stack with no label, by its number.",
       "extractionState" : "manual",

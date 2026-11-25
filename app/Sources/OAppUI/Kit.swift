@@ -368,8 +368,12 @@ final class FlatButton: NSControl {
         }
         let attributes: [NSAttributedString.Key: Any] = [.font: font_, .foregroundColor: text]
         let size = (title as NSString).size(withAttributes: attributes)
-        (title as NSString).draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+        let x = leading ? 8 : (bounds.width - size.width) / 2
+        (title as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2), withAttributes: attributes)
     }
+
+    /// Whether the title starts at the left, as a row of a list does, rather than in the middle.
+    var leading = false { didSet { needsDisplay = true } }
 
     /// Whether the title fits the button as it is laid out; the clipping test reads it (Spec 10 §18).
     var titleFits: Bool {

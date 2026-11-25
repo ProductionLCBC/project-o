@@ -21,6 +21,10 @@ final class WorkspaceView: PanelView {
     /// "A page whose object is deleted under it says "Deleted", with Undo while that delete is the history's top group."
     let undo = FlatButton(Strings.text(.menuUndo), style: .plain)
     let grid: CueGridView
+    /// Spec 11 §6 — the Stacks page's workspace (G-30), and its header's picker of the stack and the stack's menu.
+    let stacks: StackWorkspaceView
+    let objectPicker = ChoicePopUp(label: Strings.text(.editStackPicker))
+    let objectMenu = NSPopUpButton(frame: .zero, pullsDown: true)
     var machineRoot: URL? {
         didSet { grid.machineRoot = machineRoot }
     }
@@ -32,6 +36,7 @@ final class WorkspaceView: PanelView {
     init(model: ShowModel) {
         self.model = model
         grid = CueGridView(model: model)
+        stacks = StackWorkspaceView(model: model)
         super.init(title: "")
         Kit.content(title)
         meta.textColor = Palette.dimText
@@ -53,8 +58,40 @@ final class WorkspaceView: PanelView {
         message.lineBreakMode = .byWordWrapping
         message.cell?.wraps = true
         undo.onPress = { [weak model] in model?.undo() }
-        for view in [meta, zoom, openText, renumber, grid, message, undo] as [NSView] { addSubview(view) }
+        objectPicker.isBordered = false
+        objectPicker.onChoose = { [weak model] number in model?.editing.selectStack(number) }
+        objectMenu.isBordered = false
+        objectMenu.setAccessibilityLabel(Strings.text(.editStackMenu))
+        objectMenu.menu = stackMenu()
+        for view in [meta, zoom, openText, renumber, grid, stacks, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
         refresh()
+    }
+
+    /// Spec 11 §6 — "Its menu: New Stack ...; Duplicate ...; Renumber…, with swap for a taken number ...; and Delete".
+    private func stackMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editStackNew)) { [weak model] in model?.editing.newStack() })
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicateStack() })
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editCuesRenumber)) { [weak self] in self?.askStackNumber() })
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deleteStack() })
+        return menu
+    }
+
+    /// "Renumber…, with swap for a taken number": a small panel with the number.
+    private func askStackNumber() {
+        guard let stack = model.editing.stackNumber else { return }
+        let panel = PromptView(heading: Strings.text(.editCuesRenumber), width: 240)
+        let field = panel.text(Strings.text(.editCuesRenumber), String(stack), placeholder: String(stack))
+        panel.onSave = { [weak model] in
+            guard let number = Int(field.stringValue.trimmingCharacters(in: .whitespaces)), number > 0 else { return nil }
+            model?.editing.renumberStack(to: number)
+            return nil
+        }
+        panel.finish()
+        host?.present(panel, at: objectMenu)
     }
 
     @available(*, unavailable)
@@ -81,6 +118,13 @@ final class WorkspaceView: PanelView {
 
     func refresh() {
         let editing = model.editing
+        if editing.page == .stacks {
+            refreshStacks()
+            return
+        }
+        stacks.isHidden = true
+        objectPicker.isHidden = true
+        objectMenu.isHidden = true
         let onCues = editing.page == .cues
         let deleted = onCues && editing.isListDeleted
         let hasList = onCues && editing.listUuid != nil && !deleted
@@ -117,6 +161,27 @@ final class WorkspaceView: PanelView {
         needsLayout = true
     }
 
+    /// Spec 11 §6 and G-30 — the header names the stack, with a picker of every stack and the stack's menu; the slots
+    /// and the stack's fields fill the body.
+    private func refreshStacks() {
+        let page = model.editing.stackPage
+        for view in [meta, zoom, openText, renumber, grid, undo] as [NSView] { view.isHidden = true }
+        title.stringValue = EditModeWording.page(.stacks)
+        objectPicker.isHidden = page.stacks.isEmpty
+        objectPicker.set(page.stacks.map { (EditModel.name(of: $0), $0.number) }, selected: page.stack?.number ?? 0)
+        objectMenu.isHidden = false
+        for item in objectMenu.menu?.items ?? [] where item.title == Strings.text(.menuDuplicate) || item.title == Strings.text(.editCuesRenumber) {
+            item.isEnabled = page.stack != nil
+        }
+        // "Delete, refused while an output shows the stack".
+        objectMenu.menu?.items.last?.isEnabled = page.stack != nil && page.shownOn.isEmpty
+        stacks.isHidden = page.stack == nil
+        stacks.refresh()
+        message.stringValue = page.stacks.isEmpty ? Strings.text(.editStackNone) : ""
+        message.isHidden = message.stringValue.isEmpty
+        needsLayout = true
+    }
+
     /// Whether another master has this list's number: "that list's page says "Another list shares number 57"".
     private func sharesNumber(_ number: Int) -> Bool {
         (model.store.catalog?.lists.filter { $0.number == number && !$0.local }.count ?? 0) > 1
@@ -138,7 +203,12 @@ final class WorkspaceView: PanelView {
         let titleWidth = min(Kit.width(of: title), max(0, right - 12 - 40))
         title.frame = NSRect(x: 12, y: (h - 16) / 2, width: titleWidth, height: 16)
         meta.frame = NSRect(x: title.frame.maxX + 10, y: (h - 16) / 2, width: max(0, right - title.frame.maxX - 16), height: 16)
+        // The Stacks page's picker beside the title, its menu at the right.
+        let picked = objectPicker.fittingSize
+        objectPicker.frame = NSRect(x: title.frame.maxX + 10, y: (h - picked.height) / 2, width: min(picked.width + 10, 260), height: picked.height)
+        objectMenu.frame = NSRect(x: bounds.width - 12 - 34, y: (h - 24) / 2, width: 34, height: 24)
         grid.frame = body
+        stacks.frame = body
         let width = min(360, bounds.width - 40)
         // Under the grid's band and headers, where an empty list has nothing.
         let top = grid.isHidden ? body.midY - 18 : body.minY + CGFloat(CueGridGeometry.band + grid.geometry.header) + 28

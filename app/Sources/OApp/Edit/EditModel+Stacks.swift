@@ -107,6 +107,14 @@ extension EditModel {
         }
     }
 
+    /// Spec 11 §6 — a slot's "Edit Preset opens the preset editor on it, at this stack's tab (§8)".
+    public func editPreset(_ number: Int, stack: Int?) {
+        model.settings.editPreset = number
+        model.settings.editLayout = stack
+        show(page: .presets)
+        model.changed([.edit])
+    }
+
     // MARK: - The stack (Spec 11 §6, "The stack's own fields")
 
     public func setStack(_ path: String, _ value: JSONValue) {

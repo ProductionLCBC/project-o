@@ -13,6 +13,9 @@ final class PreviewPanelView: PanelView {
     let picker = NSPopUpButton(frame: .zero, pullsDown: false)
     private let frame_ = Surface()
     let picture = NSImageView()
+    /// G-30 — on the Stacks page, the stack's live picture, "the stack's preview surface before blackout" (Spec 11 §6).
+    let live = SurfaceView()
+    var mach: MachLink?
     var machineRoot: URL? { didSet { refresh() } }
     private var shownFile: String?
 
@@ -31,6 +34,7 @@ final class PreviewPanelView: PanelView {
         picture.imageScaling = .scaleProportionallyUpOrDown
         picture.setAccessibilityElement(false)
         frame_.addSubview(picture)
+        frame_.addSubview(live)
         frame_.setAccessibilityElement(true)
         frame_.setAccessibilityRole(.image)
         addSubview(picker)
@@ -44,12 +48,26 @@ final class PreviewPanelView: PanelView {
 
     @objc private func picked() {
         let stack = picker.selectedItem?.tag
+        // On the Stacks page the picker is the page's own: it picks the stack edited.
+        if model.editing.page == .stacks, let stack {
+            model.editing.selectStack(stack)
+            return
+        }
         model.change { $0.previewStack = stack }
+    }
+
+    /// The live picture, at the display's pace, on a page that shows one.
+    func draw() {
+        guard model.editing.page == .stacks, let stack = model.editing.stackNumber else { return }
+        live.set(mach?.preview(stack: stack))
     }
 
     func refresh() {
         let stacks = (model.store.catalog?.stacks ?? []).sorted { $0.number < $1.number }
-        let selected = model.previewStack
+        let onStacks = model.editing.page == .stacks
+        let selected = onStacks ? (model.editing.stackNumber ?? model.previewStack) : model.previewStack
+        live.isHidden = !onStacks
+        picture.isHidden = onStacks
         picker.removeAllItems()
         for stack in stacks {
             picker.addItem(withTitle: EditModeWording.stack(number: stack.number, label: stack.label))
@@ -97,6 +115,7 @@ final class PreviewPanelView: PanelView {
         hiding.frame = NSRect(x: picker.frame.minX - pill.width - 8, y: (Self.headerHeight - pill.height) / 2, width: pill.width, height: pill.height)
         frame_.frame = pictureFrame
         picture.frame = frame_.bounds.insetBy(dx: 2, dy: 2)
+        live.frame = picture.frame
         // "from `render` ... at the monitor's width in pixels (§3)".
         let scale = window?.backingScaleFactor ?? 2
         if picture.frame.width > 0 { model.editing.previewWidth(Int((picture.frame.width * scale).rounded())) }

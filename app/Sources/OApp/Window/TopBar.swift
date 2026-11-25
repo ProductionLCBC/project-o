@@ -219,6 +219,9 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     /// The Stacks page's selection (Spec 11 §6): the stack, and the output whose properties show.
     public var editStack: Int?
     public var editOutput: Int?
+    /// The Presets page's selection (Spec 11 §8): the preset, and its layout's tab, a stack's number or nil for `*`.
+    public var editPreset: Int?
+    public var editLayout: Int?
     public var browserTab = BrowserTab.playlists
     public var mediaView = MediaListView.grid
     /// Spec 11 §4, "Zoom" — "The zoom is one setting for every list".
@@ -284,6 +287,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editChannel, into: &editChannel)
         read(.editStack, into: &editStack)
         read(.editOutput, into: &editOutput)
+        read(.editPreset, into: &editPreset)
+        read(.editLayout, into: &editLayout)
         read(.browserTab, into: &browserTab)
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)

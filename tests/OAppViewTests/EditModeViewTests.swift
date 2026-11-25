@@ -153,8 +153,12 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(rig.model.editing.page, .stacks)
         XCTAssertEqual(bar.pagePicker.selected, 2)
         XCTAssertEqual(bar.crumb.stringValue, "Stacks")
-        XCTAssertEqual(rig.view.workspace.message.stringValue, "This page is built in a later stage")
+        XCTAssertFalse(rig.view.workspace.stacks.isHidden)
         XCTAssertTrue(rig.view.workspace.grid.isHidden)
+        bar.pagePicker.segments[5].press()
+        XCTAssertEqual(rig.model.editing.page, .objects)
+        XCTAssertEqual(rig.view.workspace.message.stringValue, "This page is built in a later stage")
+        XCTAssertTrue(rig.view.workspace.stacks.isHidden)
         rig.view.enterEdit(page: .cues)
         XCTAssertEqual(bar.pagePicker.selected, 0)
         XCTAssertFalse(rig.view.workspace.grid.isHidden)
@@ -662,6 +666,75 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(rig.view.workspace.undo.isHidden, "Undo shows only while that delete is the history's top group")
     }
 
+    // MARK: - The Stacks page (Spec 11 §6)
+
+    /// Spec 11 §6 and G-30 — the slots and the stack's fields in the workspace, the outputs, the selected output, the
+    /// channels and the audio routing in the inspector; each control sends its edit.
+    func test_theStacksPageShowsTheStackAndEachControlSendsItsEdit() throws {
+        let rig = try editing()
+        let view = rig.view
+        rig.model.editing.show(page: .stacks)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertTrue(view.inspector.isHidden, "the Cues page's inspector")
+        XCTAssertFalse(view.stackInspector.isHidden)
+        let workspace = view.workspace
+        XCTAssertTrue(workspace.grid.isHidden)
+        XCTAssertFalse(workspace.stacks.isHidden)
+        XCTAssertEqual(workspace.objectPicker.titleOfSelectedItem, "1 Main", "the stack output 1 shows")
+        XCTAssertEqual(workspace.objectPicker.itemTitles, ["1 Main", "2 Confidence"])
+        // The slots, top first: stack 1 holds 1 then 2, bottom first.
+        let stacks = workspace.stacks
+        XCTAssertEqual(stacks.rows.map(\.name.stringValue), ["Foreground", "Background"])
+        XCTAssertEqual(stacks.rows.first?.preset.titleOfSelectedItem, "None")
+        XCTAssertEqual(stacks.rows.first?.percent.stringValue, "100%")
+        XCTAssertEqual(stacks.label.stringValue, "Main")
+        // A slot's preset and opacity.
+        stacks.rows[0].preset.choose(tag: 1)
+        XCTAssertEqual(last(rig), ["edit stack 1 slot 2 preset 1"])
+        stacks.rows[1].opacity.doubleValue = 0.5
+        stacks.rows[1].opacity.sendAction(stacks.rows[1].opacity.action, to: stacks.rows[1].opacity.target)
+        XCTAssertEqual(last(rig), ["edit stack 1 slot 1 opacity 0.5"])
+        // The stack's own fields.
+        stacks.base.segments[1].press()
+        XCTAssertEqual(last(rig), ["edit stack 1 base \"transparent\""])
+        stacks.gamma.toggle()
+        XCTAssertEqual(last(rig), ["edit stack 1 gammaBlend true"])
+        // A channel the stack holds is refused at the drop; one it doesn't asks first, the stack being on air.
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(true)
+        }
+        XCTAssertFalse(stacks.accept(channel: 2, atRow: 0))
+        XCTAssertTrue(stacks.accept(channel: 3, atRow: 0))
+        XCTAssertEqual(asked, [.slotOnAir(channel: 3, label: "Clock", outputs: [1], adding: true)])
+        XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
+        // The inspector: the outputs, then the stacks none shows; the selected output; the channels; the audio routing.
+        let inspector = view.stackInspector
+        XCTAssertEqual(inspector.outputRows.map(\.title), ["1 Main · stack 1"], "as the top bar's outputs menu says it")
+        XCTAssertEqual(inspector.stackRows.map(\.title), ["2 Confidence"])
+        XCTAssertEqual(inspector.outputHeading.stringValue.uppercased(), "OUTPUT 1")
+        XCTAssertEqual(inspector.defaultStack.titleOfSelectedItem, "1 Main")
+        inspector.defaultStack.choose(tag: 2)
+        XCTAssertEqual(last(rig), ["edit output 1 defaultStack 2"])
+        XCTAssertEqual(inspector.channelRows.map(\.mark.stringValue), ["✓", "✓", ""])
+        XCTAssertEqual(inspector.audioBoxes.map { $0.map(\.state) }.first, [.on, .off])
+        inspector.audioBoxes[0][1].toggle()
+        XCTAssertEqual(last(rig), ["edit channel 1 audioOutputs [1, 2]"])
+        // A stack no output shows: a click selects it, and the header's picker follows.
+        inspector.stackRows[0].press()
+        XCTAssertEqual(workspace.objectPicker.titleOfSelectedItem, "2 Confidence")
+        XCTAssertEqual(stacks.rows.map(\.name.stringValue), ["Clock", "Foreground"])
+        workspace.objectPicker.choose(tag: 1)
+        XCTAssertEqual(rig.model.editing.stackNumber, 1)
+        // Back to the Cues page: its own inspector.
+        rig.model.editing.show(page: .cues)
+        XCTAssertFalse(view.inspector.isHidden)
+        XCTAssertTrue(view.stackInspector.isHidden)
+        XCTAssertTrue(workspace.stacks.isHidden)
+        XCTAssertFalse(workspace.grid.isHidden)
+    }
+
     // MARK: - A picture of it
 
     func test_theEditWindowDrawsIntoAPicture() throws {
@@ -692,5 +765,11 @@ final class EditModeViewTests: XCTestCase {
         let third = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: third)
         try XCTUnwrap(third.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-library.png"))
+        // The Stacks page, on stack 1.
+        rig.model.editing.show(page: .stacks)
+        rig.view.layoutSubtreeIfNeeded()
+        let fourth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: fourth)
+        try XCTUnwrap(fourth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-stacks.png"))
     }
 }
