@@ -2197,6 +2197,534 @@
         }
       }
     },
+    "edit.channel.addToStack" : {
+      "comment" : "A menu of the stacks that don't hold the channel; one adds a slot at its top.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Stack"
+          }
+        }
+      }
+    },
+    "edit.channel.any" : {
+      "comment" : "Usual content: any.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any"
+          }
+        }
+      }
+    },
+    "edit.channel.audioOutputs" : {
+      "comment" : "The channel's audio outputs, a checkbox per output on this machine.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio outputs"
+          }
+        }
+      }
+    },
+    "edit.channel.audioTransition" : {
+      "comment" : "The audio transition the channel's attributes reset to.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default audio transition"
+          }
+        }
+      }
+    },
+    "edit.channel.badSize" : {
+      "comment" : "Why a render size wasn't sent.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A width and height from 1 to 16384 pixels"
+          }
+        }
+      }
+    },
+    "edit.channel.body" : {
+      "comment" : "Text thumbnail: the text's body.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Body"
+          }
+        }
+      }
+    },
+    "edit.channel.custom" : {
+      "comment" : "Render size: a width and height.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        }
+      }
+    },
+    "edit.channel.decoderCap" : {
+      "comment" : "How many decoders the channel may hold at once.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decoder cap"
+          }
+        }
+      }
+    },
+    "edit.channel.decoderCost" : {
+      "comment" : "The cost of a higher decoder cap.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each one more is a decoder session and its frame pool, about 100 to 200 MB at 4K."
+          }
+        }
+      }
+    },
+    "edit.channel.decoderMachine" : {
+      "comment" : "The decoder cap left to this machine's default.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Machine’s"
+          }
+        }
+      }
+    },
+    "edit.channel.defaultPreset" : {
+      "comment" : "The channel's default preset: the last fallback before Preset 1.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default preset"
+          }
+        }
+      }
+    },
+    "edit.channel.empty" : {
+      "comment" : "The Preview monitor on the Channels page while the channel holds nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing on this channel now"
+          }
+        }
+      }
+    },
+    "edit.channel.firstLine" : {
+      "comment" : "Text thumbnail: the text's first line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First line"
+          }
+        }
+      }
+    },
+    "edit.channel.form" : {
+      "comment" : "The heading of the selected channel's form on the Channels page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "edit.channel.gain" : {
+      "comment" : "The gain in decibels the channel's attributes reset to.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default gain"
+          }
+        }
+      }
+    },
+    "edit.channel.gainUnit" : {
+      "comment" : "Beside the default gain field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "dB, within ±60"
+          }
+        }
+      }
+    },
+    "edit.channel.height" : {
+      "comment" : "VoiceOver: the render size's height in pixels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Height"
+          }
+        }
+      }
+    },
+    "edit.channel.held.none" : {
+      "comment" : "The Channels page's inspector when no stack holds the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No stack holds it yet."
+          }
+        }
+      }
+    },
+    "edit.channel.holders" : {
+      "comment" : "The Channels page's inspector: the stacks with a slot for the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stacks that hold it"
+          }
+        }
+      }
+    },
+    "edit.channel.inNone" : {
+      "comment" : "The channel list's In stacks column for a channel no stack holds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
+    },
+    "edit.channel.largest" : {
+      "comment" : "Render size: the largest output among the stacks that hold the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Largest"
+          }
+        }
+      }
+    },
+    "edit.channel.list" : {
+      "comment" : "The heading of the Channels page's list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels"
+          }
+        }
+      }
+    },
+    "edit.channel.live" : {
+      "comment" : "Usual content: a live input.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live"
+          }
+        }
+      }
+    },
+    "edit.channel.media" : {
+      "comment" : "Usual content: media.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "edit.channel.menu" : {
+      "comment" : "VoiceOver: the Channels page's menu of New, Duplicate and Delete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel menu"
+          }
+        }
+      }
+    },
+    "edit.channel.new" : {
+      "comment" : "The Channels page's menu: makes a channel with the first-run defaults.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Channel"
+          }
+        }
+      }
+    },
+    "edit.channel.none" : {
+      "comment" : "The Channels page with no channel in the library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No channels yet. Add one with New Channel in the ⋯ menu."
+          }
+        }
+      }
+    },
+    "edit.channel.number" : {
+      "comment" : "The channel's number field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number"
+          }
+        }
+      }
+    },
+    "edit.channel.picker" : {
+      "comment" : "VoiceOver: the Channels page's picker of the channel edited.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "edit.channel.renderSize" : {
+      "comment" : "The size the channel's content is drawn at.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Render size"
+          }
+        }
+      }
+    },
+    "edit.channel.renumber" : {
+      "comment" : "The button that renumbers the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renumber"
+          }
+        }
+      }
+    },
+    "edit.channel.renumber.body" : {
+      "comment" : "What doesn't follow a channel's new number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OSC, console and Stream Deck maps that name channel %1$lld aren’t changed, and other campuses’ stacks and key bindings still name channel %1$lld until they’re changed there."
+          }
+        }
+      }
+    },
+    "edit.channel.renumber.title" : {
+      "comment" : "The popover before a channel's number changes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renumber channel %1$lld to %2$lld?"
+          }
+        }
+      }
+    },
+    "edit.channel.resets" : {
+      "comment" : "Under the channel's defaults: when an edit to them shows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defaults show at the next list boundary, a reset of the channel or Clear All."
+          }
+        }
+      }
+    },
+    "edit.channel.slide" : {
+      "comment" : "Usual content: a slide.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slide"
+          }
+        }
+      }
+    },
+    "edit.channel.stacks" : {
+      "comment" : "A column of the channel list: the stacks that hold the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In stacks"
+          }
+        }
+      }
+    },
+    "edit.channel.swap" : {
+      "comment" : "The button that swaps the two channels' numbers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swap"
+          }
+        }
+      }
+    },
+    "edit.channel.swap.title" : {
+      "comment" : "The popover before two channels swap numbers.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swap channels %1$lld and %2$lld?"
+          }
+        }
+      }
+    },
+    "edit.channel.text" : {
+      "comment" : "Usual content: text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "edit.channel.thumbnail" : {
+      "comment" : "How the strip and the pickers show the channel's text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text thumbnail"
+          }
+        }
+      }
+    },
+    "edit.channel.transition" : {
+      "comment" : "The transition the channel's attributes reset to.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default transition"
+          }
+        }
+      }
+    },
+    "edit.channel.untitled" : {
+      "comment" : "A channel with an empty label, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld"
+          }
+        }
+      }
+    },
+    "edit.channel.usual" : {
+      "comment" : "A column of the channel list and a field of the channel's form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usual content"
+          }
+        }
+      }
+    },
+    "edit.channel.width" : {
+      "comment" : "VoiceOver: the render size's width in pixels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Width"
+          }
+        }
+      }
+    },
     "edit.chip.add" : {
       "comment" : "A chip the cue doesn't write yet: a plus, then the attribute's name.",
       "extractionState" : "manual",

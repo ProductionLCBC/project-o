@@ -23,20 +23,29 @@ final class WorkspaceView: PanelView {
     let grid: CueGridView
     /// Spec 11 §6 — the Stacks page's workspace (G-30), and its header's picker of the stack and the stack's menu.
     let stacks: StackWorkspaceView
+    /// Spec 11 §7 — the Channels page's workspace (G-31).
+    let channels: ChannelWorkspaceView
     let objectPicker = ChoicePopUp(label: Strings.text(.editStackPicker))
     let objectMenu = NSPopUpButton(frame: .zero, pullsDown: true)
+    /// The header's ⋯ menu for each page that has one.
+    private var stackMenu_ = NSMenu()
+    private var channelMenu_ = NSMenu()
     var machineRoot: URL? {
         didSet { grid.machineRoot = machineRoot }
     }
     /// The window, which opens the popovers the page's controls ask for.
     weak var host: ShowWindowView? {
-        didSet { grid.host = host }
+        didSet {
+            grid.host = host
+            channels.host = host
+        }
     }
 
     init(model: ShowModel) {
         self.model = model
         grid = CueGridView(model: model)
         stacks = StackWorkspaceView(model: model)
+        channels = ChannelWorkspaceView(model: model)
         super.init(title: "")
         Kit.content(title)
         meta.textColor = Palette.dimText
@@ -61,10 +70,23 @@ final class WorkspaceView: PanelView {
         objectPicker.isBordered = false
         objectPicker.onChoose = { [weak model] number in model?.editing.selectStack(number) }
         objectMenu.isBordered = false
-        objectMenu.setAccessibilityLabel(Strings.text(.editStackMenu))
-        objectMenu.menu = stackMenu()
-        for view in [meta, zoom, openText, renumber, grid, stacks, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
+        stackMenu_ = stackMenu()
+        channelMenu_ = channelMenu()
+        objectMenu.menu = stackMenu_
+        for view in [meta, zoom, openText, renumber, grid, stacks, channels, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
         refresh()
+    }
+
+    /// Spec 11 §7 — "Its menu: New Channel ...; Duplicate ...; Delete".
+    private func channelMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editChannelNew)) { [weak model] in model?.editing.newChannel() })
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicateChannel() })
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deleteChannel() })
+        return menu
     }
 
     /// Spec 11 §6 — "Its menu: New Stack ...; Duplicate ...; Renumber…, with swap for a taken number ...; and Delete".
@@ -122,7 +144,12 @@ final class WorkspaceView: PanelView {
             refreshStacks()
             return
         }
+        if editing.page == .channels {
+            refreshChannels()
+            return
+        }
         stacks.isHidden = true
+        channels.isHidden = true
         objectPicker.isHidden = true
         objectMenu.isHidden = true
         let onCues = editing.page == .cues
@@ -165,10 +192,13 @@ final class WorkspaceView: PanelView {
     /// and the stack's fields fill the body.
     private func refreshStacks() {
         let page = model.editing.stackPage
-        for view in [meta, zoom, openText, renumber, grid, undo] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, openText, renumber, grid, undo, channels] as [NSView] { view.isHidden = true }
         title.stringValue = EditModeWording.page(.stacks)
+        title.isHidden = false
         objectPicker.isHidden = page.stacks.isEmpty
         objectPicker.set(page.stacks.map { (EditModel.name(of: $0), $0.number) }, selected: page.stack?.number ?? 0)
+        objectMenu.menu = stackMenu_
+        objectMenu.setAccessibilityLabel(Strings.text(.editStackMenu))
         objectMenu.isHidden = false
         for item in objectMenu.menu?.items ?? [] where item.title == Strings.text(.menuDuplicate) || item.title == Strings.text(.editCuesRenumber) {
             item.isEnabled = page.stack != nil
@@ -178,6 +208,25 @@ final class WorkspaceView: PanelView {
         stacks.isHidden = page.stack == nil
         stacks.refresh()
         message.stringValue = page.stacks.isEmpty ? Strings.text(.editStackNone) : ""
+        message.isHidden = message.stringValue.isEmpty
+        needsLayout = true
+    }
+
+    /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
+    private func refreshChannels() {
+        let page = model.editing.channelPage
+        for view in [meta, zoom, openText, renumber, grid, undo, stacks, objectPicker] as [NSView] { view.isHidden = true }
+        title.stringValue = EditModeWording.page(.channels)
+        title.isHidden = false
+        objectMenu.menu = channelMenu_
+        objectMenu.setAccessibilityLabel(Strings.text(.editChannelMenu))
+        objectMenu.isHidden = false
+        for item in channelMenu_.items where item.title == Strings.text(.menuDuplicate) { item.isEnabled = page.channel != nil }
+        // "A channel with content on an output's stack ... can't be deleted".
+        channelMenu_.items.last?.isEnabled = page.channel != nil && !page.isOnAir
+        channels.isHidden = page.rows.isEmpty
+        channels.refresh()
+        message.stringValue = page.rows.isEmpty ? Strings.text(.editChannelNone) : ""
         message.isHidden = message.stringValue.isEmpty
         needsLayout = true
     }
@@ -209,6 +258,7 @@ final class WorkspaceView: PanelView {
         objectMenu.frame = NSRect(x: bounds.width - 12 - 34, y: (h - 24) / 2, width: 34, height: 24)
         grid.frame = body
         stacks.frame = body
+        channels.frame = body
         let width = min(360, bounds.width - 40)
         // Under the grid's band and headers, where an empty list has nothing.
         let top = grid.isHidden ? body.midY - 18 : body.minY + CGFloat(CueGridGeometry.band + grid.geometry.header) + 28

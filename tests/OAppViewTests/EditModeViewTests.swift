@@ -735,6 +735,84 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertFalse(workspace.grid.isHidden)
     }
 
+    // MARK: - The Channels page (Spec 11 §7)
+
+    /// Spec 11 §7 and G-31 — the channel list with the stacks that hold each, the selected channel's form whose fields
+    /// each send an `edit.set`, the number's popover, and the stacks that hold it in the inspector.
+    func test_theChannelsPageListsTheChannelsAndTheFormSendsEachField() throws {
+        let rig = try editing()
+        let view = rig.view
+        rig.model.editing.show(page: .channels)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertFalse(view.channelInspector.isHidden)
+        XCTAssertTrue(view.inspector.isHidden)
+        XCTAssertTrue(view.stackInspector.isHidden)
+        let sheet = view.workspace.channels
+        XCTAssertFalse(sheet.isHidden)
+        XCTAssertTrue(view.workspace.stacks.isHidden)
+        XCTAssertEqual(sheet.rows.map(\.name.stringValue), ["Background", "Foreground", "Clock"])
+        XCTAssertEqual(sheet.rows.map(\.stacks.stringValue), ["1", "1, 2", "2"])
+        // A click on a row selects its channel; the Preview's picker follows.
+        sheet.rows[2].onSelect?()
+        XCTAssertEqual(rig.model.editing.sheetChannel, 3)
+        XCTAssertEqual(sheet.rows.map(\.isSelected), [false, false, true])
+        XCTAssertEqual(view.previewPanel.picker.titleOfSelectedItem, "3 Clock")
+        XCTAssertEqual(sheet.label.stringValue, "Clock")
+        XCTAssertEqual(sheet.number.stringValue, "3")
+        // Each field is an `edit.set` on commit.
+        sheet.label.stringValue = "Timer"
+        sheet.label.sendAction(sheet.label.action, to: sheet.label.target)
+        XCTAssertEqual(last(rig), ["edit channel 3 label \"Timer\""])
+        sheet.usual.segments[1].press()
+        XCTAssertEqual(last(rig), ["edit channel 3 usualContent \"text\""])
+        sheet.decoderCap.segments[2].press()
+        XCTAssertEqual(last(rig), ["edit channel 3 decoderCap 3"])
+        sheet.gain.stringValue = "-6 dB"
+        sheet.gain.sendAction(sheet.gain.action, to: sheet.gain.target)
+        XCTAssertEqual(last(rig), ["edit channel 3 defaults.gain -6"])
+        // Custom render size shows the width and height and sends nothing until they are given.
+        let before = count(rig)
+        XCTAssertTrue(sheet.width.isHidden)
+        sheet.renderSize.segments[1].press()
+        XCTAssertEqual(count(rig), before)
+        XCTAssertFalse(sheet.width.isHidden)
+        sheet.width.stringValue = "1280"
+        sheet.height.stringValue = "720"
+        sheet.height.sendAction(sheet.height.action, to: sheet.height.target)
+        XCTAssertEqual(last(rig), ["edit channel 3 renderSize { \"height\": 720, \"width\": 1280 }"])
+        // The number: "Before it sends, a popover says what doesn't follow".
+        sheet.number.stringValue = "7"
+        sheet.number.sendAction(sheet.number.action, to: sheet.number.target)
+        let panel = try XCTUnwrap(view.prompt)
+        XCTAssertEqual(panel.heading.stringValue, "Renumber channel 3 to 7?")
+        XCTAssertEqual(panel.save.title, "Renumber")
+        panel.commit()
+        XCTAssertEqual(last(rig), ["edit channel 3 renumber 7"])
+        // The inspector: the stacks that hold it, with Remove; Add to Stack offers the others, at their top.
+        let inspector = view.channelInspector
+        XCTAssertEqual(inspector.holderNames.map(\.stringValue), ["2 Confidence"])
+        XCTAssertEqual(inspector.addToStack.itemTitles, ["Add to Stack", "1 Main"])
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(true)
+        }
+        inspector.addToStack.menu?.performActionForItem(at: 1)
+        XCTAssertEqual(asked, [.slotOnAir(channel: 3, label: "Clock", outputs: [1], adding: true)], "stack 1 is on output 1")
+        XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
+        inspector.removeButtons[0].press()
+        XCTAssertEqual(last(rig), ["edit stack 2 slot 3 remove"])
+        // Channel 1 holds dawn.mp4 on output 1: its number is refused before anything is asked, and the line says why.
+        sheet.rows[0].onSelect?()
+        let sent = count(rig)
+        sheet.number.stringValue = "9"
+        sheet.number.sendAction(sheet.number.action, to: sheet.number.target)
+        XCTAssertEqual(count(rig), sent)
+        XCTAssertFalse(inspector.notice.isHidden)
+        XCTAssertEqual(inspector.notice.stringValue, EditWording.rejection(code: "onAir"))
+        XCTAssertEqual(sheet.number.stringValue, "1", "the field is put back")
+    }
+
     // MARK: - A picture of it
 
     func test_theEditWindowDrawsIntoAPicture() throws {
@@ -771,5 +849,12 @@ final class EditModeViewTests: XCTestCase {
         let fourth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: fourth)
         try XCTUnwrap(fourth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-stacks.png"))
+        // The Channels page, on channel 2, whose text shows in the Preview.
+        rig.model.editing.show(page: .channels)
+        rig.model.editing.selectChannel(2)
+        rig.view.layoutSubtreeIfNeeded()
+        let fifth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: fifth)
+        try XCTUnwrap(fifth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-channels.png"))
     }
 }

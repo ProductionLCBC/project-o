@@ -417,6 +417,8 @@ final class DraggableChannelRow: NSView, NSDraggingSource {
 @MainActor
 final class StackInspectorView: PanelView {
     private let model: ShowModel
+    /// Spec 11 §2 — the notice line: why an edit was refused, or its warnings.
+    let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
     let outputsHeading = Kit.heading(Strings.text(.editStackOutputs))
     private(set) var outputRows: [FlatButton] = []
     let unshownHeading = Kit.heading(Strings.text(.editStackUnshown))
@@ -452,7 +454,8 @@ final class StackInspectorView: PanelView {
         defaultStack.onChoose = { [weak model] tag in model?.editing.setOutput("defaultStack", tag) }
         switchTransition.onChoose = { [weak model] tag in model?.editing.setOutput("transitions.switch", tag) }
         blackoutTransition.onChoose = { [weak model] tag in model?.editing.setOutput("transitions.blackout", tag) }
-        for view in [outputsHeading, unshownHeading, outputHeading, deviceName, device, formatName, format, changeInSettings, defaultName, defaultStack,
+        notice.isHidden = true
+        for view in [notice, outputsHeading, unshownHeading, outputHeading, deviceName, device, formatName, format, changeInSettings, defaultName, defaultStack,
                      switchName, switchTransition, blackoutName, blackoutTransition, setDefault, channelsHeading, audioHeading] as [NSView] {
             addSubview(view)
         }
@@ -467,6 +470,7 @@ final class StackInspectorView: PanelView {
         let catalog = model.store.catalog
         title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? ""
         title.isHidden = page.stack == nil
+        NoticeLine.show(editing.notice, in: notice, from: self)
         // Outputs, then the stacks no output shows.
         rebuild(&outputRows, count: page.outputs.count)
         for (button, output) in zip(outputRows, page.outputs) {
@@ -563,6 +567,8 @@ final class StackInspectorView: PanelView {
         super.layout()
         // Not placed while show mode leaves it at no size.
         guard bounds.width > 120 else { return }
+        let titleRight = title.frame.maxX + 14
+        notice.frame = NSRect(x: titleRight, y: (Self.headerHeight - 15) / 2, width: max(0, bounds.width - titleRight - 14), height: 15)
         let column = floor(bounds.width / 4)
         let pad: CGFloat = 14
         let top = Self.headerHeight + 12

@@ -219,6 +219,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     /// The Stacks page's selection (Spec 11 §6): the stack, and the output whose properties show.
     public var editStack: Int?
     public var editOutput: Int?
+    /// The Channels page's selection (Spec 11 §7): the channel whose form shows.
+    public var editSheetChannel: Int?
     /// The Presets page's selection (Spec 11 §8): the preset, and its layout's tab, a stack's number or nil for `*`.
     public var editPreset: Int?
     public var editLayout: Int?
@@ -287,6 +289,7 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editChannel, into: &editChannel)
         read(.editStack, into: &editStack)
         read(.editOutput, into: &editOutput)
+        read(.editSheetChannel, into: &editSheetChannel)
         read(.editPreset, into: &editPreset)
         read(.editLayout, into: &editLayout)
         read(.browserTab, into: &browserTab)

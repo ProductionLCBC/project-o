@@ -353,6 +353,78 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.sent.count, before)
     }
 
+    // MARK: - The channel sheet (Spec 11 §7)
+
+    /// Spec 11 §7 — the form's fields each send an `edit.set`; the number renumbers or swaps, refused on air; the right
+    /// column adds the channel at a stack's top or takes it out, asking first on a stack an output shows; New, Duplicate
+    /// and Delete.
+    func test_theChannelSheetSelectsSetsRenumbersAndAsksOnAir() throws {
+        try CatalogFile.install()
+        let rig = try Rig()
+        XCTAssertTrue(rig.model.editing.open(page: .channels))
+        rig.model.editing.selectChannel(3)
+        XCTAssertEqual(rig.model.editing.sheetChannel, 3)
+        XCTAssertEqual(rig.model.settings.editSheetChannel, 3, "kept in view.json")
+        rig.model.editing.setChannel("label", .string("Timer"))
+        XCTAssertEqual(last(rig), ["edit channel 3 label \"Timer\""])
+        rig.model.editing.setChannelGain(-3.25)
+        XCTAssertEqual(last(rig), ["edit channel 3 defaults.gain -3.3"])
+        rig.model.editing.setChannelAudio(output: 2, on: true)
+        XCTAssertEqual(last(rig), ["edit channel 3 audioOutputs [1, 2]"])
+        // The number: a free one renumbers, a taken one swaps; the selection follows when the engine applies it.
+        XCTAssertEqual(rig.model.editing.renumbering(to: 7), .renumber(from: 3, to: 7))
+        XCTAssertEqual(rig.model.editing.renumbering(to: 2), .onAir, "channel 2 holds the verse's text in stack 1, on output 1")
+        rig.model.store.apply(event: "channels", ["topic": .string("channels"), "channel": .number(2), "content": .null, "state": .string("empty")], now: rig.model.now)
+        XCTAssertEqual(rig.model.editing.renumbering(to: 2), .swap(3, 2), "cleared, it swaps")
+        XCTAssertEqual(rig.model.editing.renumbering(to: 3), .nothing)
+        rig.model.editing.renumberChannel(to: 7)
+        XCTAssertEqual(last(rig), ["edit channel 3 renumber 7"])
+        // Stack 1 is on output 1 and doesn't hold channel 3: adding it asks first, and adds it at the top.
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(true)
+        }
+        rig.model.editing.addChannel(toStack: 1)
+        XCTAssertEqual(asked, [.slotOnAir(channel: 3, label: "Clock", outputs: [1], adding: true)])
+        XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
+        // Stack 2 is on no output: nothing to ask.
+        asked = []
+        rig.model.editing.removeChannel(fromStack: 2)
+        XCTAssertEqual(asked, [])
+        XCTAssertEqual(last(rig), ["edit stack 2 slot 3 remove"])
+        rig.model.editing.newChannel()
+        XCTAssertEqual(last(rig), ["edit channel create"])
+        rig.model.editing.duplicateChannel()
+        XCTAssertEqual(last(rig), ["edit channel 3 duplicate"])
+        // Delete asks the engine what refers to it, then asks.
+        rig.model.editing.deleteChannel()
+        let query = try XCTUnwrap(rig.sent.last)
+        XCTAssertEqual(query.fields["what"], .string("uses"))
+        XCTAssertEqual(query.fields["channel"], .number(3))
+        rig.answers[rig.answers.count - 1](.answer(["counts": .object(["cues": .number(12), "stacks": .number(1)])]))
+        XCTAssertEqual(asked, [.deleteNumbered(name: "3 Clock", uses: ["cues": 12, "stacks": 1])])
+        XCTAssertEqual(last(rig), ["edit channel 3 delete"])
+    }
+
+    /// Spec 11 §7 — "Renumber is refused while the channel has content in a stack an output shows, and Swap while
+    /// either channel has content and either is in a stack an output shows"; Delete likewise.
+    func test_aChannelOnAirIsNeitherRenumberedNorDeleted() throws {
+        let rig = try Rig()
+        XCTAssertTrue(rig.model.editing.open(page: .channels))
+        let onAir = rig.model.store.channels.values.filter { $0.content != nil }.map(\.number).sorted()
+        XCTAssertEqual(onAir.first, 1, "the recorded state holds dawn.mp4 on channel 1, in stack 1 on output 1")
+        rig.model.editing.selectChannel(1)
+        XCTAssertTrue(rig.model.editing.channelPage.isOnAir)
+        XCTAssertEqual(rig.model.editing.renumbering(to: 9), .onAir)
+        XCTAssertEqual(rig.model.editing.renumbering(to: 3), .onAir, "a swap with a channel on air")
+        let before = rig.sent.count
+        rig.model.editing.renumberChannel(to: 9)
+        rig.model.editing.deleteChannel()
+        XCTAssertEqual(rig.sent.count, before, "nothing is sent")
+        XCTAssertEqual(rig.model.editing.notice, .rejected(EngineRejection(code: "onAir", message: "")))
+    }
+
     // MARK: - Hidden rows (Spec 11 §4, corrected 2026-11-24)
 
     /// "an eye that hides the channel from the Preview monitor's picture alone ... Hidden rows are kept by channel number

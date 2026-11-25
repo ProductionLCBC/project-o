@@ -567,7 +567,9 @@ public final class EditModel {
         guard let sending, sending.request != nil else { return nil }
         standing = nil
         model.dismissNotice(at: .inspector)
-        if let cannot = cannotEdit {
+        // A list that can't be edited holds back the Cues page's edits alone: a stack, a channel or a preset is the
+        // library's, whichever list the Cues page last showed.
+        if page == .cues, let cannot = cannotEdit {
             model.say(.notSent(cannot), at: .inspector)
             return cannot
         }
@@ -608,7 +610,7 @@ public final class EditModel {
     /// cue the confidence screen shows ahead of time is on air at once, on
     /// the outputs that look ahead. Said once for a selection, until another is made.
     private func noteOnAir() {
-        guard let catalog = store.catalog, let listUuid, let list else { return }
+        guard page == .cues, let catalog = store.catalog, let listUuid, let list else { return }
         let live = store.live
         let liveList = live.listUuid.flatMap { store.lists[$0]?.list }
         let liveIndex = live.cue.flatMap { cue in liveList?.cues.firstIndex { $0.uuid.uuidString.lowercased() == cue } }

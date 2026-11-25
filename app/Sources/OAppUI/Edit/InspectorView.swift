@@ -70,6 +70,13 @@ final class EditField: ShowField {
         if currentEditor() == nil, stringValue != text { stringValue = text }
     }
 
+    /// What was typed is dropped, unsent: a number that is the same, or that isn't one. The next redraw puts the
+    /// model's value back.
+    func putBack() {
+        pending = nil
+        shown = ""
+    }
+
     /// Outlined in red while its last edit stands refused (Spec 11 §2, "Rejections and warnings");
     /// the refused text is dropped, and the next redraw puts the model's value back.
     var isRefused = false {

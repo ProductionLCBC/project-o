@@ -15,6 +15,8 @@ final class PreviewPanelView: PanelView {
     let picture = NSImageView()
     /// G-30 — on the Stacks page, the stack's live picture, "the stack's preview surface before blackout" (Spec 11 §6).
     let live = SurfaceView()
+    /// On the Channels page, the channel's text, which has no picture of its own, or that it is empty.
+    let caption = Kit.content(Kit.label(size: 13))
     var mach: MachLink?
     var machineRoot: URL? { didSet { refresh() } }
     private var shownFile: String?
@@ -35,6 +37,12 @@ final class PreviewPanelView: PanelView {
         picture.setAccessibilityElement(false)
         frame_.addSubview(picture)
         frame_.addSubview(live)
+        caption.alignment = .center
+        caption.maximumNumberOfLines = 6
+        caption.lineBreakMode = .byWordWrapping
+        caption.cell?.wraps = true
+        caption.isHidden = true
+        frame_.addSubview(caption)
         frame_.setAccessibilityElement(true)
         frame_.setAccessibilityRole(.image)
         addSubview(picker)
@@ -47,33 +55,52 @@ final class PreviewPanelView: PanelView {
     required init?(coder: NSCoder) { nil }
 
     @objc private func picked() {
-        let stack = picker.selectedItem?.tag
-        // On the Stacks page the picker is the page's own: it picks the stack edited.
-        if model.editing.page == .stacks, let stack {
-            model.editing.selectStack(stack)
+        let number = picker.selectedItem?.tag
+        // On the Stacks and Channels pages the picker is the page's own: it picks the stack or the channel edited.
+        if model.editing.page == .stacks, let number {
+            model.editing.selectStack(number)
             return
         }
-        model.change { $0.previewStack = stack }
+        if model.editing.page == .channels, let number {
+            model.editing.selectChannel(number)
+            return
+        }
+        model.change { $0.previewStack = number }
     }
 
-    /// The live picture, at the display's pace, on a page that shows one.
+    /// The live picture, at the display's pace, on a page that shows one: the stack's (G-30), or the channel's, the
+    /// strip's picture of it (G-31).
     func draw() {
-        guard model.editing.page == .stacks, let stack = model.editing.stackNumber else { return }
-        live.set(mach?.preview(stack: stack))
+        switch model.editing.page {
+        case .stacks: live.set(model.editing.stackNumber.flatMap { mach?.preview(stack: $0) })
+        case .channels: live.set(model.editing.sheetChannel.flatMap { mach?.picture(channel: $0) })
+        default: return
+        }
     }
 
     func refresh() {
         let stacks = (model.store.catalog?.stacks ?? []).sorted { $0.number < $1.number }
-        let onStacks = model.editing.page == .stacks
+        let page = model.editing.page
+        let onStacks = page == .stacks
+        let showsLive = page == .stacks || page == .channels
         let selected = onStacks ? (model.editing.stackNumber ?? model.previewStack) : model.previewStack
-        live.isHidden = !onStacks
-        picture.isHidden = onStacks
+        live.isHidden = !showsLive
+        picture.isHidden = showsLive
         picker.removeAllItems()
-        for stack in stacks {
-            picker.addItem(withTitle: EditModeWording.stack(number: stack.number, label: stack.label))
-            picker.lastItem?.tag = stack.number
+        if page == .channels {
+            let channels = (model.store.catalog?.channels ?? []).sorted { $0.number < $1.number }
+            for channel in channels {
+                picker.addItem(withTitle: EditModel.name(of: channel))
+                picker.lastItem?.tag = channel.number
+            }
+            picker.selectItem(withTag: model.editing.sheetChannel ?? 0)
+        } else {
+            for stack in stacks {
+                picker.addItem(withTitle: EditModeWording.stack(number: stack.number, label: stack.label))
+                picker.lastItem?.tag = stack.number
+            }
+            picker.selectItem(withTag: selected)
         }
-        picker.selectItem(withTag: selected)
         let editing = model.editing
         let preview = editing.preview
         if preview.file != shownFile {
@@ -89,6 +116,22 @@ final class PreviewPanelView: PanelView {
         let number = editing.selection.first(in: editing.grid.headers.map(\.uuid)).flatMap { editing.grid.cue(of: $0) }.map { $0 + 1 }
         frame_.setAccessibilityLabel(EditModeWording.previewSpoken(cue: editing.page == .cues ? number : nil, stack: selected,
                                                                    label: stacks.first { $0.number == selected }?.label ?? ""))
+        // Spec 10 §2 — "Text gets no picture, since it has no look until a box gives it one": the channel's text shows
+        // in its place, as the strip's cell shows it; an empty channel says so.
+        caption.isHidden = true
+        if page == .channels, let channel = editing.sheetChannel {
+            let content = model.store.channels[channel]?.content
+            frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + (editing.channelPage.channel.map(EditModel.name(of:)) ?? String(channel)))
+            if case .text(let fields)? = content?.kind {
+                caption.stringValue = fields["body"] ?? fields.values.sorted().first ?? content?.label ?? ""
+                caption.textColor = Palette.text
+                caption.isHidden = false
+            } else if content == nil {
+                caption.stringValue = Strings.text(.editChannelEmpty)
+                caption.textColor = Palette.faintText
+                caption.isHidden = false
+            }
+        }
         // Spec 11 §2 — "and a pill while channels are hidden ("Hiding 2 channels")", so a partial picture is never taken for the whole.
         let hidden = editing.page == .cues ? editing.hiddenChannels.count : 0
         hiding.isHidden = hidden == 0
@@ -116,6 +159,9 @@ final class PreviewPanelView: PanelView {
         frame_.frame = pictureFrame
         picture.frame = frame_.bounds.insetBy(dx: 2, dy: 2)
         live.frame = picture.frame
+        let captionHeight = min(picture.frame.height - 16, ceil(caption.cell?.cellSize(forBounds: picture.frame.insetBy(dx: 16, dy: 8)).height ?? 18))
+        caption.frame = NSRect(x: picture.frame.minX + 16, y: picture.frame.midY - captionHeight / 2, width: max(0, picture.frame.width - 32),
+                               height: max(0, captionHeight))
         // "from `render` ... at the monitor's width in pixels (§3)".
         let scale = window?.backingScaleFactor ?? 2
         if picture.frame.width > 0 { model.editing.previewWidth(Int((picture.frame.width * scale).rounded())) }

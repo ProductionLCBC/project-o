@@ -64,6 +64,7 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.hiddenRows = [2, 3]
         settings.editStack = 2
         settings.editOutput = 1
+        settings.editSheetChannel = 3
         settings.editPreset = 3
         settings.editLayout = 2
         settings.editBrowserWidth = 300
