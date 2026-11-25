@@ -24,12 +24,19 @@ extension ThumbnailService {
         let roots = (library: job.library, machine: job.machine)
         let width = job.request.width
         switch job.request.subject {
-        case .cue(let list, let index, let stack):
-            // "The cue's projected state on that stack, Spec 3 §7's cue view, as the thumbnail job draws it (Spec 4 §10)".
+        case .cue(let list, let index, let stack, let hide):
+            // "The cue's projected state on that stack, Spec 3 §7's cue view, as the thumbnail job draws it (Spec 4 §10);
+            // the channels `hide` lists by number draw nothing".
             let size = ThumbnailService.pictureSize(width: width, of: job.geometry.stackSize(stack.number))
             return picture(size) { textures in
-                let states = projectedStates(of: list, through: index + furthestOffset(of: stack, library: roots.library), roots: roots)
+                var states = projectedStates(of: list, through: index + furthestOffset(of: stack, library: roots.library), roots: roots)
                 guard index < states.count else { return nil }
+                for position in states.indices {
+                    for number in hide where states[position].channels[number] != nil {
+                        states[position].channels[number]?.content = .empty
+                        states[position].channels[number]?.outgoing = []
+                    }
+                }
                 let pass = stackPass(states: states, index: index, roots: roots, list: list, stack: stack, size: size, target: textures.stack)
                 var drawn = RenderDrawn(png: Data(), size: size)
                 drawn.missing = ThumbnailService.namesMissingMedia(states[index...], channels: stack.effectiveSlots(library: roots.library).map(\.channel))

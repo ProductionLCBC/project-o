@@ -131,6 +131,21 @@ final class RenderPictureTests: XCTestCase {
 
     /// "The height follows the stack's size ... the size its stack pass and
     /// preview use at that moment ..., so a picture's shape is the screen's."
+    /// Spec 11 §3 as corrected 2026-11-24 — "the channels `hide` lists by number draw nothing (§4's hidden rows; a
+    /// number no channel has is ignored)".
+    func test_aCuesHiddenChannelsDrawNothing() throws {
+        let service = try service()
+        let list = try XCTUnwrap(library.list(number: 42))
+        let stack1 = try XCTUnwrap(machine.stack(1))
+        let whole = try Picture(try draw(service, .cue(list: list, index: 1, stack: stack1)).png)
+        // Cue 2 holds cue 1's background on channel 1 and writes its lyric on channel 2.
+        let noLyric = try Picture(try draw(service, .cue(list: list, index: 1, stack: stack1, hide: [2])).png)
+        XCTAssertGreaterThan(noLyric.differs(from: whole), 0, "the lyric is gone")
+        let neither = try Picture(try draw(service, .cue(list: list, index: 1, stack: stack1, hide: [1, 2, 99])).png)
+        XCTAssertEqual(neither.lit(0, 1), 0, "with both hidden nothing is drawn, and channel 99 is ignored")
+        XCTAssertEqual(try Picture(try draw(service, .cue(list: list, index: 1, stack: stack1, hide: [99])).png).differs(from: whole), 0)
+    }
+
     func test_aPicturesShapeIsItsStacksAtThatMoment() throws {
         let service = try service()
         let list = try XCTUnwrap(library.list(number: 42))

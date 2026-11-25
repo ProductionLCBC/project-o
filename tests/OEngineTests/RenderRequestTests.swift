@@ -53,12 +53,12 @@ final class RenderRequestTests: XCTestCase {
         let request = try parse(cueSubject()).get()
         XCTAssertEqual(request.canvas, "inspector")
         XCTAssertEqual(request.width, 640)
-        guard case .cue(let found, let index, let stack) = request.subject else { return XCTFail("a cue") }
+        guard case .cue(let found, let index, let stack, _) = request.subject else { return XCTFail("a cue") }
         XCTAssertEqual(found.number, 42)
         XCTAssertEqual(index, 1, "the cue's place in its list, from 0")
         XCTAssertEqual(stack.number, 1)
         // Any stack of the machine, not the thumbnail stack alone.
-        guard case .cue(_, _, let other) = try parse(cueSubject { $0["stack"] = .number(2) }).get().subject else { return XCTFail("a cue") }
+        guard case .cue(_, _, let other, _) = try parse(cueSubject { $0["stack"] = .number(2) }).get().subject else { return XCTFail("a cue") }
         XCTAssertEqual(other.number, 2)
         // A local copy, by `local`.
         let local = try XCTUnwrap(machine.localLists.first)
@@ -68,8 +68,17 @@ final class RenderRequestTests: XCTestCase {
             $0["local"] = .string(local.uuid.uuidString.lowercased())
             $0["cue"] = .string(localCue.uuid.uuidString.lowercased())
         })
-        guard case .cue(let copy, 0, _) = try asked.get().subject else { return XCTFail("the local copy's first cue") }
+        guard case .cue(let copy, 0, _, _) = try asked.get().subject else { return XCTFail("the local copy's first cue") }
         XCTAssertEqual(copy, local)
+        // Spec 11 §3 as corrected 2026-11-24 — "optionally `hide`": channel numbers, none by default.
+        guard case .cue(_, _, _, let none) = try parse(cueSubject()).get().subject else { return XCTFail("a cue") }
+        XCTAssertEqual(none, [])
+        guard case .cue(_, _, _, let hidden) = try parse(cueSubject { $0["hide"] = .array([.number(2), .number(9)]) }).get().subject else {
+            return XCTFail("a cue")
+        }
+        XCTAssertEqual(hidden, [2, 9])
+        XCTAssertEqual(reason(parse(cueSubject { $0["hide"] = .string("2") })), .badValue)
+        XCTAssertEqual(reason(parse(cueSubject { $0["hide"] = .array([.string("two")]) })), .badValue)
     }
 
     func test_aLayoutWithItsSample() throws {

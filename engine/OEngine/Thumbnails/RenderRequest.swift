@@ -21,8 +21,9 @@ struct RenderSample: Equatable, Sendable {
 /// request was read against: a cue on a stack, a preset's layout with a
 /// sample, or a media item through a grade.
 enum RenderSubject: Equatable, Sendable {
-    /// "The cue's projected state on that stack"; `index` is the cue's place in its list, from 0.
-    case cue(list: List, index: Int, stack: Stack)
+    /// "The cue's projected state on that stack"; `index` is the cue's place in its list, from 0. Spec 11 §3 as
+    /// corrected 2026-11-24 — "the channels `hide` lists by number draw nothing".
+    case cue(list: List, index: Int, stack: Stack, hide: Set<Int> = [])
     /// "a stack's own layout at that stack's size and number, the `*` layout
     /// at the size and number of the stack `stack` names".
     case layout(preset: Preset, layout: LayoutKey, stack: Stack, sample: RenderSample)
@@ -127,9 +128,18 @@ struct RenderRequest: Equatable, Sendable {
             case .success(nil): return fail(.missingArgument, "a cue's render names its cue")
             case .success(let some?): index = some
             }
+            // "optionally `hide`": channel numbers; "a number no channel has is ignored".
+            var hide: Set<Int> = []
+            if let listed = subject["hide"] {
+                guard let items = listed.arrayValue else { return fail(.badValue, "a cue's render lists the channels it hides as \"hide\": [numbers]") }
+                for item in items {
+                    guard let number = item.intValue else { return fail(.badValue, "\"hide\" lists channel numbers, not \(item)") }
+                    hide.insert(number)
+                }
+            }
             switch stack(subject["stack"], "a cue's render names its stack") {
             case .failure(let rejection): return .failure(rejection)
-            case .success(let on): return .success(RenderRequest(canvas: canvas, width: width, subject: .cue(list: found, index: index, stack: on)))
+            case .success(let on): return .success(RenderRequest(canvas: canvas, width: width, subject: .cue(list: found, index: index, stack: on, hide: hide)))
             }
 
         case "layout":

@@ -96,7 +96,7 @@ final class ApiRenderTests: XCTestCase {
         let job = try XCTUnwrap(seen.jobs.first)
         XCTAssertEqual(job.connection, client.connection.id)
         XCTAssertEqual(job.geometry, api.engine.control.geometry)
-        guard case .cue(let list, 0, let stack) = job.request.subject else { return XCTFail("the cue asked for") }
+        guard case .cue(let list, 0, let stack, _) = job.request.subject else { return XCTFail("the cue asked for") }
         XCTAssertEqual(list.number, 42)
         XCTAssertEqual(stack.number, 1)
     }
