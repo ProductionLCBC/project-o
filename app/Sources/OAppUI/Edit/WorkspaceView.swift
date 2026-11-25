@@ -25,13 +25,19 @@ final class WorkspaceView: PanelView {
     let stacks: StackWorkspaceView
     /// Spec 11 §7 — the Channels page's workspace (G-31).
     let channels: ChannelWorkspaceView
+    /// Spec 11 §8 — the Presets page's workspace (G-32).
+    let presets: PresetWorkspaceView
     let objectPicker = ChoicePopUp(label: Strings.text(.editStackPicker))
     let objectMenu = NSPopUpButton(frame: .zero, pullsDown: true)
     /// The header's ⋯ menu for each page that has one.
     private var stackMenu_ = NSMenu()
     private var channelMenu_ = NSMenu()
+    private var presetMenu_ = NSMenu()
     var machineRoot: URL? {
-        didSet { grid.machineRoot = machineRoot }
+        didSet {
+            grid.machineRoot = machineRoot
+            presets.machineRoot = machineRoot
+        }
     }
     /// The window, which opens the popovers the page's controls ask for.
     weak var host: ShowWindowView? {
@@ -46,6 +52,7 @@ final class WorkspaceView: PanelView {
         grid = CueGridView(model: model)
         stacks = StackWorkspaceView(model: model)
         channels = ChannelWorkspaceView(model: model)
+        presets = PresetWorkspaceView(model: model)
         super.init(title: "")
         Kit.content(title)
         meta.textColor = Palette.dimText
@@ -68,13 +75,31 @@ final class WorkspaceView: PanelView {
         message.cell?.wraps = true
         undo.onPress = { [weak model] in model?.undo() }
         objectPicker.isBordered = false
-        objectPicker.onChoose = { [weak model] number in model?.editing.selectStack(number) }
+        // The header's picker is the page's: the stack on the Stacks page, the preset on the Presets page.
+        objectPicker.onChoose = { [weak model] number in
+            guard let editing = model?.editing else { return }
+            if editing.page == .presets { editing.selectPreset(number) } else { editing.selectStack(number) }
+        }
         objectMenu.isBordered = false
         stackMenu_ = stackMenu()
         channelMenu_ = channelMenu()
+        presetMenu_ = presetMenu()
         objectMenu.menu = stackMenu_
-        for view in [meta, zoom, openText, renumber, grid, stacks, channels, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
+        for view in [meta, zoom, openText, renumber, grid, stacks, channels, presets, objectPicker, objectMenu, message, undo] as [NSView] { addSubview(view) }
         refresh()
+    }
+
+    /// Spec 11 §8 — "New Preset (`edit preset create`, with an empty `*` layout), Duplicate (...) and Delete"; and its
+    /// number's Renumber, with swap for a taken number.
+    private func presetMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(NSMenuItem(title: "⋯", action: nil, keyEquivalent: ""))
+        menu.addItem(ClosureMenuItem(title: Strings.text(.editPresetNew)) { [weak model] in model?.editing.newPreset() })
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDuplicate)) { [weak model] in model?.editing.duplicatePreset() })
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(title: Strings.text(.menuDelete)) { [weak model] in model?.editing.deletePreset() })
+        return menu
     }
 
     /// Spec 11 §7 — "Its menu: New Channel ...; Duplicate ...; Delete".
@@ -148,8 +173,13 @@ final class WorkspaceView: PanelView {
             refreshChannels()
             return
         }
+        if editing.page == .presets {
+            refreshPresets()
+            return
+        }
         stacks.isHidden = true
         channels.isHidden = true
+        presets.isHidden = true
         objectPicker.isHidden = true
         objectMenu.isHidden = true
         let onCues = editing.page == .cues
@@ -192,11 +222,12 @@ final class WorkspaceView: PanelView {
     /// and the stack's fields fill the body.
     private func refreshStacks() {
         let page = model.editing.stackPage
-        for view in [meta, zoom, openText, renumber, grid, undo, channels] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, openText, renumber, grid, undo, channels, presets] as [NSView] { view.isHidden = true }
         title.stringValue = EditModeWording.page(.stacks)
         title.isHidden = false
         objectPicker.isHidden = page.stacks.isEmpty
         objectPicker.set(page.stacks.map { (EditModel.name(of: $0), $0.number) }, selected: page.stack?.number ?? 0)
+        objectPicker.setAccessibilityLabel(Strings.text(.editStackPicker))
         objectMenu.menu = stackMenu_
         objectMenu.setAccessibilityLabel(Strings.text(.editStackMenu))
         objectMenu.isHidden = false
@@ -215,7 +246,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
     private func refreshChannels() {
         let page = model.editing.channelPage
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, objectPicker] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, openText, renumber, grid, undo, stacks, presets, objectPicker] as [NSView] { view.isHidden = true }
         title.stringValue = EditModeWording.page(.channels)
         title.isHidden = false
         objectMenu.menu = channelMenu_
@@ -227,6 +258,28 @@ final class WorkspaceView: PanelView {
         channels.isHidden = page.rows.isEmpty
         channels.refresh()
         message.stringValue = page.rows.isEmpty ? Strings.text(.editChannelNone) : ""
+        message.isHidden = message.stringValue.isEmpty
+        needsLayout = true
+    }
+
+    /// Spec 11 §8 and G-32 — "a header naming the preset, with a picker of every preset and the preset's menu".
+    private func refreshPresets() {
+        let page = model.editing.presetPage
+        for view in [meta, zoom, openText, renumber, grid, undo, stacks, channels] as [NSView] { view.isHidden = true }
+        title.stringValue = EditModeWording.page(.presets)
+        title.isHidden = false
+        objectPicker.isHidden = page.presets.isEmpty
+        objectPicker.set(page.presets.map { (EditModel.name(of: $0), $0.number) }, selected: page.preset?.number ?? 0)
+        objectPicker.setAccessibilityLabel(Strings.text(.editPresetPicker))
+        objectMenu.menu = presetMenu_
+        objectMenu.setAccessibilityLabel(Strings.text(.editPresetMenu))
+        objectMenu.isHidden = false
+        // "Preset 1 can be edited but not deleted, renumbered or swapped".
+        for item in presetMenu_.items where item.title == Strings.text(.menuDuplicate) { item.isEnabled = page.preset != nil }
+        presetMenu_.items.last?.isEnabled = page.preset != nil && page.preset?.number != 1
+        presets.isHidden = page.preset == nil
+        presets.refresh()
+        message.stringValue = page.presets.isEmpty ? Strings.text(.editPresetNone) : ""
         message.isHidden = message.stringValue.isEmpty
         needsLayout = true
     }
@@ -259,6 +312,7 @@ final class WorkspaceView: PanelView {
         grid.frame = body
         stacks.frame = body
         channels.frame = body
+        presets.frame = body
         let width = min(360, bounds.width - 40)
         // Under the grid's band and headers, where an empty list has nothing.
         let top = grid.isHidden ? body.midY - 18 : body.minY + CGFloat(CueGridGeometry.band + grid.geometry.header) + 28

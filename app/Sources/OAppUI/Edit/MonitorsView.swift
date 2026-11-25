@@ -65,6 +65,11 @@ final class PreviewPanelView: PanelView {
             model.editing.selectChannel(number)
             return
         }
+        // G-32 — on the Presets page it names the stack the canvas is drawn at: for `*`, any stack; else the stack's tab.
+        if model.editing.page == .presets, let number {
+            if model.editing.presetTab == .any { model.editing.setCanvasStack(number) } else { model.editing.selectTab(.stack(number)) }
+            return
+        }
         model.change { $0.previewStack = number }
     }
 
@@ -74,6 +79,8 @@ final class PreviewPanelView: PanelView {
         switch model.editing.page {
         case .stacks: live.set(model.editing.stackNumber.flatMap { mach?.preview(stack: $0) })
         case .channels: live.set(model.editing.sheetChannel.flatMap { mach?.picture(channel: $0) })
+        // G-32 — "the live picture of the stack the layout tab names (the thumbnail stack's for `*`)".
+        case .presets: live.set(model.editing.canvasStack.flatMap { mach?.preview(stack: $0) })
         default: return
         }
     }
@@ -82,8 +89,9 @@ final class PreviewPanelView: PanelView {
         let stacks = (model.store.catalog?.stacks ?? []).sorted { $0.number < $1.number }
         let page = model.editing.page
         let onStacks = page == .stacks
-        let showsLive = page == .stacks || page == .channels
-        let selected = onStacks ? (model.editing.stackNumber ?? model.previewStack) : model.previewStack
+        let showsLive = page == .stacks || page == .channels || page == .presets
+        let selected = onStacks ? (model.editing.stackNumber ?? model.previewStack)
+            : page == .presets ? (model.editing.canvasStack ?? model.previewStack) : model.previewStack
         live.isHidden = !showsLive
         picture.isHidden = showsLive
         picker.removeAllItems()

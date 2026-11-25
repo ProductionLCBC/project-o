@@ -813,6 +813,95 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(sheet.number.stringValue, "1", "the field is put back")
     }
 
+    // MARK: - The Presets page (Spec 11 §8)
+
+    /// Spec 11 §8 and G-32 — the layout tabs, the canvas whose boxes select, nudge and drag, the box list, the box's
+    /// properties and its text style, each sending its edit.
+    func test_thePresetsPageShowsTheLayoutAndEachControlSendsItsEdit() throws {
+        let rig = try editing()
+        let view = rig.view
+        rig.model.editing.show(page: .presets)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertFalse(view.presetInspector.isHidden)
+        XCTAssertTrue(view.inspector.isHidden)
+        let workspace = view.workspace
+        XCTAssertEqual(workspace.objectPicker.itemTitles, ["1 Default", "2 Clock", "3 Lower third", "4 Credits"])
+        let page = workspace.presets
+        XCTAssertFalse(page.isHidden)
+        // "a tab for the `*` layout and one per stack this machine has, each naming the stacks it draws on this machine
+        // ..., with the live dot on those an output shows".
+        XCTAssertEqual(page.tabs.map(\.title), ["● Any stack: 1 Main", "● 1 Main", "2 Confidence"])
+        XCTAssertEqual(page.layoutNote.stringValue, "Drawn at 1 Main")
+        let render = try XCTUnwrap(rig.sent.last { $0.fields["what"] == .string("render") && $0.fields["canvas"] == .string("layout") })
+        XCTAssertEqual(render.fields["subject"]?.objectValue?["layout"], .string("*"))
+        // A click selects the topmost box under it: the body box over the full-frame pixel box.
+        let canvas = page.canvas
+        let middle = canvas.rect(of: Frame(x: 0.5, y: 0.5, w: 0, h: 0)).origin
+        canvas.press(at: middle)
+        canvas.release()
+        XCTAssertEqual(rig.model.editing.presetState.box, 1)
+        let inspector = view.presetInspector
+        XCTAssertEqual(inspector.boxList.rows.map(\.name.stringValue), ["body", "pixels"])
+        XCTAssertEqual(inspector.boxList.rows.map(\.isSelected), [true, false])
+        // ⇧→ nudges by ten pixels of the stack, sent once when the key is released.
+        let before = count(rig)
+        canvas.keyDown(with: try key(124, .shift))
+        canvas.keyDown(with: try key(124, .shift))
+        XCTAssertEqual(count(rig), before, "nothing until the key is released")
+        let up = try XCTUnwrap(NSEvent.keyEvent(with: .keyUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+                                                characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: 124))
+        canvas.keyUp(with: up)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.9, \"x\": 0.0604, \"y\": 0.1 }"])
+        // The box's properties.
+        inspector.offset.segments[1].press()
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.offset 1"])
+        inspector.frameW.stringValue = "50"
+        inspector.frameW.sendAction(inspector.frameW.action, to: inspector.frameW.target)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.5, \"x\": 0.05, \"y\": 0.1 }"])
+        inspector.fallback.toggle()
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.fallback false"])
+        // Its text style.
+        XCTAssertTrue(inspector.fromStyle.stringValue.hasPrefix("From 1 Body"), inspector.fromStyle.stringValue)
+        inspector.allCaps.toggle()
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.allCaps true"])
+        inspector.size.stringValue = "60"
+        inspector.size.sendAction(inspector.size.action, to: inspector.size.target)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.size.value 60"])
+        inspector.align.segments[0].press()
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.alignment \"left\""])
+        inspector.color.choose(NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1))
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.color { \"a\": 1, \"b\": 0, \"g\": 0, \"r\": 1 }"])
+        // A drag moves the box: past the edge, it stops at it.
+        let stack = canvas.stackRect
+        canvas.press(at: middle)
+        canvas.drag(to: NSPoint(x: middle.x + stack.width * 0.1, y: middle.y), snapping: false)
+        canvas.release()
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.9, \"x\": 0.1, \"y\": 0.1 }"])
+        // The pixel box has no text style.
+        inspector.boxList.rows[1].onSelect?()
+        XCTAssertFalse(inspector.noStyle.isHidden)
+        XCTAssertTrue(inspector.size.isHidden)
+        // Add Box ▸ Pixels inserts at the top.
+        inspector.addBox.menu?.performActionForItem(at: 1)
+        XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 insert layouts.*.boxes 2 {"), true)
+        // Stack 1's tab uses the * layout, and offers Copy from *.
+        page.tabs[1].press()
+        XCTAssertEqual(page.layoutNote.stringValue, "Uses the * layout")
+        XCTAssertFalse(page.copyFromAny.isHidden)
+        XCTAssertFalse(inspector.addBox.isEnabled)
+        page.copyFromAny.press()
+        XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 layouts.1 { \"boxes\": ["), true)
+        // The sample: Empty asks for the picture again with nothing in the channel.
+        page.tabs[0].press()
+        page.sampleKind.segments[2].press()
+        let empty = try XCTUnwrap(rig.sent.last { $0.fields["what"] == .string("render") })
+        XCTAssertEqual(empty.fields["subject"]?.objectValue?["sample"], .object(["content": .object(["kind": .string("empty")])]))
+        // The header's picker picks the preset.
+        workspace.objectPicker.choose(tag: 2)
+        XCTAssertEqual(page.tabs.map(\.title), ["● Any stack: 1 Main, 2 Confidence", "● 1 Main", "2 Confidence"])
+        XCTAssertEqual(inspector.boxList.rows.map(\.name.stringValue), ["static · [Time]"])
+    }
+
     // MARK: - A picture of it
 
     func test_theEditWindowDrawsIntoAPicture() throws {
@@ -856,5 +945,12 @@ final class EditModeViewTests: XCTestCase {
         let fifth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: fifth)
         try XCTUnwrap(fifth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-channels.png"))
+        // The Presets page, the body box selected.
+        rig.model.editing.show(page: .presets)
+        rig.model.editing.selectBox(1)
+        rig.view.layoutSubtreeIfNeeded()
+        let sixth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: sixth)
+        try XCTUnwrap(sixth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-presets.png"))
     }
 }

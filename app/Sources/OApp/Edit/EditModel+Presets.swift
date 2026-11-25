@@ -79,6 +79,16 @@ extension EditModel {
         return stacks.first
     }
 
+    /// Spec 11 §3 — "A stack's size is that of the output showing it, else of an output whose default stack it is,
+    /// else 1920 by 1080": the canvas's pixels, which a nudge moves by.
+    public var canvasSize: (width: Int, height: Int) {
+        guard let stack = canvasStack, let outputs = model.store.catalog?.outputs.sorted(by: { $0.number < $1.number }) else { return (1920, 1080) }
+        let showing = model.outputDots.filter { $0.stack == stack && $0.state != .absent }.map(\.number)
+        let output = outputs.first { showing.contains($0.number) } ?? outputs.first { $0.defaultStack == stack }
+        guard let format = output?.format, format.width > 0, format.height > 0 else { return (1920, 1080) }
+        return (format.width, format.height)
+    }
+
     /// The box the properties show, when the tab's layout is its own.
     public var selectedBox: Box? {
         let page = presetPage

@@ -34,6 +34,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     /// Spec 11 §6 and G-30 — the Stacks page's inspector, where the Cues page's stands.
     let stackInspector: StackInspectorView
     let channelInspector: ChannelInspectorView
+    let presetInspector: PresetInspectorView
     /// Spec 11 §2, "The lock" — "an open field's unsent text is offered in a sheet with Copy": what was offered last.
     private(set) var unsentText: String?
     /// Spec 10 §4 — the columns' widths, "200 to 360" and "340 to 480"; Spec 10 §6 — the pool's divider.
@@ -107,19 +108,21 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         inspector = InspectorView(model: model)
         stackInspector = StackInspectorView(model: model)
         channelInspector = ChannelInspectorView(model: model)
+        presetInspector = PresetInspectorView(model: model)
         super.init(frame: .zero)
         fill = Palette.gut
         for panel in [grid, commandBar, pool] as [Surface] { dress(panel, asPanel: true) }
         dress(left, asPanel: true)
         previewPanel.mach = mach
-        for view in [grid, commandBar, pool, browser, left, workspace, previewPanel, programPanel, inspector, stackInspector, channelInspector, preview, nextRow, tabs, strip, topBar, banner,
+        for view in [grid, commandBar, pool, browser, left, workspace, previewPanel, programPanel, inspector, stackInspector, channelInspector, presetInspector, preview, nextRow, tabs, strip, topBar, banner,
                      leftDivider, rightDivider, poolDivider, browserDivider, monitorsDivider, inspectorDivider] as [NSView] {
             addSubview(view)
         }
-        for view in [browser, workspace, previewPanel, programPanel, inspector, stackInspector, channelInspector] as [NSView] { view.isHidden = true }
+        for view in [browser, workspace, previewPanel, programPanel, inspector, stackInspector, channelInspector, presetInspector] as [NSView] { view.isHidden = true }
         browser.host = self
         workspace.host = self
         inspector.host = self
+        presetInspector.host = self
         workspace.grid.onEditContent = { [weak self] in self?.inspector.editContent() }
         // Spec 11 §2 — Show and Edit in the top bar, and its page picker.
         topBar.onShow = { [weak self] in self?.leaveEdit() }
@@ -626,6 +629,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         inspector.isHidden = !editing || model.editing.page != .cues
         stackInspector.isHidden = !editing || model.editing.page != .stacks
         channelInspector.isHidden = !editing || model.editing.page != .channels
+        presetInspector.isHidden = !editing || model.editing.page != .presets
         // Spec 10 §4 — "Both modes draw their regions alike ... on the darker ground between panels". In edit mode the
         // left column is laid over the Browser's panel, which draws the chrome itself.
         fill = Palette.gut
@@ -644,6 +648,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         inspector.refresh()
         stackInspector.refresh()
         channelInspector.refresh()
+        presetInspector.refresh()
     }
 
     /// Redraws the regions a change touches.
@@ -760,6 +765,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             inspector.frame = rect(frame.inspector)
             stackInspector.frame = rect(frame.inspector)
             channelInspector.frame = rect(frame.inspector)
+            presetInspector.frame = rect(frame.inspector)
             // The dividers sit in the gaps, a few points either side of each.
             let thick = DividerView.thickness
             let gap = CGFloat(EditFrame.gap)
