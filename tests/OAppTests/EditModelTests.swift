@@ -272,6 +272,87 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.model.settings.gridZoom, 480)
     }
 
+    // MARK: - The Stacks page (Spec 11 §6)
+
+    /// The last command sent, a render query's empty entry aside; and how many were.
+    private func last(_ rig: Rig) -> [String]? { rig.commands.last { !$0.isEmpty } }
+    private func count(_ rig: Rig) -> Int { rig.commands.filter { !$0.isEmpty }.count }
+
+    /// "a click on a stack selects that stack"; "A click on an output selects the stack it shows"; the slots' moves
+    /// counted in the stack's own order; "On a stack an output shows, adding or removing a slot asks first".
+    func test_theStacksPageSelectsMovesAndAsksOnAir() throws {
+        let rig = try Rig()
+        rig.model.editing.open(page: .stacks)
+        XCTAssertEqual(rig.model.editing.stackNumber, 1, "the stack output 1 shows")
+        XCTAssertEqual(rig.model.editing.outputNumber, 1)
+        rig.model.editing.selectStack(2)
+        XCTAssertEqual(rig.model.editing.stackNumber, 2)
+        XCTAssertEqual(rig.model.settings.editStack, 2, "kept in view.json")
+        rig.model.editing.selectOutput(1)
+        XCTAssertEqual(rig.model.editing.stackNumber, 1, "the stack the output shows")
+        // Stack 1 holds 1 then 2, bottom first; the list shows 2 then 1. Channel 1 dropped above the top row goes to the top.
+        rig.model.editing.moveSlot(channel: 1, toRow: 0)
+        XCTAssertEqual(last(rig), ["edit stack 1 slot 1 move 1"])
+        rig.model.editing.moveSlot(channel: 2, up: false)
+        XCTAssertEqual(last(rig), ["edit stack 1 slot 2 move 0"])
+        let sent = count(rig)
+        rig.model.editing.moveSlot(channel: 2, up: true)
+        XCTAssertEqual(count(rig), sent, "already at the top")
+        // Stack 1 is on air on output 1: removing a slot asks first, and sends only on yes.
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(false)
+        }
+        rig.model.editing.removeSlot(channel: 2)
+        XCTAssertEqual(asked, [.slotOnAir(channel: 2, label: "Foreground", outputs: [1], adding: false)])
+        XCTAssertEqual(count(rig), sent)
+        XCTAssertFalse(rig.model.editing.canAddSlot(channel: 2), "a channel appears once per stack")
+        XCTAssertTrue(rig.model.editing.canAddSlot(channel: 3))
+        rig.model.confirm = { _, answer in answer(true) }
+        rig.model.editing.addSlot(channel: 3, atRow: 0)
+        XCTAssertEqual(last(rig), ["edit stack 1 insert slots 2 { \"channel\": 3, \"mute\": false, \"opacity\": 1, \"preset\": null }"])
+        // Stack 2 shows on no output: nothing to ask.
+        asked = []
+        rig.model.editing.selectStack(2)
+        rig.model.editing.removeSlot(channel: 3)
+        XCTAssertEqual(asked, [])
+        XCTAssertEqual(last(rig), ["edit stack 2 slot 3 remove"])
+        // The audio routing keeps the numbers this machine has no audio output for.
+        rig.model.editing.setAudio(channel: 1, output: 2, on: true)
+        XCTAssertEqual(last(rig), ["edit channel 1 audioOutputs [1, 2]"])
+        rig.model.editing.renumberStack(to: 1)
+        XCTAssertEqual(last(rig), ["edit stack 2 swap 1"], "a taken number swaps")
+    }
+
+    /// Spec 11 §6, §7, §8 — Delete "asking first ..., with the counts from `uses`".
+    func test_deleteAsksTheEngineWhatRefersToItFirst() throws {
+        try CatalogFile.install()
+        let rig = try Rig()
+        rig.model.editing.open(page: .stacks)
+        rig.model.editing.selectStack(2)
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(true)
+        }
+        rig.model.editing.deleteStack()
+        let query = try XCTUnwrap(rig.sent.last)
+        XCTAssertEqual(query.fields["what"], .string("uses"))
+        XCTAssertEqual(query.fields["object"], .string("stack"))
+        XCTAssertEqual(query.fields["stack"], .number(2))
+        rig.answers[rig.answers.count - 1](.answer(["counts": .object(["cues": .number(2), "outputs": .number(0)])]))
+        XCTAssertEqual(asked, [.deleteNumbered(name: "2 Confidence", uses: ["cues": 2])])
+        XCTAssertEqual(last(rig), ["edit stack 2 delete"])
+        XCTAssertEqual(EditWording.words(asked[0], locale: Locale(identifier: "en_US")).body,
+                       ["2 cues refer to it. They stay, and the reference report flags them until they’re edited."])
+        // Stack 1 is on air: Delete is refused before anything is asked.
+        rig.model.editing.selectStack(1)
+        let before = rig.sent.count
+        rig.model.editing.deleteStack()
+        XCTAssertEqual(rig.sent.count, before)
+    }
+
     // MARK: - Hidden rows (Spec 11 §4, corrected 2026-11-24)
 
     /// "an eye that hides the channel from the Preview monitor's picture alone ... Hidden rows are kept by channel number

@@ -375,4 +375,14 @@ public enum Confirmation: Equatable, Sendable {
     /// or include the live cue or the armed one (choice A-11)": how many
     /// cues, and which of those reasons apply.
     case deleteCues(count: Int, live: Bool, armed: Bool, edits: Bool)
+    /// Spec 11 §6 — "On a stack an output shows, adding or removing a slot
+    /// asks first, since it changes the picture at once": "Channel 3's content
+    /// and its static boxes will show on output 1 now" or "Channel 2 is on air
+    /// on output 1; removing its slot takes it off."
+    case slotOnAir(channel: Int, label: String, outputs: [Int], adding: Bool)
+    /// Spec 11 §6, §7, §8 — Delete of a stack, channel or preset, "asking
+    /// first ..., with the counts from `uses`": "12 cues in 3 lists write
+    /// channel 5. They stay in the lists, and the reference report flags them
+    /// until they're edited." `uses` is the answer's non-zero counts by kind.
+    case deleteNumbered(name: String, uses: [String: Int])
 }

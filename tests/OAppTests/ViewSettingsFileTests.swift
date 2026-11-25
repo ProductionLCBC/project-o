@@ -62,6 +62,8 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.gridZoom = 88
         settings.foldedRows = [2: true]
         settings.hiddenRows = [2, 3]
+        settings.editStack = 2
+        settings.editOutput = 1
         settings.editBrowserWidth = 300
         settings.editMonitorsWidth = 420
         settings.editInspectorHeight = 320

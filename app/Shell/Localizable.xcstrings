@@ -2581,6 +2581,30 @@
         }
       }
     },
+    "edit.confirm.delete.title" : {
+      "comment" : "Asked before a stack, channel or preset is deleted. %@ is its number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete %@?"
+          }
+        }
+      }
+    },
+    "edit.confirm.delete.used" : {
+      "comment" : "Under the delete question, when anything refers to the object. %@ is the counts, as \"12 cues and 3 stacks\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ refer to it. They stay, and the reference report flags them until they’re edited."
+          }
+        }
+      }
+    },
     "edit.confirm.deleteCues.armed" : {
       "comment" : "Under the delete-cues question, when the armed cue is selected.",
       "extractionState" : "manual",
@@ -2649,6 +2673,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Undo brings back what is deleted."
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.add" : {
+      "comment" : "The button that adds a slot to a stack on air.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.add.body" : {
+      "comment" : "Under the add-slot question. %lld is the channel's number; %@ is the outputs, as \"output 1\" or \"outputs 1 and 2\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld's content and its static boxes will show on %@ now."
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.add.title" : {
+      "comment" : "Asked before a slot is added to a stack an output shows. %@ is the channel's number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add channel %@ to a stack on air?"
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.output" : {
+      "comment" : "The output in the slot questions, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "output %@"
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.outputs" : {
+      "comment" : "The outputs in the slot questions, several joined as a list of numbers (\"1 and 2\").",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "outputs %@"
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.remove.body" : {
+      "comment" : "Under the remove-slot question. %lld is the channel's number; %@ is the outputs, as \"output 1\" or \"outputs 1 and 2\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld is on air on %@; removing its slot takes it off."
+          }
+        }
+      }
+    },
+    "edit.confirm.slot.remove.title" : {
+      "comment" : "Asked before a slot is removed from a stack an output shows. %@ is the channel's number and label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove channel %@ from a stack on air?"
           }
         }
       }
@@ -4381,6 +4489,18 @@
         }
       }
     },
+    "edit.stack.untitled" : {
+      "comment" : "A stack with no label, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld"
+          }
+        }
+      }
+    },
     "edit.state.clear" : {
       "comment" : "The three-way control: the cue clears the channel.",
       "extractionState" : "manual",
@@ -4617,6 +4737,174 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use Previous Video’s Length"
+          }
+        }
+      }
+    },
+    "edit.uses.audioOutputs" : {
+      "comment" : "A count in the delete question: audio outputs that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld audio output"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld audio outputs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.boxes" : {
+      "comment" : "A count in the delete question: preset boxes that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld box"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld boxes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.channels" : {
+      "comment" : "A count in the delete question: channels that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld channel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld channels"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.machine" : {
+      "comment" : "A count in the delete question: this machine's settings that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld machine setting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld machine settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.media" : {
+      "comment" : "A count in the delete question: media items whose defaults refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld media item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld media items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.outputs" : {
+      "comment" : "A count in the delete question: outputs that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld output"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld outputs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.uses.stacks" : {
+      "comment" : "A count in the delete question: stacks that refer to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stack"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stacks"
+                }
+              }
+            }
           }
         }
       }
