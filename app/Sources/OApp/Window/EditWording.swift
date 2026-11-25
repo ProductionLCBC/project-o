@@ -244,6 +244,9 @@ public enum EditWording {
             let parts = order.compactMap { kind, key in uses[kind].map { Strings.counted(key, $0) } }
             let body = parts.isEmpty ? [] : [Strings.text(.editConfirmDeleteUsed, joined(parts, locale: locale))]
             return ConfirmationWords(title: Strings.text(.editConfirmDeleteTitle, name), body: body, button: Strings.text(.confirmDelete))
+        case .removeLayout(let preset, let stack):
+            return ConfirmationWords(title: Strings.text(.editConfirmLayoutTitle, stack, preset), body: [Strings.text(.editConfirmLayoutBody, stack)],
+                                     button: Strings.text(.confirmRemove))
         }
     }
 

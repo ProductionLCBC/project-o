@@ -407,6 +407,134 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit channel 3 delete"])
     }
 
+    // MARK: - The preset editor (Spec 11 §8)
+
+    /// The last query sent of a kind.
+    private func query(_ rig: Rig, _ what: String) -> [String: JSONValue]? {
+        rig.sent.last { $0.fields["what"] == .string(what) }?.fields
+    }
+
+    /// Spec 11 §8 — the canvas is the engine's `render` of the layout with the sample, "the `*` layout at the size of
+    /// the stack its picker names (the thumbnail stack at first)", asked for again after each edit; Used by from `uses`;
+    /// the fonts from `fonts`.
+    func test_thePresetsPageAsksForTheLayoutsPictureUsedByAndTheFonts() throws {
+        let rig = try Rig()
+        let editing = rig.model.editing
+        XCTAssertTrue(editing.open(page: .presets))
+        XCTAssertNotNil(query(rig, "fonts"))
+        let uses = try XCTUnwrap(query(rig, "uses"))
+        XCTAssertEqual(uses["preset"], .number(1))
+        editing.canvasWidth(960)
+        let render = try XCTUnwrap(query(rig, "render"))
+        XCTAssertEqual(render["canvas"], .string("layout"))
+        XCTAssertEqual(render["width"], .number(960))
+        let subject = try XCTUnwrap(render["subject"]?.objectValue)
+        XCTAssertEqual(subject["kind"], .string("layout"))
+        XCTAssertEqual(subject["preset"], .number(1))
+        XCTAssertEqual(subject["layout"], .string("*"))
+        XCTAssertEqual(subject["stack"], .number(1), "the thumbnail stack")
+        // The sample: "the fields of the cue selected in the Cues page when it writes text, with that cue as the
+        // sample's `listUuid` and `cue`".
+        let sample = try XCTUnwrap(subject["sample"]?.objectValue)
+        XCTAssertEqual(sample["listUuid"], .string(rig.model.editing.listUuid ?? ""))
+        XCTAssertEqual(sample["cue"], .string(rig.model.editing.selection.lead ?? ""))
+        XCTAssertEqual(sample["content"]?.objectValue?["kind"], .string("text"))
+        // The answer: the picture, what overflowed and what fell back.
+        let renderAnswer = try XCTUnwrap(rig.answers.indices.last { rig.sent[$0].fields["what"] == .string("render") })
+        rig.answers[renderAnswer](.answer(["file": .string("thumbnails/render/c1-layout-9.png"), "width": .number(960), "height": .number(540),
+                                           "overflow": .array([.object(["box": .number(1), "offset": .number(0), "linesCut": .number(2)])]),
+                                           "fallbackFonts": .array([.object(["box": .number(1), "font": .string("DMSans-Bold")])])]))
+        XCTAssertEqual(editing.presetState.picture.file, "thumbnails/render/c1-layout-9.png")
+        XCTAssertEqual(editing.presetState.overflow, [LayoutOverflow(box: 1, offset: 0, linesCut: 2)])
+        XCTAssertEqual(editing.presetState.fallbackFonts, [1: "DMSans-Bold"])
+        // Used by.
+        let usesAnswer = try XCTUnwrap(rig.answers.indices.last { rig.sent[$0].fields["what"] == .string("uses") })
+        rig.answers[usesAnswer](.answer(["counts": .object(["channels": .number(2), "stacks": .number(3)]), "uses": .object([
+            "channels": .array([.object(["channel": .number(1), "field": .string("defaultPreset")])]),
+            "stacks": .array([.object(["stack": .number(1), "slot": .number(2)]), .object(["stack": .number(2), "field": .string("defaultPreset")]),
+                              .object(["stack": .number(2), "slot": .number(3), "fallback": .bool(true)])]),
+        ])]))
+        XCTAssertEqual(editing.presetState.usedBy.map(\.kind), [.channelDefault(1), .slot(stack: 1, channel: 2), .stackDefault(2), .fallback(stack: 2, channel: 3)])
+        // Stack 2's tab: its own layout at its own size; a new picture is asked for.
+        let before = rig.sent.count
+        editing.selectTab(.stack(2))
+        XCTAssertEqual(rig.sent.count, before + 1)
+        XCTAssertEqual(query(rig, "render")?["subject"]?.objectValue?["layout"], .number(2))
+        XCTAssertNil(query(rig, "render")?["subject"]?.objectValue?["stack"])
+        // The sample's own field replaces the body.
+        editing.selectTab(.any)
+        editing.setSampleText("Holy, holy, holy")
+        XCTAssertEqual(query(rig, "render")?["subject"]?.objectValue?["sample"]?.objectValue?["content"]?.objectValue?["fields"]?.objectValue?["body"],
+                       .string("Holy, holy, holy"))
+        editing.setSample(kind: .empty)
+        XCTAssertEqual(query(rig, "render")?["subject"]?.objectValue?["sample"], .object(["content": .object(["kind": .string("empty")])]))
+    }
+
+    /// Spec 11 §8 — the boxes, the layouts and the preset each send their edit.
+    func test_thePresetEditorsControlsSendTheirEdits() throws {
+        try CatalogFile.install()
+        let rig = try Rig()
+        let editing = rig.model.editing
+        XCTAssertTrue(editing.open(page: .presets))
+        // Nothing is edited until a box is selected.
+        let sent = count(rig)
+        editing.setBox("offset", .number(1))
+        XCTAssertEqual(count(rig), sent)
+        editing.selectBox(1)
+        XCTAssertEqual(editing.selectedBox?.binding.kind, .field(name: "body"))
+        editing.setBox("offset", .number(1))
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.offset 1"])
+        editing.setFrame(Frame(x: 0.1, y: 0.1, w: 0.5, h: 0.5), of: 0)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.0.frame { \"h\": 0.5, \"w\": 0.5, \"x\": 0.1, \"y\": 0.1 }"])
+        XCTAssertEqual(editing.presetState.box, 0, "the box dragged is selected")
+        editing.setStyle("allCaps", .bool(true))
+        XCTAssertEqual(count(rig), sent + 2, "a pixel box has no text style")
+        editing.selectBox(1)
+        editing.setStyle("allCaps", .bool(true))
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.textStyle.allCaps true"])
+        editing.moveBox(1, up: false)
+        XCTAssertEqual(last(rig), ["edit preset 1 move layouts.*.boxes 1 0"])
+        XCTAssertEqual(editing.presetState.box, 0, "the selection follows the box")
+        editing.removeBox(0)
+        XCTAssertEqual(last(rig), ["edit preset 1 remove layouts.*.boxes 0"])
+        XCTAssertNil(editing.presetState.box)
+        editing.addBox(.pixels)
+        XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 insert layouts.*.boxes 2 {"), true, "at the top")
+        rig.answers[rig.answers.count - 1](.result(CommandOutcome(kind: .ok)))
+        XCTAssertEqual(editing.presetState.box, 2, "the new box is selected")
+        // Stack 1's tab uses the * layout: Copy from * gives it its own; its boxes aren't edited until then.
+        editing.selectTab(.stack(1))
+        XCTAssertFalse(editing.presetPage.ownsLayout)
+        editing.selectBox(0)
+        XCTAssertNil(editing.selectedBox)
+        editing.copyLayoutFromAny()
+        XCTAssertEqual(last(rig)?.first?.hasPrefix("edit preset 1 layouts.1 { \"boxes\": ["), true)
+        // Stack 2's own layout: Remove asks first.
+        var asked: [Confirmation] = []
+        rig.model.confirm = { confirmation, answer in
+            asked.append(confirmation)
+            answer(true)
+        }
+        editing.selectTab(.stack(2))
+        editing.removeStackLayout()
+        XCTAssertEqual(asked, [.removeLayout(preset: 1, stack: 2)])
+        XCTAssertEqual(last(rig), ["edit preset 1 unset layouts.2"])
+        // Preset 1 is built in: neither deleted nor renumbered.
+        let now = rig.sent.count
+        editing.deletePreset()
+        editing.renumberPreset(to: 9)
+        XCTAssertEqual(rig.sent.count, now)
+        editing.selectPreset(3)
+        editing.renumberPreset(to: 4)
+        XCTAssertEqual(last(rig), ["edit preset 3 swap 4"], "4 is taken")
+        editing.deletePreset()
+        let uses = try XCTUnwrap(query(rig, "uses"))
+        XCTAssertEqual(uses["preset"], .number(3))
+        rig.answers[rig.answers.count - 1](.answer(["counts": .object([:])]))
+        XCTAssertEqual(asked.last, .deleteNumbered(name: "3 Lower third", uses: [:]), "a preset asks even when nothing uses it")
+        XCTAssertEqual(last(rig), ["edit preset 3 delete"])
+    }
+
     /// Spec 11 §7 — "Renumber is refused while the channel has content in a stack an output shows, and Swap while
     /// either channel has content and either is in a stack an output shows"; Delete likewise.
     func test_aChannelOnAirIsNeitherRenumberedNorDeleted() throws {

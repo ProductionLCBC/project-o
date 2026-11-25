@@ -79,6 +79,9 @@ public final class EditModel {
     /// The page's list as the show grid has it where it came from: its item's number and whether its cues may be fired.
     public private(set) var section: GridSection?
     public private(set) var preview = PreviewPicture()
+    /// Spec 11 §8 — the Presets page's own state: the selected box, the canvas's stack, the sample, the engine's
+    /// picture of the layout, what uses the preset and the fonts the engine draws.
+    public internal(set) var presetState = PresetEditorState()
 
     private var standing: EditNotice?
     private var triedLeaving = false
@@ -160,6 +163,7 @@ public final class EditModel {
         set(source: source, item: item, list: list, cue: cue)
         if wasShow { model.note?(["event": .string("editMode"), "on": .bool(true)], "Edit mode opened") }
         model.changed([.layout, .edit, .top])
+        if page == .presets { presetsOpened() }
     }
 
     /// Makes a list the Cues page's, on a cue of it: the one named, else its first.
@@ -241,6 +245,7 @@ public final class EditModel {
         model.settings.editPage = page
         model.changed([.edit, .top])
         askPreview()
+        if page == .presets { presetsOpened() }
     }
 
     public func show(tab: BrowserTab) {
@@ -354,12 +359,19 @@ public final class EditModel {
         if selection != before { remember() }
         // "It is asked for again after each `library` event that names the list or anything it draws."
         if !changes.isDisjoint(with: [.connection, .catalog, .lists, .media]) { askPreview(again: true) }
+        // Spec 11 §8 — the layout's picture is "asked for again after each edit", and Used by with it.
+        if page == .presets, !changes.isDisjoint(with: [.connection, .catalog, .media]) {
+            askLayout(again: true)
+            askPresetUses(again: true)
+            if changes.contains(.connection) { askFonts(again: true) }
+        }
     }
 
     /// The preview stack or another setting changed.
     func settingsChanged() {
         rebuild()
         askPreview()
+        if page == .presets { askLayout() }
     }
 
     private func acted() {

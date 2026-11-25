@@ -385,4 +385,7 @@ public enum Confirmation: Equatable, Sendable {
     /// channel 5. They stay in the lists, and the reference report flags them
     /// until they're edited." `uses` is the answer's non-zero counts by kind.
     case deleteNumbered(name: String, uses: [String: Int])
+    /// Spec 11 §8 — "A stack's own layout offers Remove This Stack's Layout
+    /// (`edit preset P unset layouts.S`), asking first."
+    case removeLayout(preset: Int, stack: Int)
 }

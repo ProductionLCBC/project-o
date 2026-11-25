@@ -3205,6 +3205,30 @@
         }
       }
     },
+    "edit.confirm.layout.body" : {
+      "comment" : "What removing a stack's own layout does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld will draw the preset’s * layout."
+          }
+        }
+      }
+    },
+    "edit.confirm.layout.title" : {
+      "comment" : "Before a stack's own layout is removed from a preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove stack %1$lld’s layout from preset %2$lld?"
+          }
+        }
+      }
+    },
     "edit.confirm.slot.add" : {
       "comment" : "The button that adds a slot to a stack on air.",
       "extractionState" : "manual",
@@ -4809,6 +4833,1218 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Timers"
+          }
+        }
+      }
+    },
+    "edit.preset.addBox" : {
+      "comment" : "A menu of the boxes to add at the top of the layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Box"
+          }
+        }
+      }
+    },
+    "edit.preset.addField" : {
+      "comment" : "Add Box: a box that draws one of the text's fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field"
+          }
+        }
+      }
+    },
+    "edit.preset.addPixels" : {
+      "comment" : "Add Box: a box that draws the channel's picture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixels"
+          }
+        }
+      }
+    },
+    "edit.preset.addStatic" : {
+      "comment" : "Add Box: a box of fixed text with variables.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Static Text"
+          }
+        }
+      }
+    },
+    "edit.preset.align" : {
+      "comment" : "A text style's alignment.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align"
+          }
+        }
+      }
+    },
+    "edit.preset.allCaps" : {
+      "comment" : "A text style that draws its text in capitals.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All caps"
+          }
+        }
+      }
+    },
+    "edit.preset.anyTab" : {
+      "comment" : "The * layout's tab, naming the stacks on this Mac it draws.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any stack: %@"
+          }
+        }
+      }
+    },
+    "edit.preset.anyTabNone" : {
+      "comment" : "The * layout's tab when every stack here has a layout of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any stack"
+          }
+        }
+      }
+    },
+    "edit.preset.applyStyle" : {
+      "comment" : "A menu of the numbered styles to copy into the box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply Style"
+          }
+        }
+      }
+    },
+    "edit.preset.binding" : {
+      "comment" : "What a box draws: pixels, a field or static text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Binding"
+          }
+        }
+      }
+    },
+    "edit.preset.blur" : {
+      "comment" : "A shadow's blur.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur"
+          }
+        }
+      }
+    },
+    "edit.preset.bottom" : {
+      "comment" : "Vertical alignment: bottom.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bottom"
+          }
+        }
+      }
+    },
+    "edit.preset.box" : {
+      "comment" : "The heading of the selected box's properties.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Box"
+          }
+        }
+      }
+    },
+    "edit.preset.boxMenu" : {
+      "comment" : "VoiceOver: a box row's menu.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Box menu"
+          }
+        }
+      }
+    },
+    "edit.preset.boxes" : {
+      "comment" : "The heading of the box list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boxes, top first"
+          }
+        }
+      }
+    },
+    "edit.preset.builtIn" : {
+      "comment" : "Under Preset 1's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset 1 is built in: it can be edited, not deleted or renumbered."
+          }
+        }
+      }
+    },
+    "edit.preset.canvas" : {
+      "comment" : "VoiceOver: the picture of the layout with its boxes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout canvas"
+          }
+        }
+      }
+    },
+    "edit.preset.center" : {
+      "comment" : "Alignment: centre.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centre"
+          }
+        }
+      }
+    },
+    "edit.preset.color" : {
+      "comment" : "A text style's colour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        }
+      }
+    },
+    "edit.preset.copyFromAny" : {
+      "comment" : "Gives the stack a layout of its own, a copy of the * layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy from *"
+          }
+        }
+      }
+    },
+    "edit.preset.crop" : {
+      "comment" : "Pixel fit: crop to the box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crop"
+          }
+        }
+      }
+    },
+    "edit.preset.drawnAt" : {
+      "comment" : "The stack the * layout's canvas is drawn at, before its picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drawn at"
+          }
+        }
+      }
+    },
+    "edit.preset.fallback" : {
+      "comment" : "A box that draws only when no earlier box at its offset drew.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fallback"
+          }
+        }
+      }
+    },
+    "edit.preset.fallbackFont" : {
+      "comment" : "A box whose font wasn't found.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ isn’t installed or bundled; drawn in the fallback font."
+          }
+        }
+      }
+    },
+    "edit.preset.field" : {
+      "comment" : "Binding: one of the text's fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field"
+          }
+        }
+      }
+    },
+    "edit.preset.fieldCustom" : {
+      "comment" : "Add Box ▸ Field: a field by a name typed in.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom…"
+          }
+        }
+      }
+    },
+    "edit.preset.fieldName" : {
+      "comment" : "VoiceOver: the name of the field a box draws.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field name"
+          }
+        }
+      }
+    },
+    "edit.preset.fill" : {
+      "comment" : "Pixel fit: fill the box, cropping.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fill"
+          }
+        }
+      }
+    },
+    "edit.preset.fit" : {
+      "comment" : "How a box fits what it draws.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit"
+          }
+        }
+      }
+    },
+    "edit.preset.fitFit" : {
+      "comment" : "Pixel fit: fit inside the box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit"
+          }
+        }
+      }
+    },
+    "edit.preset.font" : {
+      "comment" : "A text style's font.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Font"
+          }
+        }
+      }
+    },
+    "edit.preset.frame" : {
+      "comment" : "A box's place: x, y, width and height as percentages of the stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frame"
+          }
+        }
+      }
+    },
+    "edit.preset.fromNone" : {
+      "comment" : "A box style that came from no numbered style.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not from a numbered style"
+          }
+        }
+      }
+    },
+    "edit.preset.fromStyle" : {
+      "comment" : "The numbered style a box's style came from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From %@"
+          }
+        }
+      }
+    },
+    "edit.preset.fromStyleChanged" : {
+      "comment" : "The numbered style a box's style came from, since changed in the box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From %@, changed"
+          }
+        }
+      }
+    },
+    "edit.preset.grade" : {
+      "comment" : "A box's own grade.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
+    "edit.preset.h" : {
+      "comment" : "A box's height, as a percentage of the stack's height.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "H"
+          }
+        }
+      }
+    },
+    "edit.preset.heading" : {
+      "comment" : "The heading of the preset's own fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset"
+          }
+        }
+      }
+    },
+    "edit.preset.left" : {
+      "comment" : "Alignment: left.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Left"
+          }
+        }
+      }
+    },
+    "edit.preset.letterSpacing" : {
+      "comment" : "A text style's letter spacing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letter spacing"
+          }
+        }
+      }
+    },
+    "edit.preset.lineSpacing" : {
+      "comment" : "A text style's line spacing, as a multiple.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line spacing"
+          }
+        }
+      }
+    },
+    "edit.preset.linesCut" : {
+      "comment" : "Under a text box whose sample text overflowed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lines cut: %lld"
+          }
+        }
+      }
+    },
+    "edit.preset.maxLines" : {
+      "comment" : "Text fit: at most this many lines at the style's size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lines"
+          }
+        }
+      }
+    },
+    "edit.preset.menu" : {
+      "comment" : "VoiceOver: the Presets page's menu of New, Duplicate, Renumber and Delete.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset menu"
+          }
+        }
+      }
+    },
+    "edit.preset.middle" : {
+      "comment" : "Vertical alignment: middle.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Middle"
+          }
+        }
+      }
+    },
+    "edit.preset.minSize" : {
+      "comment" : "Text fit: the smallest size shrinking goes to.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Min size"
+          }
+        }
+      }
+    },
+    "edit.preset.ms" : {
+      "comment" : "A box transition's own duration, in milliseconds; empty uses the transition's.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ms"
+          }
+        }
+      }
+    },
+    "edit.preset.new" : {
+      "comment" : "The Presets page's menu: makes a preset with an empty * layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Preset"
+          }
+        }
+      }
+    },
+    "edit.preset.noBoxes" : {
+      "comment" : "The box list of an empty layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No boxes yet. Add one with Add Box."
+          }
+        }
+      }
+    },
+    "edit.preset.noStyle" : {
+      "comment" : "The text style column for a pixel box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A pixel box has no text style."
+          }
+        }
+      }
+    },
+    "edit.preset.none" : {
+      "comment" : "The Presets page with no preset in the library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No presets yet. Add one with New Preset in the ⋯ menu."
+          }
+        }
+      }
+    },
+    "edit.preset.number" : {
+      "comment" : "The preset's number field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number"
+          }
+        }
+      }
+    },
+    "edit.preset.offset" : {
+      "comment" : "Which cue a box draws: this one, or up to three ahead.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offset"
+          }
+        }
+      }
+    },
+    "edit.preset.onVariable" : {
+      "comment" : "A box transitions when a variable in its text changes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On variable change"
+          }
+        }
+      }
+    },
+    "edit.preset.otherStacks" : {
+      "comment" : "Layouts for stack numbers this Mac doesn't have, kept for other campuses.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other stacks"
+          }
+        }
+      }
+    },
+    "edit.preset.otherTab" : {
+      "comment" : "A layout's tab for a stack number this Mac doesn't have.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld, not on this Mac"
+          }
+        }
+      }
+    },
+    "edit.preset.outline" : {
+      "comment" : "A text style's outline width and colour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outline"
+          }
+        }
+      }
+    },
+    "edit.preset.percent" : {
+      "comment" : "Text size unit: a percentage of the output's height.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "% height"
+          }
+        }
+      }
+    },
+    "edit.preset.picker" : {
+      "comment" : "VoiceOver: the Presets page's picker of the preset edited.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset"
+          }
+        }
+      }
+    },
+    "edit.preset.pixels" : {
+      "comment" : "Binding: the channel's picture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pixels"
+          }
+        }
+      }
+    },
+    "edit.preset.pixelsTag" : {
+      "comment" : "The label on a pixel box's outline on the canvas.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pixels"
+          }
+        }
+      }
+    },
+    "edit.preset.pt" : {
+      "comment" : "Text size unit: points on the 1080-line canvas.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pt"
+          }
+        }
+      }
+    },
+    "edit.preset.reapply" : {
+      "comment" : "Copies the box's numbered style's current value again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-apply"
+          }
+        }
+      }
+    },
+    "edit.preset.removeLayout" : {
+      "comment" : "Takes the stack's own layout out; the stack then draws the * layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove This Stack’s Layout"
+          }
+        }
+      }
+    },
+    "edit.preset.right" : {
+      "comment" : "Alignment: right.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Right"
+          }
+        }
+      }
+    },
+    "edit.preset.sample" : {
+      "comment" : "The sample under the canvas: what a channel could hold.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sample"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleBuiltIn" : {
+      "comment" : "Where the sample text comes from: the built-in hymn.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in: Great Is Thy Faithfulness"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleEmpty" : {
+      "comment" : "Sample kind: nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empty"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleField" : {
+      "comment" : "VoiceOver: the sample's own text field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sample text"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleFromCue" : {
+      "comment" : "Where the sample text comes from: the cue selected on the Cues page.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld of %2$@"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleMedia" : {
+      "comment" : "Sample kind: a media item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleNoMedia" : {
+      "comment" : "The media sample when the pool has none.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No video or image in the pool"
+          }
+        }
+      }
+    },
+    "edit.preset.sampleText" : {
+      "comment" : "Sample kind: text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text"
+          }
+        }
+      }
+    },
+    "edit.preset.saveAsStyle" : {
+      "comment" : "Makes a numbered style from the box's style.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as Style…"
+          }
+        }
+      }
+    },
+    "edit.preset.selectBox" : {
+      "comment" : "The box properties with no box selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a box on the canvas or in the list."
+          }
+        }
+      }
+    },
+    "edit.preset.shadow" : {
+      "comment" : "A text style's shadow: x, y, blur and colour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shadow"
+          }
+        }
+      }
+    },
+    "edit.preset.shrink" : {
+      "comment" : "Text fit: shrink the text to fit, down to its minimum size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shrink to fit"
+          }
+        }
+      }
+    },
+    "edit.preset.size" : {
+      "comment" : "A text style's size.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Size"
+          }
+        }
+      }
+    },
+    "edit.preset.static" : {
+      "comment" : "Binding: fixed text with variables.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Static"
+          }
+        }
+      }
+    },
+    "edit.preset.staticTag" : {
+      "comment" : "The label on a static text box's outline on the canvas.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "static"
+          }
+        }
+      }
+    },
+    "edit.preset.staticText" : {
+      "comment" : "VoiceOver: a static box's text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Static text"
+          }
+        }
+      }
+    },
+    "edit.preset.stretch" : {
+      "comment" : "Pixel fit: stretch to the box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stretch"
+          }
+        }
+      }
+    },
+    "edit.preset.style" : {
+      "comment" : "The heading of a text box's style.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text style"
+          }
+        }
+      }
+    },
+    "edit.preset.styleName" : {
+      "comment" : "The name asked for when a box's style is saved as a numbered style.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        }
+      }
+    },
+    "edit.preset.styleUntitled" : {
+      "comment" : "A text style with an empty label, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Style %lld"
+          }
+        }
+      }
+    },
+    "edit.preset.top" : {
+      "comment" : "Vertical alignment: top.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top"
+          }
+        }
+      }
+    },
+    "edit.preset.transition" : {
+      "comment" : "A box's transition.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition"
+          }
+        }
+      }
+    },
+    "edit.preset.untitled" : {
+      "comment" : "A preset with an empty label, by its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset %lld"
+          }
+        }
+      }
+    },
+    "edit.preset.useChannel" : {
+      "comment" : "Used by: a channel that defaults to the preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld’s default"
+          }
+        }
+      }
+    },
+    "edit.preset.useFallback" : {
+      "comment" : "Used by: a slot that reaches the preset by fallback.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %1$lld, channel %2$lld’s slot, by fallback"
+          }
+        }
+      }
+    },
+    "edit.preset.useSlot" : {
+      "comment" : "Used by: a slot that names the preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %1$lld, channel %2$lld’s slot"
+          }
+        }
+      }
+    },
+    "edit.preset.useStack" : {
+      "comment" : "Used by: a stack that defaults to the preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld’s default"
+          }
+        }
+      }
+    },
+    "edit.preset.usedBy" : {
+      "comment" : "What refers to the preset, from the engine's uses.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used by"
+          }
+        }
+      }
+    },
+    "edit.preset.usedNone" : {
+      "comment" : "Used by, when nothing refers to the preset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing uses it yet."
+          }
+        }
+      }
+    },
+    "edit.preset.usesAny" : {
+      "comment" : "A stack's tab with no layout of its own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the * layout"
+          }
+        }
+      }
+    },
+    "edit.preset.variables" : {
+      "comment" : "A menu that inserts a variable's name into a static box's text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variables"
+          }
+        }
+      }
+    },
+    "edit.preset.vertical" : {
+      "comment" : "A text style's vertical alignment.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vertical"
+          }
+        }
+      }
+    },
+    "edit.preset.w" : {
+      "comment" : "A box's width, as a percentage of the stack's width.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W"
+          }
+        }
+      }
+    },
+    "edit.preset.weight" : {
+      "comment" : "A text style's weight, 100 to 900.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weight"
+          }
+        }
+      }
+    },
+    "edit.preset.x" : {
+      "comment" : "A box's left edge, as a percentage of the stack's width.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X"
+          }
+        }
+      }
+    },
+    "edit.preset.y" : {
+      "comment" : "A box's top edge, as a percentage of the stack's height.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Y"
           }
         }
       }
