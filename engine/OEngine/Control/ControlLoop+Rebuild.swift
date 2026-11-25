@@ -235,7 +235,6 @@ extension ControlLoop {
             if case .content(let content)? = runtime.outgoing { release(content, frame: frame) }
             release(runtime.live, frame: frame)
         }
-        pendingSnapshotWhenReady.remove(number)
         lastSampled[number] = nil
         pictureSlots[number] = nil
         let textures = [channelTextures.removeValue(forKey: number), channelSnapshots.removeValue(forKey: number)].compactMap { $0 }

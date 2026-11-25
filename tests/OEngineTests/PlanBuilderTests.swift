@@ -420,19 +420,32 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertEqual(engine.lastPlan?.channelPasses, [])
     }
 
-    func test_coldWriteShowsThePosterUntilTheFirstFrameThenStartsItsTransition() throws {
+    /// Spec 4 §6 as corrected 2026-11-24 — a cold write "starts its transition when the first decoded frame arrives.
+    /// Until then a cut ... shows the item's poster frame from the tick it lands; any other transition holds what the
+    /// channel showed, the previous content playing on with its sound, so the transition mixes the previous picture
+    /// with the new item's frames ..., never with its poster."
+    func test_aColdWritesDissolveHoldsThePreviousPictureUntilTheFirstFrameAndACutShowsThePoster() throws {
         engine.fakeSources?.readyAfterTicks = 3
         engine.send("channel 1 write media \(EngineFixtures.cross)")
-        engine.tick()
+        engine.tick(count: 4)
+        let cross = try XCTUnwrap(engine.lastPlan?.channelPasses.first).incoming.source
         engine.send("channel 1 write media \(EngineFixtures.dawn) transition 2 1.0 once")
         engine.tick()
         var pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
-        XCTAssertEqual(pass.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.dawn)), "the poster lands on the tick")
+        XCTAssertEqual(pass.incoming.source, cross, "the previous picture holds, not the poster")
         XCTAssertNil(pass.transition, "the dissolve waits for the first decoded frame")
         engine.tick(count: 3)
         pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
         guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
-        XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001, "and the dissolve starts now")
+        XCTAssertEqual(pass.outgoing?.source, cross, "and the dissolve runs from the previous picture")
+        XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001, "starting now")
+        // A cut shows the poster from the tick it lands.
+        engine.tick(count: 70)
+        engine.send("channel 1 write media \(EngineFixtures.cross) transition 1 once")
+        engine.tick()
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, .texture(engine.posterHandle(for: EngineFixtures.cross)), "the poster lands on the tick")
+        XCTAssertNil(pass.outgoing)
     }
 
     // MARK: - Posters that aren't loaded yet (Spec 8 §9)

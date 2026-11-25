@@ -204,7 +204,6 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
     private let builtAt = Atomic<Int64>(0)
-    var pendingSnapshotWhenReady: Set<Int> = []
     private var slideWarned = false
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
     /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
@@ -599,8 +598,6 @@ public final class ControlLoop: @unchecked Sendable {
                 if !poster.isNone {
                     m.poster = poster
                     rt.live = .media(m)
-                    // As a write that found its poster loaded: the transition starts from the poster.
-                    if !m.ready, let t = rt.transition, t.startFrame == nil, t.durationFrames > 0 { pendingSnapshotWhenReady.insert(channel) }
                 }
             }
             if case .media(var m) = rt.live, !m.missing, !m.ready, let source = m.source, source.isReady {
@@ -613,12 +610,8 @@ public final class ControlLoop: @unchecked Sendable {
                 m.range = source.layout.isYCbCr ? .limited : .full
                 rt.live = .media(m)
                 if var t = rt.transition, t.startFrame == nil {
-                    // Spec 4 §6 — "starts its transition when the first decoded frame arrives".
-                    if pendingSnapshotWhenReady.remove(channel) != nil {
-                        if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
-                        rt.outgoing = .snapshot
-                        rt.snapshotPending = true
-                    }
+                    // Spec 4 §6 — "starts its transition when the first decoded frame arrives", from the previous
+                    // picture it held while it waited.
                     t.startFrame = frame
                     rt.transition = t
                 }
@@ -1060,7 +1053,6 @@ public final class ControlLoop: @unchecked Sendable {
         if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
         rt.outgoing = nil
         rt.snapshotPending = false
-        pendingSnapshotWhenReady.remove(e.channel)
 
         let incoming = makeRuntime(for: e.to, channel: e.channel, frame: frame)
         let cutLike = type == .cut || durationFrames <= 0
@@ -1082,19 +1074,19 @@ public final class ControlLoop: @unchecked Sendable {
         }
 
         if case .media(let m) = incoming, !m.missing, !m.ready {
-            // Spec 4 §6 — a cold write: "shows the item's poster frame on the
-            // tick it lands and starts its transition when the first decoded
-            // frame arrives"; with no poster, the previous picture holds.
-            if !m.poster.isNone {
-                release(previous, frame: frame)
-                if !cutLike { pendingSnapshotWhenReady.insert(e.channel) }
-            } else if previousHasPicture, !cutLike {
+            // Spec 4 §6 as corrected 2026-11-24 — a cold write "starts its transition when the first decoded frame
+            // arrives. Until then a cut, or a write onto an empty channel, which has nothing to mix with, shows the
+            // item's poster frame from the tick it lands; any other transition holds what the channel showed, the
+            // previous content playing on with its sound, so the transition mixes the previous picture with the new
+            // item's frames ..., never with its poster." A write onto an empty channel cuts as a warm one does below.
+            let holds = !cutLike && previousHasPicture
+            if holds {
                 rt.outgoing = .content(previous)
             } else {
                 release(previous, frame: frame)
             }
             rt.live = incoming
-            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: cutLike ? 0 : durationFrames, startFrame: nil)
+            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: holds ? durationFrames : 0, startFrame: nil)
             model.channels[e.channel] = rt
             return
         }
@@ -1487,8 +1479,11 @@ public final class ControlLoop: @unchecked Sendable {
         }
         let transition = rt.transition?.state(at: frame)
         if transition == nil {
-            // Not running (or waiting on a cold write): hold the previous picture if there is nothing new.
-            if incoming == nil, let held = outgoing { incoming = held }
+            // Not running. A transition waiting on a cold write's first frame holds the previous picture, never the new
+            // item's poster (Spec 4 §6 as corrected 2026-11-24); otherwise the previous picture holds only while there
+            // is nothing new.
+            let waiting = rt.transition.map { $0.startFrame == nil } ?? false
+            if let held = outgoing, waiting || incoming == nil { incoming = held }
             outgoing = nil
         } else if transition?.type == .cut {
             outgoing = nil
