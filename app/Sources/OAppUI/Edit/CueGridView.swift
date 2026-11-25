@@ -142,6 +142,9 @@ final class CueGridView: Surface, EditFocus {
             model.editing.newCue(atEnd: true)
         case .fold(let row):
             model.editing.toggleFold(row: row)
+        case .eye(let row):
+            // A row for a channel number no channel has has no eye: its name answers the click.
+            if grid.rows[row].exists { model.editing.toggleHidden(row: row) } else { model.editing.select(row: .channel(grid.rows[row].channel)) }
         case .channel(let row):
             model.editing.select(row: .channel(grid.rows[row].channel))
         case .corner, .nothing:
@@ -387,7 +390,12 @@ final class CueGridView: Surface, EditFocus {
         }
         for (rowIndex, row) in grid.rows.enumerated() {
             let y = g.y(row: rowIndex) - scrollY
-            element(EditModeWording.rowSpoken(row), NSRect(x: 0, y: y, width: CueGridGeometry.channelColumn, height: g.rowHeight(rowIndex)), role: .staticText)
+            let eye = CueGridGeometry.eyeWidth
+            element(EditModeWording.rowSpoken(row), NSRect(x: 0, y: y, width: CueGridGeometry.channelColumn - (row.exists ? eye : 0), height: g.rowHeight(rowIndex)),
+                    role: .staticText)
+            if row.exists {
+                element(EditModeWording.eye(row), NSRect(x: CueGridGeometry.channelColumn - eye, y: y, width: eye, height: g.rowHeight(rowIndex)), role: .button)
+            }
             for (cue, cell) in grid.cells[rowIndex].enumerated() {
                 element(EditModeWording.cell(cell, cue: cue + 1, row: row, catalog: catalog),
                         NSRect(x: g.x(cue: cue) - scrollX, y: y, width: g.column, height: g.rowHeight(rowIndex)), role: .button)
@@ -580,6 +588,11 @@ final class CueGridView: Surface, EditFocus {
                     rect.fill()
                 }
                 drawCell(grid.cells[rowIndex][cue], in: rect, folded: row.isFolded, showsText: showsText)
+                // Spec 11 §4 — a hidden row's "cells dim".
+                if row.isHidden {
+                    Palette.panel.withAlphaComponent(0.6).setFill()
+                    rect.fill()
+                }
                 Palette.hairline.setFill()
                 NSRect(x: rect.maxX - 1, y: y, width: 1, height: height).fill()
                 NSRect(x: rect.minX, y: rect.maxY - 1, width: column, height: 1).fill()
@@ -624,8 +637,22 @@ final class CueGridView: Surface, EditFocus {
             Palette.dimText.setFill()
             arrow.fill()
             text(String(row.channel), in: NSRect(x: 24, y: rect.midY - 7, width: 18, height: 14), color: Palette.faintText, alignment: .right, mono: true)
-            text(EditModeWording.row(row), in: NSRect(x: 50, y: rect.midY - 7, width: left - 58, height: 14),
-                 color: !row.exists ? Palette.browsing : (row.isFolded ? Palette.dimText : Palette.text))
+            let eye = CGFloat(CueGridGeometry.eyeWidth)
+            text(EditModeWording.row(row), in: NSRect(x: 50, y: rect.midY - 7, width: left - 58 - (row.exists ? eye - 6 : 0), height: 14),
+                 color: !row.exists ? Palette.browsing : (row.isFolded || row.isHidden ? Palette.dimText : Palette.text))
+            // Spec 11 §4 — "an eye that hides the channel from the Preview monitor's picture alone, as a timeline hides a track".
+            if row.exists, let symbol = NSImage(systemSymbolName: row.isHidden ? "eye.slash" : "eye", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)) {
+                let tint = row.isHidden ? Palette.browsing : Palette.faintText
+                let tinted = NSImage(size: symbol.size, flipped: false) { bounds in
+                    symbol.draw(in: bounds)
+                    tint.set()
+                    bounds.fill(using: .sourceAtop)
+                    return true
+                }
+                tinted.draw(in: NSRect(x: left - eye + (eye - symbol.size.width) / 2, y: rect.midY - symbol.size.height / 2,
+                                       width: symbol.size.width, height: symbol.size.height))
+            }
             Palette.hairline.setFill()
             NSRect(x: 0, y: rect.maxY - 1, width: left, height: 1).fill()
         }

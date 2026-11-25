@@ -232,13 +232,15 @@ final class EditModeViewTests: XCTestCase {
         let spoken = grid.spoken
         XCTAssertEqual(spoken[0], "Cue 1, Verse 1, Go, live")
         XCTAssertEqual(spoken[2], "Cue 3, Verse 1, +8 s · adv 12 s")
+        // Each row's name, then its eye (Spec 11 §4, corrected 2026-11-24), then its cells.
         XCTAssertEqual(spoken[4], "1 Background")
-        XCTAssertEqual(spoken[5], "Cue 1, channel 1 Background: writes dawn.mp4, Dissolve 1 second")
-        XCTAssertEqual(spoken[6], "Cue 2, channel 1 Background: holds dawn.mp4 from cue 1")
-        XCTAssertEqual(spoken[8], "Cue 4, channel 1 Background: holds dawn.mp4 from cue 1, -6 dB")
-        XCTAssertEqual(spoken[9], "2 Foreground")
-        XCTAssertEqual(spoken[14], "3 Clock, folded")
-        XCTAssertEqual(spoken[15], "Cue 1, channel 3 Clock: holds nothing")
+        XCTAssertEqual(spoken[5], "Hide 1 Background from the Preview")
+        XCTAssertEqual(spoken[6], "Cue 1, channel 1 Background: writes dawn.mp4, Dissolve 1 second")
+        XCTAssertEqual(spoken[7], "Cue 2, channel 1 Background: holds dawn.mp4 from cue 1")
+        XCTAssertEqual(spoken[9], "Cue 4, channel 1 Background: holds dawn.mp4 from cue 1, -6 dB")
+        XCTAssertEqual(spoken[10], "2 Foreground")
+        XCTAssertEqual(spoken[16], "3 Clock, folded")
+        XCTAssertEqual(spoken[18], "Cue 1, channel 3 Clock: holds nothing")
         // Opened on the live cue, on the text channel's row.
         XCTAssertEqual(rig.view.inspector.title.stringValue, "Cue 1 of 4")
         // A click on a cell selects its cue and channel; on a header, its cue and the header row.
@@ -409,6 +411,26 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(inspector.title.stringValue, "Cue 3 of 4")
         inspector.fire.press()
         XCTAssertEqual(last(rig), ["item 2 cue 3"])
+    }
+
+    /// Spec 11 §4 as corrected 2026-11-24 — "an eye that hides the channel from the Preview monitor's picture alone ...
+    /// its cells dim, the monitor's header says how many are hidden ("Hiding 2 channels")".
+    func test_aRowsEyeHidesItsChannelFromThePreviewAndThePillSaysHowMany() throws {
+        let rig = try editing()
+        let grid = rig.view.workspace.grid
+        let g = grid.geometry
+        let eye = (x: CueGridGeometry.channelColumn - 6, y: g.y(row: 1) + g.rowHeight(1) / 2)
+        XCTAssertTrue(rig.view.previewPanel.hiding.isHidden)
+        try click(grid, x: eye.x, y: eye.y)
+        XCTAssertEqual(rig.model.settings.hiddenRows, [2])
+        XCTAssertFalse(rig.view.previewPanel.hiding.isHidden)
+        XCTAssertEqual(rig.view.previewPanel.hiding.title, "Hiding 1 channel")
+        XCTAssertTrue(grid.spoken.contains("2 Foreground, hidden from the Preview"), "\(grid.spoken)")
+        XCTAssertTrue(grid.spoken.contains("Show 2 Foreground in the Preview"))
+        XCTAssertEqual(count(rig), 0, "nothing goes to air")
+        try click(grid, x: eye.x, y: eye.y)
+        XCTAssertTrue(rig.view.previewPanel.hiding.isHidden)
+        XCTAssertTrue(grid.spoken.contains("Hide 2 Foreground from the Preview"))
     }
 
     /// Spec 11 §2 as corrected 2026-11-24 — "The gaps beside the Browser, the monitors and the inspector drag to resize

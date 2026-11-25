@@ -272,6 +272,28 @@ final class EditModelTests: XCTestCase {
         XCTAssertEqual(rig.model.settings.gridZoom, 480)
     }
 
+    // MARK: - Hidden rows (Spec 11 §4, corrected 2026-11-24)
+
+    /// "an eye that hides the channel from the Preview monitor's picture alone ... Hidden rows are kept by channel number
+    /// for every list, in `view.json`"; Spec 11 §3 — the cue's render takes "optionally `hide`".
+    func test_aHiddenRowLeavesItsChannelOutOfThePreviewAlone() throws {
+        let rig = try Rig()
+        rig.model.editing.open()
+        rig.model.editing.previewWidth(640)
+        rig.model.editing.click(cue: 1, row: .channel(1))
+        let row = try XCTUnwrap(rig.model.editing.grid.rows.firstIndex { $0.channel == 2 })
+        rig.model.editing.toggleHidden(row: row)
+        XCTAssertEqual(rig.model.settings.hiddenRows, [2])
+        XCTAssertTrue(rig.model.editing.grid.rows[row].isHidden)
+        XCTAssertEqual(rig.model.editing.hiddenChannels, [2])
+        let asked = try XCTUnwrap(rig.sent.last { $0.fields["what"] == .string("render") })
+        XCTAssertEqual(asked.fields["subject"]?.objectValue?["hide"], .array([.number(2)]), "the Preview asks without it")
+        XCTAssertEqual(rig.commands.filter { !$0.isEmpty }, [], "nothing goes to air")
+        rig.model.editing.toggleHidden(row: row)
+        XCTAssertEqual(rig.model.settings.hiddenRows, [])
+        XCTAssertNil(rig.sent.last { $0.fields["what"] == .string("render") }?.fields["subject"]?.objectValue?["hide"])
+    }
+
     // MARK: - The Live toggle (Spec 11 §2, corrected 2026-11-24)
 
     /// "Off, which edit mode always opens with, the arrows only select: nothing goes to air. On, they also fire each cue

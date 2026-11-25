@@ -212,8 +212,20 @@ public enum EditModeWording {
 
     /// "its row headers are the channels, each saying its number and label and whether it is folded".
     public static func rowSpoken(_ row: CueGridRow) -> String {
-        let name = "\(row.channel) " + self.row(row)
-        return row.isFolded ? name + ", " + Strings.text(.editCuesFolded) : name
+        var spoken = "\(row.channel) " + self.row(row)
+        if row.isFolded { spoken += ", " + Strings.text(.editCuesFolded) }
+        if row.isHidden, row.exists { spoken += ", " + Strings.text(.editCuesHidden) }
+        return spoken
+    }
+
+    /// Spec 11 §4 — a row's eye, by what pressing it does: "Hide 2 Foreground from the Preview" or "Show … in the Preview".
+    public static func eye(_ row: CueGridRow) -> String {
+        Strings.text(row.isHidden ? .editCuesShow : .editCuesHide, "\(row.channel) " + self.row(row))
+    }
+
+    /// Spec 11 §2 — the Preview's header "and a pill while channels are hidden ("Hiding 2 channels")".
+    public static func hiding(_ count: Int) -> String {
+        Strings.counted(.editPreviewHiding, count)
     }
 
     // MARK: - The inspector (Spec 11 §4)

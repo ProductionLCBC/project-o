@@ -34,6 +34,7 @@ final class PreviewPanelView: PanelView {
         frame_.setAccessibilityElement(true)
         frame_.setAccessibilityRole(.image)
         addSubview(picker)
+        addSubview(hiding)
         addSubview(frame_)
         refresh()
     }
@@ -70,8 +71,15 @@ final class PreviewPanelView: PanelView {
         let number = editing.selection.first(in: editing.grid.headers.map(\.uuid)).flatMap { editing.grid.cue(of: $0) }.map { $0 + 1 }
         frame_.setAccessibilityLabel(EditModeWording.previewSpoken(cue: editing.page == .cues ? number : nil, stack: selected,
                                                                    label: stacks.first { $0.number == selected }?.label ?? ""))
+        // Spec 11 §2 — "and a pill while channels are hidden ("Hiding 2 channels")", so a partial picture is never taken for the whole.
+        let hidden = editing.page == .cues ? editing.hiddenChannels.count : 0
+        hiding.isHidden = hidden == 0
+        if hidden > 0 { hiding.title = EditModeWording.hiding(hidden) }
         needsLayout = true
     }
+
+    /// "Hiding 2 channels", while any cue-grid row is hidden from the picture.
+    let hiding = PillButton(style: .amber)
 
     /// Where the picture sits: 16 by 9 inside the panel's padding.
     private var pictureFrame: NSRect {
@@ -83,8 +91,10 @@ final class PreviewPanelView: PanelView {
     override func layout() {
         super.layout()
         let size = picker.fittingSize
-        let width = min(size.width, max(60, bounds.width - title.frame.maxX - 20))
+        let pill = hiding.isHidden ? NSSize.zero : hiding.fitting
+        let width = min(size.width, max(60, bounds.width - title.frame.maxX - 20 - (pill.width > 0 ? pill.width + 8 : 0)))
         picker.frame = NSRect(x: bounds.width - width - 6, y: (Self.headerHeight - size.height) / 2, width: width, height: size.height)
+        hiding.frame = NSRect(x: picker.frame.minX - pill.width - 8, y: (Self.headerHeight - pill.height) / 2, width: pill.width, height: pill.height)
         frame_.frame = pictureFrame
         picture.frame = frame_.bounds.insetBy(dx: 2, dy: 2)
         // "from `render` ... at the monitor's width in pixels (§3)".

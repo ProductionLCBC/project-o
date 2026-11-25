@@ -61,6 +61,7 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.mediaView = .list
         settings.gridZoom = 88
         settings.foldedRows = [2: true]
+        settings.hiddenRows = [2, 3]
         settings.editBrowserWidth = 300
         settings.editMonitorsWidth = 420
         settings.editInspectorHeight = 320

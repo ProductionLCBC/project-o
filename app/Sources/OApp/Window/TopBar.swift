@@ -222,6 +222,9 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var gridZoom = CueGridZoom.standard
     /// Spec 11 §4 — "a row the operator folds or opens stays so for every list, by channel number".
     public var foldedRows: [Int: Bool] = [:]
+    /// Spec 11 §4 — "Hidden rows are kept by channel number for every list, in `view.json`, as folded ones are"
+    /// (corrected 2026-11-24); in number order.
+    public var hiddenRows: [Int] = []
     /// Spec 11 §2 — "The gaps beside the Browser, the monitors and the
     /// inspector drag to resize them ... `view.json` keeps the sizes"
     /// (corrected 2026-11-24). Nil monitors are "a quarter of the window's
@@ -280,6 +283,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)
         read(.foldedRows, into: &foldedRows)
+        read(.hiddenRows, into: &hiddenRows)
+        hiddenRows = Array(Set(hiddenRows)).sorted()
         read(.editBrowserWidth, into: &editBrowserWidth)
         read(.editMonitorsWidth, into: &editMonitorsWidth)
         read(.editInspectorHeight, into: &editInspectorHeight)

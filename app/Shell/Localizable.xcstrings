@@ -2965,6 +2965,30 @@
         }
       }
     },
+    "edit.cues.hidden" : {
+      "comment" : "VoiceOver, after a channel's name: its row's eye hides it from the Preview monitor.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hidden from the Preview"
+          }
+        }
+      }
+    },
+    "edit.cues.hide" : {
+      "comment" : "VoiceOver and tooltip: a cue-grid row's eye while the channel shows in the Preview monitor. %@ is the channel's number and name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide %@ from the Preview"
+          }
+        }
+      }
+    },
     "edit.cues.live" : {
       "comment" : "VoiceOver: this cue is the live cue.",
       "extractionState" : "manual",
@@ -3081,6 +3105,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Another list shares number %lld"
+          }
+        }
+      }
+    },
+    "edit.cues.show" : {
+      "comment" : "VoiceOver and tooltip: a cue-grid row's eye while the channel is hidden from the Preview monitor. %@ is the channel's number and name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show %@ in the Preview"
           }
         }
       }
@@ -4149,6 +4185,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Preview"
+          }
+        }
+      }
+    },
+    "edit.preview.hiding" : {
+      "comment" : "A pill in the Preview monitor's header while cue-grid rows are hidden from its picture: how many.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hiding %lld channel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hiding %lld channels"
+                }
+              }
+            }
           }
         }
       }

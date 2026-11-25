@@ -79,6 +79,8 @@ public struct CueGridRow: Equatable, Sendable {
     public var exists: Bool
     /// "a control that folds it to a thin strip".
     public var isFolded: Bool
+    /// Spec 11 §4 — "an eye that hides the channel from the Preview monitor's picture alone" (corrected 2026-11-24).
+    public var isHidden = false
 }
 
 /// What a tile shows, or what a channel holds at a cue.
@@ -350,17 +352,21 @@ public struct CueGridGeometry: Equatable, Sendable {
         case add
         case channel(row: Int)
         case fold(row: Int)
+        /// The row's eye, at the channel column's right end.
+        case eye(row: Int)
         case cell(cue: Int, row: Int)
         case nothing
     }
 
     /// The channel column's width, the section band's height, a folded row's height and the + column's width, as drawn.
-    public static let channelColumn: Double = 136
+    public static let channelColumn: Double = 160
     public static let band: Double = 26
     public static let foldedRow: Double = 28
     public static let addColumn: Double = 60
     /// The fold control's width, at the channel column's left edge.
     public static let foldWidth: Double = 26
+    /// The eye's width, at the channel column's right edge (Spec 11 §4, corrected 2026-11-24).
+    public static let eyeWidth: Double = 26
 
     public var column: Double
     public var cues: Int
@@ -413,7 +419,10 @@ public struct CueGridGeometry: Equatable, Sendable {
             let bottom = top + rowHeight(row)
             // A row scrolled under the headers isn't under the point.
             if y >= max(top, Self.band + header), y < bottom {
-                if overChannels { return x < Self.foldWidth ? .fold(row: row) : .channel(row: row) }
+                if overChannels {
+                    if x < Self.foldWidth { return .fold(row: row) }
+                    return x >= Self.channelColumn - Self.eyeWidth ? .eye(row: row) : .channel(row: row)
+                }
                 return cue >= 0 && cue < cues ? .cell(cue: cue, row: row) : .nothing
             }
             top = bottom

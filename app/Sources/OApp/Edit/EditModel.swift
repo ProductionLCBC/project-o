@@ -331,6 +331,8 @@ public final class EditModel {
             ?? shown.sections.first { $0.kind == .list && $0.listUuid == listUuid }
         grid = CueGridModel.make(document: listUuid.flatMap { store.lists[$0] }, section: section, catalog: catalog, media: store.media,
                                  folds: model.settings.foldedRows)
+        let hidden = Set(model.settings.hiddenRows)
+        for index in grid.rows.indices { grid.rows[index].isHidden = hidden.contains(grid.rows[index].channel) }
         let order = grid.headers.map(\.uuid)
         let channels = grid.rows.map(\.channel)
         if let pending = pendingSelect, order.contains(pending) {
@@ -443,6 +445,26 @@ public final class EditModel {
         move(forward ? .right : .left, extend: false)
     }
 
+    /// Spec 11 §4 — a row's eye "hides the channel from the Preview monitor's
+    /// picture alone ... Hidden rows are kept by channel number for every
+    /// list" (corrected 2026-11-24). A row for a channel number no channel
+    /// has has nothing to hide.
+    public func toggleHidden(row: Int) {
+        guard grid.rows.indices.contains(row), grid.rows[row].exists else { return }
+        let channel = grid.rows[row].channel
+        var hidden = Set(model.settings.hiddenRows)
+        if hidden.contains(channel) { hidden.remove(channel) } else { hidden.insert(channel) }
+        model.settings.hiddenRows = hidden.sorted()
+        rebuild()
+        askPreview()
+        model.changed([.edit])
+    }
+
+    /// The channels the Preview leaves out, in number order: "the monitor's header says how many are hidden".
+    public var hiddenChannels: [Int] {
+        grid.rows.filter { $0.isHidden && $0.exists }.map(\.channel)
+    }
+
     /// A row's fold control.
     public func toggleFold(row: Int) {
         guard grid.rows.indices.contains(row) else { return }
@@ -508,6 +530,9 @@ public final class EditModel {
         var subject: [String: JSONValue] = ["kind": .string("cue"), "cue": .string(cue), "stack": .number(Double(model.previewStack)),
                                             "width": .number(Double(previewPixels))]
         subject[isLocal ? "local" : "listUuid"] = .string(listUuid)
+        // Spec 11 §3 — "optionally `hide`": the hidden rows' channels (§4).
+        let hidden = hiddenChannels
+        if !hidden.isEmpty { subject["hide"] = .array(hidden.map { .number(Double($0)) }) }
         guard again || subject != previewSubject else { return }
         previewSubject = subject
         subject["width"] = nil

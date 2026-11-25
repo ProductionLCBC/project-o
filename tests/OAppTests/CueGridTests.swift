@@ -201,6 +201,16 @@ final class CueGridTests: XCTestCase {
         XCTAssertEqual(CueGridZoom.pinched(300, by: 1), 480)
     }
 
+    /// Spec 11 §4 as corrected 2026-11-24 — "At a row's left are its number, its label, a control that folds it ...,
+    /// and an eye that hides the channel from the Preview monitor's picture alone".
+    func test_aRowsEyeSitsAtTheChannelColumnsRightEnd() {
+        let g = CueGridGeometry(column: 140, cues: 4, folded: [false, false])
+        let middle = g.y(row: 1) + g.rowHeight(1) / 2
+        XCTAssertEqual(g.hit(x: 4, y: middle), .fold(row: 1))
+        XCTAssertEqual(g.hit(x: CueGridGeometry.channelColumn - 4, y: middle), .eye(row: 1))
+        XCTAssertEqual(g.hit(x: CueGridGeometry.channelColumn - CueGridGeometry.eyeWidth - 2, y: middle), .channel(row: 1))
+    }
+
     func test_theGridsGeometryFindsWhatIsUnderAPoint() {
         let g = CueGridGeometry(column: 140, cues: 4, folded: [false, false, true])
         let row = CueGridZoom.rowHeight(column: 140)
