@@ -144,7 +144,14 @@ green); then, on his word (Spec 11 §2, §6, §8 and §9 corrected first, G-40 t
 daae6bd, `swift test` and hosted CI green): media is picked in a chooser panel with the
 pool's folders, search, kind filter and tiles, a double-click on a slider puts it back to
 its identity, the style sample's field keeps its focus, and the built-in sample text is
-lorem ipsum; American
+lorem ipsum; then, on his choice that the engine still draws it and his go on the plan
+(Spec 11 §3, §9 and Spec 4 §10 corrected first, G-43, d962f5c; engine e083c34, app
+a74855b; `swift test` and hosted CI green), a grade's stage follows a dragged slider or the
+tint's color panel (`render` takes a grade's values; the edit is still one, at the end)
+and plays a video with Play, Loop and a scrub bar (`render` takes `atMs`, from one reader
+the thumbnail job keeps reading forward), at most 15 frames a second at the job's pace of
+30 pictures, two a frame; measured in `swift test` on this Mac, a pair costs about 12 ms
+with a 1080p frame, so the pace is the limit; American
 spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
 unchanged); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
