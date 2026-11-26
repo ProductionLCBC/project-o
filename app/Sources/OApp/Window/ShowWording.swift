@@ -16,7 +16,7 @@ public enum ShowWording {
         case .cue(let playlist, let list, let number, let label): return Strings.text(.topPositionCue, playlist, list, number, label)
         case .ready(let playlist): return Strings.text(.topPositionReady, playlist)
         case .library(let list, let number, let label): return Strings.text(.topPositionLibrary, list, number, label)
-        case .nothing(let hint): return Strings.text(hint ? .topPositionHint : .topPositionNothing)
+        case .nothing: return Strings.text(.topPositionNothing)
         }
     }
 

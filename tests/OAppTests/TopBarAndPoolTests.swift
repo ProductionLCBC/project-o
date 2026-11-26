@@ -26,9 +26,10 @@ final class TopBarModelTests: XCTestCase {
     }
 
     func test_nothingLiveSaysHowToStartWhileAPlaylistIsBrowsed() {
-        XCTAssertEqual(LivePosition.make(live: live(), shown: .playlist("b1a7")), .nothing(hint: true), "Click a cue, or choose Make Live")
-        XCTAssertEqual(LivePosition.make(live: live(), shown: .list("a9f0")), .nothing(hint: false))
-        XCTAssertEqual(LivePosition.make(live: live(), shown: nil), .nothing(hint: false))
+        // "Nothing live", and nothing more, whatever the grid browses (Spec 10 §8 as corrected 2026-11-25).
+        XCTAssertEqual(LivePosition.make(live: live(), shown: .playlist("b1a7")), .nothing)
+        XCTAssertEqual(LivePosition.make(live: live(), shown: .list("a9f0")), .nothing)
+        XCTAssertEqual(LivePosition.make(live: live(), shown: nil), .nothing)
     }
 
     func test_oneDotPerOutputWithItsStackAndItsState() {

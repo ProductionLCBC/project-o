@@ -158,7 +158,6 @@ public enum StringKey: String, CaseIterable, Sendable {
     case topPositionReady = "top.position.ready"
     case topPositionLibrary = "top.position.library"
     case topPositionNothing = "top.position.nothing"
-    case topPositionHint = "top.position.hint"
     case topAuto = "top.auto"
     case topOutputPresenting = "top.output.presenting"
     case topOutputLost = "top.output.lost"

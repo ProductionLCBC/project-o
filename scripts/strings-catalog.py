@@ -137,7 +137,6 @@ ENTRIES = [
     ("top.position.ready", "%@ · ready", "A playlist is loaded and no cue has been fired. %@ is the playlist's title."),
     ("top.position.library", "Library · %1$@ · %2$lld %3$@", "A list fired from the library is live: its title, the cue's number and label."),
     ("top.position.nothing", "Nothing live", "No playlist is loaded and no list was fired."),
-    ("top.position.hint", "Nothing live · Click a cue, or choose Make Live", "As above, while a playlist is shown in the grid."),
     ("top.auto", "Auto in %@", "The countdown to a cue that will fire by itself. %@ is a clock, as in 0:08."),
     ("top.output.presenting", "%1$lld %2$@ · stack %3$lld", "One output: its number, its label and the stack it shows."),
     ("top.output.lost", "%1$lld %2$@ · lost", "An output whose device stopped taking frames."),

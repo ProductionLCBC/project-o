@@ -14473,18 +14473,6 @@
         }
       }
     },
-    "top.position.hint" : {
-      "comment" : "As above, while a playlist is shown in the grid.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nothing live · Click a cue, or choose Make Live"
-          }
-        }
-      }
-    },
     "top.position.library" : {
       "comment" : "A list fired from the library is live: its title, the cue's number and label.",
       "extractionState" : "manual",

@@ -13,8 +13,8 @@ public enum LivePosition: Equatable, Sendable {
     case ready(playlist: String)
     /// "Library · Great Is Thy Faithfulness · 3 Verse 2" for a list fired from the library.
     case library(list: String, number: Int, label: String)
-    /// "Nothing live", followed by "Click a cue, or choose Make Live" while a playlist is browsed (§7).
-    case nothing(hint: Bool)
+    /// "Nothing live, and nothing more" (corrected 2026-11-25).
+    case nothing
 
     public static func make(live: LiveStatus, shown: GridContext?) -> LivePosition {
         if live.playlist != nil {
@@ -24,8 +24,7 @@ public enum LivePosition: Equatable, Sendable {
         if live.listUuid != nil {
             return .library(list: live.listTitle, number: live.cuePosition, label: live.label)
         }
-        if case .playlist = shown { return .nothing(hint: true) }
-        return .nothing(hint: false)
+        return .nothing
     }
 }
 
