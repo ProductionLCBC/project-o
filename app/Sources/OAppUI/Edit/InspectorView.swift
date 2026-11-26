@@ -829,7 +829,8 @@ final class CommandRowView: Surface {
         name.toolTip = line.name
         if let kind = line.warning {
             warning.stringValue = EditModeWording.warning(kind)
-            warning.toolTip = warning.stringValue
+            warning.toolTip = EditModeWording.warningSaid(kind)
+            warning.setAccessibilityLabel(EditModeWording.warningSaid(kind))
         }
         warning.textColor = Palette.browsing
         warning.isHidden = line.warning == nil

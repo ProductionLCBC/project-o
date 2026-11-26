@@ -12,6 +12,10 @@ import OCore
 final class ObjectsPageTests: XCTestCase {
     typealias Rig = ShowModelTests.Rig
 
+    override func setUp() async throws {
+        try await MainActor.run { try CatalogFile.install() }
+    }
+
     private func last(_ rig: Rig) -> [String]? { rig.commands.last { !$0.isEmpty } }
     private func count(_ rig: Rig) -> Int { rig.commands.filter { !$0.isEmpty }.count }
     private func query(_ rig: Rig, _ what: String) -> [String: JSONValue]? {

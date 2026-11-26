@@ -45,6 +45,10 @@ public struct CueCommandLine: Equatable, Sendable {
         case changesLibrary
         /// "A command kept verbatim because it is unknown shows Spec 1 §6's warning and can only be removed."
         case keptVerbatim
+        /// Spec 11 §9 as corrected 2026-11-25 — "Recursive (it calls a macro that calls this one, the engine's `cycle`)".
+        case recursive
+        /// "Missing (it names a macro, a channel, a stack, an output, a grade or a transition that doesn't exist)".
+        case missing
     }
 
     /// Its place in the cue's commands.

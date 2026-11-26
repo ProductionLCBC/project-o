@@ -291,9 +291,24 @@ public enum EditModeWording {
         return Strings.text(.editStateSpoken, channel, label, said)
     }
 
-    /// A command row's warning, in words.
+    /// A command row's warning as its short tag (Spec 11 §9 as corrected 2026-11-25: "in a short tag, not a sentence").
     public static func warning(_ warning: CueCommandLine.Warning) -> String {
-        Strings.text(warning == .changesLibrary ? .editCommandsChangesLibrary : .editCommandsKept)
+        switch warning {
+        case .changesLibrary: Strings.text(.editCommandsTagEdits)
+        case .keptVerbatim: Strings.text(.editCommandsTagUnknown)
+        case .recursive: Strings.text(.editCommandsTagRecursive)
+        case .missing: Strings.text(.editCommandsTagMissing)
+        }
+    }
+
+    /// The same warning said whole, for its tooltip.
+    public static func warningSaid(_ warning: CueCommandLine.Warning) -> String {
+        switch warning {
+        case .changesLibrary: Strings.text(.editCommandsChangesLibrary)
+        case .keptVerbatim: Strings.text(.editCommandsKept)
+        case .recursive: Strings.text(.editCommandsRecursiveSaid)
+        case .missing: Strings.text(.editCommandsMissingSaid)
+        }
     }
 
     /// Spec 11 §2, "Rejections and warnings" — what the notice line says.

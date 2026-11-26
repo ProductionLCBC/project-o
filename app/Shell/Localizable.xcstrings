@@ -2065,6 +2065,522 @@
         }
       }
     },
+    "edit.browser.atEnd" : {
+      "comment" : "A field of the command browser: loop, hold or clear.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the end"
+          }
+        }
+      }
+    },
+    "edit.browser.audio" : {
+      "comment" : "The command browser's group of the audio output commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio"
+          }
+        }
+      }
+    },
+    "edit.browser.audioMute" : {
+      "comment" : "The command browser: `audio N mute`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute an Audio Output…"
+          }
+        }
+      }
+    },
+    "edit.browser.audioOutput" : {
+      "comment" : "A field of the command browser: an audio output.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio output"
+          }
+        }
+      }
+    },
+    "edit.browser.clear" : {
+      "comment" : "A choice in the command browser's end behaviour field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        }
+      }
+    },
+    "edit.browser.cue" : {
+      "comment" : "The command browser: `cue N`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Cue…"
+          }
+        }
+      }
+    },
+    "edit.browser.cueNumber" : {
+      "comment" : "A field of the command browser: a cue's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue"
+          }
+        }
+      }
+    },
+    "edit.browser.disarm" : {
+      "comment" : "The command browser: `disarm`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disarm"
+          }
+        }
+      }
+    },
+    "edit.browser.endBehavior" : {
+      "comment" : "The command browser: a channel's end behaviour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "At the End…"
+          }
+        }
+      }
+    },
+    "edit.browser.freeze" : {
+      "comment" : "The command browser: a channel's freeze.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freeze…"
+          }
+        }
+      }
+    },
+    "edit.browser.heading" : {
+      "comment" : "The heading of the command browser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Command"
+          }
+        }
+      }
+    },
+    "edit.browser.hold" : {
+      "comment" : "A choice in the command browser's end behaviour field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold"
+          }
+        }
+      }
+    },
+    "edit.browser.item" : {
+      "comment" : "A field of the command browser: a playlist item's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        }
+      }
+    },
+    "edit.browser.itemCue" : {
+      "comment" : "The command browser: `item N cue M`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to an Item’s Cue…"
+          }
+        }
+      }
+    },
+    "edit.browser.itemSection" : {
+      "comment" : "The command browser: `item N section \"NAME\"`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to a Section…"
+          }
+        }
+      }
+    },
+    "edit.browser.list" : {
+      "comment" : "A field of the command browser: a library list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List"
+          }
+        }
+      }
+    },
+    "edit.browser.listCue" : {
+      "comment" : "The command browser: `list N cue M`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to a List’s Cue…"
+          }
+        }
+      }
+    },
+    "edit.browser.lock" : {
+      "comment" : "The command browser: a channel's lock.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock or Unlock…"
+          }
+        }
+      }
+    },
+    "edit.browser.lockOn" : {
+      "comment" : "A choice in the command browser's lock field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock"
+          }
+        }
+      }
+    },
+    "edit.browser.loop" : {
+      "comment" : "A choice in the command browser's end behaviour field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loop"
+          }
+        }
+      }
+    },
+    "edit.browser.mode" : {
+      "comment" : "A field of the command browser: play, pause or stop.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do"
+          }
+        }
+      }
+    },
+    "edit.browser.next" : {
+      "comment" : "The command browser: `next`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "edit.browser.pause" : {
+      "comment" : "A choice in the command browser's transport field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        }
+      }
+    },
+    "edit.browser.pick" : {
+      "comment" : "The command browser's form while nothing is picked.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a command in the tree."
+          }
+        }
+      }
+    },
+    "edit.browser.play" : {
+      "comment" : "A choice in the command browser's transport field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        }
+      }
+    },
+    "edit.browser.playback" : {
+      "comment" : "The command browser's group of the playlist and cue commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback"
+          }
+        }
+      }
+    },
+    "edit.browser.playlist" : {
+      "comment" : "The command browser: `playlist \"TITLE\"`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load Playlist…"
+          }
+        }
+      }
+    },
+    "edit.browser.playlistName" : {
+      "comment" : "A field of the command browser: a playlist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playlist"
+          }
+        }
+      }
+    },
+    "edit.browser.popupClear" : {
+      "comment" : "The command browser: `popup N clear`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear a Popup…"
+          }
+        }
+      }
+    },
+    "edit.browser.preflight" : {
+      "comment" : "The command browser: `system preflight`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preflight"
+          }
+        }
+      }
+    },
+    "edit.browser.previous" : {
+      "comment" : "The command browser: `previous`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous"
+          }
+        }
+      }
+    },
+    "edit.browser.redo" : {
+      "comment" : "The command browser: `redo`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo"
+          }
+        }
+      }
+    },
+    "edit.browser.search" : {
+      "comment" : "The command browser's search field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search commands"
+          }
+        }
+      }
+    },
+    "edit.browser.section" : {
+      "comment" : "A field of the command browser: a section's name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Section"
+          }
+        }
+      }
+    },
+    "edit.browser.snapshot" : {
+      "comment" : "The command browser: `system snapshot`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshot"
+          }
+        }
+      }
+    },
+    "edit.browser.stop" : {
+      "comment" : "A choice in the command browser's transport field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        }
+      }
+    },
+    "edit.browser.timerPause" : {
+      "comment" : "The command browser: `timer N pause`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause a Timer…"
+          }
+        }
+      }
+    },
+    "edit.browser.timerReset" : {
+      "comment" : "The command browser: `timer N reset`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset a Timer…"
+          }
+        }
+      }
+    },
+    "edit.browser.timerStart" : {
+      "comment" : "The command browser: `timer N start`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a Timer…"
+          }
+        }
+      }
+    },
+    "edit.browser.transport" : {
+      "comment" : "The command browser: a channel's transport.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play, Pause or Stop…"
+          }
+        }
+      }
+    },
+    "edit.browser.typed" : {
+      "comment" : "The command browser's line that takes a command in canonical text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or type one"
+          }
+        }
+      }
+    },
+    "edit.browser.undo" : {
+      "comment" : "The command browser: `undo`.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo"
+          }
+        }
+      }
+    },
+    "edit.browser.unlock" : {
+      "comment" : "A choice in the command browser's lock field.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock"
+          }
+        }
+      }
+    },
     "edit.canvas.boxFrame" : {
       "comment" : "VoiceOver: a canvas box's frame, each a percentage of the stack.",
       "extractionState" : "manual",
@@ -3169,6 +3685,30 @@
         }
       }
     },
+    "edit.commands.missingSaid" : {
+      "comment" : "The tooltip of the Missing tag.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It names something that doesn’t exist."
+          }
+        }
+      }
+    },
+    "edit.commands.recursiveSaid" : {
+      "comment" : "The tooltip of the Recursive tag.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It calls a macro that comes back to this one."
+          }
+        }
+      }
+    },
     "edit.commands.selectOne" : {
       "comment" : "In the Commands column while several cues are selected.",
       "extractionState" : "manual",
@@ -3177,6 +3717,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select one cue to edit its commands"
+          }
+        }
+      }
+    },
+    "edit.commands.tag.edits" : {
+      "comment" : "A short tag on a command that is itself an edit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edits library"
+          }
+        }
+      }
+    },
+    "edit.commands.tag.missing" : {
+      "comment" : "A short tag on a command that names something that doesn't exist.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missing"
+          }
+        }
+      }
+    },
+    "edit.commands.tag.recursive" : {
+      "comment" : "A short tag on a macro's command that calls a macro that calls it again.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recursive"
+          }
+        }
+      }
+    },
+    "edit.commands.tag.unknown" : {
+      "comment" : "A short tag on a command this version doesn't know.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
           }
         }
       }
@@ -12902,13 +13490,13 @@
       }
     },
     "rejected.cycle" : {
-      "comment" : "The engine refused a macro edit.",
+      "comment" : "The engine refused a macro edit that would make a macro run itself.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "That would make a macro run itself."
+            "value" : "Recursive macro"
           }
         }
       }

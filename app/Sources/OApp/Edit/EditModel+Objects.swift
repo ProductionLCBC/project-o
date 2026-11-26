@@ -13,6 +13,14 @@ public struct ObjectEditorState: Equatable, Sendable {
     public var ungraded = PreviewPicture()
     /// "the item picked under the preview"; nil takes "at first the pool's first video or image".
     public var gradeMedia: String?
+    /// Spec 11 §9 as corrected 2026-11-25 — a transition's stage: "from one pool item to another, both picked over
+    /// it", nil for black, and the engine's pictures of them.
+    public var transitionFrom: String??
+    public var transitionTo: String??
+    public var fromPicture = PreviewPicture()
+    public var toPicture = PreviewPicture()
+    /// A text style's sample, as typed over the stage; nil for the built-in sample.
+    public var styleSample: String?
     var pixels = 0
     var gradeAsked = 0
     var gradeSubject: [String: JSONValue]?
@@ -194,9 +202,77 @@ extension EditModel {
         askGrade()
     }
 
-    /// "`render` with `subject.kind` `grade`, and `grade` null for the second, §3": two canvases, asked together.
+    /// The stage's two items for a transition: the ones picked, else the pool's first two videos or images; nil is black.
+    public var transitionMedia: (from: String?, to: String?) {
+        let ids = gradeMediaChoices.map(\.id)
+        func kept(_ picked: String??, _ fallback: String?) -> String? {
+            guard let picked else { return fallback }
+            guard let id = picked else { return nil }
+            return ids.contains(id) ? id : fallback
+        }
+        return (kept(objectState.transitionFrom, ids.first), kept(objectState.transitionTo, ids.dropFirst().first))
+    }
+
+    public func setTransitionMedia(from id: String?) {
+        objectState.transitionFrom = .some(id)
+        model.changed([.edit])
+        askGrade()
+    }
+
+    public func setTransitionMedia(to id: String?) {
+        objectState.transitionTo = .some(id)
+        model.changed([.edit])
+        askGrade()
+    }
+
+    /// The text style's sample: what was typed over the stage, else the built-in sample's body (§8).
+    public var styleSampleText: String {
+        objectState.styleSample ?? LayoutSample.builtIn(verse: 0)["body"] ?? ""
+    }
+
+    public func setStyleSample(_ text: String) {
+        objectState.styleSample = text.isEmpty ? nil : text
+        model.changed([.edit])
+    }
+
+    /// The transition's two pictures, "the engine's (`render` with `subject.kind` `grade` and `grade` null)".
+    private func askTransitionPictures(again: Bool) {
+        guard objectState.pixels > 0 else { return }
+        let media = transitionMedia
+        func request(_ canvas: String, _ id: String) -> [String: JSONValue] {
+            ["canvas": .string(canvas), "subject": .object(["kind": .string("grade"), "grade": .null, "media": .string(id)]),
+             "width": .number(Double(objectState.pixels))]
+        }
+        let key: [String: JSONValue] = ["from": media.from.map(JSONValue.string) ?? .null, "to": media.to.map(JSONValue.string) ?? .null,
+                                        "width": .number(Double(objectState.pixels))]
+        guard again || key != objectState.gradeSubject else { return }
+        objectState.gradeSubject = key
+        objectState.gradeAsked += 1
+        let asked = objectState.gradeAsked
+        objectState.fromPicture = PreviewPicture()
+        objectState.toPicture = PreviewPicture()
+        for (id, isFrom) in [(media.from, true), (media.to, false)] {
+            guard let id else { continue }
+            model.ask(.query("render", request(isFrom ? "from" : "to", id))) { [weak self] answer in
+                guard let self, asked == self.objectState.gradeAsked, let answer, answer["superseded"] != .bool(true),
+                      let file = answer["file"]?.stringValue else { return }
+                let picture = PreviewPicture(file: file, width: answer["width"]?.intValue, height: answer["height"]?.intValue,
+                                             isMissing: answer["missing"] == .bool(true))
+                if isFrom { self.objectState.fromPicture = picture } else { self.objectState.toPicture = picture }
+                self.model.changed([.edit])
+            }
+        }
+    }
+
+    /// "`render` with `subject.kind` `grade`, and `grade` null for the second, §3": two canvases, asked together; for a
+    /// transition, its two items.
     func askGrade(again: Bool = false) {
-        guard model.mode == .edit, page == .objects, objectState.pixels > 0, let grade = selectedGrade, let media = gradeMedia else { return }
+        guard model.mode == .edit, page == .objects else { return }
+        if selectedTransition != nil {
+            askTransitionPictures(again: again)
+            return
+        }
+        guard objectState.pixels > 0, let grade = selectedGrade, let media = gradeMedia else { return }
         func request(_ canvas: String, _ grade: JSONValue) -> [String: JSONValue] {
             ["canvas": .string(canvas), "subject": .object(["kind": .string("grade"), "grade": grade, "media": .string(media)]),
              "width": .number(Double(objectState.pixels))]
@@ -271,12 +347,12 @@ extension EditModel {
 
     /// The macro's rows: "each a row with its plain name (Spec 10 §15) and Edit, Move Up, Move Down and Remove".
     public var macroLines: [CueCommandLine] {
-        guard let macro = selectedMacro else { return [] }
+        guard let macro = selectedMacro, let catalog = model.store.catalog else { return [] }
+        let media = model.store.media
         return macro.commands.enumerated().map { index, entry in
             let command = entry.command
             let kept = command.isUnknown || command.isInvalid
-            var warning: CueCommandLine.Warning?
-            if kept { warning = .keptVerbatim } else if case .edit = command { warning = .changesLibrary }
+            let warning = MacroCheck.warning(command, in: macro.number, catalog: catalog, media: media)
             return CueCommandLine(position: index, name: kept ? command.cmd : macroCommandName(command), warning: warning,
                                   canEdit: !kept, canMoveUp: index > 0, canMoveDown: index < macro.commands.count - 1)
         }
