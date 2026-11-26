@@ -98,10 +98,14 @@ public enum ContentRuntime: Sendable {
 
 /// Spec 4 §7 — the outgoing of a transition: the previous content, still
 /// playing, or a snapshot of the channel texture as it was (Area 4 reading:
-/// an interrupted or restarted transition freezes the picture it interrupts).
+/// an interrupted or restarted transition freezes the picture it interrupts),
+/// or nothing: "On a channel that held no picture the outgoing is
+/// transparent, so a dissolve fades the new content in" (as corrected
+/// 2026-11-25).
 public enum OutgoingRuntime: Sendable {
     case content(ContentRuntime)
     case snapshot
+    case nothing
 }
 
 /// Spec 4 §4 — "the transition (type, progress 0–1 for this tick, easing,

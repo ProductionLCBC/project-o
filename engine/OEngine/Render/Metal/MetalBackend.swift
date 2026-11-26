@@ -230,6 +230,10 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
         for grade in [false, true] {
             for incoming in layouts {
                 ensure(ChannelVariant(incoming: incoming, outgoing: nil, transition: .cut, grade: grade))
+                // Spec 4 §7 — a transition onto an empty channel mixes from nothing: built now, never mid-show.
+                for transition in [TransitionVariant.dissolve, .fadeThroughColor] {
+                    ensure(ChannelVariant(incoming: incoming, outgoing: nil, transition: transition, grade: grade))
+                }
                 for outgoing in layouts {
                     for transition in [TransitionVariant.dissolve, .fadeThroughColor] {
                         ensure(ChannelVariant(incoming: incoming, outgoing: outgoing, transition: transition, grade: grade))

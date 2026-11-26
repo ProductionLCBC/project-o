@@ -21,6 +21,13 @@ final class MetalRebuildTests: XCTestCase {
 
     /// The share of a captured frame that is lit. The harness captures at the stack's size, so a share is
     /// what stays the same when the stack is made again; the cue plays a clip, so it drifts a little.
+    /// Ticks until cue 1's media is fully up: it fades in onto its empty channel (Spec 4 §7 as corrected 2026-11-25).
+    func settle() {
+        engine.tick(count: 3)
+        for _ in 0..<240 where engine.lastPlan?.channelPasses.contains(where: { $0.transition != nil }) ?? false { engine.tick() }
+        engine.tick(count: 2)
+    }
+
     func lit(_ frame: CapturedFrame) -> Double {
         var count = 0
         for y in 0..<frame.height {
@@ -31,7 +38,7 @@ final class MetalRebuildTests: XCTestCase {
 
     func test_anOutputKeepsItsPictureWhileItsStackIsMadeAgainAtAnotherSize() throws {
         engine.send("list 42 cue 1")
-        engine.tick(count: 3)
+        settle()
         let small = PixelSize(width: 480, height: 270)
         let large = PixelSize(width: 1920, height: 1080)
         XCTAssertEqual(engine.control.geometry.stackSize(1), small)
@@ -75,7 +82,7 @@ final class MetalRebuildTests: XCTestCase {
         machine.settings.libraryMode = .writable
         engine = try HeadlessEngine(library: E.library(), machine: machine, media: E.media, metal: try MetalHarness.backend())
         engine.send("list 42 cue 1")
-        engine.tick(count: 3)
+        settle()
         let before = lit(try XCTUnwrap(engine.captured(output: 1)))
         XCTAssertGreaterThan(before, 0.1)
         for edit in [["edit stack create", "edit channel create"], ["edit stack 3 delete", "edit channel 4 delete"]] {

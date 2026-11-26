@@ -218,6 +218,41 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertNil(pass.outgoing)
     }
 
+    /// Spec 4 §7 as corrected 2026-11-25 — "On a channel that held no picture the outgoing is transparent, so a
+    /// dissolve fades the new content in"; and §6, a cold write "holds ... nothing on an empty channel" until its first
+    /// decoded frame, never its poster.
+    func test_aDissolveOntoAnEmptyChannelFadesInFromNothing() throws {
+        // Warm: the dissolve runs from the tick it lands, from nothing.
+        engine.send("channel 1 write media \(EngineFixtures.dawn) transition 2 1.0 once")
+        engine.tick()
+        var pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.transition?.type, .dissolve)
+        XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001)
+        XCTAssertEqual(pass.outgoing?.source, SourceRef.none, "from nothing: a transparent outgoing")
+        XCTAssertEqual(MetalBackend.variant(for: pass).outgoing, 0, "the shader's transparent outgoing: no outgoing layout")
+        engine.tick(count: 30)
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.transition?.progress ?? -1, 0.5, accuracy: 0.0001)
+        engine.tick(count: 31)
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertNil(pass.transition)
+        XCTAssertNil(pass.outgoing)
+        // Cold, onto the channel cleared: nothing until the first decoded frame, then the fade.
+        engine.fakeSources?.readyAfterTicks = 3
+        engine.send("channel 1 clear")
+        engine.tick(count: 2)
+        engine.send("channel 1 write media \(EngineFixtures.cross) transition 2 1.0 once")
+        engine.tick()
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.incoming.source, SourceRef.none, "nothing, not the poster")
+        XCTAssertNil(pass.transition, "waiting for the first decoded frame")
+        engine.tick(count: 3)
+        pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        guard case .instance = pass.incoming.source else { return XCTFail("decoded frames now") }
+        XCTAssertEqual(pass.outgoing?.source, SourceRef.none)
+        XCTAssertEqual(pass.transition?.progress ?? -1, 0, accuracy: 0.0001, "the fade starts now")
+    }
+
     func test_cutHasAZeroDurationTransitionOnTheLandingFrameOnly() throws {
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.tick()

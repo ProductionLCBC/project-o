@@ -1074,25 +1074,31 @@ public final class ControlLoop: @unchecked Sendable {
         }
 
         if case .media(let m) = incoming, !m.missing, !m.ready {
-            // Spec 4 §6 as corrected 2026-11-24 — a cold write "starts its transition when the first decoded frame
-            // arrives. Until then a cut, or a write onto an empty channel, which has nothing to mix with, shows the
-            // item's poster frame from the tick it lands; any other transition holds what the channel showed, the
-            // previous content playing on with its sound, so the transition mixes the previous picture with the new
-            // item's frames ..., never with its poster." A write onto an empty channel cuts as a warm one does below.
-            let holds = !cutLike && previousHasPicture
-            if holds {
+            // Spec 4 §6 as corrected 2026-11-24 and 25 — a cold write "starts its transition when the first decoded
+            // frame arrives. Until then a cut shows the item's poster frame from the tick it lands; any other
+            // transition holds what the channel showed, the previous content playing on with its sound, or nothing on
+            // an empty channel, so the transition mixes the previous picture with the new item's frames ..., never
+            // with its poster."
+            if cutLike {
+                release(previous, frame: frame)
+            } else if previousHasPicture {
                 rt.outgoing = .content(previous)
             } else {
                 release(previous, frame: frame)
+                rt.outgoing = .nothing
             }
             rt.live = incoming
-            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: holds ? durationFrames : 0, startFrame: nil)
+            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: cutLike ? 0 : durationFrames, startFrame: nil)
             model.channels[e.channel] = rt
             return
         }
 
+        // Spec 4 §7 as corrected 2026-11-25 — "On a channel that held no picture the outgoing is transparent, so a
+        // dissolve fades the new content in"; a transition from nothing to nothing (a clear of an empty channel) cuts.
+        let fadesIn = !cutLike && !previousHasPicture && incoming.hasPixels
         if cutLike || !previousHasPicture {
             release(previous, frame: frame)
+            if fadesIn { rt.outgoing = .nothing }
         } else if interrupted || e.restart {
             rt.outgoing = .snapshot
             rt.snapshotPending = true
@@ -1102,7 +1108,7 @@ public final class ControlLoop: @unchecked Sendable {
         }
         rt.live = incoming
         rt.transition = TransitionRun(type: type, easing: easing, color: color,
-                                      durationFrames: (cutLike || !previousHasPicture) ? 0 : durationFrames, startFrame: frame)
+                                      durationFrames: cutLike || (!previousHasPicture && !fadesIn) ? 0 : durationFrames, startFrame: frame)
         model.channels[e.channel] = rt
     }
 
@@ -1467,6 +1473,9 @@ public final class ControlLoop: @unchecked Sendable {
         switch rt.outgoing {
         case .content(let c)?:
             outgoing = binding(for: c, at: frame)
+        case .nothing?:
+            // "the outgoing is transparent": the shader's own empty outgoing.
+            outgoing = SourceBinding(source: .none, layout: .linearRGBA16, matrix: .bt709, range: .full, size: size)
         case .snapshot?:
             if let held = heldSnapshots[channel] {
                 // The channel changed size while this transition ran: its frozen picture is in the texture it was taken in.

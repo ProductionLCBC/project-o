@@ -185,6 +185,13 @@ final class PipelineCache: @unchecked Sendable {
         }
     }
 
+    /// Whether the channel variant has been built, as warm-up should have built every one a plan can name.
+    func hasChannel(_ variant: ChannelVariant) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return channel[variant.index] != nil
+    }
+
     /// Make sure the channel variant exists; compiles on the caller's thread.
     func ensureChannel(_ variant: ChannelVariant) throws {
         if channel[variant.index] != nil { return }

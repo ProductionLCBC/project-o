@@ -182,7 +182,44 @@ final class MediaDissolveEngineTests: XCTestCase {
             """)
     }
 
+    /// Spec 4 §7 as corrected 2026-11-25 — "On a channel that held no picture the outgoing is transparent, so a dissolve
+    /// fades the new content in": the pipelines for a transition with no outgoing are built at warm-up, so a fade-in
+    /// never compiles one on the render thread; and on the GPU the channel comes up from nothing.
+    func test_aDissolveOntoAnEmptyChannelFadesInOnTheGPU() throws {
+        let metal = try MetalHarness.backend()
+        _ = metal.warmUp()
+        for layout in [SourceLayout.nv12, .p010, .yuv422p10, .rgba16, .linearRGBA16] {
+            for transition in [TransitionVariant.dissolve, .fadeThroughColor] {
+                XCTAssertTrue(metal.pipelines.hasChannel(ChannelVariant(incoming: layout, outgoing: nil, transition: transition, grade: false)),
+                              "\(layout) \(transition) from nothing")
+            }
+        }
+        let engine = try HeadlessEngine(library: EngineFixtures.library(),
+                                        machine: EngineFixtures.spikeMachine(mainSize: Size(width: 480, height: 270)),
+                                        media: EngineFixtures.media, metal: metal)
+        XCTAssertNil(engine.send("channel 1 write media \(EngineFixtures.cross) transition 2 1.0 once"))
+        let started = tickUntil(engine) { pass in
+            if case .instance = pass.incoming.source { return (pass.transition?.progress ?? -1) > 0.3 } else { return false }
+        }
+        XCTAssertTrue(started, "the fade never began")
+        let pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first { $0.channel == 1 })
+        let progress = Double(pass.transition?.progress ?? 0)
+        let texture = try XCTUnwrap(engine.control.channelTextures[1])
+        let mid = try XCTUnwrap(metal.readback(texture))
+        engine.tick(count: 80)
+        let full = try XCTUnwrap(metal.readback(texture))
+        // Partway in, the cross's white is dimmer than when it is fully in.
+        func brightest(_ frame: CapturedFrame) -> Double { Self.peakLuminance(frame) }
+        XCTAssertLessThan(brightest(mid), brightest(full) * 0.9, "partway through the fade (progress \(progress)), dimmer than fully in")
+        XCTAssertGreaterThan(brightest(mid), 0, "but not nothing")
+    }
+
     // MARK: - Helpers
+
+    /// The brightest pixel's luminance in a captured channel texture.
+    private static func peakLuminance(_ frame: CapturedFrame) -> Double {
+        Double(frame.pixels.map { CrossMask.luma($0) }.max() ?? 0)
+    }
 
     /// Tick, letting the real decoders run between ticks, until channel 1's pass satisfies `condition`.
     private func tickUntil(_ engine: HeadlessEngine, ticks: Int = 300, _ condition: (ChannelPass) -> Bool) -> Bool {
