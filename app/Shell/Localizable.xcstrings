@@ -5666,13 +5666,13 @@
       }
     },
     "edit.object.fixed" : {
-      "comment" : "Beside a transition's number.",
+      "comment" : "Under the number of transitions 1 to 3, which can't be renumbered or deleted, or change type.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Transitions 1 to 3 are built in: their duration and easing can change, not their number, type or color."
+            "value" : "Built in: its number and type stay."
           }
         }
       }
@@ -5841,6 +5841,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New Text Style"
+          }
+        }
+      }
+    },
+    "edit.object.newTransition" : {
+      "comment" : "The transitions' + row: makes a 500 ms dissolve at a free number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Transition"
           }
         }
       }

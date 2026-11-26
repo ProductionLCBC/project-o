@@ -353,7 +353,7 @@ public enum EditModeWording {
     public static func newObject(_ kind: ObjectKind) -> String {
         switch kind {
         case .grade: Strings.text(.editObjectNewGrade)
-        case .transition: ""
+        case .transition: Strings.text(.editObjectNewTransition)
         case .audioTransition: Strings.text(.editObjectNewAudioTransition)
         case .textStyle: Strings.text(.editObjectNewTextStyle)
         case .macro: Strings.text(.editObjectNewMacro)

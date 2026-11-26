@@ -1161,6 +1161,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     case editObjectTextStyle = "edit.object.textStyle"
     case editObjectMacro = "edit.object.macro"
     case editObjectNewGrade = "edit.object.newGrade"
+    case editObjectNewTransition = "edit.object.newTransition"
     case editObjectNewAudioTransition = "edit.object.newAudioTransition"
     case editObjectNewTextStyle = "edit.object.newTextStyle"
     case editObjectNewMacro = "edit.object.newMacro"

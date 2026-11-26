@@ -27,6 +27,8 @@ final class ObjectWorkspaceView: NSView {
     let tint = FormColorWell(label: Strings.text(.editGradeTint))
     // Transitions and audio transitions.
     let transitionType = Kit.label(size: 12)
+    /// A new transition's type, "picked from the three"; 1–3 show theirs as text.
+    let transitionPicker = ChoicePopUp(label: Strings.text(.editObjectType))
     let audioType = ChoicePopUp(label: Strings.text(.editObjectType))
     let ms = EditField()
     let easing = ChoicePopUp(label: Strings.text(.editObjectEasing))
@@ -51,6 +53,7 @@ final class ObjectWorkspaceView: NSView {
 
     static let easings: [Easing] = [.linear, .easeIn, .easeOut, .easeInOut]
     static let audioTypes: [AudioTransitionType] = [.cut, .crossfade, .fadeThroughSilence]
+    static let transitionTypes: [TransitionType] = [.cut, .dissolve, .fadeThroughColor]
 
     override var isFlipped: Bool { true }
 
@@ -129,7 +132,11 @@ final class ObjectWorkspaceView: NSView {
             guard Self.audioTypes.indices.contains(tag) else { return }
             model?.editing.setObject("type", .string(Self.audioTypes[tag].rawValue))
         }
-        c.row(Strings.text(.editObjectType), [transitionType, audioType], height: 24)
+        transitionPicker.onChoose = { [weak model] tag in
+            guard Self.transitionTypes.indices.contains(tag) else { return }
+            model?.editing.setObject("type", .string(Self.transitionTypes[tag].rawValue))
+        }
+        c.row(Strings.text(.editObjectType), [transitionType, transitionPicker, audioType], height: 24)
         numeric(ms, Strings.text(.editObjectDuration)) { [weak model] value in model?.editing.setObject("ms", .number(max(0, value.rounded()))) }
         c.row(Strings.text(.editObjectDuration), [ms], widths: [80], height: 26)
         easing.onChoose = { [weak model] tag in
@@ -137,7 +144,8 @@ final class ObjectWorkspaceView: NSView {
             model?.editing.setObject("easing", .string(Self.easings[tag].rawValue))
         }
         c.row(Strings.text(.editObjectEasing), [easing], height: 24)
-        transitionColor.isEnabled = false
+        // "for a fade, color can be edited", 3's too.
+        transitionColor.onChoose = { [weak model] picked in model?.editing.setObject("color", FormColor.value(picked)) }
         c.row(Strings.text(.editObjectColor), [transitionColor], widths: [44], height: 24)
         // "the offset, signed and measured from the trigger, that makes J and L cuts".
         numeric(offset, Strings.text(.editObjectOffset)) { [weak model] value in
@@ -191,11 +199,11 @@ final class ObjectWorkspaceView: NSView {
         if let key {
             number.show(String(key.number), placeholder: String(key.number), subject: subject)
             // "Transitions ... can't be renumbered or swapped (Spec 5 §6)."
-            number.isEnabled = !key.kind.isFixed
+            number.isEnabled = !key.isProtected
             label.show(editing.objectLabel, placeholder: EditModeWording.objectName(key.kind, key.number), subject: subject)
             Kit.setHeading(heading, EditModeWording.group(key.kind))
         }
-        fixedNote.isHidden = key?.kind.isFixed != true
+        fixedNote.isHidden = key?.isProtected != true
         // Grades.
         let grade = editing.selectedGrade
         for parameter in GradeParameter.allCases {
@@ -212,7 +220,9 @@ final class ObjectWorkspaceView: NSView {
         // Transitions and audio transitions.
         let transition = editing.selectedTransition
         let audio = editing.selectedAudioTransition
-        transitionType.isHidden = transition == nil
+        let isBuiltIn = editing.selectedObject?.isProtected == true
+        transitionType.isHidden = transition == nil || !isBuiltIn
+        transitionPicker.isHidden = transition == nil || isBuiltIn
         audioType.isHidden = audio == nil
         ms.isHidden = transition == nil && audio == nil
         easing.isHidden = ms.isHidden
@@ -221,9 +231,11 @@ final class ObjectWorkspaceView: NSView {
         let easings = Self.easings.enumerated().map { (EditModeWording.easing($0.element), $0.offset) }
         if let transition {
             transitionType.stringValue = EditModeWording.transitionType(transition.type)
+            transitionPicker.set(Self.transitionTypes.enumerated().map { (EditModeWording.transitionType($0.element), $0.offset) },
+                                 selected: Self.transitionTypes.firstIndex(of: transition.type) ?? 1)
             ms.show(String(transition.ms), subject: subject)
             easing.set(easings, selected: Self.easings.firstIndex(of: transition.easing) ?? 0)
-            if let color = transition.color { transitionColor.show(FormColor.ns(color)) }
+            transitionColor.show(FormColor.ns(transition.color ?? Color(r: 0, g: 0, b: 0, a: 1)))
         }
         if let audio {
             audioType.set(Self.audioTypes.enumerated().map { (EditModeWording.audioTransitionType($0.element), $0.offset) },

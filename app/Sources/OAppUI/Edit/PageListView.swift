@@ -393,24 +393,25 @@ final class PageListView: PanelView, EditFocus {
                 let detail = catalog.map { Self.detail(key, catalog: $0) } ?? ""
                 return Entry(key: key.number, number: String(key.number), name: name, detail: detail == name ? "" : detail,
                              isSelected: key == page.selected, select: select,
-                             menu: kind.isFixed ? nil : menu([
+                             menu: menu([
                                 (Strings.text(.menuDuplicate), true, { [weak model] in
                                     select()
                                     model?.editing.duplicateObject()
                                 }),
-                                (Strings.text(.editCuesRenumber), true, { [weak self] in
+                                // "Transitions 1–3 can't be deleted, renumbered or swapped" (Spec 5 §6).
+                                (Strings.text(.editCuesRenumber), !key.isProtected, { [weak self] in
                                     select()
                                     self?.askNumber(key.number) { self?.model.editing.renumberObject(to: $0) }
                                 }),
                                 ("", true, {}),
-                                (Strings.text(.menuDelete), true, { [weak model] in
+                                (Strings.text(.menuDelete), !key.isProtected, { [weak model] in
                                     select()
                                     model?.editing.deleteObject()
                                 }),
                              ]))
             }
             return Section(heading: EditModeWording.group(kind), entries: entries, add: EditModeWording.newObject(kind),
-                           onAdd: kind.isFixed ? nil : { [weak model] in model?.editing.newObject(kind) }, showsAdd: !kind.isFixed,
+                           onAdd: { [weak model] in model?.editing.newObject(kind) },
                            empty: Strings.text(.editObjectNoneYet))
         }
     }

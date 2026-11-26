@@ -18,9 +18,6 @@ public enum ObjectKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// "but for Transitions, a + that creates one"; "Transitions have neither [Duplicate nor Delete], and can't be
-    /// renumbered or swapped (Spec 5 §6)."
-    public var isFixed: Bool { self == .transition }
 }
 
 /// One object on the page: its kind and its number.
@@ -32,6 +29,10 @@ public struct ObjectKey: Hashable, Sendable {
         self.kind = kind
         self.number = number
     }
+
+    /// Spec 5 §6 — "Transitions 1–3 can't be deleted, renumbered or swapped"; Spec 11 §9 as corrected 2026-11-25 —
+    /// "1–3 keep their [type]".
+    public var isProtected: Bool { kind == .transition && (1...3).contains(number) }
 }
 
 /// Spec 11 §9 — one row of a group, "by number and label".
@@ -205,27 +206,24 @@ public enum ObjectEdits {
         edit(key.kind.type, key.number, .set(path: path, value: value))
     }
 
-    /// "a + that creates one", at a free number with the type's defaults; nil for transitions, which "wait for the
-    /// transition editor the planning doc cut".
+    /// "a + row that creates one", at a free number with the type's defaults (a transition's, "a 500 ms dissolve").
     public static func create(_ kind: ObjectKind) -> Sending? {
-        guard !kind.isFixed else { return nil }
-        return edit(kind.type, nil, .create(body: nil, folder: nil, title: nil))
+        edit(kind.type, nil, .create(body: nil, folder: nil, title: nil))
     }
 
     /// "Duplicate (the UX spec's duplicate-from)".
     public static func duplicate(_ key: ObjectKey) -> Sending? {
-        guard !key.kind.isFixed else { return nil }
-        return edit(key.kind.type, key.number, .duplicate(to: nil, title: nil, picks: EditPicks()))
+        edit(key.kind.type, key.number, .duplicate(to: nil, title: nil, picks: EditPicks()))
     }
 
     /// "its number, with renumber, or swap for a taken one (Spec 5 §4)".
     public static func renumber(_ key: ObjectKey, to number: Int, swap: Bool) -> Sending? {
-        guard !key.kind.isFixed, number >= 1, number != key.number else { return nil }
+        guard !key.isProtected, number >= 1, number != key.number else { return nil }
         return edit(key.kind.type, key.number, swap ? .swap(with: number) : .renumber(to: number))
     }
 
     public static func delete(_ key: ObjectKey) -> Sending? {
-        guard !key.kind.isFixed else { return nil }
+        guard !key.isProtected else { return nil }
         return edit(key.kind.type, key.number, .delete)
     }
 

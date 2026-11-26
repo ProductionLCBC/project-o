@@ -989,9 +989,10 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(list.sections.map(\.heading.stringValue), ["GRADES", "TRANSITIONS", "AUDIO TRANSITIONS", "TEXT STYLES", "MACROS"])
         XCTAssertEqual(list.sections.map { $0.rows.map(\.name.stringValue) }, [["Warm"], ["Cut", "Dissolve", "Fade through black"],
                                                                              ["Cut", "Crossfade", "Fade through silence"], ["Body", "Caption"], ["Welcome", "Preshow"]])
-        XCTAssertEqual(list.sections.map(\.add.isHidden), [false, true, false, false, false], "no + for transitions")
+        XCTAssertEqual(list.sections.map(\.add.isHidden), [false, false, false, false, false], "a + row for each group (G-38)")
         XCTAssertEqual(list.sections[0].add.title, "+  New Grade")
-        XCTAssertNil(list.sections[1].rows[0].more.dropMenu, "a transition has no menu")
+        XCTAssertEqual(list.sections[1].rows[0].more.dropMenu?.items.map(\.isEnabled), [true, false, false, false],
+                       "a built-in transition: Duplicate, but no Renumber or Delete (the third is the separator)")
         XCTAssertEqual(list.sections[0].rows[0].more.dropMenu?.items.map(\.title), ["Duplicate", "Renumber…", "", "Delete…"])
         // "a row's ⋯ menu, and its right-click menu".
         let click = try XCTUnwrap(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,

@@ -50,14 +50,19 @@ final class ObjectsPageTests: XCTestCase {
         XCTAssertEqual(rig.model.editing.selectedObject, ObjectKey(.grade, 1), "a number that's gone falls back to the first")
     }
 
-    /// "Transitions have neither [Duplicate nor Delete], and can't be renumbered or swapped"; "but for Transitions, a +".
-    func test_transitionsAreFixed() {
-        XCTAssertEqual(ObjectKind.allCases.filter(\.isFixed), [.transition])
+    /// Spec 11 §9 as corrected 2026-11-25 (G-38) — "New (a 500 ms dissolve), Duplicate, Renumber… and Delete as for
+    /// grades, but for transitions 1–3, which ship built in and stay protected (Spec 5 §6)".
+    func test_transitionsOneToThreeAreProtectedAndNewOnesAreNot() {
         let key = ObjectKey(.transition, 2)
-        XCTAssertNil(ObjectEdits.create(.transition))
-        XCTAssertNil(ObjectEdits.duplicate(key))
+        XCTAssertTrue(key.isProtected)
+        XCTAssertFalse(ObjectKey(.transition, 4).isProtected)
+        XCTAssertFalse(ObjectKey(.grade, 2).isProtected)
+        XCTAssertEqual(ObjectEdits.create(.transition)?.lines, ["edit transition create"])
+        XCTAssertEqual(ObjectEdits.duplicate(key)?.lines, ["edit transition 2 duplicate"], "a copy of one is a new transition")
         XCTAssertNil(ObjectEdits.delete(key))
         XCTAssertNil(ObjectEdits.renumber(key, to: 7, swap: false))
+        XCTAssertEqual(ObjectEdits.delete(ObjectKey(.transition, 4))?.lines, ["edit transition 4 delete"])
+        XCTAssertEqual(ObjectEdits.renumber(ObjectKey(.transition, 4), to: 7, swap: false)?.lines, ["edit transition 4 renumber 7"])
         // "Their duration (`ms`) and easing can be edited".
         XCTAssertEqual(ObjectEdits.set(key, "ms", .number(750)).lines, ["edit transition 2 ms 750"])
         XCTAssertEqual(ObjectEdits.set(key, "easing", .string("easeOut")).lines, ["edit transition 2 easing \"easeOut\""])
@@ -173,10 +178,9 @@ final class ObjectsPageTests: XCTestCase {
         rig.answers[rig.answers.count - 1](.answer(["counts": .object(["cues": .number(3), "boxes": .number(1)])]))
         XCTAssertEqual(asked, [.deleteNumbered(name: "Grade 1 Warm", uses: ["cues": 3, "boxes": 1])])
         XCTAssertEqual(last(rig), ["edit grade 1 delete"])
-        // A transition: none of these.
+        // A built-in transition: not deleted, not renumbered.
         editing.selectObject(ObjectKey(.transition, 2))
         let now = rig.sent.count
-        editing.duplicateObject()
         editing.deleteObject()
         editing.renumberObject(to: 9)
         XCTAssertEqual(rig.sent.count, now)
