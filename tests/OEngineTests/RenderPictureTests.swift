@@ -293,6 +293,50 @@ final class RenderPictureTests: XCTestCase {
         let gone = try draw(service, .grade(nil, media: E.mountains), width: 320)
         XCTAssertTrue(gone.missing)
         XCTAssertEqual(try Picture(gone.png).lit(0, 1), 0)
+        XCTAssertTrue(try draw(service, .grade(nil, media: E.mountains, atMs: 500), width: 320).missing, "at a time too")
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "A grade's values ... draw a grade being edited as it would draw
+    /// with them, editing nothing": read from a request, the same picture as the stored grade with those values.
+    func test_aGradesValuesDrawAsTheStoredGradeWithThem() throws {
+        // The identity's values but for three, as the request's are.
+        let warm = Grade(number: 41, label: "Warmer", saturation: 1.6, brightness: -0.3, tint: Color(r: 1, g: 0.6, b: 0.2, a: 0.4))
+        library.grades.append(warm)
+        let service = try service()
+        let values: JSONValue = .object(["brightness": .number(-0.3), "saturation": .number(1.6),
+                                         "tint": .object(["r": .number(1), "g": .number(0.6), "b": .number(0.2), "a": .number(0.4)])])
+        let request = try RenderRequest.parse(["canvas": .string("grade"), "width": .number(320),
+                                               "subject": .object(["kind": .string("grade"), "grade": values, "media": .string(E.dawn)])],
+                                              library: library, machine: machine).get()
+        let draft = try Picture(try draw(service, request.subject, width: 320).png)
+        let stored = try Picture(try draw(service, .grade(warm, media: E.dawn), width: 320).png)
+        XCTAssertEqual(draft.differs(from: stored), 0)
+        let plain = try Picture(try draw(service, .grade(nil, media: E.dawn), width: 320).png)
+        XCTAssertGreaterThan(draft.differs(from: plain), 1000)
+    }
+
+    /// G-43 — "for a video with `atMs`, its frame at that time from the item's start, ... where a still ignores it";
+    /// "one reader the job keeps open, reading forward": a later time reads on, an earlier one starts another.
+    func test_aVideosFrameAtATimeFromTheKeptReaderAndAStillAtAnyTime() throws {
+        try MetalHarness.skipOnHostedRunner("AVFoundation decoding")
+        let service = try service()
+        let first = try draw(service, .grade(nil, media: E.dawn, atMs: 0), width: 320)
+        let poster = try draw(service, .grade(nil, media: E.dawn), width: 320)
+        XCTAssertEqual(first.size, poster.size, "the item's shape")
+        XCTAssertGreaterThan(try Picture(first.png).lit(0, 1), 1000)
+        XCTAssertEqual(service.gradeFrames.opened, 1)
+        _ = try draw(service, .grade(nil, media: E.dawn, atMs: 900), width: 320)
+        _ = try draw(service, .grade(nil, media: E.dawn, atMs: 1800), width: 320)
+        XCTAssertEqual(service.gradeFrames.opened, 1, "reading forward")
+        _ = try draw(service, .grade(nil, media: E.dawn, atMs: 300), width: 320)
+        XCTAssertEqual(service.gradeFrames.opened, 2, "an earlier time starts another")
+        let end = try draw(service, .grade(nil, media: E.dawn, atMs: 600_000), width: 320)
+        XCTAssertGreaterThan(try Picture(end.png).lit(0, 1), 1000, "its last frame past its end")
+
+        let still = try Picture(try draw(service, .grade(nil, media: E.cross), width: 320).png)
+        let stillLater = try Picture(try draw(service, .grade(nil, media: E.cross, atMs: 1500), width: 320).png)
+        XCTAssertEqual(stillLater.differs(from: still), 0, "a still ignores it")
+        XCTAssertEqual(service.gradeFrames.opened, 3, "a still opens no reader")
     }
 
     // MARK: - The thumbnail job after an edit
@@ -345,6 +389,54 @@ final class RenderPictureTests: XCTestCase {
         XCTAssertEqual(seen.filter { $0 == "thumbnail" }.count, list.cues.count)
         let place = try XCTUnwrap(seen.firstIndex(of: "render"))
         XCTAssertLessThan(place, seen.count - 1, "before the last thumbnails of the list: \(seen)")
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "While pictures keep coming, thumbnails still come: between two
+    /// thumbnails the job draws the pictures that were waiting, not those asked for meanwhile." A canvas that plays
+    /// asks for its next picture as soon as one is drawn; the list's thumbnails don't wait for it to stop.
+    func test_thumbnailsStillComeWhilePicturesKeepComing() throws {
+        let service = try service()
+        let list = try XCTUnwrap(library.list(number: 42))
+        XCTAssertGreaterThanOrEqual(list.cues.count, 3)
+        let order = Order()
+        service.onWritten = { _, _ in order.add("thumbnail") }
+        let playing = Playing(service: service, order: order, pictures: 30)
+        service.warm(list: list)
+        playing.next()
+        // Each picture's next turn is put on the queue as it asks: wait for them all.
+        let deadline = Date().addingTimeInterval(30)
+        while order.all.filter({ $0 == "render" }).count < 30, Date() < deadline { service.waitUntilIdle() }
+        let seen = order.all
+        XCTAssertEqual(seen.filter { $0 == "thumbnail" }.count, list.cues.count)
+        XCTAssertEqual(seen.filter { $0 == "render" }.count, 30)
+        let lastThumbnail = try XCTUnwrap(seen.lastIndex(of: "thumbnail"))
+        let lastPicture = try XCTUnwrap(seen.lastIndex(of: "render"))
+        XCTAssertLessThan(lastThumbnail, lastPicture, "the thumbnails came while the pictures did: \(seen)")
+    }
+
+    /// A canvas that plays: each picture, once drawn, asks for the next.
+    final class Playing: @unchecked Sendable {
+        let service: ThumbnailService
+        let order: Order
+        private let lock = NSLock()
+        private var left: Int
+
+        init(service: ThumbnailService, order: Order, pictures: Int) {
+            self.service = service
+            self.order = order
+            left = pictures
+        }
+
+        func next() {
+            service.performAhead { [self] in
+                order.add("render")
+                lock.lock()
+                left -= 1
+                let more = left > 0
+                lock.unlock()
+                if more { next() }
+            }
+        }
     }
 
     final class Order: @unchecked Sendable {

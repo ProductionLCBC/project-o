@@ -126,14 +126,66 @@ final class RenderRequestTests: XCTestCase {
     }
 
     func test_aMediaItemThroughAGradeOrAsItIs() throws {
-        guard case .grade(let grade, let media) = try parse(.object(["kind": .string("grade"), "grade": .number(1), "media": .string(E.dawn)])).get().subject else {
+        guard case .grade(let grade, let media, let at) = try parse(.object(["kind": .string("grade"), "grade": .number(1), "media": .string(E.dawn)])).get().subject else {
             return XCTFail("a grade")
         }
         XCTAssertEqual(grade?.number, 1)
         XCTAssertEqual(media, E.dawn)
-        guard case .grade(nil, _) = try parse(.object(["kind": .string("grade"), "grade": .null, "media": .string(E.dawn)])).get().subject else {
+        XCTAssertNil(at, "the poster without `atMs`")
+        guard case .grade(nil, _, _) = try parse(.object(["kind": .string("grade"), "grade": .null, "media": .string(E.dawn)])).get().subject else {
             return XCTFail("as it is when `grade` is null")
         }
+    }
+
+    func gradeSubject(_ grade: JSONValue, atMs: JSONValue? = nil) -> JSONValue {
+        var subject: [String: JSONValue] = ["kind": .string("grade"), "grade": grade, "media": .string(E.dawn)]
+        if let atMs { subject["atMs"] = atMs }
+        return .object(subject)
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "A grade's values (Spec 1 §2's `hue`, `saturation`, `brightness`,
+    /// `contrast`, `blur`, `tint` and `opacity`, each in its range, the identity's for any left out)"; "for a video with
+    /// `atMs`, its frame at that time from the item's start".
+    func test_aGradesValuesAndATimeIntoTheItem() throws {
+        let values: JSONValue = .object([
+            "brightness": .number(-0.25), "hue": .number(30), "blur": .number(4),
+            "tint": .object(["r": .number(1), "g": .number(0.5), "b": .number(0), "a": .number(0.2)]),
+        ])
+        guard case .grade(let grade?, let media, let at) = try parse(gradeSubject(values, atMs: .number(1500))).get().subject else {
+            return XCTFail("a grade's values")
+        }
+        XCTAssertEqual(media, E.dawn)
+        XCTAssertEqual(at, 1500)
+        XCTAssertEqual(grade.brightness, -0.25)
+        XCTAssertEqual(grade.hue, 30)
+        XCTAssertEqual(grade.blur, 4)
+        XCTAssertEqual(grade.tint, Color(r: 1, g: 0.5, b: 0, a: 0.2))
+        let identity = Grade(number: 0)
+        XCTAssertEqual(grade.saturation, identity.saturation, "the identity's for one left out")
+        XCTAssertEqual(grade.contrast, identity.contrast)
+        XCTAssertEqual(grade.opacity, identity.opacity)
+        // Values that aren't in the library: nothing names a grade's number.
+        XCTAssertNil(library.grades.first { $0.number == grade.number && $0.brightness == -0.25 })
+        guard case .grade(_, _, 0) = try parse(gradeSubject(.number(1), atMs: .number(0))).get().subject else {
+            return XCTFail("a stored grade at a time")
+        }
+    }
+
+    /// "each in its range": the ranges an edit of a grade is checked against (Spec 5 §6, check 4).
+    func test_aGradeValueOutOfItsRangeUnknownOrOfTheWrongKindAndABadTimeAreBadValue() {
+        let bad: [[String: JSONValue]] = [
+            ["saturation": .number(-0.1)], ["contrast": .number(-1)], ["blur": .number(-2)], ["opacity": .number(1.5)], ["opacity": .number(-0.1)],
+            ["tint": .object(["r": .number(2), "g": .number(0), "b": .number(0), "a": .number(1)])],
+            ["tint": .object(["r": .number(1), "g": .number(0), "b": .number(0)])],
+            ["tint": .string("red")], ["hue": .string("30")], ["glow": .number(1)],
+        ]
+        for values in bad {
+            XCTAssertEqual(reason(parse(gradeSubject(.object(values)))), .badValue, "\(values)")
+        }
+        for at: JSONValue in [.number(-1), .number(1.5), .string("1500"), .null] {
+            XCTAssertEqual(reason(parse(gradeSubject(.number(1), atMs: at))), .badValue, "\(at)")
+        }
+        XCTAssertEqual(reason(parse(gradeSubject(.string("1")))), .badValue, "a grade is a number, its values or null")
     }
 
     // MARK: - Errors

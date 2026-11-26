@@ -1,6 +1,7 @@
 // OEngine — Spec 11 §3, the `render` query's pictures, drawn by the
 // thumbnail job with the thumbnail job's code.
 
+import CoreGraphics
 import Foundation
 import OCore
 
@@ -47,15 +48,20 @@ extension ThumbnailService {
             return picture(size) { textures in
                 layoutPass(preset: preset, layout: key, stack: stack, sample: sample, roots: roots, size: size, target: textures.stack)
             }
-        case .grade(let grade, let id):
+        case .grade(let grade, let id, let atMs):
             guard let resolved = MediaResolver.resolve(id, library: roots.library, machine: roots.machine) else {
                 return .failure(Rejection(reason: .unknownObject, message: "\(id) isn't in either media index"))
             }
             // "The height follows ... the item's for a grade."
             let item = PixelSize(width: max(1, resolved.entry.width ?? 16), height: max(1, resolved.entry.height ?? 9))
             let size = ThumbnailService.pictureSize(width: width, of: item)
+            // G-43 — "for a video with `atMs`, its frame at that time ..., where a still ignores it".
+            var frame: TextureHandle?
+            if let atMs, resolved.entry.kind == .video, !missingNow.contains(resolved.entry.id) {
+                frame = videoFrame(resolved, atMs: atMs, size: size)
+            }
             return picture(size) { textures in
-                gradePass(grade, of: resolved, geometry: job.geometry, size: size, target: textures.stack)
+                gradePass(grade, of: resolved, frame: frame, geometry: job.geometry, size: size, target: textures.stack)
             }
         }
     }
@@ -217,7 +223,11 @@ extension ThumbnailService {
     /// by the item's default channel's width, or 1920 when it has none.
     /// "a media item whose file is missing draws nothing ..., and the answer
     /// says `missing: true`."
-    private func gradePass(_ grade: Grade?, of resolved: MediaResolution, geometry: MachineGeometry, size: PixelSize,
+    ///
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — a video's `frame` at a
+    /// time, when there is one, stands where its poster would; when it can't
+    /// be decoded, the poster does.
+    private func gradePass(_ grade: Grade?, of resolved: MediaResolution, frame: TextureHandle? = nil, geometry: MachineGeometry, size: PixelSize,
                            target: TextureHandle) -> (StackPass, RenderDrawn)? {
         var drawn = RenderDrawn(png: Data(), size: size)
         let black = StackPass(stack: 0, target: target, size: size, base: .black, gammaBlend: false, boxes: [])
@@ -225,8 +235,13 @@ extension ThumbnailService {
             drawn.missing = true
             return (black, drawn)
         }
-        guard let key = PosterKey.of(resolved) else { return (black, drawn) }
-        let poster = posters.load(key)
+        let poster: TextureHandle
+        if let frame, !frame.isNone {
+            poster = frame
+        } else {
+            guard let key = PosterKey.of(resolved) else { return (black, drawn) }
+            poster = posters.load(key)
+        }
         guard !poster.isNone else { return (black, drawn) }
 
         if gradeTexture?.size != size {
@@ -249,5 +264,38 @@ extension ThumbnailService {
         let full = PixelRect(x: 0, y: 0, width: Float(size.width), height: Float(size.height))
         let box = ResolvedBox(channel: 0, frame: full, content: .pixels(PixelQuad(texture: channel, frame: full, uv: .full)), opacity: 1)
         return (StackPass(stack: 0, target: target, size: size, base: .black, gammaBlend: false, boxes: [box]), drawn)
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — the video's frame at
+    /// `atMs` from the kept reader, drawn at the picture's size as a poster
+    /// is (premultiplied sRGB BGRA, its alpha kept when the item has it) into
+    /// a texture kept for the next frame of that size; nil when there is no
+    /// frame. The reader is looked at again once it may have gone unused.
+    private func videoFrame(_ resolved: MediaResolution, atMs: Int, size: PixelSize) -> TextureHandle? {
+        guard let location = resolved.location, let url = mediaFolders.url(for: location),
+              let buffer = gradeFrames.frame(of: url, atMs: atMs) else { return nil }
+        closeGradeFramesWhenIdle()
+        guard let image = AVMediaFrames.image(of: buffer, alpha: resolved.entry.hasAlpha) else { return nil }
+        var pixels = [UInt8](repeating: 0, count: size.width * size.height * 4)
+        let drawn = pixels.withUnsafeMutableBytes { raw -> Bool in
+            let alpha: CGImageAlphaInfo = resolved.entry.hasAlpha ? .premultipliedFirst : .noneSkipFirst
+            let info = CGBitmapInfo(rawValue: alpha.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+            guard let context = CGContext(data: raw.baseAddress, width: size.width, height: size.height, bitsPerComponent: 8, bytesPerRow: size.width * 4,
+                                          space: MediaImages.sRGB, bitmapInfo: info.rawValue) else { return false }
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+            return true
+        }
+        guard drawn else { return nil }
+        if gradeFrameTexture?.size != size {
+            if let old = gradeFrameTexture { backend.resources.release(old.texture) }
+            gradeFrameTexture = nil
+            let made = backend.makeTexture(TextureDescriptor(role: .poster, size: size, label: "render grade frame"))
+            guard !made.isNone else { return nil }
+            gradeFrameTexture = (size, made)
+        }
+        guard let texture = gradeFrameTexture?.texture else { return nil }
+        backend.upload(bgra8: Data(pixels), bytesPerRow: size.width * 4, into: texture)
+        return texture
     }
 }

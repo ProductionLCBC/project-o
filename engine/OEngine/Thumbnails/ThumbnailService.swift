@@ -118,10 +118,17 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
     var canvasClock: UInt64 = 0
     /// Spec 11 §3 — the channel texture of the last grade picture, kept while the next is the same size.
     var gradeTexture: (size: PixelSize, texture: TextureHandle)?
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "one reader the job keeps open, reading forward", and the texture
+    /// its last frame was drawn into at the picture's size.
+    let gradeFrames = GradeFrameReader()
+    var gradeFrameTexture: (size: PixelSize, texture: TextureHandle)?
+    /// The media folders a video's file is found in.
+    let mediaFolders: MediaFolders
 
     public init(library: Library, machine: Machine, media: MediaFolders, backend: MetalBackend, posters: any PosterProvider, variables: VariableProvider,
                 cacheFolder: URL, log: EngineLog, poolSize: Int = 32, textCacheBytes: Int = 64 * 1024 * 1024, memoryBytes: Int = 32 * 1024 * 1024) throws {
         roots = (library, machine)
+        mediaFolders = media
         self.backend = backend
         self.posters = posters
         self.variables = variables
@@ -405,6 +412,13 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         queue.sync {}
     }
 
+    /// G-43 — "it closes after ten seconds unused": looked at on the job's queue once that long has passed.
+    func closeGradeFramesWhenIdle() {
+        queue.asyncAfter(deadline: .now() + Double(GradeFrameReader.idleNs) / 1e9 + 0.1) { [weak self] in
+            self?.gradeFrames.closeIfIdle()
+        }
+    }
+
     /// Spec 11 §3 — "The engine draws it on the thumbnail job's background
     /// queue, with the thumbnail job's code, ahead of thumbnails, and waits
     /// as that job does while the render thread is skipping aux passes (Spec
@@ -417,9 +431,17 @@ public final class ThumbnailService: ShrinkableCache, @unchecked Sendable {
         queue.async { [self] in runAhead() }
     }
 
-    /// On the job's queue: everything waiting ahead of the thumbnails, in order.
+    /// On the job's queue: what waits ahead of the thumbnails, in order. Spec
+    /// 11 §3 as corrected 2026-11-26 (G-43) — "between two thumbnails the job
+    /// draws the pictures that were waiting, not those asked for meanwhile":
+    /// work asked for while this runs waits for the next turn, which its own
+    /// `performAhead` puts on the queue.
     private func runAhead() {
-        while true {
+        lock.lock()
+        var waiting = ahead.count
+        lock.unlock()
+        while waiting > 0 {
+            waiting -= 1
             lock.lock()
             guard !ahead.isEmpty else {
                 lock.unlock()

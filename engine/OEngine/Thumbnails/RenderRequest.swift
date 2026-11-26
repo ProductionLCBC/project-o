@@ -27,8 +27,10 @@ enum RenderSubject: Equatable, Sendable {
     /// "a stack's own layout at that stack's size and number, the `*` layout
     /// at the size and number of the stack `stack` names".
     case layout(preset: Preset, layout: LayoutKey, stack: Stack, sample: RenderSample)
-    /// "The item's poster or still through the grade, or as it is when `grade` is null, over black".
-    case grade(Grade?, media: String)
+    /// "The item's poster or still through the grade, or as it is when `grade` is null, over black". Spec 11 §3 as
+    /// corrected 2026-11-26 (G-43) — "for a video with `atMs`, its frame at that time from the item's start"; the
+    /// grade may be "a grade's values", drawn "as it would draw with them, editing nothing".
+    case grade(Grade?, media: String, atMs: Int? = nil)
 }
 
 /// Spec 11 §3 — one `render` request, read and checked: its canvas, its
@@ -245,19 +247,76 @@ struct RenderRequest: Equatable, Sendable {
         case "grade":
             var grade: Grade?
             if let value = subject["grade"], value != .null {
-                guard let number = value.intValue else { return fail(.badValue, "a grade is named by its number, or null") }
-                guard let found = library.grade(number) else { return fail(.unknownObject, "grade \(number) does not exist") }
-                grade = found
+                if case .object(let values) = value {
+                    switch gradeValues(values) {
+                    case .failure(let rejection): return .failure(rejection)
+                    case .success(let drafted): grade = drafted
+                    }
+                } else {
+                    guard let number = value.intValue else { return fail(.badValue, "a grade is named by its number, given as its values, or null") }
+                    guard let found = library.grade(number) else { return fail(.unknownObject, "grade \(number) does not exist") }
+                    grade = found
+                }
             }
             guard let mediaValue = subject["media"] else { return fail(.missingArgument, "a grade's render names its media item") }
             guard let id = mediaValue.stringValue else { return fail(.badValue, "a media item is named by its id") }
             guard MediaResolver.knownIds(library: library.mediaIndex, machine: machine.mediaLocal).contains(id) else {
                 return fail(.unknownObject, "\(id) isn't in either media index")
             }
-            return .success(RenderRequest(canvas: canvas, width: width, subject: .grade(grade, media: id)))
+            // G-43 — "optionally `atMs`": a whole number of milliseconds from the item's start.
+            var atMs: Int?
+            if let value = subject["atMs"] {
+                guard let ms = value.intValue, ms >= 0 else { return fail(.badValue, "atMs is a whole number of milliseconds from the item's start") }
+                atMs = ms
+            }
+            return .success(RenderRequest(canvas: canvas, width: width, subject: .grade(grade, media: id, atMs: atMs)))
 
         default:
             return fail(.badValue, "a render's subject is a cue, a layout or a grade, not \(kind)")
         }
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "A grade's values (Spec 1
+    /// §2's `hue`, `saturation`, `brightness`, `contrast`, `blur`, `tint` and
+    /// `opacity`, each in its range, the identity's for any left out)". The
+    /// ranges are those an edit of a grade is checked against (Spec 5 §6,
+    /// check 4; `EditField.grade` in OCore): saturation, contrast and blur
+    /// from 0, opacity and each of the tint's `r`, `g`, `b` and `a` from 0 to
+    /// 1. The grade is no object of the library: its number is 0.
+    static func gradeValues(_ values: [String: JSONValue]) -> Result<Grade, Rejection> {
+        func fail(_ message: String) -> Result<Grade, Rejection> { .failure(Rejection(reason: .badValue, message: message)) }
+        var grade = Grade(number: 0, uuid: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
+        let floors: [String: (min: Double?, max: Double?)] = [
+            "hue": (nil, nil), "saturation": (0, nil), "brightness": (nil, nil), "contrast": (0, nil), "blur": (0, nil), "opacity": (0, 1),
+        ]
+        for (name, value) in values {
+            if name == "tint" {
+                guard case .object(let parts) = value, Set(parts.keys) == ["r", "g", "b", "a"] else {
+                    return fail("a grade's tint is a color: r, g, b and a")
+                }
+                var channels: [String: Double] = [:]
+                for (part, number) in parts {
+                    guard let n = number.doubleValue, n.isFinite, (0...1).contains(n) else { return fail("a tint's \(part) is from 0 to 1") }
+                    channels[part] = n
+                }
+                grade.tint = Color(r: channels["r"] ?? 0, g: channels["g"] ?? 0, b: channels["b"] ?? 0, a: channels["a"] ?? 0)
+                continue
+            }
+            guard let range = floors[name] else {
+                return fail("a grade's values are hue, saturation, brightness, contrast, blur, tint and opacity, not \(name)")
+            }
+            guard let n = value.doubleValue, n.isFinite else { return fail("a grade's \(name) is a number") }
+            if let low = range.min, n < low { return fail("a grade's \(name) is at least \(Int(low))") }
+            if let high = range.max, n > high { return fail("a grade's \(name) is at most \(Int(high))") }
+            switch name {
+            case "hue": grade.hue = n
+            case "saturation": grade.saturation = n
+            case "brightness": grade.brightness = n
+            case "contrast": grade.contrast = n
+            case "blur": grade.blur = n
+            default: grade.opacity = n
+            }
+        }
+        return .success(grade)
     }
 }
