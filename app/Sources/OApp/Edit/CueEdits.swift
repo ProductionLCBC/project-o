@@ -396,7 +396,12 @@ public enum CommandsText {
 
     /// "A multi-line body shows with Spec 2 §2's escapes", so every command is one line.
     public static func lines(of cue: Cue) -> [String] {
-        cue.commands.map(line)
+        lines(of: cue.commands)
+    }
+
+    /// A cue's or a macro's commands, one line each (Spec 11 §9: "Commands as Text works as in §4").
+    public static func lines(of commands: [GuardedCommand]) -> [String] {
+        commands.map(line)
     }
 
     /// The lines the area locks: the commands kept verbatim.
@@ -408,8 +413,13 @@ public enum CommandsText {
     /// the command it was, with everything a newer version wrote beside it
     /// (Spec 1 §6); a blank line is no command.
     public static func parse(_ text: String, cue: Cue, options: ParseOptions = ParseOptions()) -> Parsed {
+        parse(text, commands: cue.commands, options: options)
+    }
+
+    /// The same for any commands the text stands for, a cue's or a macro's.
+    public static func parse(_ text: String, commands: [GuardedCommand], options: ParseOptions = ParseOptions()) -> Parsed {
         var originals: [String: [GuardedCommand]] = [:]
-        for entry in cue.commands { originals[line(entry), default: []].append(entry) }
+        for entry in commands { originals[line(entry), default: []].append(entry) }
         var parsed = Parsed(commands: [], errors: [:])
         for (index, raw) in text.components(separatedBy: "\n").enumerated() {
             let text = raw.trimmingCharacters(in: .whitespaces)

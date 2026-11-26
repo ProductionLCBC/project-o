@@ -68,6 +68,8 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.editPreset = 3
         settings.editLayout = 2
         settings.boxAnchor = .center
+        settings.editObjectKind = .macro
+        settings.editObject = 4
         settings.editBrowserWidth = 300
         settings.editMonitorsWidth = 420
         settings.editInspectorHeight = 320

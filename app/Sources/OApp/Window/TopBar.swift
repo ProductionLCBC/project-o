@@ -226,6 +226,9 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var editLayout: Int?
     /// Spec 11 §8, "Frame" (G-34) — the box's reference point the Frame fields read, "kept in `view.json`".
     public var boxAnchor = FrameAnchor.topLeft
+    /// The Objects page's selection (Spec 11 §9): the object's kind and number.
+    public var editObjectKind: ObjectKind?
+    public var editObject: Int?
     public var browserTab = BrowserTab.playlists
     public var mediaView = MediaListView.grid
     /// Spec 11 §4, "Zoom" — "The zoom is one setting for every list".
@@ -295,6 +298,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editPreset, into: &editPreset)
         read(.editLayout, into: &editLayout)
         read(.boxAnchor, into: &boxAnchor)
+        read(.editObjectKind, into: &editObjectKind)
+        read(.editObject, into: &editObject)
         read(.browserTab, into: &browserTab)
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)

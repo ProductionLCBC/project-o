@@ -82,6 +82,8 @@ public final class EditModel {
     /// Spec 11 §8 — the Presets page's own state: the selected box, the canvas's stack, the sample, the engine's
     /// picture of the layout, what uses the preset and the fonts the engine draws.
     public internal(set) var presetState = PresetEditorState()
+    /// Spec 11 §9 — the Objects page's own state: Used by, the grade's two pictures and the item they show.
+    public internal(set) var objectState = ObjectEditorState()
 
     private var standing: EditNotice?
     private var triedLeaving = false
@@ -164,6 +166,7 @@ public final class EditModel {
         if wasShow { model.note?(["event": .string("editMode"), "on": .bool(true)], "Edit mode opened") }
         model.changed([.layout, .edit, .top])
         if page == .presets { presetsOpened() }
+        if page == .objects { objectsOpened() }
     }
 
     /// Makes a list the Cues page's, on a cue of it: the one named, else its first.
@@ -246,6 +249,7 @@ public final class EditModel {
         model.changed([.edit, .top])
         askPreview()
         if page == .presets { presetsOpened() }
+        if page == .objects { objectsOpened() }
     }
 
     public func show(tab: BrowserTab) {
@@ -365,6 +369,11 @@ public final class EditModel {
             askPresetUses(again: true)
             if changes.contains(.connection) { askFonts(again: true) }
         }
+        // Spec 11 §9 — "A grade on air changes from the next frame": its picture is asked for again after each edit.
+        if page == .objects, !changes.isDisjoint(with: [.connection, .catalog, .media]) {
+            askObjectUses(again: true)
+            askGrade(again: true)
+        }
     }
 
     /// The preview stack or another setting changed.
@@ -372,6 +381,7 @@ public final class EditModel {
         rebuild()
         askPreview()
         if page == .presets { askLayout() }
+        if page == .objects { askGrade() }
     }
 
     private func acted() {

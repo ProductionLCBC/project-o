@@ -309,4 +309,129 @@ public enum EditModeWording {
             return Strings.text(outputs.count == 1 ? .editNoticeOnAirOne : .editNoticeOnAirMany, numbers)
         }
     }
+
+    // MARK: - The Objects page (Spec 11 §9)
+
+    /// A group's heading: "Grades", "Transitions", "Audio transitions", "Text styles", "Macros".
+    public static func group(_ kind: ObjectKind) -> String {
+        switch kind {
+        case .grade: Strings.text(.editObjectGrades)
+        case .transition: Strings.text(.editObjectTransitions)
+        case .audioTransition: Strings.text(.editObjectAudioTransitions)
+        case .textStyle: Strings.text(.editObjectTextStyles)
+        case .macro: Strings.text(.editObjectMacros)
+        }
+    }
+
+    /// "Grade 3", "Audio transition 1": an object by its kind and number.
+    public static func objectName(_ kind: ObjectKind, _ number: Int) -> String {
+        switch kind {
+        case .grade: Strings.text(.editObjectGrade, number)
+        case .transition: Strings.text(.editObjectTransition, number)
+        case .audioTransition: Strings.text(.editObjectAudioTransition, number)
+        case .textStyle: Strings.text(.editObjectTextStyle, number)
+        case .macro: Strings.text(.editObjectMacro, number)
+        }
+    }
+
+    /// A group's + row.
+    public static func newObject(_ kind: ObjectKind) -> String {
+        switch kind {
+        case .grade: Strings.text(.editObjectNewGrade)
+        case .transition: ""
+        case .audioTransition: Strings.text(.editObjectNewAudioTransition)
+        case .textStyle: Strings.text(.editObjectNewTextStyle)
+        case .macro: Strings.text(.editObjectNewMacro)
+        }
+    }
+
+    public static func parameter(_ parameter: GradeParameter) -> String {
+        switch parameter {
+        case .brightness: Strings.text(.editGradeBrightness)
+        case .contrast: Strings.text(.editGradeContrast)
+        case .saturation: Strings.text(.editGradeSaturation)
+        case .hue: Strings.text(.editGradeHue)
+        case .opacity: Strings.text(.editGradeOpacity)
+        case .blur: Strings.text(.editGradeBlur)
+        }
+    }
+
+    /// A grade parameter's value with its unit: "120%", "−30°", "4 px".
+    public static func shown(_ value: Double, of parameter: GradeParameter) -> String {
+        let rounded = (value * 10).rounded() / 10
+        let number = rounded == rounded.rounded() ? String(Int(rounded)) : String(rounded)
+        switch parameter {
+        case .hue: return number + "°"
+        case .blur: return Strings.text(.editGradePixels, number)
+        default: return number + "%"
+        }
+    }
+
+    public static func easing(_ easing: Easing) -> String {
+        switch easing {
+        case .linear: Strings.text(.editEasingLinear)
+        case .easeIn: Strings.text(.editEasingIn)
+        case .easeOut: Strings.text(.editEasingOut)
+        case .easeInOut: Strings.text(.editEasingInOut)
+        }
+    }
+
+    public static func transitionType(_ type: TransitionType) -> String {
+        switch type {
+        case .cut: Strings.text(.editTransitionCut)
+        case .dissolve: Strings.text(.editTransitionDissolve)
+        case .fadeThroughColor: Strings.text(.editTransitionFadeThroughColor)
+        }
+    }
+
+    public static func audioTransitionType(_ type: AudioTransitionType) -> String {
+        switch type {
+        case .cut: Strings.text(.editTransitionCut)
+        case .crossfade: Strings.text(.editAudioCrossfade)
+        case .fadeThroughSilence: Strings.text(.editAudioFadeThroughSilence)
+        }
+    }
+
+    /// One line of Used by. `media` names a media item by its id.
+    public static func use(_ use: ObjectUse, media: (String) -> String) -> String {
+        func layout(_ key: String) -> String { key == "*" ? Strings.text(.editUseAnyStack) : Strings.text(.editUseStackLayout, key) }
+        switch use {
+        case .channel(let channel, _): return Strings.text(.editUseChannel, channel)
+        case .stack(let stack, _): return Strings.text(.editUseStack, stack)
+        case .slot(let stack, let channel, let fallback):
+            return Strings.text(fallback ? .editPresetUseFallback : .editPresetUseSlot, stack, channel)
+        case .layout(let preset, let key): return Strings.text(.editUseLayout, preset, layout(key))
+        case .box(let preset, let key, let box, _): return Strings.text(.editUseBox, preset, layout(key), box + 1)
+        case .output(let output, _): return Strings.text(.editUseOutput, output)
+        case .audioOutput(let output, _): return Strings.text(.editUseAudioOutput, output)
+        case .cue(let list, let number, let label, let isLocal):
+            let cue = number.map { Strings.text(.editUseCue, $0, list) } ?? Strings.text(.editUseList, list)
+            let named = label.isEmpty ? cue : "\(cue) · \(label)"
+            return isLocal ? Strings.text(.editUseLocal, named) : named
+        case .macro(let macro, let command): return Strings.text(.editUseMacro, macro, command + 1)
+        case .key(let device, let key): return Strings.text(.editUseKey, key, device)
+        case .schedule(let at): return Strings.text(.editUseSchedule, at + 1)
+        case .media(let id, _): return Strings.text(.editUseMedia, media(id))
+        case .machine(let field):
+            switch field {
+            case "startupMacro": return Strings.text(.editUseStartup)
+            case "shutdownMacro": return Strings.text(.editUseShutdown)
+            default: return Strings.text(.editUseMachine, field)
+            }
+        }
+    }
+}
+
+/// Spec 11 §9, "Transitions" — "The preview is the easing curve drawn over the duration": the eased progress of
+/// linear progress `t`, as the engine applies it (Spec 4 §4, OEngine's `Easing.apply`).
+public enum EasingCurve {
+    public static func value(_ easing: Easing, at t: Double) -> Double {
+        let x = min(1, max(0, t))
+        switch easing {
+        case .linear: return x
+        case .easeIn: return x * x
+        case .easeOut: return 1 - (1 - x) * (1 - x)
+        case .easeInOut: return x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) * (-2 * x + 2) / 2
+        }
+    }
 }

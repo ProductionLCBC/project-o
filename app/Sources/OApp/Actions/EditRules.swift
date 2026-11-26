@@ -388,4 +388,9 @@ public enum Confirmation: Equatable, Sendable {
     /// Spec 11 §8 — "A stack's own layout offers Remove This Stack's Layout
     /// (`edit preset P unset layouts.S`), asking first."
     case removeLayout(preset: Int, stack: Int)
+    /// Spec 11 §9 — "Re-apply to Boxes copies the style's value into every one of them ..., after saying how many."
+    case reapplyStyle(name: String, boxes: Int)
+    /// Spec 11 §9 — "Run on Air ... at once while nothing is live, and after asking while something is. A macro that
+    /// holds an edit says first "This also changes the library.""
+    case runMacro(name: String, live: Bool, edits: Bool)
 }

@@ -247,6 +247,14 @@ public enum EditWording {
         case .removeLayout(let preset, let stack):
             return ConfirmationWords(title: Strings.text(.editConfirmLayoutTitle, stack, preset), body: [Strings.text(.editConfirmLayoutBody, stack)],
                                      button: Strings.text(.confirmRemove))
+        case .reapplyStyle(let name, let boxes):
+            return ConfirmationWords(title: Strings.counted(.editConfirmReapplyTitle, boxes, name), body: [Strings.text(.editConfirmReapplyBody)],
+                                     button: Strings.text(.editObjectReapply))
+        case .runMacro(let name, let live, let edits):
+            var body: [String] = []
+            if edits { body.append(Strings.text(.editObjectMacroChangesLibrary)) }
+            if live { body.append(Strings.text(.editConfirmRunLive)) }
+            return ConfirmationWords(title: Strings.text(.editConfirmRunTitle, name), body: body, button: Strings.text(.editObjectRunOnAir))
         }
     }
 

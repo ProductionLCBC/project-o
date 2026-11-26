@@ -2029,6 +2029,30 @@
         }
       }
     },
+    "edit.audio.crossfade" : {
+      "comment" : "An audio transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crossfade"
+          }
+        }
+      }
+    },
+    "edit.audio.fadeThroughSilence" : {
+      "comment" : "An audio transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fade through silence"
+          }
+        }
+      }
+    },
     "edit.browser" : {
       "comment" : "VoiceOver: edit mode's left column, with its three tabs.",
       "extractionState" : "manual",
@@ -3169,6 +3193,66 @@
         }
       }
     },
+    "edit.confirm.reapply.body" : {
+      "comment" : "Under the re-apply question.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each box’s own changes to the style are replaced. Undo puts them back."
+          }
+        }
+      }
+    },
+    "edit.confirm.reapply.title" : {
+      "comment" : "Asked before a text style is copied into the boxes that name it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld box names %@. Copy its value into it again?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld boxes name %@. Copy its value into them again?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.confirm.run.live" : {
+      "comment" : "Under the run question, while something is live.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something is live: what it does shows on the outputs at once."
+          }
+        }
+      }
+    },
+    "edit.confirm.run.title" : {
+      "comment" : "Asked before a macro runs from edit mode while something is live or when it changes the library.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run %@ on air?"
+          }
+        }
+      }
+    },
     "edit.confirm.slot.add" : {
       "comment" : "The button that adds a slot to a stack on air.",
       "extractionState" : "manual",
@@ -3805,6 +3889,54 @@
         }
       }
     },
+    "edit.easing.in" : {
+      "comment" : "An easing: starts slowly.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ease in"
+          }
+        }
+      }
+    },
+    "edit.easing.inOut" : {
+      "comment" : "An easing: starts and ends slowly.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ease in and out"
+          }
+        }
+      }
+    },
+    "edit.easing.linear" : {
+      "comment" : "An easing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linear"
+          }
+        }
+      }
+    },
+    "edit.easing.out" : {
+      "comment" : "An easing: ends slowly.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ease out"
+          }
+        }
+      }
+    },
     "edit.engine" : {
       "comment" : "Edit mode's top bar: the pill that says how the engine is.",
       "extractionState" : "manual",
@@ -3949,6 +4081,18 @@
         }
       }
     },
+    "edit.form.audioTransition" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio transition"
+          }
+        }
+      }
+    },
     "edit.form.channel" : {
       "comment" : "A label in a command's small form.",
       "extractionState" : "manual",
@@ -4009,6 +4153,30 @@
         }
       }
     },
+    "edit.form.gain" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain (dB)"
+          }
+        }
+      }
+    },
+    "edit.form.grade" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
     "edit.form.invalid" : {
       "comment" : "Under a command's text field. %@ is why.",
       "extractionState" : "manual",
@@ -4017,6 +4185,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "That isn’t a command: %@"
+          }
+        }
+      }
+    },
+    "edit.form.media" : {
+      "comment" : "A label in a command's small form: a pool item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        }
+      }
+    },
+    "edit.form.ms" : {
+      "comment" : "A label in a command's small form: empty uses the object's own.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration (ms)"
           }
         }
       }
@@ -4141,6 +4333,18 @@
         }
       }
     },
+    "edit.form.transition" : {
+      "comment" : "A label in a command's small form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition"
+          }
+        }
+      }
+    },
     "edit.goTo" : {
       "comment" : "The placeholder of the Program panel's field that takes a cue number of the live list.",
       "extractionState" : "manual",
@@ -4149,6 +4353,114 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Go to cue…"
+          }
+        }
+      }
+    },
+    "edit.grade.blur" : {
+      "comment" : "A grade's blur radius, in pixels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur"
+          }
+        }
+      }
+    },
+    "edit.grade.brightness" : {
+      "comment" : "A grade's brightness, 0 to 200%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness"
+          }
+        }
+      }
+    },
+    "edit.grade.contrast" : {
+      "comment" : "A grade's contrast, 0 to 200%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contrast"
+          }
+        }
+      }
+    },
+    "edit.grade.hue" : {
+      "comment" : "A grade's hue, -180 to 180 degrees.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hue"
+          }
+        }
+      }
+    },
+    "edit.grade.identity" : {
+      "comment" : "The tooltip of a grade's slider: where it does nothing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The mark is no change: %@."
+          }
+        }
+      }
+    },
+    "edit.grade.opacity" : {
+      "comment" : "A grade's opacity, 0 to 100%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opacity"
+          }
+        }
+      }
+    },
+    "edit.grade.pixels" : {
+      "comment" : "A blur radius in pixels.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ px"
+          }
+        }
+      }
+    },
+    "edit.grade.saturation" : {
+      "comment" : "A grade's saturation, 0 to 200%.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saturation"
+          }
+        }
+      }
+    },
+    "edit.grade.tint" : {
+      "comment" : "A grade's tint colour; white is no change.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tint"
           }
         }
       }
@@ -4549,6 +4861,618 @@
         }
       }
     },
+    "edit.object.audio.heading" : {
+      "comment" : "The heading over an audio transition's fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio transition"
+          }
+        }
+      }
+    },
+    "edit.object.audioTransition" : {
+      "comment" : "An audio transition by its number, when it has no label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio transition %lld"
+          }
+        }
+      }
+    },
+    "edit.object.audioTransitions" : {
+      "comment" : "The Objects page's list: the heading of the audio transitions.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio transitions"
+          }
+        }
+      }
+    },
+    "edit.object.color" : {
+      "comment" : "A fade-through-colour transition's colour, which stays as built.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        }
+      }
+    },
+    "edit.object.duration" : {
+      "comment" : "A transition's duration, in milliseconds.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration (ms)"
+          }
+        }
+      }
+    },
+    "edit.object.easing" : {
+      "comment" : "A transition's easing.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Easing"
+          }
+        }
+      }
+    },
+    "edit.object.fixed" : {
+      "comment" : "Beside a transition's number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transitions 1 to 3 are built in: their duration and easing can change, not their number, type or colour."
+          }
+        }
+      }
+    },
+    "edit.object.grade" : {
+      "comment" : "A grade by its number, when it has no label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade %lld"
+          }
+        }
+      }
+    },
+    "edit.object.grade.heading" : {
+      "comment" : "The heading over a grade's sliders.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade"
+          }
+        }
+      }
+    },
+    "edit.object.grades" : {
+      "comment" : "The Objects page's list: the heading of the grades.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grades"
+          }
+        }
+      }
+    },
+    "edit.object.macro" : {
+      "comment" : "A macro by its number, when it has no label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macro %lld"
+          }
+        }
+      }
+    },
+    "edit.object.macro.heading" : {
+      "comment" : "The heading over a macro's commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commands"
+          }
+        }
+      }
+    },
+    "edit.object.macroChangesLibrary" : {
+      "comment" : "Said before running a macro that holds an edit.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This also changes the library."
+          }
+        }
+      }
+    },
+    "edit.object.macros" : {
+      "comment" : "The Objects page's list: the heading of the macros.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macros"
+          }
+        }
+      }
+    },
+    "edit.object.newAudioTransition" : {
+      "comment" : "The audio transitions' + row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Audio Transition"
+          }
+        }
+      }
+    },
+    "edit.object.newGrade" : {
+      "comment" : "The grades' + row: makes a grade at a free number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Grade"
+          }
+        }
+      }
+    },
+    "edit.object.newMacro" : {
+      "comment" : "The macros' + row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Macro"
+          }
+        }
+      }
+    },
+    "edit.object.newTextStyle" : {
+      "comment" : "The text styles' + row.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New Text Style"
+          }
+        }
+      }
+    },
+    "edit.object.noCommands" : {
+      "comment" : "A macro with no commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No commands yet."
+          }
+        }
+      }
+    },
+    "edit.object.noneYet" : {
+      "comment" : "Under a group of the Objects page's list that has nothing in it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None yet."
+          }
+        }
+      }
+    },
+    "edit.object.number" : {
+      "comment" : "The field that renumbers the selected object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number"
+          }
+        }
+      }
+    },
+    "edit.object.offset" : {
+      "comment" : "An audio transition's offset from the trigger, in milliseconds, signed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offset (ms)"
+          }
+        }
+      }
+    },
+    "edit.object.offsetNote" : {
+      "comment" : "Under an audio transition's offset.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measured from the trigger: a positive offset delays the sound (an L cut), a negative one delays the picture (a J cut)."
+          }
+        }
+      }
+    },
+    "edit.object.preview.curve" : {
+      "comment" : "A transition's preview: its easing over its duration, \"Ease in over 0.5 s\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ over %2$@"
+          }
+        }
+      }
+    },
+    "edit.object.preview.graded" : {
+      "comment" : "Under the graded picture of a grade's preview.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade %lld"
+          }
+        }
+      }
+    },
+    "edit.object.preview.item" : {
+      "comment" : "The pool item a grade's preview shows.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item"
+          }
+        }
+      }
+    },
+    "edit.object.preview.noMedia" : {
+      "comment" : "A grade's preview with nothing in the pool to show.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a video or image to the pool to preview a grade."
+          }
+        }
+      }
+    },
+    "edit.object.preview.none" : {
+      "comment" : "The Preview monitor on the Objects page for a text style or a macro.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No picture for this object."
+          }
+        }
+      }
+    },
+    "edit.object.preview.spoken" : {
+      "comment" : "VoiceOver: the easing curve, its easing and its duration.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "edit.object.preview.ungraded" : {
+      "comment" : "Under the ungraded picture of a grade's preview.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without it"
+          }
+        }
+      }
+    },
+    "edit.object.reapply" : {
+      "comment" : "Copies the text style's value into every box that names it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-apply to Boxes"
+          }
+        }
+      }
+    },
+    "edit.object.runOnAir" : {
+      "comment" : "Runs the macro now, as its tile would.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run on Air"
+          }
+        }
+      }
+    },
+    "edit.object.scopeLibrary" : {
+      "comment" : "A macro's scope, computed from its commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library: it goes wherever the library goes."
+          }
+        }
+      }
+    },
+    "edit.object.scopeMachine" : {
+      "comment" : "A macro's scope, computed from its commands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This machine: it names a stack or an output, so it is kept with this Mac’s settings."
+          }
+        }
+      }
+    },
+    "edit.object.selectOne" : {
+      "comment" : "The Objects page with nothing selected.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a grade, transition, audio transition, text style or macro in the list."
+          }
+        }
+      }
+    },
+    "edit.object.shared" : {
+      "comment" : "The heading of the column every object shares.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number and label"
+          }
+        }
+      }
+    },
+    "edit.object.style.heading" : {
+      "comment" : "The heading over a text style's form.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text style"
+          }
+        }
+      }
+    },
+    "edit.object.styleBoxes" : {
+      "comment" : "Over the Re-apply to Boxes button.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld box names this style."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld boxes name this style."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "edit.object.textStyle" : {
+      "comment" : "A text style by its number, when it has no label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text style %lld"
+          }
+        }
+      }
+    },
+    "edit.object.textStyles" : {
+      "comment" : "The Objects page's list: the heading of the numbered text styles.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text styles"
+          }
+        }
+      }
+    },
+    "edit.object.tile.heading" : {
+      "comment" : "The heading over a macro's tile colour and label, as the Macros tab shows them.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tile"
+          }
+        }
+      }
+    },
+    "edit.object.tileColor" : {
+      "comment" : "A macro tile's colour.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colour"
+          }
+        }
+      }
+    },
+    "edit.object.tileLabel" : {
+      "comment" : "A macro tile's short label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Label"
+          }
+        }
+      }
+    },
+    "edit.object.transition" : {
+      "comment" : "A transition by its number, when it has no label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition %lld"
+          }
+        }
+      }
+    },
+    "edit.object.transition.heading" : {
+      "comment" : "The heading over a transition's fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition"
+          }
+        }
+      }
+    },
+    "edit.object.transitions" : {
+      "comment" : "The Objects page's list: the heading of the transitions.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transitions"
+          }
+        }
+      }
+    },
+    "edit.object.type" : {
+      "comment" : "A transition's or audio transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        }
+      }
+    },
+    "edit.object.usedBy" : {
+      "comment" : "What refers to the selected object, from the engine's uses.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used by"
+          }
+        }
+      }
+    },
+    "edit.object.usedMore" : {
+      "comment" : "The last line of Used by, when the engine stopped listing at 500.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "and more"
+          }
+        }
+      }
+    },
+    "edit.object.usedNone" : {
+      "comment" : "Used by, when nothing refers to the object.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing uses it yet."
+          }
+        }
+      }
+    },
     "edit.page.channels" : {
       "comment" : "Edit mode's page picker and View menu: the channel sheet's page.",
       "extractionState" : "manual",
@@ -4645,6 +5569,18 @@
         }
       }
     },
+    "edit.palette.audioTransition" : {
+      "comment" : "The palette: sets a channel's audio transition.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Transition…"
+          }
+        }
+      }
+    },
     "edit.palette.blackout" : {
       "comment" : "A command a cue can run: opens a small form.",
       "extractionState" : "manual",
@@ -4653,6 +5589,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Black Out a Stack…"
+          }
+        }
+      }
+    },
+    "edit.palette.channels" : {
+      "comment" : "The palette's group of channel commands, in a macro.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channels"
+          }
+        }
+      }
+    },
+    "edit.palette.clear" : {
+      "comment" : "The palette: clears a channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear…"
+          }
+        }
+      }
+    },
+    "edit.palette.gain" : {
+      "comment" : "The palette: sets a channel's gain.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gain…"
+          }
+        }
+      }
+    },
+    "edit.palette.grade" : {
+      "comment" : "The palette: sets a channel's grade.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade…"
           }
         }
       }
@@ -4741,6 +5725,18 @@
         }
       }
     },
+    "edit.palette.reset" : {
+      "comment" : "The palette: resets a channel's attributes.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset…"
+          }
+        }
+      }
+    },
     "edit.palette.stacks" : {
       "comment" : "A group of the commands a cue can run.",
       "extractionState" : "manual",
@@ -4821,6 +5817,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Timers"
+          }
+        }
+      }
+    },
+    "edit.palette.transition" : {
+      "comment" : "The palette: sets a channel's transition.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transition…"
+          }
+        }
+      }
+    },
+    "edit.palette.writeMedia" : {
+      "comment" : "The palette: a channel write of a pool item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write Media…"
+          }
+        }
+      }
+    },
+    "edit.palette.writeText" : {
+      "comment" : "The palette: a channel write of text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write Text…"
           }
         }
       }
@@ -6853,6 +7885,42 @@
         }
       }
     },
+    "edit.transition.cut" : {
+      "comment" : "A transition's or audio transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cut"
+          }
+        }
+      }
+    },
+    "edit.transition.dissolve" : {
+      "comment" : "A transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dissolve"
+          }
+        }
+      }
+    },
+    "edit.transition.fadeThroughColor" : {
+      "comment" : "A transition's type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fade through colour"
+          }
+        }
+      }
+    },
     "edit.trigger.advance" : {
       "comment" : "The inspector's field: the next cue fires this long after this one.",
       "extractionState" : "manual",
@@ -6969,6 +8037,222 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Use Previous Video’s Length"
+          }
+        }
+      }
+    },
+    "edit.use.anyStack" : {
+      "comment" : "Used by: a preset's * layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "any stack"
+          }
+        }
+      }
+    },
+    "edit.use.audioOutput" : {
+      "comment" : "Used by: an audio output.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio output %lld"
+          }
+        }
+      }
+    },
+    "edit.use.box" : {
+      "comment" : "Used by: a box of a preset's layout, counted from 1 at the bottom.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset %1$lld, %2$@, box %3$lld"
+          }
+        }
+      }
+    },
+    "edit.use.channel" : {
+      "comment" : "Used by: a channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %lld"
+          }
+        }
+      }
+    },
+    "edit.use.cue" : {
+      "comment" : "Used by: a cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld in list %2$lld"
+          }
+        }
+      }
+    },
+    "edit.use.key" : {
+      "comment" : "Used by: a key binding.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key %1$@ on %2$@"
+          }
+        }
+      }
+    },
+    "edit.use.layout" : {
+      "comment" : "Used by: a preset's layout.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preset %1$lld, %2$@"
+          }
+        }
+      }
+    },
+    "edit.use.list" : {
+      "comment" : "Used by: a list, for a cue without a number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List %lld"
+          }
+        }
+      }
+    },
+    "edit.use.local" : {
+      "comment" : "Used by: a cue in a playlist's local copy of a list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (local copy)"
+          }
+        }
+      }
+    },
+    "edit.use.machine" : {
+      "comment" : "Used by: another machine setting, by its name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Machine setting %@"
+          }
+        }
+      }
+    },
+    "edit.use.macro" : {
+      "comment" : "Used by: a macro's command.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macro %1$lld, command %2$lld"
+          }
+        }
+      }
+    },
+    "edit.use.media" : {
+      "comment" : "Used by: a media item's default.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media %@"
+          }
+        }
+      }
+    },
+    "edit.use.output" : {
+      "comment" : "Used by: an output.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output %lld"
+          }
+        }
+      }
+    },
+    "edit.use.schedule" : {
+      "comment" : "Used by: an entry of the scheduler.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scheduler entry %lld"
+          }
+        }
+      }
+    },
+    "edit.use.shutdown" : {
+      "comment" : "Used by: the machine's shutdown macro setting.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The shutdown macro"
+          }
+        }
+      }
+    },
+    "edit.use.stack" : {
+      "comment" : "Used by: a stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stack %lld"
+          }
+        }
+      }
+    },
+    "edit.use.stackLayout" : {
+      "comment" : "Used by: a preset's layout for one stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "stack %@’s layout"
+          }
+        }
+      }
+    },
+    "edit.use.startup" : {
+      "comment" : "Used by: the machine's startup macro setting.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The startup macro"
           }
         }
       }
