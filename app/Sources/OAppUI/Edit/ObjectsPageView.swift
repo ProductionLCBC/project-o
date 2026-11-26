@@ -302,7 +302,7 @@ final class ObjectWorkspaceView: NSView {
 /// Spec 11 §9, "Grades" — a parameter's slider, "its identity marked": a tick under the track where it does nothing.
 /// "Each sends one `edit.set` when its drag ends", so the slider says its value only when it is let go.
 @MainActor
-final class GradeSlider: NSSlider {
+final class GradeSlider: HeldSlider {
     let parameter: GradeParameter
     var onRelease: ((Double) -> Void)?
 
@@ -323,11 +323,16 @@ final class GradeSlider: NSSlider {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    @objc private func released() { onRelease?(doubleValue) }
+    @objc private func released() {
+        noteSent(doubleValue)
+        onRelease?(doubleValue)
+    }
 
-    func show(_ value: Double) {
-        doubleValue = value
-        setAccessibilityValueDescription(EditModeWording.shown(value, of: parameter))
+    @discardableResult
+    override func show(_ value: Double) -> Bool {
+        let shown = super.show(value)
+        setAccessibilityValueDescription(EditModeWording.shown(doubleValue, of: parameter))
+        return shown
     }
 
     /// Lets go at a value, as a drag would end.

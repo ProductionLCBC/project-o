@@ -36,4 +36,16 @@ final class ColorWellTests: XCTestCase {
         well.deactivate()
         XCTAssertEqual(chosen.count, 2, "said once")
     }
+
+    /// Adam, 2026-11-26: a grade's sliders "snap back" when dragged. Let go, a slider keeps the value it sent until the
+    /// engine's copy shows it, whatever the page's redraws bring meanwhile.
+    func test_aSliderKeepsTheValueItSentUntilItComesBack() {
+        let slider = GradeSlider(.brightness)
+        slider.release(at: 140)
+        XCTAssertFalse(slider.show(100), "the old value, from a redraw before the engine applied the edit")
+        XCTAssertEqual(slider.doubleValue, 140)
+        XCTAssertTrue(slider.show(140), "the engine's copy has it")
+        XCTAssertTrue(slider.show(90), "then another client's edit shows")
+        XCTAssertEqual(slider.doubleValue, 90)
+    }
 }

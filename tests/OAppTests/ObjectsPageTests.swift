@@ -79,25 +79,27 @@ final class ObjectsPageTests: XCTestCase {
             XCTAssertEqual(parameter.shown(identity), parameter.identity, "\(parameter) shows its identity")
             XCTAssertTrue(parameter.range.contains(parameter.identity))
         }
-        XCTAssertEqual(GradeParameter.allCases.map(\.range), [0...200, 0...200, 0...200, -180...180, 0...100, 0...64])
+        XCTAssertEqual(GradeParameter.allCases.map(\.range), [0...200, 0...200, 0...200, 0...360, 0...100, 0...64])
         // Shown and stored: brightness is held as the change from identity (Spec 4 §7: × (1 + brightness)).
         XCTAssertEqual(GradeParameter.brightness.stored(120), 0.2, accuracy: 1e-9)
         XCTAssertEqual(GradeParameter.brightness.stored(0), -1)
         XCTAssertEqual(GradeParameter.contrast.stored(150), 1.5)
         XCTAssertEqual(GradeParameter.saturation.stored(0), 0)
-        XCTAssertEqual(GradeParameter.hue.stored(-30), -30)
+        XCTAssertEqual(GradeParameter.hue.stored(330), 330)
         XCTAssertEqual(GradeParameter.opacity.stored(40), 0.4)
         XCTAssertEqual(GradeParameter.blur.stored(12), 12)
         // A value past the range is held to it.
         XCTAssertEqual(GradeParameter.saturation.stored(500), 2)
-        XCTAssertEqual(GradeParameter.hue.stored(-400), -180)
+        XCTAssertEqual(GradeParameter.hue.stored(400), 360)
+        // G-39 — a hue stored outside 0° to 360° shows turned into it.
+        XCTAssertEqual(GradeParameter.hue.shown(Grade(number: 1, hue: -30)), 330, accuracy: 1e-9)
         XCTAssertEqual(GradeParameter.blur.stored(1000), 64)
         // Grade 1 Warm, as the sliders show it.
         let warm = Grade(number: 1, hue: 8, saturation: 1.15, brightness: -0.05, contrast: 1.1)
         XCTAssertEqual(GradeParameter.brightness.shown(warm), 95, accuracy: 1e-9)
         XCTAssertEqual(GradeParameter.contrast.shown(warm), 110, accuracy: 1e-9)
         XCTAssertEqual(EditModeWording.shown(95, of: .brightness), "95%")
-        XCTAssertEqual(EditModeWording.shown(-30, of: .hue), "-30°")
+        XCTAssertEqual(EditModeWording.shown(330, of: .hue), "330°")
     }
 
     /// "Each sends one `edit.set` when its drag ends"; the preview is "`render` with `subject.kind` `grade`, and `grade`

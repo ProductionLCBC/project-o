@@ -97,7 +97,7 @@ final class SlotRowView: NSView {
     let preset = ChoicePopUp(label: Strings.text(.editStackPreset))
     /// Names the preset by its label, which the library wrote: it may truncate, with the whole in its tooltip.
     let resolves = Kit.content(Kit.label(size: 10.5, color: Palette.dimText))
-    let opacity = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
+    let opacity = HeldSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
     let percent = EditField()
     let more = FlatButton("⋯", style: .bare)
     private(set) var channel = 0
@@ -128,7 +128,7 @@ final class SlotRowView: NSView {
         let drawn = presets.first { $0.number == row.resolved }
         resolves.stringValue = Strings.text(.editStackResolves, EditModeWording.numbered(row.resolved, drawn?.label ?? ""))
         resolves.toolTip = resolves.stringValue
-        opacity.doubleValue = row.opacity
+        opacity.show(row.opacity)
         percent.show(FormNumber.text(row.opacity * 100, places: 0) + "%", subject: AnyHashable(row.channel))
         opacity.setAccessibilityLabel(Strings.text(.editStackOpacity) + ", " + name.stringValue)
         percent.setAccessibilityLabel(Strings.text(.editStackOpacity) + " %, " + name.stringValue)
@@ -294,6 +294,7 @@ final class StackWorkspaceView: NSView {
 
     @objc private func opacityMoved(_ slider: NSSlider) {
         guard let row = rows.first(where: { $0.opacity === slider }) else { return }
+        row.opacity.noteSent(slider.doubleValue)
         model.editing.setSlotOpacity(channel: row.channel, opacity: slider.doubleValue)
     }
 

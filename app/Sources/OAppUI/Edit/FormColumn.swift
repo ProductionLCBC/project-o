@@ -130,6 +130,46 @@ enum FormColor {
     }
 }
 
+/// A slider the page's redraws leave alone while it is dragged, and after it is let go until the value it sent comes
+/// back from the engine (Adam, 2026-11-26: a grade's sliders "snap back" when dragged). The page redraws on every
+/// event the engine sends, its live topics among them, so setting the stored value then would pull the knob from under
+/// the operator's hand.
+@MainActor
+class HeldSlider: NSSlider {
+    private(set) var isDragging = false
+    /// The value sent, and when, until the model shows it.
+    private var sent: (value: Double, at: TimeInterval)?
+    /// How long a sent value is held before the model's is shown anyway (the engine may have refused it).
+    static let holdSeconds = 2.0
+
+    override func mouseDown(with event: NSEvent) {
+        isDragging = true
+        // AppKit tracks the drag here and returns at mouse up.
+        super.mouseDown(with: event)
+        isDragging = false
+    }
+
+    /// The value this slider has just sent.
+    func noteSent(_ value: Double) {
+        sent = (value, ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// Shows the model's value unless the slider is being dragged or waits for its own value to come back; says
+    /// whether it showed it.
+    @discardableResult
+    func show(_ value: Double) -> Bool {
+        guard !isDragging else { return false }
+        if let sent {
+            let close = abs(value - sent.value) <= (maxValue - minValue) * 0.002
+            let stale = ProcessInfo.processInfo.systemUptime - sent.at > Self.holdSeconds
+            guard close || stale else { return false }
+            self.sent = nil
+        }
+        if doubleValue != value { doubleValue = value }
+        return true
+    }
+}
+
 /// A color well that says once what the color panel chose. An NSColorWell that isn't continuous sends nothing when the
 /// panel changes its color, not even when the panel lets it go (Adam, 2026-11-25: the tint and a transition's color
 /// "snap back"), so the well listens to every change and says the last one when the color has rested a moment, or at

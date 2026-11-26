@@ -82,7 +82,8 @@ public struct ObjectsPage: Equatable, Sendable {
 
 /// Spec 11 §9, "Grades" — "Each parameter is a slider with a number field and its identity marked (Spec 1 §2):
 /// brightness, contrast and saturation from 0 to 200% (100% is identity), hue from −180° to 180° (0°), opacity from 0
-/// to 100% (100%), blur from 0 to the largest radius the grade pass takes (0)". A grade holds brightness as the
+/// to 100% (100%), blur from 0 to the largest radius the grade pass takes (0)", hue from 0° to 360° since Adam's word of
+/// 2026-11-26 (G-39). A grade holds brightness as the
 /// change from identity (Spec 4 §7 multiplies by 1 + brightness), contrast and saturation as factors, hue in degrees,
 /// opacity from 0 to 1 and blur in pixels.
 public enum GradeParameter: String, CaseIterable, Sendable {
@@ -95,7 +96,7 @@ public enum GradeParameter: String, CaseIterable, Sendable {
     public var range: ClosedRange<Double> {
         switch self {
         case .brightness, .contrast, .saturation: 0...200
-        case .hue: -180...180
+        case .hue: 0...360
         case .opacity: 0...100
         case .blur: 0...Self.largestBlur
         }
@@ -115,7 +116,8 @@ public enum GradeParameter: String, CaseIterable, Sendable {
         case .brightness: (1 + grade.brightness) * 100
         case .contrast: grade.contrast * 100
         case .saturation: grade.saturation * 100
-        case .hue: grade.hue
+        // A stored hue outside 0° to 360° (the engine turns by any angle) shows turned into it.
+        case .hue: (grade.hue.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         case .opacity: grade.opacity * 100
         case .blur: grade.blur
         }
