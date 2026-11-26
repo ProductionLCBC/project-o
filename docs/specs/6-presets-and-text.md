@@ -133,7 +133,7 @@ The fonts and their licences sit together in the engine's resources, and which f
 - The clock, a timer or `[Service In]` alone changes the box at most once per wall-clock second, the gate `main` has used since Area 5.
 - A box's first value, and a value going empty, show at once, as on `main`.
 
-A box with `transitionOnVariableChange` runs its box transition between the old text and the new; the rest swap (Spec 4 §8). A value that arrives while that transition still runs starts a new one from the incoming text, as `main` does. A popup box for announcements usually wants the flag on (Spec 1 §2), and a caption box, which changes several times a second, wants it off.
+A box with `transitionOnVariableChange` runs its box transition between the old text and the new, its own when it sets one, else the channel's current transition (Spec 4 §9); the rest swap (Spec 4 §8). A value that arrives while that transition still runs starts a new one from the incoming text, as `main` does. A popup box for announcements usually wants the flag on (Spec 1 §2), and a caption box, which changes several times a second, wants it off.
 
 ## 6. Timers
 

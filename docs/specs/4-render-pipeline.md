@@ -206,7 +206,7 @@ One pass per due stack, compositing its slots bottom to top into the stack textu
 
 **Per-box grade** is a second instance of the channel pass's stage 2 applied in the box's fragment shader; it exists for output correction (broadcast levels on one stack) and is identity for most boxes, in which case the shader variant without it is used.
 
-**Box transitions.** When a box's content changes, the stack pass draws both the old and new textures mixed by the box's Transition object (cut or dissolve in v1), with the same mixer as the channel pass. Box transitions therefore never need a render target of their own.
+**Box transitions.** When a box's content changes, the stack pass draws both the old and new textures mixed by the transition Spec 3 §4 chooses for the change (cut or dissolve in v1): the write's `once` rider, else the channel's tracked transition, else the box's own transition when it sets one, else the channel's default (Adam, 2026-11-25), with the same mixer as the channel pass. A box whose content appears from nothing mixes from transparent, so a dissolve fades it in, as §7 has a channel do. A pixel box's change is its channel's, drawn in the channel pass, so it runs no box transition of its own. Box transitions therefore never need a render target of their own.
 
 **Opacity and mute.** A slot's effective opacity is its opacity times zero when muted; a muted slot still resolves (so unmuting is instant) and draws with alpha zero, which the pass skips. Output-level mute and blackout are not in the stack pass; they are a mix at the sink (section 10) so they can use the output's own transition.
 

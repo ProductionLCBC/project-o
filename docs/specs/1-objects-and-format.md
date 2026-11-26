@@ -48,7 +48,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 | `frame` | `{x, y, w, h}` normalized 0–1 of the stack's output size | Resolution-independent |
 | `fit` | pixels: `fill`, `fit`, `stretch`, `crop`; text: `{policy: "shrinkToFit" or "maxLines", maxLines, minSize}` |  |
 | `textStyle` | an inline Text Style value, plus `fromStyle` (style number or null) | Copied on apply; `fromStyle` only records provenance for re-apply |
-| `transition` | `{ref: transition number, ms: override or null}` | References the same Transition objects channels use; v1 implements cut and dissolve for boxes, and text-specific types join the Transition type set later |
+| `transition` | `{ref: transition number, ms: override or null}`, or null | Null takes the channel's transition (Spec 3 §4). Set on a text or static box, it overrides the channel's default transition, never one a cue sets (Adam, 2026-11-25); a pixel box always takes the channel's, which its channel pass draws (Spec 4 §7). References the same Transition objects channels use; v1 implements cut and dissolve for boxes, and text-specific types join the Transition type set later |
 | `transitionOnVariableChange` | bool | Default false; a popup box wants true |
 | `fallback` | bool | Renders only if no earlier box at the same offset drew |
 | `offset` | integer, −2 to +3, default 0; written on every box | Draws the slot's channel as it will be after this many cues (Spec 6 §3); v1 draws 0 to +3 |
@@ -295,7 +295,7 @@ The first-run library, as the engine writes it on a fresh install (Spec 10 §13)
       "boxes": [
         { "binding": { "kind": "pixels" }, "fallback": false, "fit": "fit",
           "frame": { "h": 1, "w": 1, "x": 0, "y": 0 }, "grade": null, "offset": 0,
-          "transition": { "ms": null, "ref": 1 } },
+          "transition": null },
         { "binding": { "kind": "field", "name": "body" }, "fallback": true,
           "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
           "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 }, "grade": null, "offset": 0,
@@ -304,7 +304,7 @@ The first-run library, as the engine writes it on a fresh install (Spec 10 §13)
                          "outline": { "color": { "a": 1, "b": 0, "g": 0, "r": 0 }, "width": 0 },
                          "shadow": { "blur": 8, "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 }, "x": 0, "y": 2 },
                          "size": { "unit": "pt", "value": 72 }, "verticalAlignment": "center", "weight": 700 },
-          "transition": { "ms": 250, "ref": 2 }, "transitionOnVariableChange": false }
+          "transition": null, "transitionOnVariableChange": false }
       ]
     }
   },
