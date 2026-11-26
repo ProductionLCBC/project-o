@@ -88,6 +88,8 @@ final class AppController {
     /// Spec 10 §2 — with roots in the preferences the engine is found or
     /// started; without, Spec 10 §13's sheet asks for them first.
     func start(showWindow: Bool = true) {
+        // Spec 11 §8, "Fonts in the app" — the engine's bundled faces, so the font menus draw each in itself.
+        AppFonts.register()
         if showWindow {
             windowController.window.center()
             windowController.window.makeKeyAndOrderFront(nil)
