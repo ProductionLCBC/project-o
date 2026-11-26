@@ -157,7 +157,7 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(rig.view.workspace.grid.isHidden)
         bar.pagePicker.segments[5].press()
         XCTAssertEqual(rig.model.editing.page, .objects)
-        XCTAssertEqual(rig.view.workspace.message.stringValue, "This page is built in a later stage")
+        XCTAssertFalse(rig.view.workspace.objects.isHidden)
         XCTAssertTrue(rig.view.workspace.stacks.isHidden)
         rig.view.enterEdit(page: .cues)
         XCTAssertEqual(bar.pagePicker.selected, 0)
@@ -648,6 +648,7 @@ final class EditModeViewTests: XCTestCase {
         try XCTUnwrap(menu.entry("Edit")).choose()
         XCTAssertEqual(rig.model.mode, .edit)
         XCTAssertEqual(rig.model.editing.page, .objects, "Edit on a macro tile opens Objects")
+        XCTAssertEqual(rig.model.editing.selectedObject, ObjectKey(.macro, 1), "on that macro")
         // Under the lock Edit is disabled with the reason; Run is a show command, which the lock leaves alone.
         try rig.lock()
         XCTAssertEqual(rig.view.tabs.macroMenu(1).items.map(\.isEnabled), [true, false, false])
@@ -960,6 +961,98 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(list.sections[1].rows.map(\.name.stringValue), ["static · [Time]"])
     }
 
+    // MARK: - The Objects page (Spec 11 §9)
+
+    /// Spec 11 §9 — the groups in the page's list, + rows but for Transitions; each editor in the workspace with what
+    /// every object shares beside it; the Preview showing a grade beside the item without it, or a transition's curve.
+    func test_theObjectsPageListsTheGroupsAndEachEditorSendsItsEdit() throws {
+        let rig = try editing()
+        let view = rig.view
+        let editing = rig.model.editing
+        editing.show(page: .objects)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertTrue(view.inspector.isHidden)
+        XCTAssertTrue(view.presetInspector.isHidden)
+        XCTAssertTrue(view.browser.isHidden)
+        let list = view.pageList
+        XCTAssertFalse(list.isHidden)
+        XCTAssertEqual(list.sections.map(\.heading.stringValue), ["GRADES", "TRANSITIONS", "AUDIO TRANSITIONS", "TEXT STYLES", "MACROS"])
+        XCTAssertEqual(list.sections.map { $0.rows.map(\.name.stringValue) }, [["Warm"], ["Cut", "Dissolve", "Fade through black"],
+                                                                             ["Cut", "Crossfade", "Fade through silence"], ["Body", "Caption"], ["Welcome", "Preshow"]])
+        XCTAssertEqual(list.sections.map(\.add.isHidden), [false, true, false, false, false], "no + for transitions")
+        XCTAssertEqual(list.sections[0].add.title, "+  New Grade")
+        XCTAssertNil(list.sections[1].rows[0].more.dropMenu, "a transition has no menu")
+        XCTAssertEqual(list.sections[0].rows[0].more.dropMenu?.items.map(\.title), ["Duplicate", "Renumber…", "", "Delete…"])
+        let page = view.workspace.objects
+        XCTAssertFalse(page.isHidden)
+        XCTAssertEqual(view.workspace.title.stringValue, "Grade 1 Warm")
+        // A grade: its sliders and fields, each one edit; its picture beside the item without it.
+        XCTAssertEqual(page.sliders[.brightness]?.doubleValue ?? 0, 95, accuracy: 1e-9)
+        XCTAssertEqual(page.gradeFields[.contrast]?.stringValue, "110")
+        page.sliders[.brightness]?.release(at: 120)
+        XCTAssertEqual(last(rig), ["edit grade 1 brightness 0.2"])
+        let opacity = try XCTUnwrap(page.gradeFields[.opacity])
+        opacity.stringValue = "50"
+        opacity.sendAction(opacity.action, to: opacity.target)
+        XCTAssertEqual(last(rig), ["edit grade 1 opacity 0.5"])
+        let renders = rig.sent.filter { $0.fields["what"] == .string("render") }.map { $0.fields["canvas"] }
+        XCTAssertTrue(renders.contains(.string("grade")) && renders.contains(.string("ungraded")), "\(renders)")
+        XCTAssertFalse(view.previewPanel.graded.isHidden)
+        XCTAssertEqual(view.previewPanel.picker.numberOfItems, editing.gradeMediaChoices.count, "the item picked under the preview")
+        XCTAssertEqual(page.number.stringValue, "1")
+        XCTAssertTrue(page.number.isEnabled)
+        // A transition: duration and easing only, its number fixed; the Preview draws its curve.
+        list.sections[1].rows[1].onSelect?()
+        XCTAssertEqual(view.workspace.title.stringValue, "Transition 2 Dissolve")
+        XCTAssertFalse(page.number.isEnabled)
+        XCTAssertFalse(page.fixedNote.isHidden)
+        XCTAssertTrue(page.sliders[.brightness]?.isHidden ?? false)
+        page.ms.stringValue = "750"
+        page.ms.sendAction(page.ms.action, to: page.ms.target)
+        XCTAssertEqual(last(rig), ["edit transition 2 ms 750"])
+        page.easing.choose(tag: 2)
+        XCTAssertEqual(last(rig), ["edit transition 2 easing \"easeOut\""])
+        XCTAssertFalse(view.previewPanel.curve.isHidden)
+        XCTAssertEqual(view.previewPanel.curve.caption.stringValue, "Ease in and out over 0.5 s", "the recorded dissolve, until the library event")
+        // An audio transition: its type and its offset.
+        list.sections[2].rows[1].onSelect?()
+        XCTAssertFalse(page.offset.isHidden)
+        page.offset.stringValue = "-250"
+        page.offset.sendAction(page.offset.action, to: page.offset.target)
+        XCTAssertEqual(last(rig), ["edit audiotransition 2 offsetMs -250"])
+        page.audioType.choose(tag: 2)
+        XCTAssertEqual(last(rig), ["edit audiotransition 2 type \"fadeThroughSilence\""])
+        // A text style: the style form, and Re-apply to Boxes with how many name it.
+        list.sections[3].rows[0].onSelect?()
+        XCTAssertFalse(page.style.size.isHidden)
+        page.style.size.stringValue = "60"
+        page.style.size.sendAction(page.style.size.action, to: page.style.size.target)
+        XCTAssertEqual(last(rig), ["edit textstyle 1 size.value 60"])
+        XCTAssertFalse(page.reapply.isHidden)
+        XCTAssertTrue(page.reapply.isEnabled)
+        XCTAssertFalse(view.previewPanel.caption.isHidden, "no picture for a style")
+        // A macro: its commands, the palette with a Channels group, the scope, the tile.
+        list.sections[4].rows[0].onSelect?()
+        XCTAssertEqual(page.commands.rows.count, 4)
+        XCTAssertEqual(page.scope.stringValue, Strings.text(.editObjectScopeLibrary))
+        let palette = page.commands.paletteNow
+        XCTAssertEqual(palette.items.first?.title, "Channels")
+        XCTAssertEqual(palette.items.first?.submenu?.items.map(\.title),
+                       ["Write Media…", "Write Text…", "Clear…", "Reset…", "Grade…", "Transition…", "Audio Transition…", "Gain…"])
+        let rowMenu = try XCTUnwrap(page.commands.rows[0].menuNow)
+        XCTAssertEqual(rowMenu.items.map(\.title), ["Edit…", "Move Up", "Move Down", "Remove"])
+        rowMenu.performActionForItem(at: 2)
+        XCTAssertEqual(last(rig), ["edit macro 1 move commands 0 1"])
+        page.tileLabel.stringValue = "Hi"
+        page.tileLabel.sendAction(page.tileLabel.action, to: page.tileLabel.target)
+        XCTAssertEqual(last(rig), ["edit macro 1 tileLabel \"Hi\""])
+        list.sections[4].rows[1].onSelect?()
+        XCTAssertEqual(page.scope.stringValue, Strings.text(.editObjectScopeMachine), "Preshow names an output and a stack")
+        // The + row of a group makes one.
+        list.sections[2].add.press()
+        XCTAssertEqual(last(rig), ["edit audiotransition create"])
+    }
+
     // MARK: - A picture of it
 
     func test_theEditWindowDrawsIntoAPicture() throws {
@@ -1010,5 +1103,15 @@ final class EditModeViewTests: XCTestCase {
         let sixth = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
         view.cacheDisplay(in: view.bounds, to: sixth)
         try XCTUnwrap(sixth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-presets.png"))
+        // The Objects page: a grade, an audio transition, a text style and a macro.
+        rig.model.editing.show(page: .objects)
+        for (key, name) in [(ObjectKey(.grade, 1), "grade"), (ObjectKey(.audioTransition, 2), "audio"), (ObjectKey(.textStyle, 1), "style"),
+                            (ObjectKey(.macro, 2), "macro")] {
+            rig.model.editing.selectObject(key)
+            rig.view.layoutSubtreeIfNeeded()
+            let shot = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: shot)
+            try XCTUnwrap(shot.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-objects-\(name).png"))
+        }
     }
 }

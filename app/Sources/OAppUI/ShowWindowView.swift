@@ -129,7 +129,11 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         topBar.onEdit = { [weak self] in self?.enterEdit() }
         topBar.onPage = { [weak self] page in self?.model.editing.show(page: page) }
         // "Edit on a macro tile opens Objects on that macro (Spec 10 §7)"; the page itself comes with the small editors.
-        tabs.onEditMacro = { [weak self] _ in self?.enterEdit(page: .objects) }
+        // Spec 10 §7 — a macro tile's Edit opens edit mode's macro editor on it.
+        tabs.onEditMacro = { [weak self] number in
+            self?.model.editing.selectObject(ObjectKey(.macro, number))
+            self?.enterEdit(page: .objects)
+        }
         // "the grid browses where its list came from ... and scrolls to it, firing nothing".
         model.onRevealCue = { [weak self] item, list, cue in self?.grid.scrollTo(cue: cue, item: item, list: list) }
         model.editing.onLocked = { [weak self] in self?.offerUnsentText() }

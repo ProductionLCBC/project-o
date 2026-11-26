@@ -4909,6 +4909,30 @@
         }
       }
     },
+    "edit.object.commandCount" : {
+      "comment" : "Under a macro's name in the Objects page's list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld command"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld commands"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "edit.object.duration" : {
       "comment" : "A transition's duration, in milliseconds.",
       "extractionState" : "manual",
@@ -5469,6 +5493,30 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing uses it yet."
+          }
+        }
+      }
+    },
+    "edit.object.writeMedia" : {
+      "comment" : "A macro's command that writes a pool item to a channel. %2$@ is the item's file name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld shows %2$@"
+          }
+        }
+      }
+    },
+    "edit.object.writeText" : {
+      "comment" : "A macro's command that writes text to a channel. %2$@ is the text's first line.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld shows “%2$@”"
           }
         }
       }

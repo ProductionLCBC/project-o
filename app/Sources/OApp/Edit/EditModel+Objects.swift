@@ -48,6 +48,8 @@ extension EditModel {
 
     func objectsOpened() {
         objectState.gradeSubject = nil
+        // A text style's font menu lists the `fonts` query's faces, as the preset editor's does.
+        askFonts()
         askObjectUses(again: true)
         askGrade()
     }
@@ -275,8 +277,23 @@ extension EditModel {
             let kept = command.isUnknown || command.isInvalid
             var warning: CueCommandLine.Warning?
             if kept { warning = .keptVerbatim } else if case .edit = command { warning = .changesLibrary }
-            return CueCommandLine(position: index, name: kept ? command.cmd : KeyWording.plain(command), warning: warning,
+            return CueCommandLine(position: index, name: kept ? command.cmd : macroCommandName(command), warning: warning,
                                   canEdit: !kept, canMoveUp: index > 0, canMoveDown: index < macro.commands.count - 1)
+        }
+    }
+
+    /// A command's plain name (Spec 10 §15); a channel write, which a cue shows in its grid, says what it shows here.
+    private func macroCommandName(_ command: Command) -> String {
+        guard case .channelWrite(let write) = command, case .number(let channel) = write.channel else { return KeyWording.plain(command) }
+        switch write.content {
+        case .media(let media):
+            let name = model.store.media.first { $0.id == media.ref }.map { ($0.entry.path as NSString).lastPathComponent } ?? media.ref
+            return Strings.text(.editObjectWriteMedia, channel, name)
+        case .text(let fields):
+            let body = fields["body"] ?? fields.keys.sorted().first.flatMap { fields[$0] } ?? ""
+            return Strings.text(.editObjectWriteText, channel, body.components(separatedBy: "\n").first ?? body)
+        default:
+            return KeyWording.plain(command)
         }
     }
 

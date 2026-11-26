@@ -133,6 +133,8 @@ final class PageListView: PanelView {
         var onAdd: (() -> Void)?
         var addMenu: NSMenu?
         var canAdd = true
+        /// Spec 11 §9 — "but for Transitions, a + that creates one".
+        var showsAdd = true
         var empty: String?
         /// A row dropped above the row at a place (0 = the top): its key and the place.
         var move: ((Int, Int) -> Void)?
@@ -186,6 +188,7 @@ final class PageListView: PanelView {
         case .stacks: show([stacks()])
         case .channels: show([channels()])
         case .presets: show(presets())
+        case .objects: show(objects())
         default: show([])
         }
     }
@@ -323,6 +326,67 @@ final class PageListView: PanelView {
         return [list, boxSection]
     }
 
+    /// Spec 11 §9 — "a list in groups (Grades, Transitions, Audio transitions, Text styles, Macros), each with its objects
+    /// by number and label and, but for Transitions, a + that creates one"; a row's menu has Duplicate, Renumber… and
+    /// Delete, which transitions don't have.
+    private func objects() -> [Section] {
+        let editing = model.editing
+        let page = editing.objectsPage
+        let catalog = model.store.catalog
+        return page.groups.map { group in
+            let kind = group.kind
+            let entries = group.rows.map { row -> Entry in
+                let key = row.key
+                let select: () -> Void = { [weak model] in model?.editing.selectObject(key) }
+                let name = row.label.isEmpty ? EditModeWording.objectName(kind, key.number) : row.label
+                // A detail that says only the name again ("Cut" under "Cut") is left out.
+                let detail = catalog.map { Self.detail(key, catalog: $0) } ?? ""
+                return Entry(key: key.number, number: String(key.number), name: name, detail: detail == name ? "" : detail,
+                             isSelected: key == page.selected, select: select,
+                             menu: kind.isFixed ? nil : menu([
+                                (Strings.text(.menuDuplicate), true, { [weak model] in
+                                    select()
+                                    model?.editing.duplicateObject()
+                                }),
+                                (Strings.text(.editCuesRenumber), true, { [weak self] in
+                                    select()
+                                    self?.askNumber(key.number) { self?.model.editing.renumberObject(to: $0) }
+                                }),
+                                ("", true, {}),
+                                (Strings.text(.menuDelete), true, { [weak model] in
+                                    select()
+                                    model?.editing.deleteObject()
+                                }),
+                             ]))
+            }
+            return Section(heading: EditModeWording.group(kind), entries: entries, add: EditModeWording.newObject(kind),
+                           onAdd: kind.isFixed ? nil : { [weak model] in model?.editing.newObject(kind) }, showsAdd: !kind.isFixed,
+                           empty: Strings.text(.editObjectNoneYet))
+        }
+    }
+
+    /// What a row says under its name: a transition's type and duration, a style's font and size, a macro's commands.
+    static func detail(_ key: ObjectKey, catalog: Catalog) -> String {
+        func seconds(_ ms: Int) -> String { SecondsText.text(ms: ms) + " s" }
+        switch key.kind {
+        case .grade:
+            return ""
+        case .transition:
+            guard let t = catalog.transitions.first(where: { $0.number == key.number }) else { return "" }
+            return t.type == .cut ? EditModeWording.transitionType(t.type) : "\(EditModeWording.transitionType(t.type)) · \(seconds(t.ms))"
+        case .audioTransition:
+            guard let t = catalog.audioTransitions.first(where: { $0.number == key.number }) else { return "" }
+            return t.type == .cut ? EditModeWording.audioTransitionType(t.type) : "\(EditModeWording.audioTransitionType(t.type)) · \(seconds(t.ms))"
+        case .textStyle:
+            guard let style = catalog.textStyles.first(where: { $0.number == key.number }) else { return "" }
+            let size = FormNumber.text(style.values.size.value) + (style.values.size.unit == .percent ? "%" : " pt")
+            return "\(style.values.font) · \(size)"
+        case .macro:
+            guard let macro = catalog.macros.first(where: { $0.number == key.number }) else { return "" }
+            return Strings.counted(.editObjectCommandCount, macro.commands.count)
+        }
+    }
+
     /// "Add Box ▸ Pixels, Field ▸ (body, title, copyright, reference, or a custom name) or Static Text".
     private func addBoxMenu() -> NSMenu {
         let menu = NSMenu()
@@ -410,6 +474,7 @@ final class PageListView: PanelView {
             views.add.dropMenu = list.addMenu
             views.add.chevron = false
             views.add.isEnabled = list.canAdd
+            views.add.isHidden = !list.showsAdd
             views.empty.stringValue = list.entries.isEmpty ? (list.empty ?? "") : ""
             views.empty.isHidden = views.empty.stringValue.isEmpty
         }
@@ -457,6 +522,10 @@ final class PageListView: PanelView {
             if !views.empty.isHidden {
                 views.empty.frame = NSRect(x: 14, y: y + 4, width: width - 28, height: 16)
                 y += 24
+            }
+            if views.add.isHidden {
+                y += 4
+                continue
             }
             views.add.frame = NSRect(x: 4, y: y + 2, width: width - 8, height: 28)
             y += 36

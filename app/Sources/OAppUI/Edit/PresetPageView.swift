@@ -240,23 +240,12 @@ final class PresetInspectorView: PanelView {
     let applyStyle = FlatButton(Strings.text(.editPresetApplyStyle), style: .plain)
     let reapply = FlatButton(Strings.text(.editPresetReapply), style: .plain)
     let saveAsStyle = FlatButton(Strings.text(.editPresetSaveAsStyle), style: .plain)
-    let font = FlatButton("", style: .plain)
-    let size = EditField()
-    let unit = SegmentedView([Strings.text(.editPresetPt), Strings.text(.editPresetPercent)], small: true)
-    let weight = EditField()
-    let color = FormColorWell(label: Strings.text(.editPresetColor))
-    let align = SegmentedView([Strings.text(.editPresetLeft), Strings.text(.editPresetCenter), Strings.text(.editPresetRight)], small: true)
-    let vertical = SegmentedView([Strings.text(.editPresetTop), Strings.text(.editPresetMiddle), Strings.text(.editPresetBottom)], small: true)
-    let lineSpacing = EditField()
-    let letterSpacing = EditField()
-    let outlineSize = EditField()
-    let outlineColor = FormColorWell(label: Strings.text(.editPresetOutline))
-    let shadowX = EditField()
-    let shadowY = EditField()
-    let shadowBlur = EditField()
-    let shadowColor = FormColorWell(label: Strings.text(.editPresetShadow))
-    let allCaps = ChoiceBox(Strings.text(.editPresetAllCaps))
-    private var fontsShown = 0
+    /// The style's own controls (Spec 11 §8, "The text style"), shared with the Objects page's text styles.
+    let style = StyleForm()
+    var size: EditField { style.size }
+    var align: SegmentedView { style.align }
+    var color: FormColorWell { style.color }
+    var allCaps: ChoiceBox { style.allCaps }
     /// The field committed last: outlined in red while the engine's refusal of it stands.
     private weak var lastField: EditField?
 
@@ -441,41 +430,10 @@ final class PresetInspectorView: PanelView {
         saveAsStyle.fontSize = 11
         saveAsStyle.onPress = { [weak self] in self?.askStyleName() }
         c.row(nil, [applyStyle, reapply, saveAsStyle], widths: [nil, nil, nil], height: 24)
-        font.fontSize = 12
-        font.leading = true
-        font.setAccessibilityLabel(Strings.text(.editPresetFont))
-        c.row(Strings.text(.editPresetFont), [font], height: 24)
-        numeric(size, Strings.text(.editPresetSize)) { [weak self] value in self?.model.editing.setStyle("size.value", .number(max(1, value))) }
-        unit.setAccessibilityLabel(Strings.text(.editPresetSize))
-        unit.onSelect = { [weak self] index in self?.model.editing.setStyle("size.unit", .string(index == 1 ? "percent" : "pt")) }
-        c.row(Strings.text(.editPresetSize), [size, unit], widths: [56, nil], height: 24)
-        numeric(weight, Strings.text(.editPresetWeight)) { [weak self] value in self?.model.editing.setStyle("weight", .number(min(1000, max(1, value.rounded())))) }
-        color.onChoose = { [weak self] picked in self?.model.editing.setStyle("color", FormColor.value(picked)) }
-        c.row(Strings.text(.editPresetWeight), [weight], widths: [64], height: 24)
-        c.row(Strings.text(.editPresetColor), [color], widths: [44], height: 24)
-        align.setAccessibilityLabel(Strings.text(.editPresetAlign))
-        align.onSelect = { [weak self] index in self?.model.editing.setStyle("alignment", .string(["left", "center", "right"][min(2, max(0, index))])) }
-        c.row(Strings.text(.editPresetAlign), [align], height: 24)
-        vertical.setAccessibilityLabel(Strings.text(.editPresetVertical))
-        vertical.onSelect = { [weak self] index in self?.model.editing.setStyle("verticalAlignment", .string(["top", "center", "bottom"][min(2, max(0, index))])) }
-        c.row(Strings.text(.editPresetVertical), [vertical], height: 24)
-        numeric(lineSpacing, Strings.text(.editPresetLineSpacing)) { [weak self] value in self?.model.editing.setStyle("lineSpacing", .number(max(0.1, value))) }
-        c.row(Strings.text(.editPresetLineSpacing), [lineSpacing], widths: [64], height: 24)
-        numeric(letterSpacing, Strings.text(.editPresetLetterSpacing)) { [weak self] value in self?.model.editing.setStyle("letterSpacing", .number(value)) }
-        c.row(Strings.text(.editPresetLetterSpacing), [letterSpacing], widths: [64], height: 24)
-        numeric(outlineSize, Strings.text(.editPresetOutline)) { [weak self] value in self?.model.editing.setStyle("outline.width", .number(max(0, value))) }
-        outlineColor.onChoose = { [weak self] picked in self?.model.editing.setStyle("outline.color", FormColor.value(picked)) }
-        c.row(Strings.text(.editPresetOutline), [outlineSize, outlineColor], widths: [56, 44], height: 24)
-        numeric(shadowX, Strings.text(.editPresetShadow) + " X") { [weak self] value in self?.model.editing.setStyle("shadow.x", .number(value)) }
-        numeric(shadowY, Strings.text(.editPresetShadow) + " Y") { [weak self] value in self?.model.editing.setStyle("shadow.y", .number(value)) }
-        numeric(shadowBlur, Strings.text(.editPresetBlur)) { [weak self] value in self?.model.editing.setStyle("shadow.blur", .number(max(0, value))) }
-        shadowColor.onChoose = { [weak self] picked in self?.model.editing.setStyle("shadow.color", FormColor.value(picked)) }
-        shadowX.placeholderString = "X"
-        shadowY.placeholderString = "Y"
-        shadowBlur.placeholderString = Strings.text(.editPresetBlur)
-        c.row(Strings.text(.editPresetShadow), [shadowX, shadowY, shadowBlur, shadowColor], widths: [nil, nil, nil, 44], height: 24)
-        allCaps.onToggle = { [weak self] on in self?.model.editing.setStyle("allCaps", .bool(on)) }
-        c.row(nil, [allCaps], height: 20)
+        style.onSet = { [weak self] field, value in self?.model.editing.setStyle(field, value) }
+        style.onCommit = { [weak self] field in self?.lastField = field }
+        style.onPutBack = { [weak self] in self?.refresh() }
+        style.addRows(to: c)
     }
 
     /// "Save as Style… asks for a name".
@@ -502,8 +460,7 @@ final class PresetInspectorView: PanelView {
         NoticeLine.show(editing.notice, in: notice, from: self)
         var refused = false
         if case .rejected? = editing.notice { refused = true }
-        for field in [number, label, fieldName, staticText, frameX, frameY, frameW, frameH, fitNumber, transitionMs, size, weight, lineSpacing,
-                      letterSpacing, outlineSize, shadowX, shadowY, shadowBlur] {
+        for field in [number, label, fieldName, staticText, frameX, frameY, frameW, frameH, fitNumber, transitionMs] + style.fields {
             field.isRefused = refused && field === lastField
         }
         // The preset and Used by.
@@ -608,9 +565,7 @@ final class PresetInspectorView: PanelView {
         let style = box?.textStyle
         let isText = box?.binding.isText ?? false
         noStyle.isHidden = box == nil || isText
-        let controls: [NSView] = [fromStyle, applyStyle, reapply, saveAsStyle, font, size, unit, weight, color, align, vertical, lineSpacing, letterSpacing,
-                                  outlineSize, outlineColor, shadowX, shadowY, shadowBlur, shadowColor, allCaps]
-        for view in controls { view.isHidden = !isText || style == nil }
+        for view in [fromStyle, applyStyle, reapply, saveAsStyle] as [NSView] + self.style.controls { view.isHidden = !isText || style == nil }
         styleHeading.isHidden = box == nil
         guard isText, let style, let catalog else { return }
         let subject = AnyHashable("\(model.editing.presetNumber ?? 0)-\(model.editing.presetTab.string)-\(model.editing.presetState.box ?? -1)")
@@ -631,53 +586,7 @@ final class PresetInspectorView: PanelView {
             menu.addItem(ClosureMenuItem(title: name) { [weak model] in model?.editing.applyStyle(numbered.number) })
         }
         applyStyle.dropMenu = menu
-        // The font: "from the `fonts` query's families and faces", each drawn in itself.
-        if fonts.count != fontsShown || font.title != style.values.font {
-            fontsShown = fonts.count
-            font.title = style.values.font
-            font.dropMenu = fontMenu(fonts, current: style.values.font)
-        }
-        let v = style.values
-        size.show(FormNumber.text(v.size.value), subject: subject)
-        unit.selected = v.size.unit == .percent ? 1 : 0
-        weight.show(FormNumber.text(v.weight, places: 0), subject: subject)
-        color.color = FormColor.ns(v.color)
-        align.selected = [TextAlignment.left, .center, .right].firstIndex(of: v.alignment)
-        vertical.selected = [VerticalAlignment.top, .center, .bottom].firstIndex(of: v.verticalAlignment)
-        lineSpacing.show(FormNumber.text(v.lineSpacing), subject: subject)
-        letterSpacing.show(FormNumber.text(v.letterSpacing), subject: subject)
-        outlineSize.show(FormNumber.text(v.outline.width), subject: subject)
-        outlineColor.color = FormColor.ns(v.outline.color)
-        shadowX.show(FormNumber.text(v.shadow.x), subject: subject)
-        shadowY.show(FormNumber.text(v.shadow.y), subject: subject)
-        shadowBlur.show(FormNumber.text(v.shadow.blur), subject: subject)
-        shadowColor.color = FormColor.ns(v.shadow.color)
-        allCaps.state = v.allCaps ? .on : .off
-    }
-
-    /// The families, each with its faces drawn in themselves; the button's title is the box's font.
-    private func fontMenu(_ fonts: [FontFace], current: String) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        var families: [(String, [FontFace])] = []
-        for face in fonts {
-            if families.last?.0 == face.family { families[families.count - 1].1.append(face) } else { families.append((face.family, [face])) }
-        }
-        for (family, faces) in families {
-            let item = NSMenuItem(title: family, action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for face in faces {
-                let entry = ClosureMenuItem(title: face.name) { [weak model] in model?.editing.setStyle("font", .string(face.name)) }
-                if let drawn = NSFont(name: face.name, size: 13) {
-                    entry.attributedTitle = NSAttributedString(string: drawn.displayName ?? face.name, attributes: [.font: drawn])
-                }
-                if face.name == current { entry.state = .on }
-                sub.addItem(entry)
-            }
-            item.submenu = sub
-            menu.addItem(item)
-        }
-        return menu
+        self.style.show(style.values, subject: subject, fonts: fonts)
     }
 
     override func layout() {

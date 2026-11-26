@@ -153,7 +153,11 @@ enum EditPopovers {
     /// exists ... Each opens a small form with pickers ...; Add inserts the
     /// command after the selected one, or at the end." A command that needs
     /// nothing asked is added at once.
-    static func palette(model: ShowModel, after position: Int?, present: @escaping @MainActor (PromptView) -> Void) -> NSMenu {
+    /// `insert` adds the command where it goes: the cue's, unless a macro's is given. Spec 11 §9 — "A macro has no channel
+    /// rows, so here the palette's Channels group adds channel commands: a write from the pool, a text write, clear, reset,
+    /// and the grade, transition, audio transition and gain commands."
+    static func palette(model: ShowModel, after position: Int?, insert: (@MainActor (Command) -> Void)? = nil, channelGroup: Bool = false,
+                        present: @escaping @MainActor (PromptView) -> Void) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         guard let catalog = model.store.catalog else { return menu }
@@ -167,12 +171,17 @@ enum EditPopovers {
             item.submenu = sub
             menu.addItem(item)
         }
-        func add(_ command: Command) { editing.insertCommand(command, after: position) }
+        func add(_ command: Command) {
+            if let insert { insert(command) } else { editing.insertCommand(command, after: position) }
+        }
         let stacks = catalog.stacks.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
         let outputs = catalog.outputs.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
         let channels = catalog.channels.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
         let settings = catalog.settings ?? MachineSettings()
 
+        if channelGroup, !channels.isEmpty {
+            group(.editPaletteChannels) { sub in channelCommands(sub, catalog: catalog, media: model.store.media, add: { add($0) }, present: present) }
+        }
         group(.editPaletteStacks) { sub in
             if !outputs.isEmpty, !stacks.isEmpty {
                 sub.addItem(ClosureMenuItem(title: Strings.text(.editPaletteOutputStack)) {
@@ -292,6 +301,95 @@ enum EditPopovers {
             sub.addItem(ClosureMenuItem(title: Strings.text(.clearsClearAll)) { add(.systemClearAll) })
         }
         return menu
+    }
+
+    /// The Channels group's commands, each a small form with the channel and what the command takes.
+    private static func channelCommands(_ sub: NSMenu, catalog: Catalog, media: [MediaItem], add: @escaping @MainActor (Command) -> Void,
+                                        present: @escaping @MainActor (PromptView) -> Void) {
+        let channels = catalog.channels.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
+        func item(_ key: StringKey, _ build: @escaping @MainActor (PromptView, NSPopUpButton) -> (() -> PromptView.PromptProblem?)) {
+            sub.addItem(ClosureMenuItem(title: Strings.text(key)) {
+                let panel = form(key)
+                let channel = numbers(channels, selected: channels.first?.number)
+                panel.addRow(Strings.text(.editFormChannel), channel)
+                panel.onSave = build(panel, channel)
+                panel.finish()
+                present(panel)
+            })
+        }
+        let pool = media.filter { $0.presence == "ok" }
+        if !pool.isEmpty {
+            item(.editPaletteWriteMedia) { panel, channel in
+                let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+                popup.font = .systemFont(ofSize: 12)
+                for entry in pool {
+                    popup.addItem(withTitle: (entry.entry.path as NSString).lastPathComponent)
+                    popup.lastItem?.representedObject = entry.id
+                }
+                panel.addRow(Strings.text(.editFormMedia), popup)
+                return {
+                    guard let ref = popup.selectedItem?.representedObject as? String else { return nil }
+                    add(.channelWrite(ChannelWrite(channel: .number(channel.selectedTag()), content: .media(MediaContent(ref: ref)))))
+                    return nil
+                }
+            }
+        }
+        item(.editPaletteWriteText) { panel, channel in
+            let body = panel.text(Strings.text(.editContentFormBody), "")
+            return {
+                add(.channelWrite(ChannelWrite(channel: .number(channel.selectedTag()), content: .text(fields: ["body": body.stringValue]))))
+                return nil
+            }
+        }
+        item(.editPaletteClear) { _, channel in
+            return {
+                add(.channelClear(channel: .number(channel.selectedTag())))
+                return nil
+            }
+        }
+        item(.editPaletteReset) { _, channel in
+            return {
+                add(.channelReset(channel: .number(channel.selectedTag())))
+                return nil
+            }
+        }
+        let grades = catalog.grades.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
+        let transitions = catalog.transitions.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
+        let audio = catalog.audioTransitions.sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
+        let attributes: [(StringKey, StringKey, [(number: Int, label: String)])] = [
+            (.editPaletteGrade, .editFormGrade, grades), (.editPaletteTransition, .editFormTransition, transitions),
+            (.editPaletteAudioTransition, .editFormAudioTransition, audio),
+        ]
+        for (key, label, items) in attributes where !items.isEmpty {
+            item(key) { panel, channel in
+                let ref = numbers(items, selected: items.first?.number)
+                panel.addRow(Strings.text(label), ref)
+                // "an empty duration uses the object's own".
+                let duration = panel.text(Strings.text(.editFormMs), "", placeholder: Strings.text(.editChipFormOwn))
+                return {
+                    let typed = duration.stringValue.trimmingCharacters(in: .whitespaces)
+                    let ms = Int(typed)
+                    if !typed.isEmpty, (ms ?? -1) < 0 { return .invalid(Strings.text(.editFormNumber)) }
+                    let target = Target.number(channel.selectedTag())
+                    switch key {
+                    case .editPaletteGrade: add(.channelGrade(channel: target, ref: ref.selectedTag(), ms: ms))
+                    case .editPaletteTransition: add(.channelTransition(channel: target, ref: ref.selectedTag(), ms: ms))
+                    default: add(.channelAudioTransition(channel: target, ref: ref.selectedTag(), ms: ms))
+                    }
+                    return nil
+                }
+            }
+        }
+        item(.editPaletteGain) { panel, channel in
+            let gain = panel.text(Strings.text(.editFormGain), "0")
+            return {
+                guard let db = Double(gain.stringValue.trimmingCharacters(in: .whitespaces)), (-60...60).contains(db) else {
+                    return .invalid(Strings.text(.editChipFormRange))
+                }
+                add(.channelGain(channel: .number(channel.selectedTag()), db: db))
+                return nil
+            }
+        }
     }
 
     private static func form(_ heading: StringKey) -> PromptView {

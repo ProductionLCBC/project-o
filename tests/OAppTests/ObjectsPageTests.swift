@@ -249,6 +249,7 @@ final class ObjectsPageTests: XCTestCase {
         XCTAssertEqual(lines.count, 4)
         XCTAssertEqual(lines.map(\.canMoveUp), [false, true, true, true])
         XCTAssertEqual(lines.map(\.canMoveDown), [true, true, true, false])
+        XCTAssertEqual(lines[0].name, "Channel 2 shows “Welcome”", "a channel write says what it shows")
         XCTAssertEqual(lines[1].name, KeyWording.plain(.timerSet(timer: 1, ms: 300_000)))
         editing.insertMacroCommand(.timerReset(timer: 1), after: 0)
         XCTAssertEqual(last(rig), ["edit macro 1 insert commands 1 { \"cmd\": \"timer.reset\", \"timer\": 1 }"])

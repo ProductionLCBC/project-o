@@ -25,7 +25,7 @@ public enum EditPage: String, Codable, CaseIterable, Sendable {
 
     /// "the Cues and Presets pages keep the inspector under the workspace and the monitors; the Stacks and Channels
     /// pages have none". The Objects page's is settled with its stage (§9).
-    public var hasInspector: Bool { self != .stacks && self != .channels }
+    public var hasInspector: Bool { self == .cues || self == .text || self == .presets }
 }
 
 /// Spec 11 §2, "The Browser" — "Three tabs: Playlists, Library and Media".
