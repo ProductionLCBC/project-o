@@ -127,8 +127,14 @@ keys; the Cues page with every control's edit; the Stacks, Channels, Presets and
 pages, each laying the window out for its own work. Not built: the Text page, which is
 Area 10's. Nobody has listened to it with VoiceOver, and the system's accessibility audit
 (a UI test under `xcodebuild`) is not run: the checks are `swift test`'s offscreen ones.
-Adam has used the Cues, Stacks, Channels and Presets pages himself on a screen; the
-Objects page he has not seen yet.
+Adam has used every page himself on a screen. After his look at the Objects page on
+2026-11-25 it was rebuilt on his word (Spec 11 §4 and §9 corrected first, G-37; 977e16c,
+pushed, `swift test` and hosted CI green): each object in one column with its number and
+label at the top, the rest of the workspace a stage that plays a transition between two
+pool items, draws an audio transition's gains and a text style's sample, or holds a
+macro's commands; short tags for what is wrong with a command; Add Command a browser over
+a tree of the whole vocabulary, for cues and macros alike. The top bar's "Nothing live"
+lost its hint the same day, on his word (Spec 10 §8; 69a7e8a). The try-out app is rebuilt.
 
 The engine side was at its first stop on 2026-11-21. On Adam's word that day ("free to
 do any testing for any amount of time") it ran on the real engine, a release build of
@@ -209,6 +215,11 @@ the pilot.
     one three-hour soak of the branch.
   - *The bench's golden images* haven't been run against the Preset 1 change (its `*`
     boxes take the channel's transition). Recommended: with the bench run.
+  - *Two faults of the engine's audio transitions, found building their preview* (on
+    `main` since Area 16): the gains ramp in a straight line whatever the object's easing,
+    and a negative offset is taken as none, so a J cut never delays the picture as the UX
+    spec says. The preview draws what the object asks. Recommended: fix both, with a plan,
+    in this area or as a follow-up.
 
 ### Decisions
 
