@@ -660,6 +660,11 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     /// Redraws the regions a change touches.
     func refresh(_ changes: Set<ShowModel.Change>) {
         let editing = model.mode == .edit
+        // A grade's pictures as they come while its video plays: the stage alone (Spec 11 §9, G-43).
+        if changes == [.stage] {
+            if editing { workspace.objects.stage.refresh() }
+            return
+        }
         if changes.contains(.layout) || changes.contains(.edit) { placeModes() }
         if editing {
             if changes.contains(.edit) {

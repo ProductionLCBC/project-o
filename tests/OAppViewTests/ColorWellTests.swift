@@ -49,6 +49,41 @@ final class ColorWellTests: XCTestCase {
         XCTAssertEqual(slider.doubleValue, 90)
     }
 
+    /// Spec 11 §9 as corrected 2026-11-26 (G-43) — the panel's every color as it moves, for the stage that draws the
+    /// tint while the panel is open; the edit still once.
+    func test_theWellSaysEachColorAsThePanelMoves() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        let well = FormColorWell(label: "Tint")
+        well.frame = NSRect(x: 10, y: 10, width: 44, height: 24)
+        window.contentView?.addSubview(well)
+        var changing: [NSColor] = []
+        var chosen: [NSColor] = []
+        well.onChanging = { changing.append($0) }
+        well.onChoose = { chosen.append($0) }
+        defer { NSColorPanel.shared.orderOut(nil) }
+        well.activate(true)
+        for green in [0.2, 0.4, 0.6] { NSColorPanel.shared.color = NSColor(srgbRed: 1, green: green, blue: 0, alpha: 1) }
+        XCTAssertEqual(changing.count, 3)
+        XCTAssertEqual(chosen.count, 0)
+        well.deactivate()
+        XCTAssertEqual(chosen.count, 1)
+    }
+
+    /// G-43 — a grade's slider says each step of a drag, and its value to send once let go.
+    func test_aSliderSaysEachStepOfADragAndItsValueOnceLetGo() {
+        let slider = GradeSlider(.saturation)
+        var slid: [Double] = []
+        var released: [Double] = []
+        slider.onSlide = { slid.append($0) }
+        slider.onRelease = { released.append($0) }
+        slider.slide(to: 120)
+        slider.slide(to: 140)
+        XCTAssertEqual(slid, [120, 140])
+        XCTAssertEqual(released, [])
+        slider.dragEnded()
+        XCTAssertEqual(released, [140])
+    }
+
     /// Spec 11 §9 (G-40) — "a double-click putting it back to its identity", sent as one edit.
     func test_aDoubleClickPutsASliderBack() {
         let slider = GradeSlider(.contrast)

@@ -21,6 +21,8 @@ public final class ShowModel {
         case dropNotes
         /// Edit mode's regions: its Browser, workspace, monitors and inspector (Spec 11 §2).
         case edit
+        /// Only the Objects page's stage: a grade's pictures as they come, while a video plays (Spec 11 §9, G-43).
+        case stage
     }
 
     /// Spec 10 §4, the Mode menu — "Show ⌘1; Edit ⌘2". Edit mode's own model

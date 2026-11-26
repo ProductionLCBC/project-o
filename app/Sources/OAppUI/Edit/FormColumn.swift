@@ -128,6 +128,13 @@ enum FormColor {
         func n(_ v: CGFloat) -> JSONValue { .number((Double(v) * 10000).rounded() / 10000) }
         return .object(["r": n(c.redComponent), "g": n(c.greenComponent), "b": n(c.blueComponent), "a": n(c.alphaComponent)])
     }
+
+    /// The same color as a style or grade holds it, rounded as `value` rounds it.
+    static func color(_ color: NSColor) -> Color {
+        let c = color.usingColorSpace(.sRGB) ?? color
+        func n(_ v: CGFloat) -> Double { (Double(v) * 10000).rounded() / 10000 }
+        return Color(r: n(c.redComponent), g: n(c.greenComponent), b: n(c.blueComponent), a: n(c.alphaComponent))
+    }
 }
 
 /// A slider the page's redraws leave alone while it is dragged, and after it is let go until the value it sent comes
@@ -153,7 +160,11 @@ class HeldSlider: NSSlider {
         // AppKit tracks the drag here and returns at mouse up.
         super.mouseDown(with: event)
         isDragging = false
+        dragEnded()
     }
+
+    /// The mouse is up: a slider that says its value at the end says it here.
+    func dragEnded() {}
 
     /// Puts the slider back, as a double-click does, and sends it.
     func reset() {
@@ -197,6 +208,9 @@ final class FormColorWell: NSColorWell {
     /// How long a color rests before it is said.
     static let restSeconds = 0.35
 
+    /// Every color the panel moves through, as it moves: for a picture that follows it (Spec 11 §9, G-43).
+    var onChanging: ((NSColor) -> Void)?
+
     convenience init(label: String) {
         self.init(frame: .zero)
         isContinuous = true
@@ -206,6 +220,7 @@ final class FormColorWell: NSColorWell {
     }
 
     @objc private func changed() {
+        onChanging?(color)
         pending = color
         rest?.invalidate()
         rest = Timer.scheduledTimer(withTimeInterval: Self.restSeconds, repeats: false) { [weak self] _ in

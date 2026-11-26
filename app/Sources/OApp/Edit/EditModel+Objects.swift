@@ -21,13 +21,59 @@ public struct ObjectEditorState: Equatable, Sendable {
     public var toPicture = PreviewPicture()
     /// A text style's sample, as typed over the stage; nil for the built-in sample.
     public var styleSample: String?
+    /// Spec 11 §9 as corrected 2026-11-26 (G-43) — the values a grade's sliders or tint show while dragged or chosen,
+    /// drawn in the stored grade's place until the edit sent at the end is answered; nil draws the stored grade.
+    public var gradeDraft: Grade?
+    /// G-43 — the time into a video both pictures are of: the scrub bar's, or the time played.
+    public var gradeTimeMs = 0
+    /// G-43 — "a loop switch".
+    public var gradeLoop = false
+    /// G-43 — while a video plays: when it started on the app's clock, and from which time.
+    public var gradePlay: GradePlay?
     var pixels = 0
     var gradeAsked = 0
     var gradeSubject: [String: JSONValue]?
+    var ungradedAsked = 0
+    var ungradedSubject: [String: JSONValue]?
+    /// The grade's canvases asked for whose answers are still to come.
+    var gradeWaiting: Set<String> = []
     var usesFor: ObjectKey?
     var usesAsked = 0
 
     public init() {}
+}
+
+/// Spec 11 §9 as corrected 2026-11-26 (G-43) — a video played on a grade's stage: when, on the app's clock, and from
+/// which time into the item.
+public struct GradePlay: Equatable, Sendable {
+    public var since: TimeInterval
+    public var fromMs: Int
+}
+
+extension GradeParameter {
+    /// The parameter's stored value in a grade.
+    func value(of grade: Grade) -> Double {
+        switch self {
+        case .brightness: grade.brightness
+        case .contrast: grade.contrast
+        case .saturation: grade.saturation
+        case .hue: grade.hue
+        case .opacity: grade.opacity
+        case .blur: grade.blur
+        }
+    }
+
+    /// A grade with the parameter's stored value set.
+    func set(_ stored: Double, in grade: inout Grade) {
+        switch self {
+        case .brightness: grade.brightness = stored
+        case .contrast: grade.contrast = stored
+        case .saturation: grade.saturation = stored
+        case .hue: grade.hue = stored
+        case .opacity: grade.opacity = stored
+        case .blur: grade.blur = stored
+        }
+    }
 }
 
 extension EditModel {
@@ -49,6 +95,9 @@ extension EditModel {
         guard key != chosenObject else { return }
         model.settings.editObjectKind = key.kind
         model.settings.editObject = key.number
+        // G-43 — the values dragged and the video played are the grade's own.
+        objectState.gradeDraft = nil
+        objectState.gradePlay = nil
         model.changed([.edit])
         askObjectUses()
         askGrade()
@@ -56,6 +105,9 @@ extension EditModel {
 
     func objectsOpened() {
         objectState.gradeSubject = nil
+        objectState.ungradedSubject = nil
+        objectState.gradeDraft = nil
+        objectState.gradePlay = nil
         // A text style's font menu lists the `fonts` query's faces, as the preset editor's does.
         askFonts()
         askObjectUses(again: true)
@@ -101,21 +153,73 @@ extension EditModel {
         _ = send(ObjectEdits.set(key, path, value))
     }
 
-    /// "Each sends one `edit.set` when its drag ends": a slider's value, or its number field's, as shown.
+    /// "Each sends one `edit.set` when its drag ends": a slider's value, or its number field's, as shown. G-43 — the
+    /// stage keeps the values shown until the edit is answered, then draws the grade as the engine holds it.
     public func setGrade(_ parameter: GradeParameter, shown: Double) {
         guard let grade = selectedGrade, shown.isFinite else { return }
         let stored = parameter.stored(shown)
-        let current: Double
-        switch parameter {
-        case .brightness: current = grade.brightness
-        case .contrast: current = grade.contrast
-        case .saturation: current = grade.saturation
-        case .hue: current = grade.hue
-        case .opacity: current = grade.opacity
-        case .blur: current = grade.blur
+        var draft = objectState.gradeDraft ?? grade
+        parameter.set(stored, in: &draft)
+        guard stored != parameter.value(of: grade) else {
+            settleGradeDraft(draft, stored: grade)
+            return
         }
-        guard stored != current else { return }
-        setObject(parameter.rawValue, .number(stored))
+        sendGrade(parameter.rawValue, .number(stored), draft: draft)
+    }
+
+    /// Spec 11 §9 as corrected 2026-11-26 (G-43) — "while it is dragged ... the stage draws the grade with the values
+    /// shown (`render` with the grade's values, §3)": nothing is sent.
+    public func previewGrade(_ parameter: GradeParameter, shown: Double) {
+        guard let grade = selectedGrade, shown.isFinite else { return }
+        var draft = objectState.gradeDraft ?? grade
+        parameter.set(parameter.stored(shown), in: &draft)
+        objectState.gradeDraft = draft
+        askGrade()
+    }
+
+    /// G-43 — "and while the tint's colour panel is open".
+    public func previewGradeTint(_ color: Color) {
+        guard let grade = selectedGrade else { return }
+        var draft = objectState.gradeDraft ?? grade
+        draft.tint = color
+        objectState.gradeDraft = draft
+        askGrade()
+    }
+
+    /// The tint the color panel chose: one edit, as a slider's release is.
+    public func setGradeTint(_ color: Color) {
+        guard let grade = selectedGrade else { return }
+        var draft = objectState.gradeDraft ?? grade
+        draft.tint = color
+        guard color != grade.tint else {
+            settleGradeDraft(draft, stored: grade)
+            return
+        }
+        sendGrade("tint", .object(["r": .number(color.r), "g": .number(color.g), "b": .number(color.b), "a": .number(color.a)]), draft: draft)
+    }
+
+    /// A value let go where it is stored: nothing to send, and the stored grade drawn once nothing else differs.
+    private func settleGradeDraft(_ draft: Grade, stored: Grade) {
+        objectState.gradeDraft = draft == stored ? nil : draft
+        askGrade()
+    }
+
+    /// One edit of the selected grade, its values drawn meanwhile; once it is answered, applied or not, the stage
+    /// draws the grade by its number, as the engine then holds it, unless another drag has moved on.
+    private func sendGrade(_ path: String, _ value: JSONValue, draft: Grade) {
+        guard let key = selectedObject else { return }
+        objectState.gradeDraft = draft
+        askGrade()
+        let sent = send(ObjectEdits.set(key, path, value), answered: { [weak self] in
+            guard let self, self.objectState.gradeDraft == draft else { return }
+            self.objectState.gradeDraft = nil
+            self.askGrade()
+        })
+        if sent != nil {
+            // Not sent: nothing will answer it.
+            objectState.gradeDraft = nil
+            askGrade()
+        }
     }
 
     /// "a + that creates one"; the new one is selected.
@@ -190,8 +294,84 @@ extension EditModel {
 
     public func setGradeMedia(_ id: String) {
         objectState.gradeMedia = id
+        objectState.gradeTimeMs = 0
+        objectState.gradePlay = nil
         model.changed([.edit])
         askGrade()
+    }
+
+    // MARK: - A video on a grade's stage (Spec 11 §9 as corrected 2026-11-26, G-43)
+
+    /// The item's length when it is a video: "a scrub bar over the item's length"; nil for a still.
+    public var gradeVideoMs: Int? {
+        guard let id = gradeMedia, let item = model.store.media.first(where: { $0.id == id }), item.entry.kind == .video else { return nil }
+        return item.entry.durationMs.map { max(1, $0) }
+    }
+
+    public var isGradePlaying: Bool { objectState.gradePlay != nil }
+
+    /// "Play": from the scrub bar's time, or from the start when that is the end.
+    public func playGrade() {
+        guard selectedGrade != nil, let length = gradeVideoMs else { return }
+        let from = objectState.gradeTimeMs >= length ? 0 : objectState.gradeTimeMs
+        objectState.gradeTimeMs = from
+        objectState.gradePlay = GradePlay(since: model.now, fromMs: from)
+        askGrade(again: true)
+        model.changed([.stage])
+    }
+
+    public func stopGrade() {
+        objectState.gradePlay = nil
+        model.changed([.stage])
+    }
+
+    public func setGradeLoop(_ on: Bool) {
+        objectState.gradeLoop = on
+        model.changed([.stage])
+    }
+
+    /// "stopped, both pictures are of the scrub bar's time": a move of it stops the video there.
+    public func scrubGrade(toMs ms: Int) {
+        guard let length = gradeVideoMs else { return }
+        objectState.gradePlay = nil
+        objectState.gradeTimeMs = min(length, max(0, ms))
+        askGrade()
+        model.changed([.stage])
+    }
+
+    /// "playing asks for both pictures at the time played and for the next as soon as both have come ...; at the end
+    /// it stops, or with the loop on starts again".
+    private func nextGradeFrame() {
+        guard let play = objectState.gradePlay else { return }
+        guard model.mode == .edit, page == .objects, selectedGrade != nil, let length = gradeVideoMs else {
+            objectState.gradePlay = nil
+            return
+        }
+        guard objectState.gradeWaiting.isEmpty else { return }
+        var ms = play.fromMs + Int(((model.now - play.since) * 1000).rounded())
+        if ms >= length {
+            if objectState.gradeLoop {
+                ms %= length
+            } else {
+                ms = length
+                objectState.gradePlay = nil
+            }
+        }
+        guard ms != objectState.gradeTimeMs || objectState.gradePlay == nil else {
+            // No time has passed since the last pair: ask again a moment later.
+            model.later(1.0 / 60) { [weak self] in self?.nextGradeFrame() }
+            return
+        }
+        objectState.gradeTimeMs = ms
+        askGrade(again: true)
+        model.changed([.stage])
+    }
+
+    /// One of the grade's pictures has come: the next pair once both have, while playing.
+    private func gradeAnswered(_ canvas: String) {
+        objectState.gradeWaiting.remove(canvas)
+        guard objectState.gradePlay != nil, objectState.gradeWaiting.isEmpty else { return }
+        model.later(0) { [weak self] in self?.nextGradeFrame() }
     }
 
     /// The width each picture is asked for at.
@@ -273,25 +453,57 @@ extension EditModel {
             return
         }
         guard objectState.pixels > 0, let grade = selectedGrade, let media = gradeMedia else { return }
+        // G-43 — a video's pictures are of the scrub bar's time, or the time played.
+        let at: JSONValue? = gradeVideoMs == nil ? nil : .number(Double(objectState.gradeTimeMs))
         func request(_ canvas: String, _ grade: JSONValue) -> [String: JSONValue] {
-            ["canvas": .string(canvas), "subject": .object(["kind": .string("grade"), "grade": grade, "media": .string(media)]),
-             "width": .number(Double(objectState.pixels))]
+            var subject: [String: JSONValue] = ["kind": .string("grade"), "grade": grade, "media": .string(media)]
+            if let at { subject["atMs"] = at }
+            return ["canvas": .string(canvas), "subject": .object(subject), "width": .number(Double(objectState.pixels))]
         }
-        let graded = request("grade", .number(Double(grade.number)))
-        guard again || graded != objectState.gradeSubject else { return }
-        objectState.gradeSubject = graded
-        objectState.gradeAsked += 1
-        let asked = objectState.gradeAsked
-        for (subject, isGraded) in [(graded, true), (request("ungraded", .null), false)] {
-            model.ask(.query("render", subject)) { [weak self] answer in
-                guard let self, asked == self.objectState.gradeAsked, let answer, answer["superseded"] != .bool(true),
-                      let file = answer["file"]?.stringValue else { return }
-                let picture = PreviewPicture(file: file, width: answer["width"]?.intValue, height: answer["height"]?.intValue,
-                                             isMissing: answer["missing"] == .bool(true))
-                if isGraded { self.objectState.graded = picture } else { self.objectState.ungraded = picture }
-                self.model.changed([.edit])
+        // G-43 — the values shown while a slider is dragged, else the grade by its number.
+        let graded = request("grade", objectState.gradeDraft.map { Self.values($0) } ?? .number(Double(grade.number)))
+        let plain = request("ungraded", .null)
+        if again || graded != objectState.gradeSubject {
+            objectState.gradeSubject = graded
+            objectState.gradeAsked += 1
+            let asked = objectState.gradeAsked
+            objectState.gradeWaiting.insert("grade")
+            model.ask(.query("render", graded)) { [weak self] answer in
+                guard let self, asked == self.objectState.gradeAsked else { return }
+                if let picture = Self.picture(answer) { self.objectState.graded = picture }
+                self.model.changed([.stage])
+                self.gradeAnswered("grade")
             }
         }
+        // The item as it is changes only with the item, its time and the width.
+        if again || plain != objectState.ungradedSubject {
+            objectState.ungradedSubject = plain
+            objectState.ungradedAsked += 1
+            let asked = objectState.ungradedAsked
+            objectState.gradeWaiting.insert("ungraded")
+            model.ask(.query("render", plain)) { [weak self] answer in
+                guard let self, asked == self.objectState.ungradedAsked else { return }
+                if let picture = Self.picture(answer) { self.objectState.ungraded = picture }
+                self.model.changed([.stage])
+                self.gradeAnswered("ungraded")
+            }
+        }
+    }
+
+    /// A render's answer as a picture; nil for one superseded, refused or without a file.
+    private static func picture(_ answer: [String: JSONValue]?) -> PreviewPicture? {
+        guard let answer, answer["superseded"] != .bool(true), let file = answer["file"]?.stringValue else { return nil }
+        return PreviewPicture(file: file, width: answer["width"]?.intValue, height: answer["height"]?.intValue, isMissing: answer["missing"] == .bool(true))
+    }
+
+    /// Spec 11 §3 as corrected 2026-11-26 (G-43) — "A grade's values (Spec 1 §2's `hue`, `saturation`, `brightness`,
+    /// `contrast`, `blur`, `tint` and `opacity`)".
+    static func values(_ grade: Grade) -> JSONValue {
+        .object([
+            "hue": .number(grade.hue), "saturation": .number(grade.saturation), "brightness": .number(grade.brightness),
+            "contrast": .number(grade.contrast), "blur": .number(grade.blur), "opacity": .number(grade.opacity),
+            "tint": .object(["r": .number(grade.tint.r), "g": .number(grade.tint.g), "b": .number(grade.tint.b), "a": .number(grade.tint.a)]),
+        ])
     }
 
     // MARK: - Text styles (Spec 11 §9, "Text styles")

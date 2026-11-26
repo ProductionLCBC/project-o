@@ -1032,6 +1032,37 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(gradePicker.tiles.allSatisfy { [.video, .image].contains($0.tile.kind) }, "videos and images, no sound")
         XCTAssertEqual(gradePicker.kindFilter.segments.map(\.title), ["All", "Video", "Image"])
         XCTAssertGreaterThan(page.stage.frame.width, page.editor.scroll.frame.width, "the stage takes the rest of the width")
+        // Spec 11 §9 as corrected 2026-11-26 (G-43) — "while it is dragged ... the stage draws the grade with the values
+        // shown": a step of a drag asks for the graded picture with them, and sends no edit.
+        let editsBefore = rig.commands.filter { !$0.isEmpty }.count
+        page.sliders[.saturation]?.slide(to: 150)
+        let drawn = rig.sent.last { $0.fields["what"] == .string("render") }?.fields
+        XCTAssertEqual(drawn?["canvas"], .string("grade"))
+        XCTAssertEqual(drawn?["subject"]?.objectValue?["grade"]?.objectValue?["saturation"], .number(1.5))
+        XCTAssertEqual(rig.commands.filter { !$0.isEmpty }.count, editsBefore, "nothing sent until it is let go")
+        // "For a video it has Play, a loop switch and a scrub bar over the item's length"; a still has none.
+        let video = try XCTUnwrap(editing.gradeMediaChoices.first { $0.entry.kind == .video })
+        editing.setGradeMedia(video.id)
+        view.layoutSubtreeIfNeeded()
+        let stageControls: [NSView] = [page.stage.play, page.stage.loop, page.stage.scrub, page.stage.time]
+        XCTAssertEqual(stageControls.map(\.isHidden), [false, false, false, false])
+        XCTAssertEqual(page.stage.scrub.maxValue, Double(try XCTUnwrap(video.entry.durationMs)))
+        XCTAssertTrue(page.stage.time.stringValue.hasPrefix("0 / "), page.stage.time.stringValue)
+        XCTAssertGreaterThan(page.stage.scrub.frame.width, 100)
+        XCTAssertGreaterThan(page.stage.play.frame.minY, page.stage.gradedCaption.frame.maxY, "under the pictures")
+        page.stage.play.onPress?()
+        XCTAssertTrue(editing.isGradePlaying)
+        XCTAssertEqual(page.stage.play.title, "Stop", "the stage alone is redrawn as it plays")
+        page.stage.play.onPress?()
+        XCTAssertFalse(editing.isGradePlaying)
+        XCTAssertEqual(page.stage.play.title, "Play")
+        page.stage.scrub.doubleValue = 500
+        page.stage.scrub.sendAction(page.stage.scrub.action, to: page.stage.scrub.target)
+        XCTAssertEqual(rig.sent.last { $0.fields["what"] == .string("render") }?.fields["subject"]?.objectValue?["atMs"], .number(500))
+        let still = try XCTUnwrap(editing.gradeMediaChoices.first { $0.entry.kind == .image })
+        editing.setGradeMedia(still.id)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(stageControls.map(\.isHidden), [true, true, true, true])
         XCTAssertEqual(page.number.stringValue, "1")
         XCTAssertTrue(page.number.isEnabled)
         // A transition: duration and easing only, its number fixed; the Preview draws its curve.

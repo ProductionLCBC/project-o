@@ -582,9 +582,11 @@ public final class EditModel {
 
     /// Sends one of the page's edits. A list that can't be edited sends
     /// nothing and says why; a refusal is said in the notice line; an
-    /// applied edit's warnings stand there until the next edit.
+    /// applied edit's warnings stand there until the next edit. `done` hears
+    /// an edit that was applied; `answered`, whatever the answer was.
     @discardableResult
-    func send(_ sending: Sending?, then done: (@MainActor (CommandOutcome) -> Void)? = nil) -> CannotEdit? {
+    func send(_ sending: Sending?, then done: (@MainActor (CommandOutcome) -> Void)? = nil,
+              answered: (@MainActor () -> Void)? = nil) -> CannotEdit? {
         acted()
         guard let sending, sending.request != nil else { return nil }
         standing = nil
@@ -605,6 +607,7 @@ public final class EditModel {
         noteOnAir()
         pending += 1
         transmit(request) { [weak self] reply in
+            defer { answered?() }
             guard let self else { return }
             self.pending = max(0, self.pending - 1)
             guard let outcome = reply?.outcome else {

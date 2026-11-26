@@ -1250,6 +1250,8 @@ public enum StringKey: String, CaseIterable, Sendable {
     case editObjectPlay = "edit.object.play"
     case editObjectStop = "edit.object.stop"
     case editObjectLoop = "edit.object.loop"
+    case editObjectPosition = "edit.object.position"
+    case editObjectVideoTime = "edit.object.videoTime"
     case editObjectSample = "edit.object.sample"
     case editObjectLaneOut = "edit.object.laneOut"
     case editObjectLaneIn = "edit.object.laneIn"

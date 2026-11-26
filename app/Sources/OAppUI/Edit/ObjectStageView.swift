@@ -26,11 +26,14 @@ final class ObjectStageView: NSView {
     let gradedCaption = Kit.label(size: 11, color: Palette.dimText)
     let ungradedCaption = Kit.label(Strings.text(.editObjectPreviewUngraded), size: 11, color: Palette.dimText)
     let note = Kit.label(size: 12, color: Palette.faintText)
-    // Transitions: "Play, a loop switch and a scrub bar over the easing curve".
+    // Transitions: "Play, a loop switch and a scrub bar over the easing curve"; a grade's video (G-43): Play, the loop
+    // switch and a scrub bar over the item's length, with the time.
     let player = TransitionPlayerView()
     let play = FlatButton(Strings.text(.editObjectPlay), style: .plain)
     let loop = ChoiceBox(Strings.text(.editObjectLoop))
     let curve = EasingCurveView()
+    let scrub = HeldSlider()
+    let time = Kit.label(size: 11.5, color: Palette.dimText)
     // Audio transitions: the lanes.
     let lanes = AudioLanesView()
     // Text styles: the sample.
@@ -72,13 +75,28 @@ final class ObjectStageView: NSView {
         for caption in [gradedCaption, ungradedCaption, note] { caption.alignment = .center }
         note.maximumNumberOfLines = 2
         play.onPress = { [weak self] in self?.togglePlay() }
-        loop.onToggle = { _ in }
+        loop.onToggle = { [weak model] on in
+            // A transition's loop is read as it plays; a grade's video's is the model's.
+            if model?.editing.selectedGrade != nil { model?.editing.setGradeLoop(on) }
+        }
+        scrub.isContinuous = true
+        scrub.controlSize = .small
+        scrub.minValue = 0
+        scrub.target = self
+        scrub.action = #selector(scrubbed)
+        scrub.setAccessibilityLabel(Strings.text(.editObjectPosition))
+        time.alignment = .right
         curve.onScrub = { [weak self] t in self?.scrub(to: t) }
         sampleField.setAccessibilityLabel(Strings.text(.editObjectSample))
         sampleField.placeholderString = Strings.text(.editObjectSample)
         sampleField.onCommit = { [weak model] text in model?.editing.setStyleSample(text) }
         for view in [heading, firstName, firstPicker, secondName, secondPicker, graded, ungraded, gradedCaption, ungradedCaption, note, player, play,
-                     loop, curve, lanes, sampleField, sample, commands] as [NSView] { addSubview(view) }
+                     loop, curve, scrub, time, lanes, sampleField, sample, commands] as [NSView] { addSubview(view) }
+    }
+
+    /// G-43 — "stopped, both pictures are of the scrub bar's time".
+    @objc private func scrubbed() {
+        model.editing.scrubGrade(toMs: Int(scrub.doubleValue.rounded()))
     }
 
     @available(*, unavailable)
@@ -131,7 +149,7 @@ final class ObjectStageView: NSView {
     func refresh() {
         let editing = model.editing
         let all: [NSView] = [firstName, firstPicker, secondName, secondPicker, graded, ungraded, gradedCaption, ungradedCaption, note, player, play,
-                             loop, curve, lanes, sampleField, sample, commands]
+                             loop, curve, scrub, time, lanes, sampleField, sample, commands]
         // What shows this time; each view is shown or hidden only when that changes, since hiding a field that has the
         // keys takes them from it (the sample's text lost its selection at every redraw, Adam, 2026-11-26).
         var showing: [NSView] = []
@@ -155,6 +173,14 @@ final class ObjectStageView: NSView {
                 showing += [firstName, firstPicker, graded, ungraded, gradedCaption, ungradedCaption]
                 _ = show(editing.objectState.graded, in: graded)
                 _ = show(editing.objectState.ungraded, in: ungraded)
+                // G-43 — "For a video it has Play, a loop switch and a scrub bar over the item's length".
+                if let length = editing.gradeVideoMs {
+                    showing += [play, loop, scrub, time]
+                    scrub.maxValue = Double(length)
+                    scrub.show(Double(editing.objectState.gradeTimeMs))
+                    loop.state = editing.objectState.gradeLoop ? .on : .off
+                    time.stringValue = Strings.text(.editObjectVideoTime, SecondsText.text(ms: editing.objectState.gradeTimeMs), SecondsText.text(ms: length))
+                }
             }
             stop()
         } else if let transition = editing.selectedTransition {
@@ -189,7 +215,8 @@ final class ObjectStageView: NSView {
         } else {
             stop()
         }
-        play.title = Strings.text(started == nil ? .editObjectPlay : .editObjectStop)
+        let playing = editing.selectedGrade != nil ? editing.isGradePlaying : started != nil
+        play.title = Strings.text(playing ? .editObjectStop : .editObjectPlay)
         needsLayout = true
     }
 
@@ -204,6 +231,12 @@ final class ObjectStageView: NSView {
     }
 
     private func togglePlay() {
+        // G-43 — a grade's video is played by the model, as fast as its pictures come.
+        let editing = model.editing
+        if editing.selectedGrade != nil {
+            if editing.isGradePlaying { editing.stopGrade() } else { editing.playGrade() }
+            return
+        }
         if started != nil {
             stop()
         } else {
@@ -285,13 +318,24 @@ final class ObjectStageView: NSView {
         }
         let room = max(0, bounds.height - y - pad)
         if !graded.isHidden {
-            // Two pictures side by side, each 16 by 9, a caption under each.
+            // Two pictures side by side, each 16 by 9, a caption under each; for a video, its controls under them.
+            let controls: CGFloat = scrub.isHidden ? 0 : 36
             let half = (inner - 12) / 2
-            let height = min(half * 9 / 16, max(0, room - 22))
+            let height = min(half * 9 / 16, max(0, room - 22 - controls))
             graded.frame = NSRect(x: pad, y: y, width: half, height: height)
             ungraded.frame = NSRect(x: pad + half + 12, y: y, width: half, height: height)
             gradedCaption.frame = NSRect(x: graded.frame.minX, y: graded.frame.maxY + 4, width: half, height: 15)
             ungradedCaption.frame = NSRect(x: ungraded.frame.minX, y: ungraded.frame.maxY + 4, width: half, height: 15)
+            if !scrub.isHidden {
+                let row = gradedCaption.frame.maxY + 12
+                let playWidth = max(80, play.fitting.width + 8)
+                play.frame = NSRect(x: pad, y: row, width: playWidth, height: 24)
+                loop.frame = NSRect(x: play.frame.maxX + 12, y: row + 2, width: loop.fittingSize.width + 4, height: 20)
+                let timeWidth = max(90, Kit.width(of: time) + 8)
+                time.frame = NSRect(x: pad + inner - timeWidth, y: row + 4, width: timeWidth, height: 16)
+                let left = loop.frame.maxX + 14
+                scrub.frame = NSRect(x: left, y: row + 2, width: max(40, time.frame.minX - 12 - left), height: 20)
+            }
             let scale = window?.backingScaleFactor ?? 2
             if half > 0 { model.editing.gradeWidth(Int((half * scale).rounded())) }
         }

@@ -141,6 +141,156 @@ final class ObjectsPageTests: XCTestCase {
         }
     }
 
+    private func renders(_ rig: Rig) -> [(index: Int, fields: [String: JSONValue])] {
+        rig.sent.indices.filter { rig.sent[$0].fields["what"] == .string("render") }.map { ($0, rig.sent[$0].fields) }
+    }
+
+    /// Answers every render asked for since `from` (an index into `rig.sent`), as the engine would.
+    private func answerRenders(_ rig: Rig, from: Int) {
+        for (index, fields) in renders(rig) where index >= from {
+            let canvas = fields["canvas"]?.stringValue ?? "x"
+            rig.answers[index](.answer(["file": .string("thumbnails/render/c1-\(canvas)-\(index).png"), "width": .number(640), "height": .number(360)]))
+        }
+    }
+
+    private func subject(_ fields: [String: JSONValue]?) -> [String: JSONValue]? { fields?["subject"]?.objectValue }
+
+    /// Spec 11 §9 as corrected 2026-11-26 (G-43) — "Each sends one `edit.set` when its drag ends; while it is dragged,
+    /// and while the tint's colour panel is open, the stage draws the grade with the values shown (`render` with the
+    /// grade's values, §3)".
+    func test_aDraggedSliderDrawsTheGradeWithTheValuesShownAndSendsOneEditWhenItEnds() throws {
+        let rig = try Rig()
+        let editing = rig.model.editing
+        XCTAssertTrue(editing.open(page: .objects))
+        let still = try XCTUnwrap(editing.gradeMediaChoices.first { $0.entry.kind == .image }?.id)
+        editing.setGradeMedia(still)
+        editing.gradeWidth(640)
+        answerRenders(rig, from: 0)
+        let edits = count(rig)
+        let before = rig.sent.count
+        editing.previewGrade(.brightness, shown: 130)
+        editing.previewGrade(.brightness, shown: 140)
+        XCTAssertEqual(count(rig), edits, "nothing sent while it is dragged")
+        let asked = renders(rig).filter { $0.index >= before }.map(\.fields)
+        XCTAssertEqual(asked.map { $0["canvas"] }, [.string("grade"), .string("grade")], "only the graded picture changes")
+        let values = try XCTUnwrap(subject(asked.last)?["grade"]?.objectValue)
+        XCTAssertEqual(values["brightness"]?.doubleValue ?? 0, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(values["hue"], .number(8), "the grade's other values as stored (grade 1 Warm)")
+        XCTAssertNil(subject(asked.last)?["atMs"], "a still has no time")
+        // Let go: one edit. The picture keeps the values until the edit's outcome, then is the grade's by its number.
+        editing.setGrade(.brightness, shown: 140)
+        XCTAssertEqual(last(rig), ["edit grade 1 brightness 0.4"])
+        XCTAssertNotNil(editing.objectState.gradeDraft)
+        ok(rig)
+        XCTAssertNil(editing.objectState.gradeDraft)
+        XCTAssertEqual(subject(renders(rig).last?.fields)?["grade"], .number(1))
+        // The tint while the color panel is open, then chosen.
+        editing.previewGradeTint(Color(r: 1, g: 0.5, b: 0, a: 0.3))
+        let tint = subject(renders(rig).last?.fields)?["grade"]?.objectValue?["tint"]
+        XCTAssertEqual(tint, .object(["r": .number(1), "g": .number(0.5), "b": .number(0), "a": .number(0.3)]))
+        XCTAssertEqual(count(rig), edits + 1, "nothing sent while the panel chooses")
+        editing.setGradeTint(Color(r: 1, g: 0.5, b: 0, a: 0.3))
+        XCTAssertEqual(last(rig), ["edit grade 1 tint { \"a\": 0.3, \"b\": 0, \"g\": 0.5, \"r\": 1 }"])
+        // A refused edit draws the grade as it is again.
+        rig.answers[rig.answers.count - 1](.result(CommandOutcome(kind: .rejected)))
+        XCTAssertNil(editing.objectState.gradeDraft)
+        XCTAssertEqual(subject(renders(rig).last?.fields)?["grade"], .number(1))
+        // Another object: no values carried over.
+        editing.previewGrade(.contrast, shown: 150)
+        editing.selectObject(ObjectKey(.transition, 1))
+        XCTAssertNil(editing.objectState.gradeDraft)
+    }
+
+    /// G-43 — "For a video it has Play, a loop switch and a scrub bar over the item's length: playing asks for both
+    /// pictures at the time played and for the next as soon as both have come, so it plays as fast as the engine
+    /// draws, dropping frames rather than queueing them; at the end it stops, or with the loop on starts again;
+    /// stopped, both pictures are of the scrub bar's time."
+    func test_aVideoPlaysAsFastAsBothPicturesComeAndStopsOrStartsAgainAtItsEnd() throws {
+        let rig = try Rig()
+        let editing = rig.model.editing
+        XCTAssertTrue(editing.open(page: .objects))
+        let video = try XCTUnwrap(editing.gradeMediaChoices.first { $0.entry.kind == .video })
+        editing.setGradeMedia(video.id)
+        editing.gradeWidth(640)
+        let length = try XCTUnwrap(editing.gradeVideoMs)
+        XCTAssertEqual(length, video.entry.durationMs)
+        // Stopped: both pictures at the scrub bar's time, from the start.
+        XCTAssertEqual(renders(rig).suffix(2).map { subject($0.fields)?["atMs"] }, [.number(0), .number(0)])
+        var mark = rig.sent.count
+        editing.scrubGrade(toMs: 500)
+        XCTAssertEqual(renders(rig).filter { $0.index >= mark }.map { subject($0.fields)?["atMs"] }, [.number(500), .number(500)])
+        answerRenders(rig, from: 0)
+
+        // Play from there: the next pair only once both have come.
+        mark = rig.sent.count
+        editing.playGrade()
+        XCTAssertTrue(editing.isGradePlaying)
+        let pair = renders(rig).filter { $0.index >= mark }
+        XCTAssertEqual(pair.map { $0.fields["canvas"] }, [.string("grade"), .string("ungraded")])
+        rig.clock.advance(by: 0.2)
+        rig.answers[pair[0].index](.answer(["file": .string("thumbnails/render/c1-grade-p.png")]))
+        rig.clock.advance(by: 0.01)
+        XCTAssertEqual(renders(rig).count, renders(rig).filter { $0.index < mark }.count + 2, "one of the two still to come")
+        rig.answers[pair[1].index](.answer(["file": .string("thumbnails/render/c1-ungraded-p.png")]))
+        mark = rig.sent.count
+        rig.clock.advance(by: 0.01)
+        let next = renders(rig).filter { $0.index >= mark }
+        XCTAssertEqual(next.count, 2)
+        let played = try XCTUnwrap(subject(next.first?.fields)?["atMs"]?.intValue)
+        XCTAssertEqual(played, 500 + 220, accuracy: 15, "the time played, from the scrub bar's")
+        XCTAssertEqual(editing.objectState.gradeTimeMs, played)
+
+        // At the end it stops, on its last frame: the video's length passes while that pair is drawn.
+        rig.clock.advance(by: Double(length) / 1000)
+        let drawing = mark
+        mark = rig.sent.count
+        answerRenders(rig, from: drawing)
+        rig.clock.advance(by: 0.01)
+        XCTAssertEqual(renders(rig).filter { $0.index >= mark }.map { subject($0.fields)?["atMs"] }, [.number(Double(length)), .number(Double(length))])
+        XCTAssertFalse(editing.isGradePlaying)
+        answerRenders(rig, from: mark)
+        mark = rig.sent.count
+        rig.clock.advance(by: 1)
+        XCTAssertTrue(renders(rig).filter { $0.index >= mark }.isEmpty, "stopped: nothing more asked")
+
+        // With the loop on it starts again: Play at the end starts from the start, and the end wraps.
+        editing.setGradeLoop(true)
+        mark = rig.sent.count
+        editing.playGrade()
+        XCTAssertEqual(subject(renders(rig).filter { $0.index >= mark }.first?.fields)?["atMs"], .number(0))
+        rig.clock.advance(by: Double(length) / 1000 + 0.3)
+        let looping = mark
+        mark = rig.sent.count
+        answerRenders(rig, from: looping)
+        rig.clock.advance(by: 0.01)
+        let wrapped = try XCTUnwrap(subject(renders(rig).filter { $0.index >= mark }.first?.fields)?["atMs"]?.intValue)
+        XCTAssertEqual(wrapped, 300, accuracy: 15)
+        XCTAssertTrue(editing.isGradePlaying)
+
+        // Scrubbing stops it; another object stops it too.
+        editing.scrubGrade(toMs: 100)
+        XCTAssertFalse(editing.isGradePlaying)
+        editing.playGrade()
+        editing.selectObject(ObjectKey(.transition, 1))
+        XCTAssertFalse(editing.isGradePlaying)
+    }
+
+    /// A still has no time, no Play and no scrub bar.
+    func test_aStillHasNoTime() throws {
+        let rig = try Rig()
+        let editing = rig.model.editing
+        XCTAssertTrue(editing.open(page: .objects))
+        let still = try XCTUnwrap(editing.gradeMediaChoices.first { $0.entry.kind == .image }?.id)
+        editing.setGradeMedia(still)
+        editing.gradeWidth(640)
+        XCTAssertNil(editing.gradeVideoMs)
+        XCTAssertNil(subject(renders(rig).last?.fields)?["atMs"])
+        let now = rig.sent.count
+        editing.playGrade()
+        XCTAssertFalse(editing.isGradePlaying)
+        XCTAssertEqual(rig.sent.count, now)
+    }
+
     // MARK: - What every object shares (Spec 11 §9)
 
     /// "its number, with renumber, or swap for a taken one"; Duplicate; "Delete asks first, with the counts from

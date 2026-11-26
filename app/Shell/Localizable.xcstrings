@@ -5786,7 +5786,7 @@
       }
     },
     "edit.object.loop" : {
-      "comment" : "Plays the transition on the stage again and again.",
+      "comment" : "Plays the transition, or a grade's video, on the stage again and again.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -5978,13 +5978,25 @@
       }
     },
     "edit.object.play" : {
-      "comment" : "Plays the transition on the stage.",
+      "comment" : "Plays the transition, or a grade's video, on the stage.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Play"
+          }
+        }
+      }
+    },
+    "edit.object.position" : {
+      "comment" : "The scrub bar under a grade's video: where in the video both pictures are.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position"
           }
         }
       }
@@ -6158,7 +6170,7 @@
       }
     },
     "edit.object.stop" : {
-      "comment" : "Stops the transition playing on the stage.",
+      "comment" : "Stops the transition or the grade's video playing on the stage.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -6333,6 +6345,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing uses it yet."
+          }
+        }
+      }
+    },
+    "edit.object.videoTime" : {
+      "comment" : "Where a grade's video is, and its length, in seconds: \"1.2 / 4 s\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@ s"
           }
         }
       }

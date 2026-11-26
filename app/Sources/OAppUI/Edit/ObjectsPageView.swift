@@ -116,6 +116,8 @@ final class ObjectWorkspaceView: NSView {
         for parameter in GradeParameter.allCases {
             let slider = GradeSlider(parameter)
             slider.onRelease = { [weak model] value in model?.editing.setGrade(parameter, shown: value) }
+            // G-43 — "while it is dragged ... the stage draws the grade with the values shown".
+            slider.onSlide = { [weak model] value in model?.editing.previewGrade(parameter, shown: value) }
             let field = EditField()
             numeric(field, EditModeWording.parameter(parameter)) { [weak model] value in model?.editing.setGrade(parameter, shown: value) }
             sliders[parameter] = slider
@@ -123,7 +125,9 @@ final class ObjectWorkspaceView: NSView {
             c.row(EditModeWording.parameter(parameter), [slider, field], widths: [nil, 56], height: 24)
         }
         // "tint, a color well (white is identity)".
-        tint.onChoose = { [weak model] picked in model?.editing.setObject("tint", FormColor.value(picked)) }
+        tint.onChoose = { [weak model] picked in model?.editing.setGradeTint(FormColor.color(picked)) }
+        // G-43 — "and while the tint's colour panel is open".
+        tint.onChanging = { [weak model] picked in model?.editing.previewGradeTint(FormColor.color(picked)) }
         tint.toolTip = Strings.text(.editGradeIdentity, "white")
         c.row(Strings.text(.editGradeTint), [tint], widths: [44], height: 24)
         // Transitions: "Their duration (`ms`) and easing can be edited; their type and color stay as built"; an audio
@@ -300,11 +304,14 @@ final class ObjectWorkspaceView: NSView {
 }
 
 /// Spec 11 §9, "Grades" — a parameter's slider, "its identity marked": a tick under the track where it does nothing.
-/// "Each sends one `edit.set` when its drag ends", so the slider says its value only when it is let go.
+/// "Each sends one `edit.set` when its drag ends", so the slider says its value to be sent only when it is let go;
+/// "while it is dragged ... the stage draws the grade with the values shown" (G-43), so it says each step as well.
 @MainActor
 final class GradeSlider: HeldSlider {
     let parameter: GradeParameter
     var onRelease: ((Double) -> Void)?
+    /// Each step of a drag.
+    var onSlide: ((Double) -> Void)?
 
     init(_ parameter: GradeParameter) {
         self.parameter = parameter
@@ -313,10 +320,10 @@ final class GradeSlider: HeldSlider {
         maxValue = parameter.range.upperBound
         doubleValue = parameter.identity
         resetValue = parameter.identity
-        isContinuous = false
+        isContinuous = true
         controlSize = .small
         target = self
-        action = #selector(released)
+        action = #selector(moved)
         setAccessibilityLabel(EditModeWording.parameter(parameter))
         toolTip = Strings.text(.editGradeIdentity, EditModeWording.shown(parameter.identity, of: parameter))
     }
@@ -324,9 +331,24 @@ final class GradeSlider: HeldSlider {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    @objc private func released() {
+    /// A step of a drag says where it is; a change by the keys, or a double-click, is let go at once.
+    @objc private func moved() {
+        if isDragging { onSlide?(doubleValue) } else { released() }
+    }
+
+    override func dragEnded() {
+        released()
+    }
+
+    private func released() {
         noteSent(doubleValue)
         onRelease?(doubleValue)
+    }
+
+    /// A step of a drag, as the mouse would make it.
+    func slide(to value: Double) {
+        doubleValue = value
+        onSlide?(value)
     }
 
     @discardableResult

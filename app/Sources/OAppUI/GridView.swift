@@ -13,6 +13,11 @@ final class PictureStore {
     private var pictures: [String: NSImage] = [:]
     private var loading: Set<String> = []
     private var waiting: [String: [(NSImage) -> Void]] = [:]
+    /// Edit mode's pictures (Spec 11 §3), newest last: each answer is a new file and the engine keeps only each
+    /// canvas's newest two, so only the newest are kept here, enough for a connection's eight canvases. A grade's video
+    /// playing (G-43) brings one every few frames.
+    private var renders: [String] = []
+    static let rendersKept = 16
 
     /// The picture at `url` when it has been read; otherwise nil, and `ready` is called once it has.
     func picture(at url: URL, ready: @escaping (NSImage) -> Void) -> NSImage? {
@@ -31,6 +36,7 @@ final class PictureStore {
                         return
                     }
                     self.pictures[key] = picture
+                    if key.contains("/thumbnails/render/") { self.keepRender(key) }
                     for call in self.waiting.removeValue(forKey: key) ?? [] { call(picture) }
                 }
             }
@@ -42,6 +48,18 @@ final class PictureStore {
     func forget(_ url: URL) {
         pictures[url.path] = nil
     }
+
+    /// An edit-mode picture read: the oldest go past the newest sixteen.
+    private func keepRender(_ key: String) {
+        renders.removeAll { $0 == key }
+        renders.append(key)
+        while renders.count > Self.rendersKept {
+            pictures[renders.removeFirst()] = nil
+        }
+    }
+
+    /// How many edit-mode pictures are kept, for the tests.
+    var rendersHeld: Int { renders.filter { pictures[$0] != nil }.count }
 }
 
 /// Spec 10 §6, "The chips" — "each state with its own shape: filled blue for
