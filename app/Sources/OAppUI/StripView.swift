@@ -169,15 +169,8 @@ final class StripCellView: Surface {
         } else {
             remaining.stringValue = ""
         }
-        if let progress = model.transitionProgress(channel: cell.number) {
-            transition.isHidden = false
-            transition.fraction = progress
-            // "Stepped on, it flashes red".
-            transition.color = model.isSteppedOn(cell.number) ? Palette.live : Palette.selection
-        } else {
-            transition.isHidden = true
-        }
-        // "for five seconds under the label, what put the content there".
+        stepTransition()
+        // "for five seconds under the label", what put the content there".
         if model.now < showsOriginUntil, let origin = cell.origin {
             detail.stringValue = ShowWording.origin(origin)
         } else {
@@ -188,6 +181,21 @@ final class StripCellView: Surface {
     func draw(mach: MachLink?) {
         if case .live = cell.picture { picture.set(mach?.picture(channel: cell.number)) } else { picture.set(nil) }
         if cell.hasMeter { meter.level = mach?.level(channel: cell.number) }
+        stepTransition()
+    }
+
+    /// The transition's bar, moved at the display's pace with the pictures, so it runs smoothly rather than in the
+    /// quarter-second steps of the app's own clock (Adam, 2026-11-25).
+    func stepTransition() {
+        if let progress = model.transitionProgress(channel: cell.number) {
+            transition.isHidden = false
+            if transition.fraction != progress { transition.fraction = progress }
+            // "Stepped on, it flashes red".
+            let color = model.isSteppedOn(cell.number) ? Palette.live : Palette.selection
+            if transition.color != color { transition.color = color }
+        } else if !transition.isHidden {
+            transition.isHidden = true
+        }
     }
 
     /// Shows what put the content there, as a click on the thumbnail does.
