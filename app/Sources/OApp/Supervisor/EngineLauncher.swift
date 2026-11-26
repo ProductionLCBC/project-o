@@ -47,7 +47,7 @@ public enum EngineLaunchError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// A watch on one process; cancelling it stops the report, not the process.
+/// A watch on one process; canceling it stops the report, not the process.
 public protocol ProcessWatch: AnyObject, Sendable {
     func cancel()
 }

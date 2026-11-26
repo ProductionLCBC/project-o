@@ -12,7 +12,7 @@ import Synchronization
 /// Spec 4 §14 — v1: "Video file, still, empty"; later "Live inputs, Hap,
 /// designed slides, audio sets".
 public protocol ContentSource: AnyObject, Sendable {
-    /// Spec 4 §7 — the plane layout the channel shader is specialised for.
+    /// Spec 4 §7 — the plane layout the channel shader is specialized for.
     var layout: SourceLayout { get }
     var size: PixelSize { get }
     /// Spec 4 §6 — true once the first frame is available, which is when a

@@ -1641,7 +1641,7 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 10 §3, the `channels` topic — "for timed media its duration,
-    /// position, loop and end behaviour"; "Timed media's duration and
+    /// position, loop and end behavior"; "Timed media's duration and
     /// position count within its in and out points". By channel, for media
     /// that has a length: not a still, and with an out point or a known
     /// duration. Paused or held media reads where it stands. Control side.

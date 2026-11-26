@@ -50,7 +50,7 @@ public struct AnyKey: CodingKey, Hashable, Sendable {
 
 extension Decoder {
     /// Spec 1 §8 — "every object keeps an opaque bag of keys it did not
-    /// recognise": the members of this object whose keys are not `known`.
+    /// recognize": the members of this object whose keys are not `known`.
     func unknownKeys(besides known: Set<String>) throws -> [String: JSONValue] {
         let container = try container(keyedBy: AnyKey.self)
         var out: [String: JSONValue] = [:]

@@ -203,8 +203,8 @@ final class ProcessTests: XCTestCase {
         let still = try StillSource.decode(url: folder.appendingPathComponent("stills/cross.png"), fitWithin: PixelSize(width: 4096, height: 2160))
         XCTAssertEqual(still.width, 640)
         XCTAssertEqual(still.height, 360)
-        let centre = still[320, 180]
-        XCTAssertGreaterThan(centre.r, 0.9, "the cross is white at the centre")
+        let center = still[320, 180]
+        XCTAssertGreaterThan(center.r, 0.9, "the cross is white at the center")
         // The index names what was written, path for path.
         let roots = try Self.roots()
         XCTAssertEqual(Set(roots.library.mediaIndex.entries.map(\.path)), Set(SpikeFixtures.items().map(\.path)))

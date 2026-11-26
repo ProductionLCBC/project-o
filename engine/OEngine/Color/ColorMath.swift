@@ -1,5 +1,5 @@
-// OEngine — Spec 4 §1 guarantee 4 and §7 stage 1 and 2, the colour pipeline
-// on the CPU: the reference the shaders are tested against (Spec 4 §16, Colour).
+// OEngine — Spec 4 §1 guarantee 4 and §7 stage 1 and 2, the color pipeline
+// on the CPU: the reference the shaders are tested against (Spec 4 §16, Color).
 
 import Foundation
 import OCore
@@ -23,7 +23,7 @@ public enum ColorMath {
 
     /// Spec 4 §7 — "matrix (BT.709 by default, BT.601 for SD-sized sources,
     /// BT.2020 sources converted to 709 primaries)". Y' in 0...1, Cb and Cr
-    /// centred on zero, to non-linear R'G'B'.
+    /// centered on zero, to non-linear R'G'B'.
     public static func ycbcrToRGB(_ matrix: ColorMatrix) -> simd_float3x3 {
         switch matrix {
         case .bt709:
@@ -43,7 +43,7 @@ public enum ColorMath {
 
     /// Spec 4 §7 — "range expansion when the source is limited range": the
     /// scale and offset that take a code (normalized to full scale of its bit
-    /// depth) to Y' in 0...1 and chroma centred on zero: (yScale, yOffset,
+    /// depth) to Y' in 0...1 and chroma centered on zero: (yScale, yOffset,
     /// cScale, cOffset).
     public static func rangeExpansion(range: ColorRange, bits: Int) -> SIMD4<Float> {
         let full = Float((1 << bits) - 1)

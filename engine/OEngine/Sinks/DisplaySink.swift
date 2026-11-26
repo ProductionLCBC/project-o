@@ -148,7 +148,7 @@ public struct DisplaySinkState: Equatable, Sendable {
 /// the screen's current mode, on every Space, above every other window but
 /// the few of the operator app's that must sit over an output (Spec 10 §2,
 /// §11), hosting a CAMetalLayer: pixel format bgr10a2Unorm (10-bit;
-/// bgra8Unorm_srgb as a fallback the sink reports), colour space
+/// bgra8Unorm_srgb as a fallback the sink reports), color space
 /// sRGB/Rec.709, extended dynamic range off, displaySyncEnabled on,
 /// presentsWithTransaction off, maximumDrawableCount 3. ... The sink's
 /// CADisplayLink callback, not the render thread, takes the newest completed

@@ -1,12 +1,12 @@
 // OCore — Spec 3 §7, the cue view: a list folded from its top, and each cue's chips (Spec 3 §3, Spec 10 §6).
 
-/// Spec 3 §3, "What a chip colour means" — "An attribute whose value changed
+/// Spec 3 §3, "What a chip color means" — "An attribute whose value changed
 /// and whose origin is `tracked` or `once` from this cue is *new*; one whose
 /// value is unchanged and was not written by this cue is *held*; one written
 /// by this cue to the value it already had is *redundant*, a write worth
 /// removing. Content follows the same three rules." Spec 10 §6 gives each
 /// state its own shape, and a clear its own: "filled blue for a new value,
-/// outlined grey for held, amber with a diagonal stripe for a redundant
+/// outlined gray for held, amber with a diagonal stripe for a redundant
 /// write, and struck through for a clear".
 public enum ChipState: String, Codable, Equatable, Sendable {
     case new
@@ -50,7 +50,7 @@ public struct CueChip: Equatable, Sendable {
 /// treat the list's first cue as a boundary into that list, and fold cue 1
 /// through cue K. The result is what the default stack would show if the
 /// list ran from the start, which is the UX spec's definition of a cue
-/// thumbnail and of the chip colours."
+/// thumbnail and of the chip colors."
 ///
 /// One fold for both: the engine's thumbnail job draws the states, and the
 /// cue grid shows the chips (Spec 10 §6: "from the app's own fold of the

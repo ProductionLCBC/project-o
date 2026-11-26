@@ -180,7 +180,7 @@ enum EditPopovers {
         var duration: ShowField?
         switch chip.kind {
         case .transition:
-            // "a transition whose type applies to pixels": v1's transitions are cut, dissolve and fade through a colour.
+            // "a transition whose type applies to pixels": v1's transitions are cut, dissolve and fade through a color.
             let items = (catalog?.transitions ?? []).sorted { $0.number < $1.number }.map { (number: $0.number, label: $0.label) }
             value = numbers(items, selected: current?.ref ?? items.first?.number)
         case .audioTransition:

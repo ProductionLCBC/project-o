@@ -35,7 +35,7 @@ public struct MediaClock: Equatable, Sendable {
 }
 
 /// Spec 4 §6 — a media instance as the engine runs it: its source, its
-/// poster, its clock and its colour description for stage 1.
+/// poster, its clock and its color description for stage 1.
 public struct MediaRuntime: Sendable {
     public var ref: String
     public var handle: InstanceHandle
@@ -55,7 +55,7 @@ public struct MediaRuntime: Sendable {
     public var missing: Bool
     /// Spec 4 §6 — the end-of-media `clear` was issued.
     public var clearIssued: Bool
-    /// The transport and end behaviour last seen in ShowState.
+    /// The transport and end behavior last seen in ShowState.
     public var transport: Transport
     public var endBehavior: EndBehavior
     /// Spec 4 §11 — the instance's sound on every device its channel's
@@ -109,7 +109,7 @@ public enum OutgoingRuntime: Sendable {
 }
 
 /// Spec 4 §4 — "the transition (type, progress 0–1 for this tick, easing,
-/// colour)" tracked by frame on the control thread. `startFrame` is nil
+/// color)" tracked by frame on the control thread. `startFrame` is nil
 /// while a cold write waits for its first decoded frame (Spec 4 §6).
 public struct TransitionRun: Equatable, Sendable {
     public var type: TransitionType

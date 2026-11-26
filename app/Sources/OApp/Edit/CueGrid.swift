@@ -133,7 +133,7 @@ public struct CueGridCell: Equatable, Sendable {
 }
 
 /// Spec 11 §4, "The section band" — "over each run of cues that share a
-/// section, the section's name under a rule of its colour".
+/// section, the section's name under a rule of its color".
 public struct CueGridRun: Equatable, Sendable {
     public var name: String
     public var hue: Int?

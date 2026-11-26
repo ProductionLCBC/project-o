@@ -74,7 +74,7 @@ final class EditListTests: XCTestCase {
         XCTAssertEqual(edits.refuse("edit list 42 cues []")?.reason, .readOnlyField)
         XCTAssertEqual(edits.refuse("edit list 42 cues.0.label \"x\"")?.reason, .readOnlyField)
         XCTAssertEqual(edits.refuse("edit list 42 timeline {}")?.reason, .notInV1)
-        XCTAssertEqual(edits.refuse("edit list 42 colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit list 42 color \"red\"")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit list 42 unset title")?.reason, .badValue)
     }
 

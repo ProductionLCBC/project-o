@@ -64,7 +64,7 @@ final class CueInspectorTests: XCTestCase {
         let third = try inspector42([2])
         XCTAssertEqual(third.trigger, .same(.time(ms: 8000)))
         XCTAssertEqual(third.advanceAfterMs, .same(12000))
-        XCTAssertEqual(third.pairWarnings, [], "its neighbours set neither")
+        XCTAssertEqual(third.pairWarnings, [], "its neighbors set neither")
         // "When this cue's Time and the previous cue's advance-after are both set ... the shorter" wins.
         let before = try inspector42([2]) { $0.list.cues[1].advanceAfterMs = 5000 }
         XCTAssertEqual(before.pairWarnings, [PairWarning(advanceCue: 2, advanceMs: 5000, timeCue: 3, timeMs: 8000)])

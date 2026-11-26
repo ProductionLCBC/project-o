@@ -210,7 +210,7 @@ final class CommandRunnerTests: XCTestCase {
         XCTAssertNil(again.executed[0].refusal)
     }
 
-    /// A guard on a command submitted outside a macro is honoured too: a
+    /// A guard on a command submitted outside a macro is honored too: a
     /// failing guard skips the command and logs nothing (Spec 2 §7, "the
     /// command runs only when it holds").
     func test_guardsOnSubmittedCommands() throws {

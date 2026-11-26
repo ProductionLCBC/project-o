@@ -436,7 +436,7 @@ final class CueGridView: Surface, EditFocus {
         image.draw(in: drawn, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high.rawValue])
     }
 
-    /// The small mark that says a cell carries attribute writes: a diamond, so it isn't told by colour alone.
+    /// The small mark that says a cell carries attribute writes: a diamond, so it isn't told by color alone.
     private func mark(at center: NSPoint) {
         let path = NSBezierPath()
         path.move(to: NSPoint(x: center.x, y: center.y - 4))
@@ -663,7 +663,7 @@ final class CueGridView: Surface, EditFocus {
         NSRect(x: 0, y: 0, width: bounds.width, height: top).fill()
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: NSRect(x: left, y: 0, width: max(0, bounds.width - left), height: top)).addClip()
-        // "over each run of cues that share a section, the section's name under a rule of its colour".
+        // "over each run of cues that share a section, the section's name under a rule of its color".
         for run in grid.runs {
             let rect = NSRect(x: x(run.first), y: 0, width: column * CGFloat(run.count), height: headerTop)
             guard rect.maxX > left, rect.minX < bounds.width else { continue }

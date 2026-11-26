@@ -5,7 +5,7 @@ import AppKit
 import OApp
 import OCore
 
-/// The style form: font, size, weight, colour, alignment, spacing, outline, shadow and all caps, each change one edit
+/// The style form: font, size, weight, color, alignment, spacing, outline, shadow and all caps, each change one edit
 /// of one field (`textStyle.FIELD` of a box, or `edit textstyle N FIELD VALUE`). Its rows go into the page's column.
 @MainActor
 final class StyleForm {

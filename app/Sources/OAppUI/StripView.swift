@@ -37,7 +37,7 @@ final class StripCellView: Surface {
         super.init(frame: .zero)
         radius = 9
         fill = Palette.raised
-        // Blue for selection (Spec 10 §4); the badge says it too, so colour is never the only signal.
+        // Blue for selection (Spec 10 §4); the badge says it too, so color is never the only signal.
         if cell.isSelected {
             outline = Palette.selection
             outlineWidth = 1.5
@@ -103,7 +103,7 @@ final class StripCellView: Surface {
             }
             button.setAccessibilityLabel(ShowWording.dot(dot))
             button.toolTip = ShowWording.dot(dot)
-            // "hollow grey and inert where the stack doesn't hold the channel".
+            // "hollow gray and inert where the stack doesn't hold the channel".
             button.isEnabled = dot.state != .absent && away == nil
             button.reason = dot.state == .absent ? ShowWording.dot(dot) : ShowWording.unavailable(away)
             button.onPress = { [weak model] in model?.send(Actions.stackMute(stack: dot.stack, channel: cell.number)) }
@@ -299,7 +299,7 @@ final class StripCellView: Surface {
             item.isEnabled = away == nil
             sub.addItem(item)
         }
-        submenu(Strings.text(.stripEndBehaviour)) { sub in
+        submenu(Strings.text(.stripEndBehavior)) { sub in
             entry(sub, Strings.text(.transportLoop)) { Actions.end(.loop, channel: number) }
             entry(sub, Strings.text(.transportHold)) { Actions.end(.hold, channel: number) }
             entry(sub, Strings.text(.transportClear)) { Actions.end(.clear, channel: number) }

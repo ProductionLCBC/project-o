@@ -227,7 +227,7 @@ final class CueEditTableTests: XCTestCase {
         let toEnd = try XCTUnwrap(CueEdits.move(cues: [list.cues[0], list.cues[1]], before: 4, in: list))
         XCTAssertEqual(text(toEnd), ["edit list 42 cue \(c[0]) move 3", "edit list 42 cue \(c[1]) move 3"])
         XCTAssertEqual(apply(toEnd, to: c), [c[2], c[3], c[0], c[1]])
-        // Two cues that aren't neighbours, dragged to the front, land together in the list's order.
+        // Two cues that aren't neighbors, dragged to the front, land together in the list's order.
         let toFront = try XCTUnwrap(CueEdits.move(cues: [list.cues[1], list.cues[3]], before: 0, in: list))
         XCTAssertEqual(apply(toFront, to: c), [c[1], c[3], c[0], c[2]])
         // Dragged between themselves.

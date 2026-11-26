@@ -38,7 +38,7 @@ final class EditStackTests: XCTestCase {
         XCTAssertEqual(edits.refuse("edit stack 1 slot 2 opacity 1.5")?.reason, .badValue)
         XCTAssertEqual(edits.refuse("edit stack 1 slot 2 preset 99")?.reason, .unknownReference)
         XCTAssertEqual(edits.refuse("edit stack 1 slot 2 channel 3")?.reason, .readOnlyField)
-        XCTAssertEqual(edits.refuse("edit stack 1 slot 2 colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit stack 1 slot 2 color \"red\"")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit stack 1 slot 3 opacity 0.5")?.reason, .unknownObject, "stack 1 doesn't hold channel 3")
         XCTAssertEqual(edits.refuse("edit stack 9 slot 1 opacity 0.5")?.reason, .unknownObject)
     }

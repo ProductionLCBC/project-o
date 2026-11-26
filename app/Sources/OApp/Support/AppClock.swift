@@ -2,7 +2,7 @@
 
 import Foundation
 
-/// Something scheduled on the clock; cancelling it means it never runs.
+/// Something scheduled on the clock; canceling it means it never runs.
 @MainActor
 public protocol ClockTask: AnyObject {
     func cancel()

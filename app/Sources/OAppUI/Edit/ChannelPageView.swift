@@ -279,7 +279,7 @@ final class ChannelWorkspaceView: NSView {
             self?.model.editing.renumberChannel(to: typed)
             return nil
         }
-        // Cancelled, the number goes back.
+        // Canceled, the number goes back.
         panel.onClose = { [weak self] in
             if !sent { self?.number.putBack() }
             self?.refresh()

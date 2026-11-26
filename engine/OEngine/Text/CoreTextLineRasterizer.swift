@@ -8,7 +8,7 @@ import OCore
 
 /// Spec 4 §8 — "Layout is Core Text: an attributed string from the field text
 /// and the box's Text Style (font by PostScript name, size resolved from
-/// points-at-1080 or percent of output height, weight, colour, spacing,
+/// points-at-1080 or percent of output height, weight, color, spacing,
 /// all-caps), laid out into a CTFrame within the box's pixel width."
 /// "Raster is Core Graphics into a premultiplied BGRA8 bitmap, one texture per
 /// line, with the style's outline and shadow drawn as part of the line."
@@ -124,7 +124,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
     }
 
     /// Spec 4 §8 — the attributes every run of a box's text is drawn with: the
-    /// font, the colour, the spacing, the outline and the alignment.
+    /// font, the color, the spacing, the outline and the alignment.
     func attributes(values: TextStyleValues, font: CTFont, outputHeight: Int) -> [CFString: Any] {
         let color = CGColor(colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
                             components: [CGFloat(values.color.r), CGFloat(values.color.g), CGFloat(values.color.b), CGFloat(values.color.a)])
@@ -260,7 +260,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
             }
         }
         // Spec 6 §4 — "It places the block of lines in the box: the first line at the box's top, the block
-        // centred, or the last line at the box's bottom."
+        // centered, or the last line at the box's bottom."
         let blockHeight = Double(laid.lines.count) * laid.lineHeight
         let top = overflowsBox ? 0 : CoreTextLineRasterizer.top(of: blockHeight, in: boxHeight, anchor: values.verticalAlignment)
         // Spec 6 §4 — "`outline.width`, `shadow.x`, `shadow.y`, `shadow.blur` ... are points on the 1080-line
@@ -312,7 +312,7 @@ public final class CoreTextLineRasterizer: TextRenderer, @unchecked Sendable {
     }
 
     /// Spec 6 §4 — where the block's first line starts in a box of `height`:
-    /// at the top, centred, or with the last line at the bottom. A block
+    /// at the top, centered, or with the last line at the bottom. A block
     /// taller than the box starts at the top.
     static func top(of blockHeight: Double, in height: Double, anchor: VerticalAlignment) -> Double {
         switch anchor {

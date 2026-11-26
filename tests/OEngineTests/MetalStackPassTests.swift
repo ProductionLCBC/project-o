@@ -60,9 +60,9 @@ final class MetalStackPassTests: XCTestCase {
                 MetalHarness.assertPixel(frame[2, 27], LinearPixel(r: 1, g: 0, b: 0, a: 1), "stretch: edge to edge")
                 MetalHarness.assertPixel(frame[48, 2], LinearPixel(r: 0, g: 0, b: 1, a: 1), "stretch: the blue row is at the top")
             case .crop:
-                MetalHarness.assertPixel(frame[8, 27], .black, "crop: 64 of 96 columns at 1:1, centred")
+                MetalHarness.assertPixel(frame[8, 27], .black, "crop: 64 of 96 columns at 1:1, centered")
                 MetalHarness.assertPixel(frame[20, 27], LinearPixel(r: 1, g: 0, b: 0, a: 1))
-                MetalHarness.assertPixel(frame[48, 1], .black, "crop: 48 of 54 rows, centred")
+                MetalHarness.assertPixel(frame[48, 1], .black, "crop: 48 of 54 rows, centered")
             }
             try MetalHarness.assertGolden(goldens, "fit-\(fit.rawValue)", frame)
         }
@@ -138,7 +138,7 @@ final class MetalStackPassTests: XCTestCase {
         }
     }
 
-    /// Spec 6 §11 — "Anchor ... Goldens for top, centre and bottom."
+    /// Spec 6 §11 — "Anchor ... Goldens for top, center and bottom."
     func test_theVerticalAnchorMatchesTheGoldens() throws {
         let goldens = MetalHarness.goldens("stack")
         let frameRect = PixelRect(x: 24, y: 27, width: 432, height: 216)
@@ -149,13 +149,13 @@ final class MetalStackPassTests: XCTestCase {
             rows[anchor] = litRows(frame, in: frameRect)
             try MetalHarness.assertGolden(goldens, "anchor-\(anchor.rawValue)", frame, tolerance: .text)
         }
-        let top = try XCTUnwrap(rows[.top]), centre = try XCTUnwrap(rows[.center]), bottom = try XCTUnwrap(rows[.bottom])
+        let top = try XCTUnwrap(rows[.top]), center = try XCTUnwrap(rows[.center]), bottom = try XCTUnwrap(rows[.bottom])
         XCTAssertLessThan(try XCTUnwrap(top.first), 27 + 216 / 3, "top: ink starts in the box's upper third")
         XCTAssertLessThan(try XCTUnwrap(top.last), 27 + 216 / 2)
         XCTAssertGreaterThan(try XCTUnwrap(bottom.first), 27 + 216 / 2, "bottom: ink in the lower half")
         XCTAssertGreaterThan(try XCTUnwrap(bottom.last), 27 + 216 * 2 / 3)
-        let middle = Double(try XCTUnwrap(centre.first) + XCTUnwrap(centre.last)) / 2
-        XCTAssertEqual(middle, 27 + 108, accuracy: 12, "centre: the ink straddles the box's middle")
+        let middle = Double(try XCTUnwrap(center.first) + XCTUnwrap(center.last)) / 2
+        XCTAssertEqual(middle, 27 + 108, accuracy: 12, "center: the ink straddles the box's middle")
     }
 
     /// Spec 6 §11 — "`shrinkToFit` at `minSize`, and `maxLines` taller than

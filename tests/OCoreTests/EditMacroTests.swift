@@ -14,7 +14,7 @@ final class EditMacroTests: XCTestCase {
 
     // MARK: - Fields and commands (Spec 11 §9)
 
-    func test_theTilesColourAndLabel() {
+    func test_theTilesColorAndLabel() {
         var edits = Edits()
         XCTAssertEqual(edits.apply("edit macro 1 label \"Hello\"").first?.inverse, EditCommand(address, .set(path: "label", value: .string("Welcome"))))
         XCTAssertEqual(edits.apply("edit macro 1 tileLabel \"HELLO\"").first?.inverse, EditCommand(address, .set(path: "tileLabel", value: .string("WELCOME"))))

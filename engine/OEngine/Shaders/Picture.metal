@@ -5,7 +5,7 @@
 // doesn't alias". "Without a mip chain": every picture pixel is the mean of the
 // block of channel pixels it covers, taken in this one pass, in linear light; the
 // sRGB-typed target encodes on write. The channel texture is premultiplied, so
-// over black its colour is the picture's colour and the picture is opaque.
+// over black its color is the picture's color and the picture is opaque.
 
 #include <metal_stdlib>
 using namespace metal;
@@ -40,7 +40,7 @@ fragment float4 pictureFragment(PictureVertexOut in [[stage_in]],
     int across = max(1, int(u.taps.x));
     int down = max(1, int(u.taps.y));
     float2 texel = u.taps.zw;
-    // The picture pixel's centre maps to the centre of its source block; step back to the block's first texel centre.
+    // The picture pixel's center maps to the center of its source block; step back to the block's first texel center.
     float2 origin = local - float2(across - 1, down - 1) * 0.5 * texel;
     float4 sum = float4(0);
     for (int y = 0; y < down; y++) {

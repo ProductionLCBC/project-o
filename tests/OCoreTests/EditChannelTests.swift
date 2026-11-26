@@ -61,7 +61,7 @@ final class EditChannelTests: XCTestCase {
 
     func test_thePathAndTheValueAreChecked() {
         var edits = Edits()
-        XCTAssertEqual(edits.refuse("edit channel 2 colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit channel 2 color \"red\"")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit channel 2 defaults.fade 2")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit channel 1 renderSize.width 1280")?.reason, .unknownPath, "\"largest\" has no width")
         XCTAssertEqual(edits.refuse("edit channel 2 uuid \"8d1e0000-0000-4000-8000-000000000009\"")?.reason, .readOnlyField)

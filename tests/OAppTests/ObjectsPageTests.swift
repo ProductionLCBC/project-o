@@ -274,7 +274,7 @@ final class ObjectsPageTests: XCTestCase {
         XCTAssertEqual(count(rig), sent)
         XCTAssertTrue(editing.setMacroCommands(text: text + "\ntimer 1 reset"))
         XCTAssertEqual(last(rig)?.first?.hasPrefix("edit macro 1 commands ["), true)
-        // "Fields: the tile's colour and label".
+        // "Fields: the tile's color and label".
         editing.setObject("tileLabel", .string("Hello"))
         XCTAssertEqual(last(rig), ["edit macro 1 tileLabel \"Hello\""])
     }

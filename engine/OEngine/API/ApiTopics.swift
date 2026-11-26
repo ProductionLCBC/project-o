@@ -32,7 +32,7 @@ enum ApiEvents {
 
     /// Spec 10 §3 — "One event per channel: its content (kind, ref, label,
     /// missing, whether it has a picture and whether it has sound, and for
-    /// timed media its duration, position, loop and end behaviour; for text
+    /// timed media its duration, position, loop and end behavior; for text
     /// its fields), state as `/o/channel/N/state` reports it, provenance,
     /// lock, tracked attributes with their origins (Spec 3 §2)". "An empty
     /// channel has `content: null`."

@@ -180,7 +180,7 @@ final class EditFieldsTests: XCTestCase {
         XCTAssertNil(unmade.value)
         if case .map = unmade.parent {} else { XCTFail("layouts is a map") }
 
-        for bad in ["layouts.x", "layouts.2.boxes.5", "layouts.2.boxes.0.colour", "layouts.7.boxes", "nothing", "label.more",
+        for bad in ["layouts.x", "layouts.2.boxes.5", "layouts.2.boxes.0.color", "layouts.7.boxes", "nothing", "label.more",
                     "layouts.*.boxes.0.binding.text"] {
             XCTAssertThrowsError(try place(EditFields.preset, bad, in: lowerThird), bad) { error in
                 guard case EditPathError.unknown = error else { return XCTFail("\(bad): \(error)") }
@@ -216,7 +216,7 @@ final class EditFieldsTests: XCTestCase {
         XCTAssertTrue(try place(EditFields.channel, "number", in: try json(try XCTUnwrap(library.channel(1)))).readOnly)
         XCTAssertTrue(try place(EditFields.preset, "builtIn", in: try json(try XCTUnwrap(library.preset(1)))).readOnly)
         let dissolve = try json(try XCTUnwrap(library.transition(2)))
-        XCTAssertTrue(try place(EditFields.transition, "type", in: dissolve).readOnly, "their type and colour stay as built")
+        XCTAssertTrue(try place(EditFields.transition, "type", in: dissolve).readOnly, "their type and color stay as built")
         XCTAssertTrue(try place(EditFields.transition, "color", in: dissolve).readOnly)
         XCTAssertFalse(try place(EditFields.transition, "ms", in: dissolve).readOnly)
         XCTAssertFalse(try place(EditFields.transition, "easing", in: dissolve).readOnly)

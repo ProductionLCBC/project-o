@@ -127,7 +127,7 @@ final class EditStyleTests: XCTestCase {
     // MARK: - Transitions (Spec 11 §9: "transitions 1–3 only, as built")
 
     /// "Their duration (`ms`) and easing can be edited; their type and
-    /// colour stay as built, and new transitions wait for the transition
+    /// color stay as built, and new transitions wait for the transition
     /// editor"; Spec 5 §6 — "Transitions 1–3 can't be deleted, renumbered or swapped".
     func test_aTransitionsTimingIsEditedAndNothingElse() {
         var edits = Edits()

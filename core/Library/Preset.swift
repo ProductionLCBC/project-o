@@ -346,7 +346,7 @@ public struct Preset: Codable, Equatable, Sendable {
     /// when a library has no preset 1 on disk (§8). `"*"`: "a pixel box filling
     /// the frame, then a fallback body box". `"2"`, the confidence layout:
     /// "a body box for the current cue in the upper part of the frame, and a
-    /// smaller grey body box at +1 below it".
+    /// smaller gray body box at +1 below it".
     public static let builtInDefault = Preset(
         number: 1, label: "Default", uuid: UUID(uuidString: "c0de0000-0000-4000-8000-000000000001") ?? UUID(), builtIn: true,
         layouts: [
@@ -364,7 +364,7 @@ public struct Preset: Codable, Equatable, Sendable {
                     textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 64), alignment: .left, verticalAlignment: .top), fromStyle: 1),
                     transition: BoxTransition(ref: 1)),
                 // "The +1 box matches the first apart from offset 1, its frame (y 0.7, h 0.27), the maxLines policy
-                // with 3 lines, a grey colour (0.7) and a size of 40 points."
+                // with 3 lines, a gray color (0.7) and a size of 40 points."
                 Box(binding: .field(name: "body"), frame: Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27),
                     fit: .text(TextFit(policy: .maxLines, maxLines: 3, minSize: 24)),
                     textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 40), color: Color(r: 0.7, g: 0.7, b: 0.7),

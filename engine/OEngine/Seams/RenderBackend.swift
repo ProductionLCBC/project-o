@@ -4,7 +4,7 @@ import Foundation
 
 /// Spec 4 §14 — `RenderBackend`: "Metal" in v1, "A Direct3D 12 backend
 /// (Windows), behind the same pass descriptions" later. "What is not a seam.
-/// The frame plan, the tick order, the colour pipeline and the resource rules
+/// The frame plan, the tick order, the color pipeline and the resource rules
 /// are fixed. A future backend reproduces them; it does not get to reinterpret
 /// them."
 ///
@@ -46,7 +46,7 @@ public protocol RenderBackend: AnyObject, Sendable {
     func makeStill(_ frame: CapturedFrame, label: String) -> TextureHandle
 
     /// Harness: planes of one source layout from raw bytes, as a decoder would
-    /// hand them over, so the colour tests can feed known code values.
+    /// hand them over, so the color tests can feed known code values.
     func makePlanes(layout: SourceLayout, size: PixelSize, planes: [Data]) -> PickedFrame?
 
     /// Spec 4 §12 — after a command buffer error: "rebuild pipelines and

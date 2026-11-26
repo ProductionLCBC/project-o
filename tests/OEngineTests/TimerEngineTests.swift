@@ -243,7 +243,7 @@ final class PopupClearTests: XCTestCase {
         engine.tick()
         engine.send("popup 1 set \"Six\"")
         engine.tick(count: 180)
-        XCTAssertEqual(engine.state.popups[1], "Six", "the clear cancelled the pending clear")
+        XCTAssertEqual(engine.state.popups[1], "Six", "the clear canceled the pending clear")
         XCTAssertEqual(clears(engine).filter { $0.source.kind == .engine }.count, 1)
     }
 
@@ -260,7 +260,7 @@ final class PopupClearTests: XCTestCase {
         XCTAssertEqual(result("popup 1 set \"Same\""), .ok)
         XCTAssertEqual(result("popup 1 set \"Same\""), .noop, "nothing pending, none asked for")
         XCTAssertEqual(result("popup 1 set \"Same\" clearafter 5"), .ok, "a clear to come")
-        XCTAssertEqual(result("popup 1 set \"Same\""), .ok, "the pending clear cancelled")
+        XCTAssertEqual(result("popup 1 set \"Same\""), .ok, "the pending clear canceled")
         engine.tick(count: 400)
         XCTAssertEqual(engine.state.popups[1], "Same")
     }

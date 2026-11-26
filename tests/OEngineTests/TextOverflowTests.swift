@@ -74,8 +74,8 @@ final class TextOverflowTests: XCTestCase {
     }
 
     /// "as `maxLines` already does when it cuts text": the ellipsis is part of
-    /// the line, drawn in the line's own colour, not left black.
-    func test_theEllipsisIsDrawnInTheLinesOwnColour() throws {
+    /// the line, drawn in the line's own color, not left black.
+    func test_theEllipsisIsDrawnInTheLinesOwnColor() throws {
         let red = Color(r: 1, g: 0, b: 0, a: 1)
         let fit = TextFit(policy: .maxLines, maxLines: 1, minSize: 20)
         let raster = try rasterizer.rasterize(T.job(long, style: T.plain(color: red), box: PixelSize(width: 1200, height: 400), fit: fit))

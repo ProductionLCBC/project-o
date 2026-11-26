@@ -317,7 +317,7 @@ public enum MacroCheck {
     }
 }
 
-/// Spec 11 §9 as corrected 2026-11-25 — the stage's transition preview: how much of the outgoing picture, the colour
+/// Spec 11 §9 as corrected 2026-11-25 — the stage's transition preview: how much of the outgoing picture, the color
 /// and the incoming picture make the frame at linear progress `t`, "as Spec 4 §7 says the channel pass does".
 public enum TransitionMix {
     public static func weights(_ type: TransitionType, easing: Easing, at t: Double) -> (outgoing: Double, color: Double, incoming: Double) {
@@ -329,7 +329,7 @@ public enum TransitionMix {
             let e = EasingCurve.value(easing, at: p)
             return (1 - e, 0, e)
         case .fadeThroughColor:
-            // "t < 0.5: lerp(outgoing, colour, 2t); else lerp(colour, incoming, 2t - 1)".
+            // "t < 0.5: lerp(outgoing, color, 2t); else lerp(color, incoming, 2t - 1)".
             let e = EasingCurve.value(easing, at: p)
             return e < 0.5 ? (1 - 2 * e, 2 * e, 0) : (0, 2 - 2 * e, 2 * e - 1)
         }

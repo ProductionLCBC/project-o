@@ -45,7 +45,7 @@ final class PictureStore {
 }
 
 /// Spec 10 §6, "The chips" — "each state with its own shape: filled blue for
-/// a new value, outlined grey for held, amber with a diagonal stripe for a
+/// a new value, outlined gray for held, amber with a diagonal stripe for a
 /// redundant write, and struck through for a clear. A dot on a chip marks
 /// attribute writes, listed on hover."
 @MainActor
@@ -328,7 +328,7 @@ final class CueCellView: Surface {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        // "the section's colour as the left edge".
+        // "the section's color as the left edge".
         if let hue = Palette.section(cell.hue) {
             hue.setFill()
             NSBezierPath(roundedRect: NSRect(x: 3, y: 8, width: 3, height: bounds.height - 16), xRadius: 1.5, yRadius: 1.5).fill()

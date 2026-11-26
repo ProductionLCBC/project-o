@@ -9,7 +9,7 @@ import OCore
 @MainActor
 enum Audit {
     /// Each visible control or accessibility element under `view` that has no label, by its type.
-    static func unlabelled(in view: NSView) -> [String] {
+    static func unlabeled(in view: NSView) -> [String] {
         var found: [String] = []
         func walk(_ view: NSView) {
             guard !view.isHidden else { return }
@@ -200,7 +200,7 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(live.map(\.cell.label), ["Verse 1"], "a red outline on the live cue")
         XCTAssertEqual(live.first?.outlineWidth, 2.5, "heavier than any other outline in the grid")
         XCTAssertEqual(live.first?.shownTags, [], "and no \"Live\" tag (Adam, 2026-11-17)")
-        XCTAssertEqual(live.first?.accessibilityLabel()?.contains("live"), true, "the word is there for VoiceOver: colour is never the only signal")
+        XCTAssertEqual(live.first?.accessibilityLabel()?.contains("live"), true, "the word is there for VoiceOver: color is never the only signal")
         XCTAssertEqual(grid.document.cells[2].trigger.stringValue, "+8 s · adv 12 s")
         XCTAssertEqual(grid.document.cells[4].section.isLocal, true)
         XCTAssertEqual(Audit.all(ListHeaderView.self, in: grid).map(\.title.stringValue), ["Great Is Thy Faithfulness", "Great Is Thy Faithfulness (Manheim)", "Doxology"])
@@ -397,7 +397,7 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(details.stack.selectedItem?.title, "Stack 1 Main")
         details.choose(stack: 2)
         XCTAssertEqual(rig.commands, [["output 1 stack 2"]])
-        XCTAssertEqual(Audit.unlabelled(in: details), [])
+        XCTAssertEqual(Audit.unlabeled(in: details), [])
         for row in details.rows { XCTAssertFalse(Audit.isCutOff(row.name), row.name.stringValue) }
         // Spec 10 §8 as corrected 2026-11-24 — "for an output on a screen, Release This Screen ... or Put Back on This
         // Screen while they are released".
@@ -431,13 +431,13 @@ final class ShowWindowTests: XCTestCase {
         let rig = try Rig(size: NSSize(width: 1440, height: 1100))
         for tab in TabsView.Tab.allCases {
             rig.view.tabs.show(tab)
-            XCTAssertEqual(Audit.unlabelled(in: rig.view), [], "Spec 10 §15: every control has a label (\(tab))")
+            XCTAssertEqual(Audit.unlabeled(in: rig.view), [], "Spec 10 §15: every control has a label (\(tab))")
         }
         rig.model.selectOnly(1)
         rig.view.tabs.show(.transport)
         rig.model.change { $0.multiviewer = true }
         rig.model.browse(.list(Self.list7))
-        XCTAssertEqual(Audit.unlabelled(in: rig.view), [])
+        XCTAssertEqual(Audit.unlabeled(in: rig.view), [])
     }
 
     func test_nothingOfTheAppsOwnIsClippedAt1440By900UnderEitherPseudolanguage() throws {

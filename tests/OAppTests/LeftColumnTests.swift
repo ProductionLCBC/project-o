@@ -6,7 +6,7 @@ import OCore
 /// Spec 10 §5, "The Playlists window" — "a tree of the machine's playlists:
 /// undated ones first, by title, then dated ones, newest date first (Spec 1
 /// §3). Archived playlists are hidden unless View ▸ Show Archived Playlists
-/// is on (L4); then they show greyed with an "archived" tag. A playlist
+/// is on (L4); then they show grayed with an "archived" tag. A playlist
 /// expands to its items: headers in small capitals, linked items with their
 /// list's title, an item whose list is missing in red, and a local item with
 /// its "local" tag (Spec 7 §3). One playlist is expanded at a time; ⌥-click
@@ -43,7 +43,7 @@ final class PlaylistTreeTests: XCTestCase {
         XCTAssertEqual(PlaylistTree.ordered(catalog.playlists, showArchived: false).map(\.playlist.title), ["Sunday Night", "Sunday"])
         XCTAssertEqual(PlaylistTree.ordered(catalog.playlists, showArchived: true).map(\.playlist.title), ["Sunday Night", "Sunday", "Sunday 2026-11-01"])
         let rows = PlaylistTree.rows(catalog: catalog, live: LiveStatus(), expanded: [], shown: nil, showArchived: true)
-        XCTAssertEqual(rows.map(\.isArchived), [false, false, true], "greyed with an \"archived\" tag")
+        XCTAssertEqual(rows.map(\.isArchived), [false, false, true], "grayed with an \"archived\" tag")
     }
 
     func test_aPlaylistExpandsToItsItems() throws {

@@ -7,7 +7,7 @@ import Foundation
 /// Restarting…", "The engine isn't responding" with "Restart the engine",
 /// and the console log's last lines where the spec shows them.
 public struct EngineBanner: Equatable, Sendable {
-    /// What the banner's colour says (Spec 10 §4: "red for live and for
+    /// What the banner's color says (Spec 10 §4: "red for live and for
     /// errors ... amber ... for warnings"); never the only signal, since the
     /// sentence says it too (§15).
     public enum Tone: Equatable, Sendable {

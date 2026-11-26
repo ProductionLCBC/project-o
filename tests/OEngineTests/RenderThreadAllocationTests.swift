@@ -15,7 +15,7 @@ import OCore
 ///
 /// The exact zero holds in an optimized build (`swift test -c release`), which
 /// is what ships. An unoptimized build allocates and frees a temporary per
-/// loop iteration of unspecialised generic code (measured: every `for` over an
+/// loop iteration of unspecialized generic code (measured: every `for` over an
 /// array or a range, nothing of the engine's own), so there the test proves
 /// the weaker property that nothing survives the tick.
 final class RenderThreadAllocationTests: XCTestCase {

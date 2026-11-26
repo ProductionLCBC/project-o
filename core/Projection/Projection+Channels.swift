@@ -301,7 +301,7 @@ extension Fold {
         }
     }
 
-    // MARK: - Transport, end behaviour, lock, freeze, build
+    // MARK: - Transport, end behavior, lock, freeze, build
 
     /// Spec 3 §4 — "`play`, `pause` and `stop` change `transport`; `stop` also
     /// resets the playhead by setting `startedAtFrame` to the landing frame

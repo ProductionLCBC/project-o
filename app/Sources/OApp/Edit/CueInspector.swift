@@ -278,7 +278,7 @@ public struct EditStatus: Equatable, Sendable {
 /// Spec 11 §2, "Program" — "the live picture of the same stack ... outlined
 /// in the live red while an output shows it, with a pill naming those
 /// outputs, "On air · Out 1, 2"; when none does, the outline is plain and
-/// the pill says "Preview only". A blacked-out stack is dimmed and labelled
+/// the pill says "Preview only". A blacked-out stack is dimmed and labeled
 /// as in show mode's preview."
 public struct ProgramPanel: Equatable, Sendable {
     public var stack: Int

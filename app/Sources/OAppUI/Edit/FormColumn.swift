@@ -1,4 +1,4 @@
-// OAppUI — a column of labelled rows for the inspector's forms (Spec 11 §2: "Inspector: the selection's properties"),
+// OAppUI — a column of labeled rows for the inspector's forms (Spec 11 §2: "Inspector: the selection's properties"),
 // in a scroll view when the inspector is shorter than the form.
 
 import AppKit
@@ -116,7 +116,7 @@ enum FormNumber {
     }
 }
 
-/// A colour as a style holds it (Spec 1 §2: r, g, b and a from 0 to 1) and as a colour well shows it.
+/// A color as a style holds it (Spec 1 §2: r, g, b and a from 0 to 1) and as a color well shows it.
 @MainActor
 enum FormColor {
     static func ns(_ color: Color) -> NSColor {
@@ -130,7 +130,7 @@ enum FormColor {
     }
 }
 
-/// A colour well that says when its colour was chosen, not at every step of a drag in the colour panel.
+/// A color well that says when its color was chosen, not at every step of a drag in the color panel.
 @MainActor
 final class FormColorWell: NSColorWell {
     var onChoose: ((NSColor) -> Void)?
@@ -151,13 +151,13 @@ final class FormColorWell: NSColorWell {
         chose()
     }
 
-    /// Whether the colour panel is choosing for this well, so the model's colour must wait.
+    /// Whether the color panel is choosing for this well, so the model's color must wait.
     var isChoosing: Bool { isActive || choosingForTest }
-    /// A test's stand-in for an open colour panel, which needs a screen.
+    /// A test's stand-in for an open color panel, which needs a screen.
     var choosingForTest = false
 
-    /// Shows the model's colour, but not while the panel is choosing for the well: the page redraws on every change
-    /// (a picture arriving, another client's edit), and setting the colour then would put the panel back to the old
+    /// Shows the model's color, but not while the panel is choosing for the well: the page redraws on every change
+    /// (a picture arriving, another client's edit), and setting the color then would put the panel back to the old
     /// one under the operator's hand (Adam, 2026-11-25: "it keeps resetting").
     func show(_ color: NSColor) {
         guard !isChoosing else { return }

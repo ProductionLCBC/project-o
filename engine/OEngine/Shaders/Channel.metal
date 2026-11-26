@@ -1,7 +1,7 @@
 // OEngine — Spec 4 §7, the channel pass: "One pass per channel with pixel
 // content, producing the channel texture: the content converted to linear
 // light, graded, and mixed with the outgoing content if a transition is
-// running." One shader, specialised with function constants for the source
+// running." One shader, specialized with function constants for the source
 // layouts and the transition type (Spec 4 §7, "Shader variants").
 
 #include <metal_stdlib>
@@ -31,7 +31,7 @@ struct ChannelUniforms {
     float4 outgoingRange;
     float4 codeScales;        // incoming, outgoing, unused, unused
     float4 transition;        // eased progress, unused...
-    float4 color;             // fade-through colour, opaque premultiplied linear
+    float4 color;             // fade-through color, opaque premultiplied linear
     float4 gradeA;            // saturation, brightness, contrast, opacity
     float4 tint;              // rgba
     float3x3 incomingMatrix;  // Y'CbCr to R'G'B'
@@ -130,6 +130,6 @@ fragment float4 channelFragment(VertexOut in [[stage_in]],
     float t = u.transition.x;
     // Spec 4 §7 stage 3 — "dissolve: lerp(outgoing, incoming, t)".
     if (kTransition == 1) return mix(outg, inc, t);
-    // "fadeThroughColor: t < 0.5: lerp(outgoing, colour, 2t); else lerp(colour, incoming, 2t - 1), colour opaque and premultiplied".
+    // "fadeThroughColor: t < 0.5: lerp(outgoing, color, 2t); else lerp(color, incoming, 2t - 1), color opaque and premultiplied".
     return t < 0.5 ? mix(outg, u.color, 2 * t) : mix(u.color, inc, 2 * t - 1);
 }

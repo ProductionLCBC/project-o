@@ -25,7 +25,7 @@ public enum TransitionVariant: Int32, Codable, Sendable {
 }
 
 /// Spec 4 §7 — "the mix happens here", with the parameters the shader reads:
-/// eased progress and the fade-through colour, "opaque and premultiplied".
+/// eased progress and the fade-through color, "opaque and premultiplied".
 public struct TransitionParameters: Equatable, Sendable {
     public var progress: Float
     public var color: ColorValue
@@ -38,8 +38,8 @@ public struct TransitionParameters: Equatable, Sendable {
 
 /// Spec 4 §7 — the three built-in types as the table defines them:
 /// cut: incoming only; dissolve: `lerp(outgoing, incoming, t)`;
-/// fadeThroughColor: `t < 0.5`: `lerp(outgoing, colour, 2t)`; else
-/// `lerp(colour, incoming, 2t - 1)`.
+/// fadeThroughColor: `t < 0.5`: `lerp(outgoing, color, 2t)`; else
+/// `lerp(color, incoming, 2t - 1)`.
 public struct BuiltInTransition: TransitionShader, Equatable {
     public let type: TransitionType
 
@@ -60,7 +60,7 @@ public struct BuiltInTransition: TransitionShader, Equatable {
         return TransitionParameters(progress: min(1, max(0, progress)), color: opaque)
     }
 
-    /// Spec 4 §7 — the mix of one premultiplied linear colour pair, as the
+    /// Spec 4 §7 — the mix of one premultiplied linear color pair, as the
     /// shader computes it; the tests check the shader against this.
     public func mix(outgoing: LinearPixel, incoming: LinearPixel, progress t: Float, color: ColorValue?) -> LinearPixel {
         switch type {

@@ -1,7 +1,7 @@
 import XCTest
 @testable import OCore
 
-/// Behaviour Spec 3 specifies outside the §9 table: macro inlining with
+/// Behavior Spec 3 specifies outside the §9 table: macro inlining with
 /// guards (§6, Spec 2 §7), lock through a macro fired by a cue (§8), output
 /// and stack commands (§6 effects table), popups (§4) and pass-through.
 final class ProjectionSupplementaryTests: XCTestCase {

@@ -246,7 +246,7 @@ final class RestoreRulesTests: XCTestCase {
         let then = snapshot()
         var now = library
         now.info.name = "Renamed Since"
-        now.channels[0].label = "Relabelled"
+        now.channels[0].label = "Relabeled"
         now.textStyles[0].label = "Restyled"
         now.presets.removeAll { $0.number == 4 }
         now.documentPaths.removeValue(forKey: "preset/4")
@@ -436,10 +436,10 @@ final class RestoreRulesTests: XCTestCase {
         resized.channels[1].renderSize = size
         XCTAssertEqual(try restore(snapshot(resized), state: empty).get().library.channels[1].renderSize, size)
 
-        var relabelled = library
-        relabelled.channels[1].label = "Lyrics Then"
-        relabelled.channels[1].decoderCap = 3
-        XCTAssertEqual(try restore(snapshot(relabelled), state: empty).get().library.channels[1].label, "Lyrics Then")
+        var relabeled = library
+        relabeled.channels[1].label = "Lyrics Then"
+        relabeled.channels[1].decoderCap = 3
+        XCTAssertEqual(try restore(snapshot(relabeled), state: empty).get().library.channels[1].label, "Lyrics Then")
     }
 
     /// "On a `readOnlyMasters` machine only the machine documents are replaced, and the result warns that

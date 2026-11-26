@@ -275,9 +275,9 @@ final class MediaImportsTests: XCTestCase {
     }
 
     /// "and not when the channel's content changed meanwhile, the drop was
-    /// cancelled or the engine ended"; "the cell then says so ("Not sent:
+    /// canceled or the engine ended"; "the cell then says so ("Not sent:
     /// channel 2 changed while importing"), and an import that finished stays in the pool."
-    func test_nothingGoesLiveWhenTheChannelChangedTheDropWasCancelledOrTheEngineEnded() throws {
+    func test_nothingGoesLiveWhenTheChannelChangedTheDropWasCanceledOrTheEngineEnded() throws {
         let test = try Importing()
         test.imports.importFile("/Users/x/a.mov", liveOn: 3)
         test.accept(job: "j-1")
@@ -294,7 +294,7 @@ final class MediaImportsTests: XCTestCase {
         test.accept(job: "j-2")
         test.imports.cancel(row: try XCTUnwrap(test.imports.rows.last?.id))
         test.media("j-2", file: "b.mov", state: "done", outcome: "imported", id: fresh)
-        XCTAssertEqual(test.rig.sent.count, 2, "cancelled: nothing goes live")
+        XCTAssertEqual(test.rig.sent.count, 2, "canceled: nothing goes live")
 
         test.imports.importFile("/Users/x/c.mov", liveOn: 1)
         test.accept(job: "j-3")

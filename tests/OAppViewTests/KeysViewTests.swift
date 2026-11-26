@@ -362,7 +362,7 @@ final class KeysViewTests: XCTestCase {
     }
 
     /// Spec 10 §15 and §18 — every control has a label, and "under the accented pseudolanguage and one 40% longer, nothing is clipped".
-    func test_theOverlayIsLabelledAndShowsEveryLineWholeUnderEitherPseudolanguage() throws {
+    func test_theOverlayIsLabeledAndShowsEveryLineWholeUnderEitherPseudolanguage() throws {
         for transform in [{ $0 }, Pseudolanguage.accented, Pseudolanguage.longer] as [(String) -> String] {
             try ViewStrings.install(transform: transform)
             let rig = try Rig()
@@ -371,7 +371,7 @@ final class KeysViewTests: XCTestCase {
             rig.view.showKeys()
             rig.view.layoutSubtreeIfNeeded()
             let overlay = try XCTUnwrap(rig.view.keysOverlay)
-            XCTAssertEqual(Audit.unlabelled(in: overlay), [])
+            XCTAssertEqual(Audit.unlabeled(in: overlay), [])
             XCTAssertEqual(overlay.accessibilityLabel(), transform("Keys"))
             let labels = Audit.all(NSTextField.self, in: overlay)
             XCTAssertGreaterThan(labels.count, 20)
@@ -416,7 +416,7 @@ final class KeysViewTests: XCTestCase {
         XCTAssertEqual(bar.frame.minX, rig.view.grid.frame.minX)
         XCTAssertEqual(bar.frame.width, rig.view.grid.frame.width)
         XCTAssertEqual(rig.view.grid.frame.minY, gridTop + CommandBarView.height + 4, "the grid starts under it, a gap apart (Spec 10 §4)")
-        XCTAssertEqual(Audit.unlabelled(in: bar), [])
+        XCTAssertEqual(Audit.unlabeled(in: bar), [])
         rig.view.focusCommandBar()
         XCTAssertEqual(rig.window.keyTap.context().field, .commandBar)
     }

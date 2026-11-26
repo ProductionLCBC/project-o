@@ -80,7 +80,7 @@ final class EditPlaylistTests: XCTestCase {
         }
         XCTAssertEqual(edits.refuse("edit playlist \(Self.n) items []")?.reason, .readOnlyField)
         XCTAssertEqual(edits.refuse("edit playlist \(Self.n) uuid \"x\"")?.reason, .readOnlyField)
-        XCTAssertEqual(edits.refuse("edit playlist \(Self.n) colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit playlist \(Self.n) color \"red\"")?.reason, .unknownPath)
     }
 
     // MARK: - Items
@@ -111,7 +111,7 @@ final class EditPlaylistTests: XCTestCase {
         XCTAssertEqual(edits.refuse("edit playlist \(Self.n) insert items 99 { \"kind\": \"header\", \"label\": \"x\" }")?.reason, .badValue)
     }
 
-    func test_removingMovingAndRelabellingItems() throws {
+    func test_removingMovingAndRelabelingItems() throws {
         var edits = Edits()
         let items = edits.sunday.items
         edits.apply("edit playlist \(Self.p) item \(Self.u(items[1].uuid)) remove")

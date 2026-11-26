@@ -49,7 +49,7 @@ extension Fold {
 
         let source = CommandSource(kind: .cue, list: list.uuid, cue: cue.uuid, playlist: position.playlist?.uuid)
         // Spec 1 §6 — a `when` guard on a cue command is reserved: "the field
-        // exists without the behaviour" (Spec 2 §7), so the command runs unguarded.
+        // exists without the behavior" (Spec 2 §7), so the command runs unguarded.
         for entry in cue.commands {
             apply(entry.command, source: source, nesting: nesting)
         }

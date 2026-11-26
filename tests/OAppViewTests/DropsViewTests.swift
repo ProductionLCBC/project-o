@@ -174,7 +174,7 @@ final class DropsViewTests: XCTestCase {
         XCTAssertEqual(rig.sent.count, 0, "nothing is sent until a channel is chosen")
         XCTAssertTrue(rig.view.hasPopover)
         XCTAssertTrue(rig.window.keyTap.context().sheet, "while it is open the show keys wait (§9)")
-        XCTAssertEqual(Audit.unlabelled(in: list), [])
+        XCTAssertEqual(Audit.unlabeled(in: list), [])
         // Return sends, on the picked channel.
         list.keyDown(with: try rig.key(36))
         XCTAssertEqual(rig.commands, [["edit list 42 cue \(verse.cell.uuid) channel 1 write media \(id) transition 2 1.0 once"]])
@@ -240,7 +240,7 @@ final class DropsViewTests: XCTestCase {
         XCTAssertEqual(rig.view.pool.jobs.map(\.label.stringValue), [ImportWording.row(ImportRow(id: 1, name: "Ocean loop.mov", state: .importing(progress: 0.42)))])
         XCTAssertEqual(rig.view.pool.jobs.first?.button.title, "Cancel", "the pool's header offers it too")
         rig.view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(Audit.unlabelled(in: verse), [])
+        XCTAssertEqual(Audit.unlabeled(in: verse), [])
         verse.dropNote.cancel.press()
         XCTAssertEqual(verse.dropNote.text, "", "Cancel: the cell lets go of it")
         XCTAssertEqual(rig.view.pool.jobs.first?.button.isHidden, true, "the import goes on, with nothing waiting on it")
@@ -410,7 +410,7 @@ final class DropsViewTests: XCTestCase {
         XCTAssertEqual(pool.jobs.map(\.label.stringValue), ["notes.txt: not imported. Project O can’t play this kind of file.", "Ocean loop.mov: imported"],
                        "what must be read comes first")
         rig.view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(Audit.unlabelled(in: pool), [])
+        XCTAssertEqual(Audit.unlabeled(in: pool), [])
         XCTAssertGreaterThan(pool.rail.frame.minY, PoolView.headerHeight, "the imports sit between the header and the tiles")
         rig.clock.advance(by: 5.1)
         XCTAssertEqual(pool.jobs.map(\.row.name), ["notes.txt"], "what ended well leaves by itself; the refusal stays")
@@ -511,7 +511,7 @@ final class DropsViewTests: XCTestCase {
         XCTAssertEqual(made.loop.state, .on, "dawn.mp4 loops")
         XCTAssertEqual(made.channel.titleOfSelectedItem, "1 Background")
         XCTAssertEqual(made.grade.titleOfSelectedItem, "None")
-        XCTAssertEqual(Audit.unlabelled(in: made.panel), [])
+        XCTAssertEqual(Audit.unlabeled(in: made.panel), [])
         // What isn't a number is said, and nothing is sent.
         made.gain.stringValue = "loud"
         made.panel.commit()
@@ -547,7 +547,7 @@ final class DropsViewTests: XCTestCase {
         XCTAssertTrue(rig.view.pool.details.stringValue.hasPrefix("dawn.mp4 · "))
         XCTAssertTrue(rig.view.pool.details.stringValue.contains("loops"))
         rig.view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(Audit.unlabelled(in: rig.view.pool), [])
+        XCTAssertEqual(Audit.unlabeled(in: rig.view.pool), [])
         XCTAssertEqual(rig.sent.count, 0, "There is no single-click firing")
     }
 
@@ -579,7 +579,7 @@ final class DropsViewTests: XCTestCase {
         rig.model.change { $0.panel = .collapsed }
         rig.view.layoutSubtreeIfNeeded()
         XCTAssertEqual(rig.view.pool.tiles.first?.frame.size, PoolTileView.size(.medium))
-        XCTAssertEqual(Audit.unlabelled(in: rig.view.pool), [])
+        XCTAssertEqual(Audit.unlabeled(in: rig.view.pool), [])
     }
 
     // MARK: - Panels (Spec 10 §9, §10)

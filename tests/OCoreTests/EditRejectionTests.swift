@@ -33,7 +33,7 @@ final class EditRejectionTests: XCTestCase {
             row(.unknownObject, "edit list 42 cue \(u(F.uuid("ffff", 1))) label \"x\""),
             row(.unknownObject, "edit playlist \(u(F.uuid("ffff", 2))) title \"x\""),
             row(.unknownObject, "edit folder \"Easter\" delete"),
-            row(.unknownPath, "edit list 42 colour \"red\""),
+            row(.unknownPath, "edit list 42 color \"red\""),
             row(.readOnlyField, "edit list 42 version 99"),
             row(.badValue, "edit list 42 trackThrough \"yes\""),
             row(.unknownReference, "edit list 42 cue \(c1) insert commands 0 { \"cmd\": \"macro.run\", \"macro\": 99 }"),
@@ -98,7 +98,7 @@ final class EditRejectionTests: XCTestCase {
     /// Spec 7 §7 as Spec 11 corrected it — "Area 17 for settings (the rest of
     /// outputs, audio outputs, keys and the machine)": rejected with
     /// `notInV1`, naming the area, until it lands. Areas 8 and 14 have built
-    /// theirs (MediaDefaultsEditTests; EditChannelTests and its neighbours).
+    /// theirs (MediaDefaultsEditTests; EditChannelTests and its neighbors).
     func test_theSettingsEditsWaitForArea17() {
         var edits = Edits()
         let expected: [(String, String)] = [

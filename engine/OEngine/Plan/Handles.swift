@@ -90,7 +90,7 @@ public struct UVRect: Equatable, Codable, Sendable {
     public static let full = UVRect(u: 0, v: 0, width: 1, height: 1)
 }
 
-/// A colour as the shaders take it: four floats. Spec 1 §5 colours are sRGB
+/// A color as the shaders take it: four floats. Spec 1 §5 colors are sRGB
 /// 0–1; whether a value here is encoded or linear is said where it is used.
 public struct ColorValue: Equatable, Codable, Sendable {
     public var r: Float

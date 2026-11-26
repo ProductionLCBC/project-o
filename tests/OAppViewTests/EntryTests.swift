@@ -316,7 +316,7 @@ final class EntryTests: XCTestCase {
         let window = MainWindowController()
         for phase: EngineSupervisor.Phase in [.starting, .notResponding, .noSocket(console: ["a line"]), .restarting(ends: 4, console: ["a line"]), .wrongAPI(engine: "0.9.0")] {
             window.show(phase)
-            XCTAssertEqual(Audit.unlabelled(in: try XCTUnwrap(window.window.contentView)), [], "Spec 10 §15: every control has a label (\(phase))")
+            XCTAssertEqual(Audit.unlabeled(in: try XCTUnwrap(window.window.contentView)), [], "Spec 10 §15: every control has a label (\(phase))")
             XCTAssertEqual(window.banner.accessibilityLabel(), window.banner.shownText)
         }
     }

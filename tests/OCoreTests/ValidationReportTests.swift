@@ -338,7 +338,7 @@ final class ValidationReportTests: XCTestCase {
 
     /// Spec 1 §6 — "flags unknown commands or bad parameters on the cue rather
     /// than dropping them"; Spec 2 §7 — guards on cue commands are "rejected by
-    /// the v1 validator, so the field exists without the behaviour".
+    /// the v1 validator, so the field exists without the behavior".
     func test_unknownInvalidAndGuardedCueCommandsAreFlaggedOnTheCue() throws {
         var (library, machine) = fresh()
         let unknown = try JSONCoding.decode(GuardedCommand.self, from: .object(["cmd": .string("channel.teleport"), "channel": .number(2)]))

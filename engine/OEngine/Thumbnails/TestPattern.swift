@@ -5,8 +5,8 @@ import Foundation
 import OCore
 
 /// Spec 11 §3 as corrected 2026-11-24 — "the test pattern, which the engine draws itself at the stack's size, so a
-/// box's fit, crop and place read at once: a grid at each tenth of the frame, the centre lines and a circle, the
-/// action-safe and title-safe areas (93% and 90%), and a row of colour bars; it ships in the engine's code, never as a
+/// box's fit, crop and place read at once: a grid at each tenth of the frame, the center lines and a circle, the
+/// action-safe and title-safe areas (93% and 90%), and a row of color bars; it ships in the engine's code, never as a
 /// file in the repository".
 enum TestPattern {
     /// The reference the pattern travels under through the projection, as a media item would: never a media index id
@@ -43,14 +43,14 @@ enum TestPattern {
             context.fill(CGRect(x: x - line / 4, y: 0, width: max(1, line / 2), height: h))
             context.fill(CGRect(x: 0, y: y - line / 4, width: w, height: max(1, line / 2)))
         }
-        // The colour bars across the middle third, at 75%: white, yellow, cyan, green, magenta, red, blue.
+        // The color bars across the middle third, at 75%: white, yellow, cyan, green, magenta, red, blue.
         let bars: [(CGFloat, CGFloat, CGFloat)] = [(0.75, 0.75, 0.75), (0.75, 0.75, 0), (0, 0.75, 0.75), (0, 0.75, 0), (0.75, 0, 0.75), (0.75, 0, 0), (0, 0, 0.75)]
         let barWidth = w / CGFloat(bars.count)
         for (index, (r, g, b)) in bars.enumerated() {
             context.setFillColor(red: r, green: g, blue: b, alpha: 1)
             context.fill(CGRect(x: (CGFloat(index) * barWidth).rounded(), y: (h / 3).rounded(), width: barWidth.rounded(.up), height: (h / 3).rounded()))
         }
-        // A circle round the centre.
+        // A circle round the center.
         context.setStrokeColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1)
         context.setLineWidth(line)
         let radius = h * 0.4
@@ -60,7 +60,7 @@ enum TestPattern {
         context.stroke(CGRect(x: w * 0.035, y: h * 0.035, width: w * 0.93, height: h * 0.93))
         context.setStrokeColor(red: 0.3, green: 0.8, blue: 0.9, alpha: 1)
         context.stroke(CGRect(x: w * 0.05, y: h * 0.05, width: w * 0.9, height: h * 0.9))
-        // The centre lines, on top.
+        // The center lines, on top.
         context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
         context.fill(CGRect(x: (w / 2).rounded() - line / 2, y: 0, width: line, height: h))
         context.fill(CGRect(x: 0, y: (h / 2).rounded() - line / 2, width: w, height: line))

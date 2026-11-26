@@ -51,7 +51,7 @@ public enum ApiToken {
     /// May wait on a system prompt: call it from a background thread.
     ///
     /// Area 19 readings: whatever text the item holds is the token, so one a
-    /// person put there by hand is honoured; an item that isn't text, or is
+    /// person put there by hand is honored; an item that isn't text, or is
     /// empty, is `unreadable` and is not replaced, since replacing it is New
     /// Token…'s job (Spec 10 §12); and a new token that can't be written is
     /// not used, since the next launch would make another and every remote

@@ -4,7 +4,7 @@ import OCore
 @testable import OApp
 
 /// Spec 11 §8, "Moving" — "Dragging moves the box and the handles resize it. ... the arrows nudge the selected box by
-/// one pixel of the stack, and with ⇧ by ten. ... Boxes snap to the canvas's edges and centre lines and to other boxes'
+/// one pixel of the stack, and with ⇧ by ten. ... Boxes snap to the canvas's edges and center lines and to other boxes'
 /// edges, not while ⌘ is held."
 final class LayoutCanvasTests: XCTestCase {
     private func near(_ a: Frame, _ b: Frame, file: StaticString = #filePath, line: UInt = #line) {
@@ -20,8 +20,8 @@ final class LayoutCanvasTests: XCTestCase {
         near(LayoutCanvasMath.dragged(frame, handle: .left, dx: 0.9, dy: 0), Frame(x: 0.59, y: 0.2, w: 0.01, h: 0.3))
     }
 
-    func test_boxesSnapToTheEdgesTheCentreLinesAndOtherBoxesEdges() {
-        // The box's centre comes within the threshold of the canvas's centre line.
+    func test_boxesSnapToTheEdgesTheCenterLinesAndOtherBoxesEdges() {
+        // The box's center comes within the threshold of the canvas's center line.
         let moved = LayoutCanvasMath.snapped(Frame(x: 0.296, y: 0.1, w: 0.4, h: 0.2), handle: .move, others: [], threshold: 0.01)
         near(moved.frame, Frame(x: 0.3, y: 0.1, w: 0.4, h: 0.2))
         XCTAssertEqual(moved.xs, [0.5])
@@ -42,9 +42,9 @@ final class LayoutCanvasTests: XCTestCase {
         XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .topLeft).x, 0.2, accuracy: 1e-9)
         XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .center).x, 0.4, accuracy: 1e-9)
         XCTAssertEqual(LayoutCanvasMath.point(of: frame, at: .bottomRight).y, 0.3, accuracy: 1e-9)
-        // The centre placed at the stack's middle.
+        // The center placed at the stack's middle.
         near(LayoutCanvasMath.typed(frame, anchor: .center, x: 0.5, y: 0.5), Frame(x: 0.3, y: 0.4, w: 0.4, h: 0.2))
-        // A new width about the centre grows both ways; about the right edge, to the left.
+        // A new width about the center grows both ways; about the right edge, to the left.
         near(LayoutCanvasMath.typed(frame, anchor: .center, w: 0.6), Frame(x: 0.1, y: 0.1, w: 0.6, h: 0.2))
         near(LayoutCanvasMath.typed(frame, anchor: .right, w: 0.6), Frame(x: 0.0, y: 0.1, w: 0.6, h: 0.2))
         near(LayoutCanvasMath.typed(frame, anchor: .topLeft, h: 0.5), Frame(x: 0.2, y: 0.1, w: 0.4, h: 0.5))

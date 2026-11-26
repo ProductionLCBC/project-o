@@ -81,7 +81,7 @@ public enum TransportPanel: Equatable, Sendable {
     /// "Anything else shows "No transport"."
     case none
     /// "One channel with timed media shows its position and remaining time
-    /// as a bar, Play, Pause and Stop ..., and its end behaviour as Loop,
+    /// as a bar, Play, Pause and Stop ..., and its end behavior as Loop,
     /// Hold and Clear."
     case one(channel: Int, positionMs: Int, durationMs: Int, isPlaying: Bool, endBehavior: String)
     /// "Several channels show Play, Pause and Stop for all of them, as one group."
@@ -225,7 +225,7 @@ public struct StripSelection: Equatable, Sendable {
 }
 
 /// Spec 10 §7, "Stack dots" — "A dot is filled while its stack shows the
-/// channel, hollow amber while that stack mutes it, and hollow grey and
+/// channel, hollow amber while that stack mutes it, and hollow gray and
 /// inert where the stack doesn't hold the channel."
 public struct StackDot: Equatable, Sendable {
     public enum State: Equatable, Sendable {

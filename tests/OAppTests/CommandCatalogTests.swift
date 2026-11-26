@@ -82,7 +82,7 @@ final class CommandCatalogTests: XCTestCase {
         XCTAssertEqual(EditWording.rejection(code: "cycle"), "Recursive macro")
     }
 
-    /// "a dissolve's mix by the eased progress, fade through a colour to the colour by the first half and from it by the
+    /// "a dissolve's mix by the eased progress, fade through a color to the color by the first half and from it by the
     /// second, a cut at the trigger".
     func test_theTransitionPreviewMixesAsTheChannelPassDoes() {
         func w(_ type: TransitionType, _ t: Double, _ easing: Easing = .linear) -> [Double] {

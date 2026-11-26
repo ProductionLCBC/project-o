@@ -119,11 +119,11 @@ final class ObjectWorkspaceView: NSView {
             gradeFields[parameter] = field
             c.row(EditModeWording.parameter(parameter), [slider, field], widths: [nil, 56], height: 24)
         }
-        // "tint, a colour well (white is identity)".
+        // "tint, a color well (white is identity)".
         tint.onChoose = { [weak model] picked in model?.editing.setObject("tint", FormColor.value(picked)) }
         tint.toolTip = Strings.text(.editGradeIdentity, "white")
         c.row(Strings.text(.editGradeTint), [tint], widths: [44], height: 24)
-        // Transitions: "Their duration (`ms`) and easing can be edited; their type and colour stay as built"; an audio
+        // Transitions: "Their duration (`ms`) and easing can be edited; their type and color stay as built"; an audio
         // transition's type is picked "from cut, crossfade and fade through silence".
         audioType.onChoose = { [weak model] tag in
             guard Self.audioTypes.indices.contains(tag) else { return }

@@ -31,7 +31,7 @@ final class CueGridTests: XCTestCase {
 
     func test_theSectionBandRunsOverCuesThatShareASection() throws {
         let grid = try grid42()
-        // "over each run of cues that share a section, the section's name under a rule of its colour".
+        // "over each run of cues that share a section, the section's name under a rule of its color".
         XCTAssertEqual(grid.runs.map(\.name), ["Verse 1", "Chorus"])
         XCTAssertEqual(grid.runs.map(\.first), [0, 3])
         XCTAssertEqual(grid.runs.map(\.count), [3, 1])

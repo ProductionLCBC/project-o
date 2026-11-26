@@ -1742,7 +1742,7 @@
       }
     },
     "defaults.grade" : {
-      "comment" : "A media item's default: the colour grade it is shown with.",
+      "comment" : "A media item's default: the color grade it is shown with.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -2114,7 +2114,7 @@
       }
     },
     "edit.browser.clear" : {
-      "comment" : "A choice in the command browser's end behaviour field.",
+      "comment" : "A choice in the command browser's end behavior field.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -2162,7 +2162,7 @@
       }
     },
     "edit.browser.endBehavior" : {
-      "comment" : "The command browser: a channel's end behaviour.",
+      "comment" : "The command browser: a channel's end behavior.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -2198,7 +2198,7 @@
       }
     },
     "edit.browser.hold" : {
-      "comment" : "A choice in the command browser's end behaviour field.",
+      "comment" : "A choice in the command browser's end behavior field.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -2294,7 +2294,7 @@
       }
     },
     "edit.browser.loop" : {
-      "comment" : "A choice in the command browser's end behaviour field.",
+      "comment" : "A choice in the command browser's end behavior field.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -5150,7 +5150,7 @@
       }
     },
     "edit.grade.tint" : {
-      "comment" : "A grade's tint colour; white is no change.",
+      "comment" : "A grade's tint color; white is no change.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -5606,13 +5606,13 @@
       }
     },
     "edit.object.color" : {
-      "comment" : "A fade-through-colour transition's colour, which stays as built.",
+      "comment" : "A fade-through-color transition's color, which stays as built.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Colour"
+            "value" : "Color"
           }
         }
       }
@@ -5672,7 +5672,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Transitions 1 to 3 are built in: their duration and easing can change, not their number, type or colour."
+            "value" : "Transitions 1 to 3 are built in: their duration and easing can change, not their number, type or color."
           }
         }
       }
@@ -6158,19 +6158,19 @@
       }
     },
     "edit.object.tileColor" : {
-      "comment" : "A macro tile's colour.",
+      "comment" : "A macro tile's color.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Colour"
+            "value" : "Color"
           }
         }
       }
     },
     "edit.object.tileLabel" : {
-      "comment" : "A macro's tile: its short label and its colour, for the Macros tab.",
+      "comment" : "A macro's tile: its short label and its color, for the Macros tab.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -6758,13 +6758,13 @@
       }
     },
     "edit.preset.anchor.center" : {
-      "comment" : "Reference point: the box's centre.",
+      "comment" : "Reference point: the box's center.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Centre"
+            "value" : "Center"
           }
         }
       }
@@ -6950,13 +6950,13 @@
       }
     },
     "edit.preset.center" : {
-      "comment" : "Alignment: centre.",
+      "comment" : "Alignment: center.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Centre"
+            "value" : "Center"
           }
         }
       }
@@ -6974,13 +6974,13 @@
       }
     },
     "edit.preset.color" : {
-      "comment" : "A text style's colour.",
+      "comment" : "A text style's color.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Colour"
+            "value" : "Color"
           }
         }
       }
@@ -7430,7 +7430,7 @@
       }
     },
     "edit.preset.outline" : {
-      "comment" : "A text style's outline width and colour.",
+      "comment" : "A text style's outline width and color.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -7598,7 +7598,7 @@
       }
     },
     "edit.preset.samplePattern" : {
-      "comment" : "The media sample the engine draws itself: a grid, centre lines, safe areas and colour bars.",
+      "comment" : "The media sample the engine draws itself: a grid, center lines, safe areas and color bars.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -7646,7 +7646,7 @@
       }
     },
     "edit.preset.shadow" : {
-      "comment" : "A text style's shadow: x, y, blur and colour.",
+      "comment" : "A text style's shadow: x, y, blur and color.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -8696,7 +8696,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fade through colour"
+            "value" : "Fade through color"
           }
         }
       }
@@ -9961,7 +9961,7 @@
         }
       }
     },
-    "grid.cue.unlabelled" : {
+    "grid.cue.unlabeled" : {
       "comment" : "VoiceOver: a cue with no label.",
       "extractionState" : "manual",
       "localizations" : {
@@ -14329,14 +14329,14 @@
         }
       }
     },
-    "strip.endBehaviour" : {
+    "strip.endBehavior" : {
       "comment" : "A channel's menu: what its media does at its end.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "End Behaviour"
+            "value" : "End Behavior"
           }
         }
       }
@@ -14462,7 +14462,7 @@
       }
     },
     "strip.grade" : {
-      "comment" : "A channel's menu: its colour grade.",
+      "comment" : "A channel's menu: its color grade.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

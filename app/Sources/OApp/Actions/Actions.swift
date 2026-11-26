@@ -74,9 +74,9 @@ public enum Actions {
         Sending(Selection.expand(channels) { .channelTransport(channel: .number($0), mode: mode) })
     }
 
-    /// "its end behaviour as Loop, Hold and Clear (`channel N end loop | hold | clear`)".
-    public static func end(_ behaviour: EndBehavior, channel: Int) -> Sending {
-        Sending([.channelEndBehavior(channel: .number(channel), mode: behaviour)])
+    /// "its end behavior as Loop, Hold and Clear (`channel N end loop | hold | clear`)".
+    public static func end(_ behavior: EndBehavior, channel: Int) -> Sending {
+        Sending([.channelEndBehavior(channel: .number(channel), mode: behavior)])
     }
 
     // MARK: Clears (Spec 10 §7, choice U-4)

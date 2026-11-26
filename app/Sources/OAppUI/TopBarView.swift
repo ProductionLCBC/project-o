@@ -200,7 +200,7 @@ final class TopBarView: Surface {
         }
         for (index, dot) in dots.enumerated() {
             let (button, mark) = outputs[index]
-            // The text carries the state in words; the dot's shape says it again, so colour is never the only signal.
+            // The text carries the state in words; the dot's shape says it again, so color is never the only signal.
             button.title = "    " + ShowWording.output(dot)
             button.setAccessibilityLabel(ShowWording.output(dot))
             mark.color = dot.state == .presenting ? Palette.outputting : Palette.live
@@ -339,7 +339,7 @@ final class TopBarView: Surface {
             dot.frame = NSRect(x: 9, y: 8, width: 10, height: 10)
             right -= size.width + 2
         }
-        // The middle: the position at the left, Back to Live after it, the countdown centred in what is left.
+        // The middle: the position at the left, Back to Live after it, the countdown centered in what is left.
         let positionWidth = min(Kit.width(of: position), max(80, right - x - 20))
         position.frame = NSRect(x: x, y: (h - 17) / 2, width: positionWidth, height: 17)
         x += positionWidth + 12
@@ -348,7 +348,7 @@ final class TopBarView: Surface {
             backToLive.frame = NSRect(x: x, y: (h - 24) / 2, width: size.width, height: 24)
             x += size.width + 12
         }
-        // "Center: the armed countdown ...; and, while a text field has the focus, what its keys do": side by side, centred together.
+        // "Center: the armed countdown ...; and, while a text field has the focus, what its keys do": side by side, centered together.
         let countdownWidth = countdown.isHidden ? 0 : Kit.width(of: countdown)
         let hintWidth = hint.isHidden ? 0 : Kit.width(of: hint)
         let gap: CGFloat = countdownWidth > 0 && hintWidth > 0 ? 18 : 0

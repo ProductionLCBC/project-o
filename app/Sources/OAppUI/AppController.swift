@@ -350,7 +350,7 @@ final class AppController {
         return .terminateLater
     }
 
-    /// Whether Quit has been asked and not cancelled.
+    /// Whether Quit has been asked and not canceled.
     private(set) var isQuitting = false
 
     private func quitAnswered(_ response: NSApplication.ModalResponse) {

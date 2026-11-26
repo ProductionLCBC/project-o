@@ -91,10 +91,10 @@ public enum GoldenImage {
 
     // MARK: - PNG
 
-    /// A frame's premultiplied colour as an opaque 8-bit sRGB PNG: the
+    /// A frame's premultiplied color as an opaque 8-bit sRGB PNG: the
     /// picture as it would look over black. PNG stores straight alpha, and
     /// un-premultiplying at low alpha amplifies rounding, so alpha travels in
-    /// its own grayscale PNG (`alphaPNG`) and the colour stays exact.
+    /// its own grayscale PNG (`alphaPNG`) and the color stays exact.
     public static func png(from frame: CapturedFrame) throws -> Data {
         var bytes = [UInt8](repeating: 255, count: frame.width * frame.height * 4)
         for i in 0..<frame.pixels.count {
@@ -151,17 +151,17 @@ public enum GoldenImage {
         return (width, height, bytes)
     }
 
-    /// A frame from its colour PNG and, when there is one, its alpha PNG.
+    /// A frame from its color PNG and, when there is one, its alpha PNG.
     public static func frame(fromPNG data: Data, alpha: Data? = nil) throws -> CapturedFrame {
-        let colour = try decodePNG(data, gray: false)
-        var frame = CapturedFrame(width: colour.width, height: colour.height)
-        for i in 0..<(colour.width * colour.height) {
-            frame.pixels[i] = LinearPixel(r: srgbDecode(Float(colour.bytes[i * 4]) / 255), g: srgbDecode(Float(colour.bytes[i * 4 + 1]) / 255),
-                                          b: srgbDecode(Float(colour.bytes[i * 4 + 2]) / 255), a: 1)
+        let color = try decodePNG(data, gray: false)
+        var frame = CapturedFrame(width: color.width, height: color.height)
+        for i in 0..<(color.width * color.height) {
+            frame.pixels[i] = LinearPixel(r: srgbDecode(Float(color.bytes[i * 4]) / 255), g: srgbDecode(Float(color.bytes[i * 4 + 1]) / 255),
+                                          b: srgbDecode(Float(color.bytes[i * 4 + 2]) / 255), a: 1)
         }
         if let alpha {
             let mask = try decodePNG(alpha, gray: true)
-            guard mask.width == colour.width, mask.height == colour.height else { throw GoldenError.decodeFailed }
+            guard mask.width == color.width, mask.height == color.height else { throw GoldenError.decodeFailed }
             for i in 0..<frame.pixels.count { frame.pixels[i].a = Float(mask.bytes[i]) / 255 }
         }
         return frame

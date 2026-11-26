@@ -26,13 +26,13 @@ final class FontLibraryTests: XCTestCase {
         (CTFontCopyVariation(font) as? [NSNumber: NSNumber])?[NSNumber(value: 0x7767_6874)]?.doubleValue ?? 400
     }
 
-    func test_theEngineBundlesDMSansWithItsLicence() throws {
+    func test_theEngineBundlesDMSansWithItsLicense() throws {
         let files = try FileManager.default.contentsOfDirectory(atPath: folder().path)
         XCTAssertTrue(files.contains("DMSans[opsz,wght].ttf"), "\(files)")
         XCTAssertTrue(files.contains("DMSans-Italic[opsz,wght].ttf"))
         XCTAssertTrue(files.contains("OFL.txt"))
-        let licence = try String(contentsOf: folder().appendingPathComponent("OFL.txt"), encoding: .utf8)
-        XCTAssertTrue(licence.contains("SIL OPEN FONT LICENSE Version 1.1"))
+        let license = try String(contentsOf: folder().appendingPathComponent("OFL.txt"), encoding: .utf8)
+        XCTAssertTrue(license.contains("SIL OPEN FONT LICENSE Version 1.1"))
         let library = FontLibrary(folder: try folder(), installedNames: [])
         for name in ["DMSans-9ptRegular", "DMSans-9ptRegular_Bold", "DMSans-9ptItalic", "DMSans-Thin", "DMSans-Regular", "DMSans-Bold",
                      "DMSans-Black", "DMSans-Italic", "DMSans-BoldItalic", "DMSans-BlackItalic"] {

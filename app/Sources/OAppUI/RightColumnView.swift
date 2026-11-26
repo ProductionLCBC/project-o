@@ -111,7 +111,7 @@ final class PreviewView: Surface {
             Kit.content(label)
             let blackout = Kit.label(Strings.text(.previewBlackout), size: 12, weight: .semibold, color: Palette.browsing)
             blackout.alignment = .center
-            // "a blacked-out stack's tile is dimmed and labelled "Blackout"".
+            // "a blacked-out stack's tile is dimmed and labeled "Blackout"".
             let isBlack = model.store.stacks[number]?.blackout ?? false
             blackout.isHidden = !isBlack
             picture.alphaValue = isBlack ? 0.35 : 1
@@ -425,7 +425,7 @@ final class TabsView: Surface {
                 Actions.transport(playing ? .pause : .play, channels: [channel])
             }
             _ = button(Strings.text(.transportStop), frame: NSRect(x: third + 8, y: 40, width: third, height: 26)) { Actions.transport(.stop, channels: [channel]) }
-            // "its end behaviour as Loop, Hold and Clear".
+            // "its end behavior as Loop, Hold and Clear".
             let ends: [(StringKey, EndBehavior, String)] = [(.transportLoop, .loop, "loop"), (.transportHold, .hold, "hold"), (.transportClear, .clear, "clear")]
             for (index, entry) in ends.enumerated() {
                 let made = button(Strings.text(entry.0), style: .bare, frame: NSRect(x: CGFloat(index) * (third + 8), y: 70, width: third, height: 22)) {
@@ -463,7 +463,7 @@ final class TabsView: Surface {
         }
     }
 
-    // "Macros: the macros of both roots by number, each a tile with its label and colour".
+    // "Macros: the macros of both roots by number, each a tile with its label and color".
     private func buildMacros() {
         let w = contentWidth
         let macros = model.store.catalog?.macros ?? []

@@ -30,7 +30,7 @@ final class MetalScratchTests: XCTestCase {
         return StackPass(stack: stack, target: target, size: size, base: .black, gammaBlend: true, boxes: [box])
     }
 
-    /// Encodes a plan as the render thread does, without preparing it, and reads a stack's centre pixel.
+    /// Encodes a plan as the render thread does, without preparing it, and reads a stack's center pixel.
     func encode(_ pass: StackPass) throws -> LinearPixel {
         let receipt = backend.encode(TickTime(tick: 0, reference: .zero, wake: .zero), plan: FramePlan(frame: 0, stackPasses: [pass]),
                                      picks: PickedFrames(capacity: 4), options: EncodeOptions())

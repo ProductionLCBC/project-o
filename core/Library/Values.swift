@@ -130,7 +130,7 @@ public enum TextAlignment: String, Codable, Equatable, Sendable {
 
 /// Spec 1 §2 and Spec 6 §4 — Text Style `verticalAlignment`: "`top`,
 /// `center` or `bottom`, defaulting to `center` ... It places the block of
-/// lines in the box: the first line at the box's top, the block centred, or
+/// lines in the box: the first line at the box's top, the block centered, or
 /// the last line at the box's bottom."
 public enum VerticalAlignment: String, Codable, Equatable, Sendable, CaseIterable {
     case top, center, bottom

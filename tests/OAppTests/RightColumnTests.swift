@@ -87,7 +87,7 @@ final class TransportPanelTests: XCTestCase {
                                               hasPicture: true, durationMs: duration, positionMs: position))
     }
 
-    func test_oneChannelWithTimedMediaShowsItsPositionAndItsEndBehaviour() {
+    func test_oneChannelWithTimedMediaShowsItsPositionAndItsEndBehavior() {
         let panel = TransportPanel.make(selection: [1], channels: [1: media(position: 12_000)])
         XCTAssertEqual(panel, .one(channel: 1, positionMs: 12_000, durationMs: 60_000, isPlaying: true, endBehavior: "hold"))
     }
@@ -231,7 +231,7 @@ final class StripCellModelTests: XCTestCase {
     func test_theStackDotsSitInStackOrderOnEveryCell() throws {
         let cells = try cells()
         XCTAssertEqual(cells[0].dots, [StackDot(stack: 1, label: "Main", state: .showing), StackDot(stack: 2, label: "Confidence", state: .absent)],
-                       "hollow grey and inert where the stack doesn't hold the channel")
+                       "hollow gray and inert where the stack doesn't hold the channel")
         XCTAssertEqual(cells[1].dots.map(\.state), [.showing, .showing])
         XCTAssertEqual(cells[2].dots.map(\.state), [.absent, .showing])
     }

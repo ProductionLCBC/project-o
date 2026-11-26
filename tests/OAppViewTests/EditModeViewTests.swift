@@ -903,14 +903,14 @@ final class EditModeViewTests: XCTestCase {
         inspector.frameW.stringValue = "50"
         inspector.frameW.sendAction(inspector.frameW.action, to: inspector.frameW.target)
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.5, \"x\": 0.05, \"y\": 0.1 }"], "about the top left")
-        // The reference point: X and Y say where the centre sits, and a new width keeps it in place.
+        // The reference point: X and Y say where the center sits, and a new width keeps it in place.
         inspector.anchor.choose(.center)
         XCTAssertEqual(rig.model.settings.boxAnchor, .center)
         XCTAssertEqual(inspector.frameX.stringValue, "50")
         XCTAssertEqual(inspector.frameY.stringValue, "50")
         inspector.frameW.stringValue = "60"
         inspector.frameW.sendAction(inspector.frameW.action, to: inspector.frameW.target)
-        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.6, \"x\": 0.2, \"y\": 0.1 }"], "about the centre")
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.6, \"x\": 0.2, \"y\": 0.1 }"], "about the center")
         inspector.anchor.choose(.topLeft)
         inspector.fallback.toggle()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.fallback false"])
@@ -1009,7 +1009,7 @@ final class EditModeViewTests: XCTestCase {
         opacity.stringValue = "50"
         opacity.sendAction(opacity.action, to: opacity.target)
         XCTAssertEqual(last(rig), ["edit grade 1 opacity 0.5"])
-        // The tint: a colour chosen is sent, and a redraw while the panel is choosing leaves the well alone (Adam,
+        // The tint: a color chosen is sent, and a redraw while the panel is choosing leaves the well alone (Adam,
         // 2026-11-25: "it keeps resetting").
         page.tint.choosingForTest = true
         page.tint.choose(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1))
@@ -1113,7 +1113,7 @@ final class EditModeViewTests: XCTestCase {
             func check(_ what: String) {
                 view.refreshAll()
                 view.layoutSubtreeIfNeeded()
-                if index == 0 { XCTAssertEqual(Audit.unlabelled(in: view), [], "every control has a label (\(what))") }
+                if index == 0 { XCTAssertEqual(Audit.unlabeled(in: view), [], "every control has a label (\(what))") }
                 for button in Audit.all(FlatButton.self, in: view) where button.frame.width > 0 {
                     XCTAssertTrue(button.titleFits, "\"\(button.title)\" is clipped (\(what))")
                 }

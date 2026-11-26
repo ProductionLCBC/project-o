@@ -264,7 +264,7 @@ final class KeyboardPathTests: XCTestCase {
         let armed = try XCTUnwrap(rig.view.grid.document.cells.first { $0.cell.isArmed })
         XCTAssertTrue(armed.accessibilityLabel()?.contains("armed") ?? false, armed.accessibilityLabel() ?? "")
         rig.view.layoutSubtreeIfNeeded()
-        for region in [rig.view.grid, rig.view.strip, rig.view.pool, rig.view.left, rig.view.topBar] as [NSView] { XCTAssertEqual(Audit.unlabelled(in: region), []) }
+        for region in [rig.view.grid, rig.view.strip, rig.view.pool, rig.view.left, rig.view.topBar] as [NSView] { XCTAssertEqual(Audit.unlabeled(in: region), []) }
     }
 
     // MARK: - Increase Contrast and Reduce Motion (Spec 10 §15)

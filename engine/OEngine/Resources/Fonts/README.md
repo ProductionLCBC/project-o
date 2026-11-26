@@ -13,7 +13,7 @@ is logged once. ADR 0008 records the decision. OFL fonts only (`CLAUDE.md`).
 
 **Source.** The `ofl/dmsans` folder of github.com/google/fonts at commit
 `5b35b7208dd4100571326fdf37f030b32a524232` (2026-05-21), unmodified; each file's git blob
-hash matched that commit's listing when it was copied here (2026-11-10). The licence names
+hash matched that commit's listing when it was copied here (2026-11-10). The license names
 no Reserved Font Name.
 
 **Names.** Core Text names the roman file's default instance `DMSans-9ptRegular` and its

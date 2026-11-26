@@ -52,7 +52,7 @@ final class MediaDefaultsEditTests: XCTestCase {
     func test_whatTheDefaultsEditRefuses() {
         var edits = Edits()
         XCTAssertEqual(edits.refuse("edit media \(F.dawn) path \"elsewhere.mp4\"")?.reason, .readOnlyField, "read from the file")
-        XCTAssertEqual(edits.refuse("edit media \(F.dawn) defaults.colour 3")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit media \(F.dawn) defaults.color 3")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit media \(F.dawn) defaults.gain 61")?.reason, .badValue, "within ±60 dB")
         XCTAssertEqual(edits.refuse("edit media \(F.dawn) defaults.syncOffsetMs 1001")?.reason, .badValue, "within ±1000 ms")
         XCTAssertEqual(edits.refuse("edit media \(F.dawn) defaults.trimInMs -1")?.reason, .badValue)

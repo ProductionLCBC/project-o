@@ -149,7 +149,7 @@ final class SegmentedView: Surface {
 @MainActor
 final class PillButton: NSControl {
     enum Style {
-        /// A quiet grey pill: "Saved", "Engine", "Preview only".
+        /// A quiet gray pill: "Saved", "Engine", "Preview only".
         case quiet
         /// The live red: "On air · Out 1, 2".
         case live
@@ -159,11 +159,11 @@ final class PillButton: NSControl {
         case red
         /// Dashed and faint: something that can be added.
         case add
-        /// Raised, with the text's full colour: a value that is set.
+        /// Raised, with the text's full color: a value that is set.
         case set
     }
 
-    /// The dot's look: none, filled, or hollow (and square where something is wrong), so its state isn't told by colour alone.
+    /// The dot's look: none, filled, or hollow (and square where something is wrong), so its state isn't told by color alone.
     enum Dot {
         case none
         case filled(NSColor)

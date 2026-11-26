@@ -266,7 +266,7 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertNil(pass.transition)
     }
 
-    func test_fadeThroughColorCarriesItsColour() throws {
+    func test_fadeThroughColorCarriesItsColor() throws {
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         engine.tick()
         engine.send("channel 1 write media \(EngineFixtures.cross) transition 3 once")
@@ -387,7 +387,7 @@ final class PlanBuilderTests: XCTestCase {
         XCTAssertEqual(mediaTime, 500, accuracy: 0.01)
     }
 
-    func test_endBehaviourHoldKeepsTheLastFrame() throws {
+    func test_endBehaviorHoldKeepsTheLastFrame() throws {
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         XCTAssertNil(engine.send("channel 1 end hold"))
         engine.tick()
@@ -399,7 +399,7 @@ final class PlanBuilderTests: XCTestCase {
 
     /// Spec 4 §6 — "`clear` asks the control thread to issue `channel N clear`
     /// with source `engine`".
-    func test_endBehaviourClearIssuesAClearFromTheEngine() throws {
+    func test_endBehaviorClearIssuesAClearFromTheEngine() throws {
         engine.send("channel 1 write media \(EngineFixtures.dawn)")
         XCTAssertNil(engine.send("channel 1 end clear"))
         engine.tick()

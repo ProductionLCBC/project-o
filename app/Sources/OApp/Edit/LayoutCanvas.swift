@@ -15,7 +15,7 @@ public enum CanvasHandle: CaseIterable, Sendable {
 }
 
 /// Spec 11 §8, "Frame" (G-34) — a box's reference point, "picked from nine: a corner, the middle of an edge, or the
-/// centre", which X and Y read and a new width or height keeps in place.
+/// center", which X and Y read and a new width or height keeps in place.
 public enum FrameAnchor: Int, CaseIterable, Codable, Sendable {
     case topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight
 
@@ -25,7 +25,7 @@ public enum FrameAnchor: Int, CaseIterable, Codable, Sendable {
 }
 
 /// Spec 11 §8, "Moving" — "Dragging moves the box and the handles resize it. ... the arrows nudge the selected box by
-/// one pixel of the stack, and with ⇧ by ten. ... Boxes snap to the canvas's edges and centre lines and to other boxes'
+/// one pixel of the stack, and with ⇧ by ten. ... Boxes snap to the canvas's edges and center lines and to other boxes'
 /// edges, not while ⌘ is held."
 public enum LayoutCanvasMath {
     /// The smallest a box gets: a hundredth of the stack each way.
@@ -42,7 +42,7 @@ public enum LayoutCanvasMath {
         return Frame(x: left, y: top, w: right - left, h: bottom - top)
     }
 
-    /// The frame snapped to the canvas's edges and centre lines and to `others`' edges, when an edge that moves comes
+    /// The frame snapped to the canvas's edges and center lines and to `others`' edges, when an edge that moves comes
     /// within `threshold` of one; the lines it snapped to, for the canvas to draw.
     public static func snapped(_ frame: Frame, handle: CanvasHandle, others: [Frame], threshold: Double) -> (frame: Frame, xs: [Double], ys: [Double]) {
         let xTargets: [Double] = [0, 0.5, 1] + others.flatMap { [$0.x, $0.x + $0.w] }

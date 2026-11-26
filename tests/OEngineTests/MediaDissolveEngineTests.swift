@@ -231,7 +231,7 @@ final class MediaDissolveEngineTests: XCTestCase {
         return false
     }
 
-    /// The mean absolute difference of two captures' colour, per channel.
+    /// The mean absolute difference of two captures' color, per channel.
     private func meanDifference(_ x: CapturedFrame, _ y: CapturedFrame) -> Float {
         guard x.pixels.count == y.pixels.count, !x.pixels.isEmpty else { return .infinity }
         var sum: Float = 0

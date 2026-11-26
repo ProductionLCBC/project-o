@@ -29,7 +29,7 @@ public struct PlaylistRow: Equatable, Sendable {
     public var title: String
     /// A playlist's `serviceDate`, as stored.
     public var date: String?
-    /// "greyed with an "archived" tag".
+    /// "grayed with an "archived" tag".
     public var isArchived = false
     /// "The live playlist and its live item carry the red live dot".
     public var isLive = false

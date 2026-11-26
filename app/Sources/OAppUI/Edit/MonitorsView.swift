@@ -243,7 +243,7 @@ final class ProgramPanelView: PanelView, NSTextFieldDelegate {
         pill.style = panel.isOnAir ? .live : .quiet
         pill.dot = panel.isOnAir ? .filled(Palette.live) : .none
         frame_.outline = panel.isOnAir ? Palette.live : Palette.hairlineStrong
-        // "A blacked-out stack is dimmed and labelled as in show mode's preview."
+        // "A blacked-out stack is dimmed and labeled as in show mode's preview."
         let isBlack = model.store.stacks[panel.stack]?.blackout ?? panel.isBlackedOut
         blackout.isHidden = !isBlack
         picture.alphaValue = isBlack ? 0.35 : 1

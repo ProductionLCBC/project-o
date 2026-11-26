@@ -20,7 +20,7 @@ final class PreviewPassTests: XCTestCase {
     }
 
     /// A 96×52 stack: red left half, green right half, a band of pixel checks
-    /// (white and black) across rows 24 to 27 that averages to mid grey.
+    /// (white and black) across rows 24 to 27 that averages to mid gray.
     func picture() -> CapturedFrame {
         var frame = CapturedFrame(width: 96, height: 52)
         for y in 0..<52 {
@@ -59,7 +59,7 @@ final class PreviewPassTests: XCTestCase {
         XCTAssertEqual(frame.height, 13)
         MetalHarness.assertPixel(frame[2, 3], LinearPixel(r: 1, g: 0, b: 0, a: 1), accuracy: 0.01, "left: red")
         MetalHarness.assertPixel(frame[21, 3], LinearPixel(r: 0, g: 1, b: 0, a: 1), accuracy: 0.01, "right: green")
-        MetalHarness.assertPixel(frame[11, 6], LinearPixel(r: 0.5, g: 0.5, b: 0.5, a: 1), accuracy: 0.02, "the checks average to mid grey, in linear light")
+        MetalHarness.assertPixel(frame[11, 6], LinearPixel(r: 0.5, g: 0.5, b: 0.5, a: 1), accuracy: 0.02, "the checks average to mid gray, in linear light")
         MetalHarness.assertPixel(frame[11, 9], LinearPixel(r: 1, g: 0, b: 0, a: 1), accuracy: 0.01, "below the band, left of the middle: red")
         MetalHarness.assertPixel(frame[12, 9], LinearPixel(r: 0, g: 1, b: 0, a: 1), accuracy: 0.01, "right of the middle: green")
         try MetalHarness.assertGolden(goldens, "preview-quarter", frame)

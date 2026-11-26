@@ -35,7 +35,7 @@ final class DropPlanTests: XCTestCase {
         // Dropped above the item two places down, it ends one place down.
         XCTAssertEqual(try plan(.item(playlist: sunday, item: items[1]), onto: .item(playlist: sunday, item: items[3], below: false)).sending?.text,
                        ["edit playlist \(sunday) item \(items[1]) move 2"])
-        // Where it already is, on either side of itself or beside its neighbour: nothing.
+        // Where it already is, on either side of itself or beside its neighbor: nothing.
         XCTAssertEqual(try plan(.item(playlist: sunday, item: items[1]), onto: .item(playlist: sunday, item: items[1], below: false)), .none)
         XCTAssertEqual(try plan(.item(playlist: sunday, item: items[1]), onto: .item(playlist: sunday, item: items[1], below: true)), .none)
         XCTAssertEqual(try plan(.item(playlist: sunday, item: items[1]), onto: .item(playlist: sunday, item: items[2], below: false)), .none)

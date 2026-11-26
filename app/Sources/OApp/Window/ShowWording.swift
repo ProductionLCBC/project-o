@@ -110,7 +110,7 @@ public enum ShowWording {
 
     /// A cue, for VoiceOver: "Cue 3, Verse 2", and that it is live.
     public static func cue(_ cell: CueCell) -> String {
-        let text = cell.label.isEmpty ? Strings.text(.gridCueUnlabelled, cell.number) : Strings.text(.gridCue, cell.number, cell.label)
+        let text = cell.label.isEmpty ? Strings.text(.gridCueUnlabeled, cell.number) : Strings.text(.gridCue, cell.number, cell.label)
         return cell.isLive ? text + ", " + Strings.text(.tagLive) : text
     }
 

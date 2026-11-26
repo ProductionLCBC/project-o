@@ -122,8 +122,8 @@ final class LivePlaceTests: XCTestCase {
     }
 
     /// "With the live cue removed, by a delete or a merge, `next` and
-    /// `previous` fire its old neighbours."
-    func test_withTheLiveCueRemovedNextAndPreviousFireItsOldNeighbours() {
+    /// `previous` fire its old neighbors."
+    func test_withTheLiveCueRemovedNextAndPreviousFireItsOldNeighbors() {
         var show = live(item: 2, cue: 2)
         show.run("edit list 42 cue \(Self.u(Self.c[1])) remove")
         XCTAssertEqual(show.reading.gone, ["cue"])
@@ -141,10 +141,10 @@ final class LivePlaceTests: XCTestCase {
         XCTAssertEqual(merged.previous?.cueUuid, Self.c[0])
     }
 
-    /// "after a section remove that takes the neighbours too, they fire the
+    /// "after a section remove that takes the neighbors too, they fire the
     /// nearest cues that remain, and with every cue before it gone, the place
     /// is the top."
-    func test_aSectionRemoveThatTakesTheNeighboursLeavesThePlaceAtTheTop() {
+    func test_aSectionRemoveThatTakesTheNeighborsLeavesThePlaceAtTheTop() {
         var show = live(item: 4, cue: 2)
         show.run("edit list 42 cue \(Self.u(Self.c[1])) section remove")
         XCTAssertEqual(show.library.list(number: 42)?.cues.map(\.uuid), [Self.c[3]])

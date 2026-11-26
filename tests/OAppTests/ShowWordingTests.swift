@@ -69,7 +69,7 @@ final class ShowWordingTests: XCTestCase {
 
     func test_aCueAndTheGridsCountForVoiceOverAndTheHeader() throws {
         XCTAssertEqual(ShowWording.cue(cell()), "Cue 3, Verse 2")
-        XCTAssertEqual(ShowWording.cue(cell(live: true)), "Cue 3, Verse 2, live", "colour is never the only signal")
+        XCTAssertEqual(ShowWording.cue(cell(live: true)), "Cue 3, Verse 2, live", "color is never the only signal")
         XCTAssertEqual(ShowWording.cue(cell(label: "")), "Cue 3")
         XCTAssertEqual(ShowWording.count(GridModel.make(try Recorded.inputs(.playlist(Recorded.sunday)))), "3 lists")
         XCTAssertEqual(ShowWording.count(GridModel.make(try Recorded.inputs(.list(Recorded.list42)))), "4 cues")

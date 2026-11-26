@@ -12,7 +12,7 @@ extension Editor {
         return nil
     }
 
-    /// Spec 11 §9 — a macro's commands, "the tile's colour and label", New,
+    /// Spec 11 §9 — a macro's commands, "the tile's color and label", New,
     /// Duplicate, Delete, renumber and swap. "A cycle, or a macro nested past
     /// the depth cap, is refused (`cycle`, Spec 5 §6)."
     mutating func editMacro(_ number: Int?, _ action: EditAction, makeUUID: () -> UUID) throws -> (EditCommand, EditCommand?) {

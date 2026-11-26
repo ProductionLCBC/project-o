@@ -6,7 +6,7 @@ import OApp
 import OCore
 
 /// Spec 11 §8, "Frame" (G-34) — the box's reference point, "picked from nine: a corner, the middle of an edge, or the
-/// centre": a square of nine dots, the chosen one filled. The choice is the app's, kept in `view.json`.
+/// center": a square of nine dots, the chosen one filled. The choice is the app's, kept in `view.json`.
 @MainActor
 final class AnchorPicker: NSView {
     static let size: CGFloat = 42
@@ -45,8 +45,8 @@ final class AnchorPicker: NSView {
         }
     }
 
-    /// The centre of a point's dot.
-    private func centre(of anchor: FrameAnchor) -> NSPoint {
+    /// The center of a point's dot.
+    private func center(of anchor: FrameAnchor) -> NSPoint {
         let inset: CGFloat = 7
         let step = (min(bounds.width, bounds.height) - 2 * inset) / 2
         return NSPoint(x: inset + CGFloat(anchor.rawValue % 3) * step, y: inset + CGFloat(anchor.rawValue / 3) * step)
@@ -58,7 +58,7 @@ final class AnchorPicker: NSView {
         NSBezierPath(rect: box.insetBy(dx: 0.5, dy: 0.5)).stroke()
         let chosen = model.settings.boxAnchor
         for anchor in FrameAnchor.allCases {
-            let at = centre(of: anchor)
+            let at = center(of: anchor)
             let dot = NSRect(x: at.x - 3.5, y: at.y - 3.5, width: 7, height: 7)
             if anchor == chosen {
                 Palette.selection.setFill()
@@ -73,7 +73,7 @@ final class AnchorPicker: NSView {
     /// Picks the point nearest a press.
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        guard let nearest = FrameAnchor.allCases.min(by: { hypot(centre(of: $0).x - point.x, centre(of: $0).y - point.y) < hypot(centre(of: $1).x - point.x, centre(of: $1).y - point.y) }) else { return }
+        guard let nearest = FrameAnchor.allCases.min(by: { hypot(center(of: $0).x - point.x, center(of: $0).y - point.y) < hypot(center(of: $1).x - point.x, center(of: $1).y - point.y) }) else { return }
         choose(nearest)
     }
 
@@ -96,7 +96,7 @@ final class AnchorPicker: NSView {
 }
 
 /// Spec 11 §8 — "The canvas is the layout at its stack's size (§3) ... Its picture is the engine's (choice A-1) ...
-/// Over it the app draws each box's outline and handles, labelled with its binding ("body", "pixels", "static") and
+/// Over it the app draws each box's outline and handles, labeled with its binding ("body", "pixels", "static") and
 /// its offset when it isn't 0 ("+1")."
 @MainActor
 final class LayoutCanvasView: NSView, EditFocus {
@@ -226,7 +226,7 @@ final class LayoutCanvasView: NSView, EditFocus {
         let element = NSAccessibilityElement()
         element.setAccessibilityParent(self)
         element.setAccessibilityRole(.group)
-        // "an overflowing box's red outline with how many lines were cut" (colour is never alone).
+        // "an overflowing box's red outline with how many lines were cut" (color is never alone).
         let overflow = model.editing.presetState.overflow.first { $0.box == index }
         element.setAccessibilityLabel(Self.spoken(box) + (overflow.map { ", " + Strings.text(.editPresetLinesCut, $0.linesCut) } ?? ""))
         element.setAccessibilityFrameInParentSpace(rect(of: box.frame))

@@ -8,9 +8,9 @@ import XCTest
 final class TextStyleTests: XCTestCase {
     typealias F = FixtureLibrary
 
-    func test_theVerticalAlignmentDefaultsToCentreAndIsWrittenOnEveryStyle() throws {
+    func test_theVerticalAlignmentDefaultsToCenterAndIsWrittenOnEveryStyle() throws {
         XCTAssertEqual(TextStyleValues().verticalAlignment, .center)
-        // A style written before Spec 6 has no key: it reads as centre.
+        // A style written before Spec 6 has no key: it reads as center.
         let older = JSONValue.object(["fromStyle": .null, "font": .string("HelveticaNeue-Bold")])
         let inline = try JSONCoding.decode(BoxTextStyle.self, from: older)
         XCTAssertEqual(inline.values.verticalAlignment, .center)

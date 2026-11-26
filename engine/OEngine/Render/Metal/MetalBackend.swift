@@ -431,7 +431,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
             let parameters = BuiltInTransition(t.type).parameters(progress: t.progress, color: t.color)
             uniforms.transition.x = parameters.progress
             let c = parameters.color
-            // Spec 1 §5 colours are sRGB; the fade colour is "opaque and premultiplied" in linear light.
+            // Spec 1 §5 colors are sRGB; the fade color is "opaque and premultiplied" in linear light.
             uniforms.color = SIMD4(ColorMath.srgbDecode(c.r), ColorMath.srgbDecode(c.g), ColorMath.srgbDecode(c.b), 1)
         }
         uniforms.setGrade(graded)
@@ -666,7 +666,7 @@ public final class MetalBackend: RenderBackend, @unchecked Sendable {
     }
 
     /// Where a channel's texture lands in its picture, and how many of its pixels each picture pixel takes in: the
-    /// texture keeps its shape, centred, and the taps cover the block of source pixels one picture pixel stands for.
+    /// texture keeps its shape, centered, and the taps cover the block of source pixels one picture pixel stands for.
     static func pictureUniforms(source: PixelSize, target: PixelSize) -> PictureUniforms {
         let sw = Float(max(1, source.width)), sh = Float(max(1, source.height))
         let tw = Float(max(1, target.width)), th = Float(max(1, target.height))

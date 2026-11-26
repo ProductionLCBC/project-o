@@ -37,8 +37,8 @@ class Surface: NSView {
 
 @MainActor
 enum Kit {
-    /// A line of text that never takes typing. With no colour given it is the
-    /// palette's text colour. (The default is resolved in here and not in
+    /// A line of text that never takes typing. With no color given it is the
+    /// palette's text color. (The default is resolved in here and not in
     /// the signature: Swift 6.0.3's compiler crashes on a main-actor default
     /// argument reached from a stored property's initializer.)
     static func label(_ text: String = "", size: CGFloat = 12, weight: NSFont.Weight = .regular, color: NSColor? = nil, mono: Bool = false) -> NSTextField {
@@ -69,7 +69,7 @@ enum Kit {
     /// draws it measures it now. (Not `intrinsicContentSize`, which AppKit
     /// keeps from before the text last changed; and not the attributed
     /// string's own size, which comes out narrower than the cell draws a
-    /// centred line: the countdown read "…" on a real run for that.)
+    /// centered line: the countdown read "…" on a real run for that.)
     static func width(of field: NSTextField) -> CGFloat {
         guard !field.stringValue.isEmpty, let cell = field.cell else { return 0 }
         let measured = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10_000, height: 200)).width
@@ -169,7 +169,7 @@ final class TagView: Surface {
 @MainActor
 final class FlatButton: NSControl {
     enum Style {
-        /// A raised grey button.
+        /// A raised gray button.
         case plain
         /// The large Next.
         case primary
@@ -184,7 +184,7 @@ final class FlatButton: NSControl {
     }
 
     var style = Style.plain { didSet { needsDisplay = true } }
-    /// Drawn as a small tag, in that tag's colours: a tag that opens
+    /// Drawn as a small tag, in that tag's colors: a tag that opens
     /// something is a button like any other (Spec 10 §8).
     var tagStyle: TagView.Style? { didSet { refresh() } }
     var title = "" { didSet { refresh() } }
@@ -405,7 +405,7 @@ final class FlatButton: NSControl {
 }
 
 /// A dot: filled, or hollow (Spec 10 §8: "filled green while presenting,
-/// and otherwise a hollow red shape"), so its state isn't told by colour alone.
+/// and otherwise a hollow red shape"), so its state isn't told by color alone.
 @MainActor
 final class DotView: NSView {
     var color = Palette.live { didSet { needsDisplay = true } }

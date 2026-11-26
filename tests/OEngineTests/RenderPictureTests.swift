@@ -258,7 +258,7 @@ final class RenderPictureTests: XCTestCase {
         XCTAssertFalse(drawn.missing, "the pattern is never a missing file")
         let picture = try Picture(drawn.png)
         XCTAssertGreaterThan(picture.lit(0, 1), 1000, "the pattern fills the box")
-        // The colour bars across its middle: a saturated yellow and a saturated blue among them.
+        // The color bars across its middle: a saturated yellow and a saturated blue among them.
         func some(_ test: (Int, Int, Int) -> Bool) -> Bool {
             stride(from: 0, to: picture.bytes.count, by: 4).contains { test(Int(picture.bytes[$0]), Int(picture.bytes[$0 + 1]), Int(picture.bytes[$0 + 2])) }
         }

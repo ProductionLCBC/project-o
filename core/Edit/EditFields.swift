@@ -509,7 +509,7 @@ enum EditFields {
     ])
 
     /// Spec 1 §2 — Transition. Spec 11 §9 — "Their duration (`ms`) and easing
-    /// can be edited; their type and colour stay as built".
+    /// can be edited; their type and color stay as built".
     static let transition: EditField = object([
         "type": .readOnly(.choice(["cut", "dissolve", "fadeThroughColor"])),
         "ms": .whole(min: 0),

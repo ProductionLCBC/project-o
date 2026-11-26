@@ -1,4 +1,4 @@
-// OEngine — Spec 4 §7, "Shader variants. One channel shader, specialised with
+// OEngine — Spec 4 §7, "Shader variants. One channel shader, specialized with
 // Metal function constants ... compiled at launch into a small pipeline
 // cache, so the per-tick work is a pipeline lookup and no branching in the
 // shader."

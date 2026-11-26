@@ -21,8 +21,8 @@ public enum EncodeKind: String, Codable, Sendable {
 }
 
 /// Spec 4 §14 — a sink encoder: the output's transfer function and pixel
-/// format, as a shader variant and the CPU reference the colour tests check
-/// it against (Spec 4 §16, "Colour").
+/// format, as a shader variant and the CPU reference the color tests check
+/// it against (Spec 4 §16, "Color").
 public protocol SinkEncoder: Sendable {
     var kind: EncodeKind { get }
     /// The code values one linear premultiplied pixel encodes to, per channel,
