@@ -60,8 +60,7 @@ final class EditRejectionTests: XCTestCase {
             row(.onAir, "edit channel 2 renumber 9") { edits in edits.play("channel 2 write text \"Great is Thy faithfulness\"") },
             row(.duplicate, "edit stack 1 insert slots 0 { \"channel\": 2, \"mute\": false, \"opacity\": 1, \"preset\": null }"),
             row(.unknownPath, "edit preset 3 layouts.2.boxes.4.frame.x 0.1"),
-            row(.readOnlyField, "edit transition 2 type cut"),
-            row(.notInV1, "edit transition create"),
+            row(.readOnlyField, "edit transition 2 builtIn false"),
             row(.notInV1, "edit output 1 label \"Wall\""),
             row(.notInV1, "edit playlist \(p) insert items 0 { \"kind\": \"local\", \"localUuid\": \"\(u(F.localCopyUuid))\" }"),
         ]

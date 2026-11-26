@@ -124,36 +124,68 @@ final class EditStyleTests: XCTestCase {
         assertRoundTrip(["edit grade create", "edit grade 1 duplicate", "edit grade 1 renumber 9", "edit grade 9 delete"])
     }
 
-    // MARK: - Transitions (Spec 11 §9: "transitions 1–3 only, as built")
+    // MARK: - Transitions (Spec 11 §9 as corrected 2026-11-25, G-38)
 
-    /// "Their duration (`ms`) and easing can be edited; their type and
-    /// color stay as built, and new transitions wait for the transition
-    /// editor"; Spec 5 §6 — "Transitions 1–3 can't be deleted, renumbered or swapped".
-    func test_aTransitionsTimingIsEditedAndNothingElse() {
+    /// "Every transition's duration (`ms`), easing and, for a fade, color can be edited; the type of a new one is
+    /// picked from the three, and 1–3 keep theirs (`protected`)"; Spec 5 §6 — "Transitions 1–3 can't be deleted,
+    /// renumbered or swapped".
+    func test_theBuiltInTransitionsKeepTheirTypeAndStayProtected() {
         var edits = Edits()
         XCTAssertEqual(edits.apply("edit transition 2 ms 750").first?.inverse, set(.transition, 2, "ms", .number(500)))
         XCTAssertEqual(edits.apply("edit transition 2 easing linear").first?.inverse, set(.transition, 2, "easing", .string("easeInOut")))
         edits.apply("edit transition 2 label \"Slow dissolve\"")
         XCTAssertEqual(edits.library.transition(2)?.ms, 750)
         XCTAssertEqual(edits.library.transition(2)?.easing, .linear)
+        // A fade's color can change, 3's too.
+        edits.apply("edit transition 3 color {\"a\": 1, \"b\": 1, \"g\": 1, \"r\": 1}")
+        XCTAssertEqual(edits.library.transition(3)?.color, Color(r: 1, g: 1, b: 1, a: 1))
+        // 1–3 keep their type.
+        XCTAssertEqual(edits.refuse("edit transition 2 type cut")?.reason, .protected)
         XCTAssertEqual(edits.library.transition(2)?.type, .dissolve)
-
-        XCTAssertEqual(edits.refuse("edit transition 2 type cut")?.reason, .readOnlyField)
-        XCTAssertEqual(edits.refuse("edit transition 3 color {\"a\": 1, \"b\": 1, \"g\": 1, \"r\": 1}")?.reason, .readOnlyField)
         XCTAssertEqual(edits.refuse("edit transition 2 builtIn false")?.reason, .readOnlyField)
         XCTAssertEqual(edits.refuse("edit transition 2 ms -1")?.reason, .badValue)
         XCTAssertEqual(edits.refuse("edit transition 2 ms 0.5")?.reason, .badValue)
         XCTAssertEqual(edits.refuse("edit transition 2 easing bounce")?.reason, .badValue)
+        XCTAssertEqual(edits.refuse("edit transition 2 type wipe")?.reason, .badValue, "new types are v2's")
         for number in 1...3 {
             XCTAssertEqual(edits.refuse("edit transition \(number) delete")?.reason, .protected)
             XCTAssertEqual(edits.refuse("edit transition \(number) renumber 9")?.reason, .protected)
         }
         XCTAssertEqual(edits.refuse("edit transition 1 swap 2")?.reason, .protected)
-        XCTAssertEqual(edits.refuse("edit transition create")?.reason, .notInV1)
-        XCTAssertEqual(edits.refuse("edit transition 4 create {\"type\": \"dissolve\", \"ms\": 200}")?.reason, .notInV1)
-        XCTAssertEqual(edits.refuse("edit transition 2 duplicate")?.reason, .notInV1)
         XCTAssertEqual(edits.refuse("edit transition 9 ms 1")?.reason, .unknownObject)
         assertRoundTrip(["edit transition 2 ms 750", "edit transition 3 easing easeIn", "edit transition 1 label \"Hard cut\""])
+    }
+
+    /// "New (a 500 ms dissolve), Duplicate, Renumber… and Delete as for grades": a new transition's type is its own.
+    func test_aNewTransitionIsMadeChangedAndDeletedAsAGradeIs() throws {
+        var edits = Edits()
+        let made = try XCTUnwrap(edits.apply("edit transition create").first)
+        let fresh = try XCTUnwrap(edits.library.transition(4))
+        XCTAssertEqual(fresh.type, .dissolve)
+        XCTAssertEqual(fresh.ms, 500)
+        XCTAssertFalse(fresh.builtIn)
+        XCTAssertEqual(made.inverse, EditCommand(.numbered(.transition, 4), .delete))
+        // Its type, its color.
+        XCTAssertEqual(edits.apply("edit transition 4 type fadeThroughColor").first?.inverse, set(.transition, 4, "type", .string("dissolve")))
+        edits.apply("edit transition 4 color {\"a\": 1, \"b\": 0, \"g\": 0, \"r\": 1}")
+        XCTAssertEqual(edits.library.transition(4)?.type, .fadeThroughColor)
+        XCTAssertEqual(edits.library.transition(4)?.color, Color(r: 1, g: 0, b: 0, a: 1))
+        // A copy of a built-in one is not built in, and its type is its own.
+        edits.apply("edit transition 2 duplicate")
+        XCTAssertEqual(edits.library.transition(5)?.type, .dissolve)
+        XCTAssertEqual(edits.library.transition(5)?.builtIn, false)
+        edits.apply("edit transition 5 type cut")
+        XCTAssertEqual(edits.library.transition(5)?.type, .cut)
+        // Renumbered, swapped among the new ones, deleted.
+        edits.apply("edit transition 5 renumber 9")
+        XCTAssertNotNil(edits.library.transition(9))
+        edits.apply("edit transition 4 swap 9")
+        XCTAssertEqual(edits.library.transition(4)?.type, .cut)
+        XCTAssertEqual(edits.refuse("edit transition 4 swap 2")?.reason, .protected)
+        edits.apply("edit transition 9 delete")
+        XCTAssertNil(edits.library.transition(9))
+        assertRoundTrip(["edit transition create", "edit transition 2 duplicate", "edit transition 4 type cut", "edit transition 5 renumber 9",
+                         "edit transition 9 delete"])
     }
 
     // MARK: - Audio transitions (Spec 11 §9, choice A-7)

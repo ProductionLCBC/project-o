@@ -37,7 +37,8 @@ struct ObjectRules<T: NumberedObject> {
     /// Checks 6 and 8 and the warnings, once the changed object reads; `old`
     /// is nil for a new one. It may adjust the object (a copy's `builtIn`).
     var settled: (inout Editor, T?, inout T) throws -> Void = { _, _, _ in }
-    /// Spec 11 §9 — "new transitions wait for the transition editor".
+    /// Whether the type's objects can be made and copied; every type's can since Spec 11 §9 was corrected on
+    /// 2026-11-25 to let transitions be made (G-38).
     var makes = true
     /// Spec 1 §5 — the key of a per-file document's path (`preset`), nil for a catalog's objects.
     var document: String?
@@ -104,8 +105,10 @@ extension Editor {
     }
 
     /// Spec 5 §6, check 7 — "Preset 1 and Transitions 1–3 can't be deleted,
-    /// renumbered or swapped, though both stay editable". Spec 11 §9 — "new
-    /// transitions wait for the transition editor the planning doc cut".
+    /// renumbered or swapped, though both stay editable". Spec 11 §9 as
+    /// corrected 2026-11-25 — "New (a 500 ms dissolve), Duplicate, Renumber…
+    /// and Delete as for grades, but for transitions 1–3, which ship built in
+    /// and stay protected ... 1–3 keep their [type] (`protected`)".
     static var transitions: Shelf<Transition> {
         var rules = ObjectRules<Transition>()
         rules.held = { _, transition, verb in
@@ -117,9 +120,15 @@ extension Editor {
                 Rejection(reason: .protected, message: "transition \($0.number) is built in: it can be edited, not swapped")
             }
         }
-        rules.makes = false
+        rules.settled = { editor, old, transition in
+            // A new one or a copy is never built in.
+            if old == nil { transition.builtIn = false }
+            if let old, (1...3).contains(old.number), old.type != transition.type {
+                throw editor.reject(.protected, "transition \(old.number) is built in: it keeps its type, \(old.type.rawValue)")
+            }
+        }
         return Shelf(type: .transition, table: EditFields.transition, read: { $0.library.transitions }, write: { $0.library.transitions = $1 },
-                     fresh: { Transition(number: $0, type: .cut, ms: 0, uuid: $1) }, rules: rules)
+                     fresh: { Transition(number: $0, type: .dissolve, ms: 500, uuid: $1) }, rules: rules)
     }
 
     /// Spec 11 §9 — "New, Duplicate and Delete as for grades, the type picked

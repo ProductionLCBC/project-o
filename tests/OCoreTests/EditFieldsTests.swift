@@ -216,8 +216,11 @@ final class EditFieldsTests: XCTestCase {
         XCTAssertTrue(try place(EditFields.channel, "number", in: try json(try XCTUnwrap(library.channel(1)))).readOnly)
         XCTAssertTrue(try place(EditFields.preset, "builtIn", in: try json(try XCTUnwrap(library.preset(1)))).readOnly)
         let dissolve = try json(try XCTUnwrap(library.transition(2)))
-        XCTAssertTrue(try place(EditFields.transition, "type", in: dissolve).readOnly, "their type and color stay as built")
-        XCTAssertTrue(try place(EditFields.transition, "color", in: dissolve).readOnly)
+        // Spec 11 §9 as corrected 2026-11-25 — a transition's type and color are edited; 1–3 keep their type by the
+        // shelf's rule (`protected`), not by the field.
+        XCTAssertFalse(try place(EditFields.transition, "type", in: dissolve).readOnly)
+        XCTAssertFalse(try place(EditFields.transition, "color", in: dissolve).readOnly)
+        XCTAssertTrue(try place(EditFields.transition, "builtIn", in: dissolve).readOnly)
         XCTAssertFalse(try place(EditFields.transition, "ms", in: dissolve).readOnly)
         XCTAssertFalse(try place(EditFields.transition, "easing", in: dissolve).readOnly)
         XCTAssertFalse(try place(EditFields.stack, "gammaBlend", in: try json(try XCTUnwrap(machine.stack(1)))).readOnly)

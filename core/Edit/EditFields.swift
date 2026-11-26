@@ -508,13 +508,15 @@ enum EditFields {
         "blur": .number(min: 0), "tint": color, "opacity": .number(min: 0, max: 1),
     ])
 
-    /// Spec 1 §2 — Transition. Spec 11 §9 — "Their duration (`ms`) and easing
-    /// can be edited; their type and color stay as built".
+    /// Spec 1 §2 — Transition. Spec 11 §9 as corrected 2026-11-25 — "Every
+    /// transition's duration (`ms`), easing and, for a fade, color can be
+    /// edited; the type of a new one is picked from the three, and 1–3 keep
+    /// theirs (`protected`)", which the shelf's rules check.
     static let transition: EditField = object([
-        "type": .readOnly(.choice(["cut", "dissolve", "fadeThroughColor"])),
+        "type": .choice(["cut", "dissolve", "fadeThroughColor"]),
         "ms": .whole(min: 0),
         "easing": .choice(["linear", "easeIn", "easeOut", "easeInOut"]),
-        "color": .readOnly(.optional(color)),
+        "color": .optional(color),
         "builtIn": .readOnly(.flag),
     ])
 
