@@ -130,25 +130,55 @@ enum FormColor {
     }
 }
 
-/// A color well that says when its color was chosen, not at every step of a drag in the color panel.
+/// A color well that says once what the color panel chose. An NSColorWell that isn't continuous sends nothing when the
+/// panel changes its color, not even when the panel lets it go (Adam, 2026-11-25: the tint and a transition's color
+/// "snap back"), so the well listens to every change and says the last one when the color has rested a moment, or at
+/// once when the panel lets the well go: one edit for a drag across the color wheel, not one a step.
 @MainActor
 final class FormColorWell: NSColorWell {
     var onChoose: ((NSColor) -> Void)?
+    /// The color chosen and not said yet.
+    private var pending: NSColor?
+    private var rest: Timer?
+    /// How long a color rests before it is said.
+    static let restSeconds = 0.35
 
     convenience init(label: String) {
         self.init(frame: .zero)
-        isContinuous = false
+        isContinuous = true
         target = self
-        action = #selector(chose)
+        action = #selector(changed)
         setAccessibilityLabel(label)
     }
 
-    @objc private func chose() { onChoose?(color) }
+    @objc private func changed() {
+        pending = color
+        rest?.invalidate()
+        rest = Timer.scheduledTimer(withTimeInterval: Self.restSeconds, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.flush() }
+        }
+    }
 
-    /// Chooses as the panel would.
+    /// Says the color chosen, if there is one not said yet.
+    func flush() {
+        rest?.invalidate()
+        rest = nil
+        guard let color = pending else { return }
+        pending = nil
+        onChoose?(color)
+    }
+
+    /// The panel lets the well go: what it chose is said at once.
+    override func deactivate() {
+        super.deactivate()
+        flush()
+    }
+
+    /// Chooses as the panel would, and says it at once.
     func choose(_ color: NSColor) {
         self.color = color
-        chose()
+        changed()
+        flush()
     }
 
     /// Whether the color panel is choosing for this well, so the model's color must wait.
@@ -160,7 +190,7 @@ final class FormColorWell: NSColorWell {
     /// (a picture arriving, another client's edit), and setting the color then would put the panel back to the old
     /// one under the operator's hand (Adam, 2026-11-25: "it keeps resetting").
     func show(_ color: NSColor) {
-        guard !isChoosing else { return }
+        guard !isChoosing, pending == nil else { return }
         if self.color != color { self.color = color }
     }
 }
