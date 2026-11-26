@@ -17,18 +17,9 @@ final class PreviewPanelView: PanelView {
     let live = SurfaceView()
     /// On the Channels page, the channel's text, which has no picture of its own, or that it is empty.
     let caption = Kit.content(Kit.label(size: 13))
-    /// Spec 11 §9, "Grades" — "the engine's picture of a pool item through the grade beside the same item without it".
-    let graded = NSImageView()
-    let ungraded = NSImageView()
-    let gradedCaption = Kit.label(size: 11, color: Palette.dimText)
-    let ungradedCaption = Kit.label(Strings.text(.editObjectPreviewUngraded), size: 11, color: Palette.dimText)
-    /// Spec 11 §9, "Transitions" — "The preview is the easing curve drawn over the duration".
-    let curve = EasingCurveView()
     var mach: MachLink?
     var machineRoot: URL? { didSet { refresh() } }
     private var shownFile: String?
-    private var shownGraded: String?
-    private var shownUngraded: String?
 
     init(model: ShowModel) {
         self.model = model
@@ -52,15 +43,6 @@ final class PreviewPanelView: PanelView {
         caption.cell?.wraps = true
         caption.isHidden = true
         frame_.addSubview(caption)
-        for image in [graded, ungraded] {
-            image.imageScaling = .scaleProportionallyUpOrDown
-            image.setAccessibilityElement(false)
-        }
-        for label in [gradedCaption, ungradedCaption] { label.alignment = .center }
-        for view in [graded, ungraded, gradedCaption, ungradedCaption, curve] as [NSView] {
-            view.isHidden = true
-            frame_.addSubview(view)
-        }
         frame_.setAccessibilityElement(true)
         frame_.setAccessibilityRole(.image)
         addSubview(picker)
@@ -73,11 +55,6 @@ final class PreviewPanelView: PanelView {
     required init?(coder: NSCoder) { nil }
 
     @objc private func picked() {
-        // Spec 11 §9 — on the Objects page it names "the item picked under the preview" of a grade.
-        if model.editing.page == .objects {
-            if let id = picker.selectedItem?.representedObject as? String { model.editing.setGradeMedia(id) }
-            return
-        }
         let number = picker.selectedItem?.tag
         // On the Stacks and Channels pages the picker is the page's own: it picks the stack or the channel edited.
         if model.editing.page == .stacks, let number {
@@ -104,6 +81,8 @@ final class PreviewPanelView: PanelView {
         case .channels: live.set(model.editing.sheetChannel.flatMap { mach?.picture(channel: $0) })
         // G-32 — "the live picture of the stack the layout tab names (the thumbnail stack's for `*`)".
         case .presets: live.set(model.editing.canvasStack.flatMap { mach?.preview(stack: $0) })
+        // Spec 11 §9 as corrected 2026-11-25 — "the live picture of the stack its picker names, as on the Stacks page".
+        case .objects: live.set(mach?.preview(stack: model.previewStack))
         default: return
         }
     }
@@ -111,14 +90,8 @@ final class PreviewPanelView: PanelView {
     func refresh() {
         let stacks = (model.store.catalog?.stacks ?? []).sorted { $0.number < $1.number }
         let page = model.editing.page
-        for view in [graded, ungraded, gradedCaption, ungradedCaption, curve] as [NSView] { view.isHidden = true }
-        picker.isHidden = false
-        if page == .objects {
-            refreshObjects()
-            return
-        }
         let onStacks = page == .stacks
-        let showsLive = page == .stacks || page == .channels || page == .presets
+        let showsLive = page == .stacks || page == .channels || page == .presets || page == .objects
         let selected = onStacks ? (model.editing.stackNumber ?? model.previewStack)
             : page == .presets ? (model.editing.canvasStack ?? model.previewStack) : model.previewStack
         live.isHidden = !showsLive
@@ -176,62 +149,6 @@ final class PreviewPanelView: PanelView {
         needsLayout = true
     }
 
-    /// Spec 11 §9 — the Objects page's preview: a grade's two pictures, a transition's curve, or that there is none.
-    private func refreshObjects() {
-        let editing = model.editing
-        live.isHidden = true
-        picture.isHidden = true
-        hiding.isHidden = true
-        caption.isHidden = true
-        picker.removeAllItems()
-        picker.isHidden = true
-        if let grade = editing.selectedGrade {
-            let choices = editing.gradeMediaChoices
-            if choices.isEmpty {
-                caption.stringValue = Strings.text(.editObjectPreviewNoMedia)
-                caption.textColor = Palette.faintText
-                caption.isHidden = false
-            } else {
-                // "the item picked under the preview, at first the pool's first video or image".
-                for item in choices {
-                    picker.addItem(withTitle: (item.entry.path as NSString).lastPathComponent)
-                    picker.lastItem?.representedObject = item.id
-                }
-                picker.selectItem(at: choices.firstIndex { $0.id == editing.gradeMedia } ?? 0)
-                picker.isHidden = false
-                gradedCaption.stringValue = Strings.text(.editObjectPreviewGraded, grade.number)
-                for view in [graded, ungraded, gradedCaption, ungradedCaption] as [NSView] { view.isHidden = false }
-                show(editing.objectState.graded.file, in: graded, shown: &shownGraded)
-                show(editing.objectState.ungraded.file, in: ungraded, shown: &shownUngraded)
-                frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + editing.objectName(ObjectKey(.grade, grade.number)))
-            }
-        } else if let transition = editing.selectedTransition {
-            curve.show(easing: transition.easing, ms: transition.ms)
-            curve.isHidden = false
-        } else if let audio = editing.selectedAudioTransition {
-            curve.show(easing: audio.easing, ms: audio.ms, offsetMs: audio.offsetMs)
-            curve.isHidden = false
-        } else {
-            caption.stringValue = Strings.text(.editObjectPreviewNone)
-            caption.textColor = Palette.faintText
-            caption.isHidden = false
-        }
-        if !curve.isHidden { frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + curve.caption.stringValue) }
-        if !caption.isHidden { frame_.setAccessibilityLabel(Strings.text(.editPreview) + ", " + caption.stringValue) }
-        needsLayout = true
-    }
-
-    /// An engine picture in an image view, read again only when its file changes.
-    private func show(_ file: String?, in view: NSImageView, shown: inout String?) {
-        guard file != shown else { return }
-        shown = file
-        guard let file, let root = machineRoot else {
-            view.image = nil
-            return
-        }
-        view.image = PictureStore.shared.picture(at: root.appendingPathComponent(file)) { [weak view] image in view?.image = image }
-    }
-
     /// "Hiding 2 channels", while any cue-grid row is hidden from the picture.
     let hiding = PillButton(style: .amber)
 
@@ -255,22 +172,9 @@ final class PreviewPanelView: PanelView {
         let captionHeight = min(picture.frame.height - 16, ceil(caption.cell?.cellSize(forBounds: picture.frame.insetBy(dx: 16, dy: 8)).height ?? 18))
         caption.frame = NSRect(x: picture.frame.minX + 16, y: picture.frame.midY - captionHeight / 2, width: max(0, picture.frame.width - 32),
                                height: max(0, captionHeight))
-        // A grade's two pictures side by side, each 16 by 9 with its caption under it; the curve fills the frame.
-        let half = max(0, (picture.frame.width - 8) / 2)
-        let pictureHeight = min(half * 9 / 16, max(0, picture.frame.height - 22))
-        let top = picture.frame.minY + max(0, (picture.frame.height - pictureHeight - 18) / 2)
-        graded.frame = NSRect(x: picture.frame.minX, y: top, width: half, height: pictureHeight)
-        ungraded.frame = NSRect(x: graded.frame.maxX + 8, y: top, width: half, height: pictureHeight)
-        gradedCaption.frame = NSRect(x: graded.frame.minX, y: graded.frame.maxY + 3, width: half, height: 15)
-        ungradedCaption.frame = NSRect(x: ungraded.frame.minX, y: ungraded.frame.maxY + 3, width: half, height: 15)
-        curve.frame = picture.frame
         // "from `render` ... at the monitor's width in pixels (§3)".
         let scale = window?.backingScaleFactor ?? 2
-        if model.editing.page == .objects {
-            if half > 0 { model.editing.gradeWidth(Int((half * scale).rounded())) }
-        } else if picture.frame.width > 0 {
-            model.editing.previewWidth(Int((picture.frame.width * scale).rounded()))
-        }
+        if picture.frame.width > 0 { model.editing.previewWidth(Int((picture.frame.width * scale).rounded())) }
     }
 }
 

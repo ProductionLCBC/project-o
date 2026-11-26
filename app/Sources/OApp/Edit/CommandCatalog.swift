@@ -69,7 +69,7 @@ public struct CommandLeaf: Equatable, Sendable {
 }
 
 /// One group of the tree.
-public struct CommandGroup: Equatable, Sendable {
+public struct CommandBranch: Equatable, Sendable {
     public var title: String
     public var leaves: [CommandLeaf]
 }
@@ -79,7 +79,7 @@ public struct CommandGroup: Equatable, Sendable {
 @MainActor
 public enum CommandCatalog {
     /// The tree for a cue's commands, or for macro `macro`'s, which adds Channels and marks the recursive macros.
-    public static func groups(catalog: Catalog, macro: Int? = nil) -> [CommandGroup] {
+    public static func groups(catalog: Catalog, macro: Int? = nil) -> [CommandBranch] {
         let settings = catalog.settings ?? MachineSettings()
         func field(_ id: String, _ label: StringKey, _ kind: CommandField.Kind, optional: Bool = false) -> CommandField {
             CommandField(id: id, label: label, kind: kind, optional: optional)
@@ -88,9 +88,9 @@ public enum CommandCatalog {
             CommandLeaf(kind: kind, title: Strings.text(title), fields: fields)
         }
         let channel = field("channel", .editFormChannel, .pick(.channel))
-        var groups: [CommandGroup] = []
+        var groups: [CommandBranch] = []
         func add(_ title: StringKey, _ leaves: [CommandLeaf]) {
-            if !leaves.isEmpty { groups.append(CommandGroup(title: Strings.text(title), leaves: leaves)) }
+            if !leaves.isEmpty { groups.append(CommandBranch(title: Strings.text(title), leaves: leaves)) }
         }
         add(.editBrowserPlayback, [
             leaf(.next, .editBrowserNext), leaf(.previous, .editBrowserPrevious),
@@ -156,7 +156,7 @@ public enum CommandCatalog {
 
     /// "a search field over a tree": the groups with only the commands whose title has the words typed, case and
     /// accents ignored; empty, everything.
-    public static func filter(_ groups: [CommandGroup], _ query: String) -> [CommandGroup] {
+    public static func filter(_ groups: [CommandBranch], _ query: String) -> [CommandBranch] {
         let words = query.split(separator: " ").map { String($0) }
         guard !words.isEmpty else { return groups }
         func has(_ text: String) -> Bool {
@@ -164,7 +164,7 @@ public enum CommandCatalog {
         }
         return groups.compactMap { group in
             let leaves = has(group.title) ? group.leaves : group.leaves.filter { has($0.title) }
-            return leaves.isEmpty ? nil : CommandGroup(title: group.title, leaves: leaves)
+            return leaves.isEmpty ? nil : CommandBranch(title: group.title, leaves: leaves)
         }
     }
 

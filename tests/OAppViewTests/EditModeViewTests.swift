@@ -552,21 +552,31 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(inspector.commandRows.first?.menuNow).titles, ["Edit…", "Move Up", "Move Down", "Remove"])
         try XCTUnwrap(inspector.commandRows.first?.menuNow?.entry("Remove")).choose()
         XCTAssertEqual(last(rig), ["edit list 7 cue \(out) remove commands 1"])
-        // The palette: grouped by what they touch, only for what exists; a macro is added at once, at the end.
-        var presented: [PromptView] = []
-        let palette = EditPopovers.palette(model: rig.model, after: nil) { presented.append($0) }
-        XCTAssertEqual(palette.items.map(\.title), ["Stacks and outputs", "Macros", "Timers", "Popups", "System"])
-        let macros = try XCTUnwrap(palette.items[1].submenu)
-        XCTAssertEqual(macros.titles, ["1 · Welcome", "2 · Preshow"])
-        try XCTUnwrap(macros.items.first as? ClosureMenuItem).choose()
+        // Spec 11 §4 as corrected 2026-11-25 — the palette is a browser: "a search field over a tree of the commands,
+        // grouped by what they touch and offering only what exists"; a cue's has no Channels group.
+        let (panel, browser) = inspector.browser()
+        XCTAssertEqual(panel.save.title, "Add")
+        XCTAssertEqual(browser.nodes.map(\.title), ["Playback", "Stacks and outputs", "Audio", "Macros", "Timers", "Popups", "System"])
+        XCTAssertEqual(browser.nodes[3].children.map(\.title), ["1 · Welcome", "2 · Preshow"])
+        XCTAssertTrue(browser.select("1 · Welcome"))
+        XCTAssertEqual(browser.preview.stringValue, "macro 1")
+        panel.commit()
         XCTAssertEqual(last(rig), ["edit list 7 cue \(out) insert commands 3 { \"cmd\": \"macro.run\", \"macro\": 1 }"])
-        // One that needs asking opens a small form with pickers; Add inserts it.
-        try XCTUnwrap(palette.items[0].submenu?.entry("Black Out a Stack…")).choose()
-        let form = try XCTUnwrap(presented.last)
-        XCTAssertEqual(form.heading.stringValue, "Black Out a Stack")
-        XCTAssertEqual(form.save.title, "Add")
-        form.commit()
+        // One with a form: its pickers beside the tree, its canonical text under them; Add inserts it.
+        let (second, form) = inspector.browser()
+        XCTAssertTrue(form.select("Black Out a Stack…"))
+        XCTAssertEqual(form.formTitle.stringValue, "Black Out a Stack")
+        XCTAssertEqual(form.preview.stringValue, "stack 1 blackout on")
+        second.commit()
         XCTAssertEqual(last(rig), ["edit list 7 cue \(out) insert commands 3 { \"cmd\": \"stack.blackout\", \"stack\": 1, \"state\": \"on\" }"])
+        // The search narrows the tree; the line at the foot takes any command typed.
+        form.filter("timer")
+        XCTAssertEqual(form.nodes.map(\.title), ["Timers"])
+        let (third, _) = inspector.browser()
+        let typed = try XCTUnwrap(third.subviews.compactMap { $0 as? ShowField }.first)
+        typed.stringValue = "timer 1 start"
+        third.commit()
+        XCTAssertEqual(last(rig), ["edit list 7 cue \(out) insert commands 3 { \"cmd\": \"timer.start\", \"timer\": 1 }"])
         // Commands as text: the cue's whole list, a line a command; an error keeps it from being sent.
         inspector.asText.performClick(nil)
         XCTAssertTrue(inspector.showsText)
@@ -983,6 +993,10 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(list.sections[0].add.title, "+  New Grade")
         XCTAssertNil(list.sections[1].rows[0].more.dropMenu, "a transition has no menu")
         XCTAssertEqual(list.sections[0].rows[0].more.dropMenu?.items.map(\.title), ["Duplicate", "Renumber…", "", "Delete…"])
+        // "a row's ⋯ menu, and its right-click menu".
+        let click = try XCTUnwrap(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                     context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        XCTAssertEqual(list.sections[0].rows[0].menu(for: click)?.items.map(\.title), ["Duplicate", "Renumber…", "", "Delete…"])
         let page = view.workspace.objects
         XCTAssertFalse(page.isHidden)
         XCTAssertEqual(view.workspace.title.stringValue, "Grade 1 Warm")
@@ -997,8 +1011,10 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit grade 1 opacity 0.5"])
         let renders = rig.sent.filter { $0.fields["what"] == .string("render") }.map { $0.fields["canvas"] }
         XCTAssertTrue(renders.contains(.string("grade")) && renders.contains(.string("ungraded")), "\(renders)")
-        XCTAssertFalse(view.previewPanel.graded.isHidden)
-        XCTAssertEqual(view.previewPanel.picker.numberOfItems, editing.gradeMediaChoices.count, "the item picked under the preview")
+        // "the item through the grade beside the same item without it, the item picked over them", on the stage.
+        XCTAssertFalse(page.stage.graded.isHidden)
+        XCTAssertEqual(page.stage.firstPicker.numberOfItems, editing.gradeMediaChoices.count)
+        XCTAssertGreaterThan(page.stage.frame.width, page.editor.scroll.frame.width, "the stage takes the rest of the width")
         XCTAssertEqual(page.number.stringValue, "1")
         XCTAssertTrue(page.number.isEnabled)
         // A transition: duration and easing only, its number fixed; the Preview draws its curve.
@@ -1012,8 +1028,17 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit transition 2 ms 750"])
         page.easing.choose(tag: 2)
         XCTAssertEqual(last(rig), ["edit transition 2 easing \"easeOut\""])
-        XCTAssertFalse(view.previewPanel.curve.isHidden)
-        XCTAssertEqual(view.previewPanel.curve.caption.stringValue, "Ease in and out over 0.5 s", "the recorded dissolve, until the library event")
+        // "The stage plays the transition from one pool item to another, both picked over it ..., with Play, a loop
+        // switch and a scrub bar over the easing curve".
+        let stage = page.stage
+        XCTAssertFalse(stage.player.isHidden)
+        XCTAssertEqual(stage.firstPicker.titleOfSelectedItem, "dawn.mp4")
+        XCTAssertEqual(stage.curve.caption.stringValue, "Ease in and out over 0.5 s", "the recorded dissolve, until the library event")
+        XCTAssertTrue(rig.sent.contains { $0.fields["canvas"] == .string("from") }, "the engine's picture of the first item")
+        stage.show(elapsed: ObjectStageView.holdMs + 250)
+        XCTAssertEqual(stage.player.mix.incoming, 0.5, accuracy: 1e-9, "half way through the dissolve")
+        XCTAssertEqual(stage.curve.playhead ?? 0, 0.5, accuracy: 1e-9)
+        XCTAssertTrue(view.previewPanel.picture.isHidden, "the Preview monitor shows the live stack")
         // An audio transition: its type and its offset.
         list.sections[2].rows[1].onSelect?()
         XCTAssertFalse(page.offset.isHidden)
@@ -1030,16 +1055,27 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit textstyle 1 size.value 60"])
         XCTAssertFalse(page.reapply.isHidden)
         XCTAssertTrue(page.reapply.isEnabled)
-        XCTAssertFalse(view.previewPanel.caption.isHidden, "no picture for a style")
+        // "The stage draws a sample in the style on the shape of the thumbnail stack".
+        XCTAssertFalse(page.stage.sample.isHidden)
+        XCTAssertEqual(page.stage.sample.text, editing.styleSampleText)
+        XCTAssertNotNil(page.stage.sample.attributed(scale: 0.5))
         // A macro: its commands, the palette with a Channels group, the scope, the tile.
         list.sections[4].rows[0].onSelect?()
-        XCTAssertEqual(page.commands.rows.count, 4)
-        XCTAssertEqual(page.scope.stringValue, Strings.text(.editObjectScopeLibrary))
-        let palette = page.commands.paletteNow
-        XCTAssertEqual(palette.items.first?.title, "Channels")
-        XCTAssertEqual(palette.items.first?.submenu?.items.map(\.title),
-                       ["Write Media…", "Write Text…", "Clear…", "Reset…", "Grade…", "Transition…", "Audio Transition…", "Gain…"])
-        let rowMenu = try XCTUnwrap(page.commands.rows[0].menuNow)
+        let commands = page.stage.commands
+        XCTAssertEqual(commands.rows.count, 4)
+        XCTAssertEqual(page.scope.title, "Library", "the scope as a tag")
+        // The browser, with the Channels group and the macro itself refused.
+        let (panel, browser) = commands.browser()
+        XCTAssertEqual(browser.nodes.prefix(2).map(\.title), ["Playback", "Channels"])
+        XCTAssertEqual(browser.nodes[1].children.map(\.title),
+                       ["Write Media…", "Write Text…", "Clear…", "Reset…", "Play, Pause or Stop…", "At the End…", "Lock or Unlock…", "Freeze…",
+                        "Grade…", "Transition…", "Audio Transition…", "Gain…"])
+        XCTAssertFalse(browser.select("1 · Welcome"), "Recursive and not offered")
+        XCTAssertTrue(browser.select("Clear…"))
+        XCTAssertEqual(browser.preview.stringValue, "channel 1 clear")
+        panel.commit()
+        XCTAssertEqual(last(rig), ["edit macro 1 insert commands 4 { \"channel\": 1, \"cmd\": \"channel.clear\" }"])
+        let rowMenu = try XCTUnwrap(commands.rows[0].menuNow)
         XCTAssertEqual(rowMenu.items.map(\.title), ["Edit…", "Move Up", "Move Down", "Remove"])
         rowMenu.performActionForItem(at: 2)
         XCTAssertEqual(last(rig), ["edit macro 1 move commands 0 1"])
@@ -1047,7 +1083,7 @@ final class EditModeViewTests: XCTestCase {
         page.tileLabel.sendAction(page.tileLabel.action, to: page.tileLabel.target)
         XCTAssertEqual(last(rig), ["edit macro 1 tileLabel \"Hi\""])
         list.sections[4].rows[1].onSelect?()
-        XCTAssertEqual(page.scope.stringValue, Strings.text(.editObjectScopeMachine), "Preshow names an output and a stack")
+        XCTAssertEqual(page.scope.title, "Machine", "Preshow names an output and a stack")
         // The + row of a group makes one.
         list.sections[2].add.press()
         XCTAssertEqual(last(rig), ["edit audiotransition create"])
@@ -1178,7 +1214,8 @@ final class EditModeViewTests: XCTestCase {
         try XCTUnwrap(sixth.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-presets.png"))
         // The Objects page: a grade, an audio transition, a text style and a macro.
         rig.model.editing.show(page: .objects)
-        for (key, name) in [(ObjectKey(.grade, 1), "grade"), (ObjectKey(.audioTransition, 2), "audio"), (ObjectKey(.textStyle, 1), "style"),
+        for (key, name) in [(ObjectKey(.grade, 1), "grade"), (ObjectKey(.transition, 3), "transition"), (ObjectKey(.audioTransition, 2), "audio"),
+                            (ObjectKey(.textStyle, 1), "style"),
                             (ObjectKey(.macro, 2), "macro")] {
             rig.model.editing.selectObject(key)
             rig.view.layoutSubtreeIfNeeded()

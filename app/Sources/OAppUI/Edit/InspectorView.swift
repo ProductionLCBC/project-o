@@ -364,15 +364,18 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
 
     // MARK: - The Commands column
 
-    /// "The palette (E4): Add Command offers, grouped by what they touch and only for what exists ...".
+    /// Spec 11 §4 as corrected 2026-11-25 — "Add Command opens a search field over a tree of the commands".
     private func showPalette() {
         guard !inspector.isMulti, inspector.number != nil else { return }
+        host?.present(browser().0, at: addCommand)
+    }
+
+    /// The browser, as Add Command opens it on the selected cue.
+    func browser() -> (PromptView, CommandBrowserView) {
         let after = commandRows.first(where: \.isChosen)?.line.position
-        let menu = EditPopovers.palette(model: model, after: after) { [weak self] panel in
-            guard let self else { return }
-            self.host?.present(panel, at: self.addCommand)
+        return CommandBrowser.panel(model: model, macro: nil) { [weak model] command in
+            model?.editing.insertCommand(command, after: after)
         }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: addCommand.bounds.height + 2), in: addCommand)
     }
 
     private func menu(for line: CueCommandLine, at anchor: NSView) -> NSMenu {

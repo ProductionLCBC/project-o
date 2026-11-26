@@ -1,20 +1,26 @@
-// OAppUI — Spec 11 §9, the small editors: the Objects page's workspace, the selected object's own editor in one tall
-// column and beside it what every object shares; the grade's sliders, the easing curve and a macro's commands.
+// OAppUI — Spec 11 §9 as corrected 2026-11-25 (G-37), the small editors: the Objects page's workspace, the selected
+// object in one column, its number and label at the top and Used by at the foot, and the rest of the width its stage.
 
 import AppKit
 import OApp
 import OCore
 
-/// Spec 11 §9 — the Objects page's workspace: "The rest of the center edits the selected object; the right column holds
-/// what every object shares". The objects themselves are the page's list (PageListView), in their groups.
+/// Spec 11 §9 — "The workspace holds the selected object in one column, its number and label at the column's top and
+/// Used by ... at its foot, and gives the rest of its width to the object's preview, the stage." The objects themselves
+/// are the page's list (PageListView), in their groups.
 @MainActor
 final class ObjectWorkspaceView: NSView {
     private let model: ShowModel
-    weak var host: ShowWindowView? { didSet { commands.host = host } }
-    /// The object's own editor, one tall column.
+    weak var host: ShowWindowView? { didSet { stage.host = host } }
+    var machineRoot: URL? { didSet { stage.machineRoot = machineRoot } }
+    /// The object, one tall column.
     let editor = FormColumn()
     let heading = Kit.heading("")
     let selectNote = Kit.label(Strings.text(.editObjectSelectOne), size: 12, color: Palette.faintText)
+    // Its number and label.
+    let number = EditField()
+    let fixedNote = Kit.label(Strings.text(.editObjectFixed), size: 11, color: Palette.faintText)
+    let label = EditField()
     // Grades.
     private(set) var sliders: [GradeParameter: GradeSlider] = [:]
     private(set) var gradeFields: [GradeParameter: EditField] = [:]
@@ -26,26 +32,20 @@ final class ObjectWorkspaceView: NSView {
     let easing = ChoicePopUp(label: Strings.text(.editObjectEasing))
     let transitionColor = FormColorWell(label: Strings.text(.editObjectColor))
     let offset = EditField()
-    let offsetNote = Kit.label(Strings.text(.editObjectOffsetNote), size: 11, color: Palette.faintText)
     // Text styles.
     let style = StyleForm()
-    // Macros.
-    let runOnAir = FlatButton(Strings.text(.editObjectRunOnAir), style: .plain)
-    let scope = Kit.label(size: 11.5, color: Palette.dimText)
-    let commands: MacroCommandsView
-    let tileHeading = Kit.heading(Strings.text(.editObjectTileHeading))
-    let tileColor = FormColorWell(label: Strings.text(.editObjectTileColor))
-    let tileLabel = EditField()
-    /// What every object shares.
-    let shared = FormColumn()
-    let sharedHeading = Kit.heading(Strings.text(.editObjectShared))
-    let number = EditField()
-    let fixedNote = Kit.label(Strings.text(.editObjectFixed), size: 11, color: Palette.faintText)
-    let label = EditField()
     let styleBoxes = Kit.label(size: 11.5, color: Palette.dimText)
     let reapply = FlatButton(Strings.text(.editObjectReapply), style: .plain)
+    // Macros.
+    let scope = PillButton()
+    let runOnAir = FlatButton(Strings.text(.editObjectRunOnAir), style: .plain)
+    let tileColor = FormColorWell(label: Strings.text(.editObjectTileColor))
+    let tileLabel = EditField()
+    // Used by, at the foot.
     let usedHeading = Kit.heading(Strings.text(.editObjectUsedBy))
     let usedBy = Kit.label(size: 11.5, color: Palette.text)
+    /// The rest of the width: the object's preview, or a macro's commands.
+    let stage: ObjectStageView
     /// The field committed last: outlined in red while the engine's refusal of it stands (Spec 11 §2).
     private weak var lastField: EditField?
 
@@ -56,12 +56,12 @@ final class ObjectWorkspaceView: NSView {
 
     init(model: ShowModel) {
         self.model = model
-        commands = MacroCommandsView(model: model)
+        stage = ObjectStageView(model: model)
         super.init(frame: .zero)
-        buildEditor()
-        buildShared()
+        build()
         addSubview(editor.scroll)
-        addSubview(shared.scroll)
+        addSubview(stage)
+        stage.commands.onResize = { [weak self] in self?.needsLayout = true }
     }
 
     @available(*, unavailable)
@@ -86,13 +86,30 @@ final class ObjectWorkspaceView: NSView {
         }
     }
 
-    private func buildEditor() {
+    private func build() {
         let c = editor
-        c.nameShare = 0.3
+        c.nameShare = 0.44
         c.wide(heading, height: 14)
         wrap(selectNote)
         c.wide(selectNote, height: 34)
-        // "Each parameter is a slider with a number field and its identity marked".
+        // "its number and label at the column's top".
+        number.setAccessibilityLabel(Strings.text(.editObjectNumber))
+        number.onCommit = { [weak self] text in
+            guard let self else { return }
+            self.lastField = self.number
+            if let value = Int(text.trimmingCharacters(in: .whitespaces)), value >= 1 { self.model.editing.renumberObject(to: value) } else { self.number.putBack() }
+            self.refresh()
+        }
+        c.row(Strings.text(.editObjectNumber), [number], widths: [64], height: 26)
+        wrap(fixedNote)
+        c.wide(fixedNote, height: 30)
+        label.setAccessibilityLabel(Strings.text(.editFieldLabel))
+        label.onCommit = { [weak self] text in
+            self?.lastField = self?.label
+            self?.model.editing.setObject("label", .string(text))
+        }
+        c.row(Strings.text(.editFieldLabel), [label], height: 26)
+        // Grades: "Each parameter is a slider with a number field and its identity marked".
         for parameter in GradeParameter.allCases {
             let slider = GradeSlider(parameter)
             slider.onRelease = { [weak model] value in model?.editing.setGrade(parameter, shown: value) }
@@ -100,14 +117,14 @@ final class ObjectWorkspaceView: NSView {
             numeric(field, EditModeWording.parameter(parameter)) { [weak model] value in model?.editing.setGrade(parameter, shown: value) }
             sliders[parameter] = slider
             gradeFields[parameter] = field
-            c.row(EditModeWording.parameter(parameter), [slider, field], widths: [nil, 64], height: 24)
+            c.row(EditModeWording.parameter(parameter), [slider, field], widths: [nil, 56], height: 24)
         }
         // "tint, a colour well (white is identity)".
         tint.onChoose = { [weak model] picked in model?.editing.setObject("tint", FormColor.value(picked)) }
         tint.toolTip = Strings.text(.editGradeIdentity, "white")
         c.row(Strings.text(.editGradeTint), [tint], widths: [44], height: 24)
-        // "Their duration (`ms`) and easing can be edited; their type and colour stay as built"; an audio transition's
-        // type is "picked from cut, crossfade and fade through silence".
+        // Transitions: "Their duration (`ms`) and easing can be edited; their type and colour stay as built"; an audio
+        // transition's type is picked "from cut, crossfade and fade through silence".
         audioType.onChoose = { [weak model] tag in
             guard Self.audioTypes.indices.contains(tag) else { return }
             model?.editing.setObject("type", .string(Self.audioTypes[tag].rawValue))
@@ -126,15 +143,27 @@ final class ObjectWorkspaceView: NSView {
         numeric(offset, Strings.text(.editObjectOffset)) { [weak model] value in
             model?.editing.setObject("offsetMs", .number(min(1000, max(-1000, value.rounded()))))
         }
+        offset.toolTip = Strings.text(.editObjectOffsetNote)
         c.row(Strings.text(.editObjectOffset), [offset], widths: [80], height: 26)
-        wrap(offsetNote)
-        c.wide(offsetNote, height: 30)
-        // Text styles: "the style form of §8".
+        // Text styles: "the style form of §8", then Re-apply to Boxes with how many name it.
         style.onSet = { [weak model] field, value in model?.editing.setTextStyle(field, value) }
         style.onCommit = { [weak self] field in self?.lastField = field }
         style.onPutBack = { [weak self] in self?.refresh() }
         style.addRows(to: c)
-        // Macros: Run on Air, the scope, the commands, then the tile.
+        reapply.fontSize = 11.5
+        reapply.onPress = { [weak model] in model?.editing.reapplyToBoxes() }
+        wrap(styleBoxes)
+        c.wide(styleBoxes, height: 30)
+        c.row(nil, [reapply], widths: [max(140, reapply.fitting.width + 8)], height: 24)
+        // Macros: the tile, the scope as a tag, Run on Air.
+        tileColor.onChoose = { [weak model] picked in model?.editing.setObject("color", FormColor.value(picked)) }
+        tileLabel.setAccessibilityLabel(Strings.text(.editObjectTileLabel))
+        tileLabel.onCommit = { [weak self] text in
+            self?.lastField = self?.tileLabel
+            self?.model.editing.setObject("tileLabel", .string(text))
+        }
+        c.row(Strings.text(.editObjectTileLabel), [tileLabel, tileColor], widths: [nil, 44], height: 26)
+        c.row(Strings.text(.editObjectScope), [scope], widths: [100], height: PillButton.height)
         runOnAir.fontSize = 12
         runOnAir.onPress = { [weak self] in
             // "commits an open field first".
@@ -142,45 +171,7 @@ final class ObjectWorkspaceView: NSView {
             self?.model.editing.runMacro()
         }
         c.row(nil, [runOnAir], widths: [max(140, runOnAir.fitting.width + 8)], height: 26)
-        wrap(scope)
-        c.wide(scope, height: 30)
-        c.wide(commands, height: 60)
-        commands.onResize = { [weak self] in self?.refresh() }
-        c.wide(tileHeading, height: 14)
-        tileColor.onChoose = { [weak model] picked in model?.editing.setObject("color", FormColor.value(picked)) }
-        c.row(Strings.text(.editObjectTileColor), [tileColor], widths: [44], height: 24)
-        tileLabel.setAccessibilityLabel(Strings.text(.editObjectTileLabel))
-        tileLabel.onCommit = { [weak self] text in
-            self?.lastField = self?.tileLabel
-            self?.model.editing.setObject("tileLabel", .string(text))
-        }
-        c.row(Strings.text(.editObjectTileLabel), [tileLabel], height: 26)
-    }
-
-    private func buildShared() {
-        let c = shared
-        c.wide(sharedHeading, height: 14)
-        number.setAccessibilityLabel(Strings.text(.editObjectNumber))
-        number.onCommit = { [weak self] text in
-            guard let self else { return }
-            self.lastField = self.number
-            if let value = Int(text.trimmingCharacters(in: .whitespaces)), value >= 1 { self.model.editing.renumberObject(to: value) } else { self.number.putBack() }
-            self.refresh()
-        }
-        c.row(Strings.text(.editObjectNumber), [number], widths: [70], height: 26)
-        wrap(fixedNote)
-        c.wide(fixedNote, height: 44)
-        label.setAccessibilityLabel(Strings.text(.editFieldLabel))
-        label.onCommit = { [weak self] text in
-            self?.lastField = self?.label
-            self?.model.editing.setObject("label", .string(text))
-        }
-        c.row(Strings.text(.editFieldLabel), [label], height: 26)
-        wrap(styleBoxes)
-        c.wide(styleBoxes, height: 18)
-        reapply.fontSize = 11.5
-        reapply.onPress = { [weak model] in model?.editing.reapplyToBoxes() }
-        c.row(nil, [reapply], widths: [max(150, reapply.fitting.width + 8)], height: 24)
+        // "Used by (from `uses`, §3) at its foot".
         c.wide(usedHeading, height: 14)
         wrap(usedBy)
         c.wide(usedBy, height: 18)
@@ -194,10 +185,17 @@ final class ObjectWorkspaceView: NSView {
         var refused = false
         if case .rejected? = editing.notice { refused = true }
         for field in [number, label, ms, offset, tileLabel] + Array(gradeFields.values) + style.fields { field.isRefused = refused && field === lastField }
-        let kind = key?.kind
         selectNote.isHidden = key != nil
-        heading.isHidden = key == nil
+        for view in [heading, number, label, usedHeading, usedBy] as [NSView] { view.isHidden = key == nil }
         let subject = AnyHashable(key.map { "\($0.kind.rawValue)-\($0.number)" } ?? "")
+        if let key {
+            number.show(String(key.number), placeholder: String(key.number), subject: subject)
+            // "Transitions ... can't be renumbered or swapped (Spec 5 §6)."
+            number.isEnabled = !key.kind.isFixed
+            label.show(editing.objectLabel, placeholder: EditModeWording.objectName(key.kind, key.number), subject: subject)
+            Kit.setHeading(heading, EditModeWording.group(key.kind))
+        }
+        fixedNote.isHidden = key?.kind.isFixed != true
         // Grades.
         let grade = editing.selectedGrade
         for parameter in GradeParameter.allCases {
@@ -220,7 +218,6 @@ final class ObjectWorkspaceView: NSView {
         easing.isHidden = ms.isHidden
         transitionColor.isHidden = transition?.type != .fadeThroughColor
         offset.isHidden = audio == nil
-        offsetNote.isHidden = audio == nil
         let easings = Self.easings.enumerated().map { (EditModeWording.easing($0.element), $0.offset) }
         if let transition {
             transitionType.stringValue = EditModeWording.transitionType(transition.type)
@@ -238,54 +235,26 @@ final class ObjectWorkspaceView: NSView {
         // Text styles.
         let textStyle = editing.selectedTextStyle
         style.setHidden(textStyle == nil)
-        if let textStyle { style.show(textStyle.values, subject: subject, fonts: editing.presetState.fonts) }
-        // Macros.
+        styleBoxes.isHidden = textStyle == nil
+        reapply.isHidden = textStyle == nil
+        if let textStyle {
+            style.show(textStyle.values, subject: subject, fonts: editing.presetState.fonts)
+            let boxes = editing.styledBoxes.count
+            styleBoxes.stringValue = Strings.counted(.editObjectStyleBoxes, boxes)
+            reapply.isEnabled = boxes > 0
+        }
+        // Macros: "the scope as a tag, computed".
         let macro = editing.selectedMacro
-        for view in [runOnAir, scope, commands, tileHeading, tileColor, tileLabel] as [NSView] { view.isHidden = macro == nil }
+        for view in [scope, runOnAir, tileColor, tileLabel] as [NSView] { view.isHidden = macro == nil }
         if let macro {
-            // "A marker shows its scope, computed".
-            scope.stringValue = Strings.text(macro.isMachineLevel ? .editObjectScopeMachine : .editObjectScopeLibrary)
+            scope.title = Strings.text(macro.isMachineLevel ? .editObjectScopeTagMachine : .editObjectScopeTagLibrary)
+            scope.toolTip = Strings.text(macro.isMachineLevel ? .editObjectScopeMachine : .editObjectScopeLibrary)
+            scope.setAccessibilityLabel(Strings.text(.editObjectScope) + ", " + scope.title)
             tileColor.color = FormColor.ns(macro.color)
             tileLabel.show(macro.tileLabel, subject: subject)
             runOnAir.isEnabled = model.store.cannotSend == nil
             runOnAir.reason = ShowWording.unavailable(model.store.cannotSend)
-            commands.refresh()
-            editor.setHeight(commands.wantedHeight, of: commands)
         }
-        if let kind {
-            switch kind {
-            case .grade: Kit.setHeading(heading, Strings.text(.editObjectGradeHeading))
-            case .transition: Kit.setHeading(heading, Strings.text(.editObjectTransitionHeading))
-            case .audioTransition: Kit.setHeading(heading, Strings.text(.editObjectAudioHeading))
-            case .textStyle: Kit.setHeading(heading, Strings.text(.editObjectStyleHeading))
-            case .macro: Kit.setHeading(heading, Strings.text(.editObjectMacroHeading))
-            }
-        }
-        refreshShared(key)
-        editor.needsLayout = true
-        shared.needsLayout = true
-        needsLayout = true
-    }
-
-    private func refreshShared(_ key: ObjectKey?) {
-        let editing = model.editing
-        for view in [sharedHeading, number, label, usedHeading, usedBy] as [NSView] { view.isHidden = key == nil }
-        guard let key else {
-            for view in [fixedNote, styleBoxes, reapply] as [NSView] { view.isHidden = true }
-            return
-        }
-        let subject = AnyHashable("\(key.kind.rawValue)-\(key.number)")
-        number.show(String(key.number), placeholder: String(key.number), subject: subject)
-        // "Transitions ... can't be renumbered or swapped (Spec 5 §6)."
-        number.isEnabled = !key.kind.isFixed
-        fixedNote.isHidden = !key.kind.isFixed
-        label.show(editing.objectLabel, placeholder: EditModeWording.objectName(key.kind, key.number), subject: subject)
-        // Text styles: "Re-apply to Boxes ..., after saying how many".
-        let boxes = key.kind == .textStyle ? editing.styledBoxes.count : 0
-        styleBoxes.isHidden = key.kind != .textStyle
-        reapply.isHidden = key.kind != .textStyle
-        styleBoxes.stringValue = Strings.counted(.editObjectStyleBoxes, boxes)
-        reapply.isEnabled = boxes > 0
         // "Used by, from `uses` (§3)".
         let media = model.store.media
         var lines = editing.objectState.usedBy.map { use in
@@ -294,25 +263,27 @@ final class ObjectWorkspaceView: NSView {
         if editing.objectState.usedMore { lines.append(Strings.text(.editObjectUsedMore)) }
         usedBy.stringValue = lines.isEmpty ? Strings.text(.editObjectUsedNone) : lines.joined(separator: "\n")
         usedBy.textColor = lines.isEmpty ? Palette.faintText : Palette.text
-        shared.setHeight(CGFloat(max(1, lines.count)) * 17 + 2, of: usedBy)
+        editor.setHeight(CGFloat(max(1, lines.count)) * 17 + 2, of: usedBy)
+        stage.refresh()
+        editor.needsLayout = true
+        needsLayout = true
     }
 
-    /// The editor's column: as wide as its fields want, the shared column taking the rest.
-    private var editorWidth: CGFloat { max(360, min(600, bounds.width * 0.62)) }
+    /// The column: as wide as its fields want and no wider; the stage takes the rest.
+    private var columnWidth: CGFloat { min(440, max(360, bounds.width * 0.36)) }
 
     override func layout() {
         super.layout()
         guard bounds.width > 120 else { return }
-        editor.scroll.frame = NSRect(x: 0, y: 0, width: editorWidth, height: bounds.height)
+        editor.scroll.frame = NSRect(x: 0, y: 0, width: columnWidth, height: bounds.height)
         editor.place()
-        shared.scroll.frame = NSRect(x: editorWidth + 1, y: 0, width: max(0, bounds.width - editorWidth - 1), height: bounds.height)
-        shared.place()
+        stage.frame = NSRect(x: columnWidth + 1, y: 0, width: max(0, bounds.width - columnWidth - 1), height: bounds.height)
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // The line between the object's editor and what every object shares.
+        // The line between the object's column and its stage.
         Palette.hairline.setFill()
-        NSRect(x: editorWidth, y: 10, width: 1, height: max(0, bounds.height - 20)).fill()
+        NSRect(x: columnWidth, y: 10, width: 1, height: max(0, bounds.height - 20)).fill()
     }
 }
 
@@ -372,6 +343,10 @@ final class EasingCurveView: NSView {
     var ms = 0 { didSet { needsDisplay = true } }
     var offsetMs = 0 { didSet { needsDisplay = true } }
     let caption = Kit.label(size: 11.5, color: Palette.dimText)
+    /// Where a run of the transition is, from 0 to 1; nil before one.
+    var playhead: Double? { didSet { needsDisplay = true } }
+    /// "a scrub bar over the easing curve": a click or a drag says where.
+    var onScrub: ((Double) -> Void)?
 
     override var isFlipped: Bool { true }
 
@@ -434,7 +409,22 @@ final class EasingCurveView: NSView {
         if to < plot.maxX { curve.line(to: NSPoint(x: plot.maxX, y: plot.minY)) }
         curve.lineWidth = 2
         curve.stroke()
+        if let playhead {
+            Palette.live.setFill()
+            NSRect(x: (from + (to - from) * CGFloat(playhead)).rounded() - 1, y: plot.minY, width: 2, height: plot.height).fill()
+        }
     }
+
+    private var plotFrame: NSRect { NSRect(x: 18, y: 14, width: max(0, bounds.width - 36), height: max(0, bounds.height - 48)) }
+
+    private func scrub(_ event: NSEvent) {
+        guard let onScrub, plotFrame.width > 0 else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        onScrub(min(1, max(0, Double((point.x - plotFrame.minX) / plotFrame.width))))
+    }
+
+    override func mouseDown(with event: NSEvent) { scrub(event) }
+    override func mouseDragged(with event: NSEvent) { scrub(event) }
 }
 
 /// Spec 11 §9, "Macros" — "Commands, in order, each a row with its plain name (Spec 10 §15) and Edit, Move Up, Move Down
@@ -519,22 +509,17 @@ final class MacroCommandsView: NSView, NSTextViewDelegate {
         needsLayout = true
     }
 
-    /// "Add Command" with the palette, the Channels group in it: after the row last clicked, or at the end.
+    /// "added with the palette's browser (§4)", its Channels group in it: after the row last clicked, or at the end.
     private func showPalette() {
-        let after = rows.first(where: \.isChosen)?.line.position
-        let menu = EditPopovers.palette(model: model, after: after, insert: { [weak model] command in
-            model?.editing.insertMacroCommand(command, after: after)
-        }, channelGroup: true) { [weak self] panel in
-            guard let self else { return }
-            self.host?.present(panel, at: self.addCommand)
-        }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: addCommand.bounds.height + 2), in: addCommand)
+        host?.present(browser().0, at: addCommand)
     }
 
-    /// The palette as it stands, for a test.
-    var paletteNow: NSMenu {
-        EditPopovers.palette(model: model, after: nil, insert: { [weak model] command in model?.editing.insertMacroCommand(command, after: nil) },
-                             channelGroup: true) { _ in }
+    /// The browser, for this macro, as Add Command opens it.
+    func browser() -> (PromptView, CommandBrowserView) {
+        let after = rows.first(where: \.isChosen)?.line.position
+        return CommandBrowser.panel(model: model, macro: model.editing.selectedMacro?.number) { [weak model] command in
+            model?.editing.insertMacroCommand(command, after: after)
+        }
     }
 
     private func menu(for line: CueCommandLine, at anchor: NSView) -> NSMenu {

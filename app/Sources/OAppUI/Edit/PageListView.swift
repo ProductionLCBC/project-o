@@ -109,6 +109,16 @@ final class PageListRowView: NSView {
         onSelect?()
         return true
     }
+
+    /// Spec 11 §9 as corrected 2026-11-25 — "a row's ⋯ menu, and its right-click menu": a right-click selects the row and
+    /// opens the same menu.
+    override func rightMouseDown(with event: NSEvent) {
+        onFocus?()
+        onSelect?()
+        super.rightMouseDown(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? { more.isHidden ? nil : more.dropMenu }
 }
 
 /// Spec 11 §2 and G-30 to G-33 — the page's own list, "the page's objects by number and label, the selected one

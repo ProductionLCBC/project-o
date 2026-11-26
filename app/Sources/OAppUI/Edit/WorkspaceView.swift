@@ -35,6 +35,7 @@ final class WorkspaceView: PanelView {
         didSet {
             grid.machineRoot = machineRoot
             presets.machineRoot = machineRoot
+            objects.machineRoot = machineRoot
         }
     }
     /// The window, which opens the popovers the page's controls ask for.

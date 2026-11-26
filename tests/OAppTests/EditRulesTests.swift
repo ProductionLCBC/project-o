@@ -320,7 +320,8 @@ final class EditWordingTests: XCTestCase {
         for code in Set(spec5 + spec8) {
             let sentence = EditWording.rejection(code: code)
             XCTAssertNotEqual(sentence, "The engine refused it (\(code)).", "\(code) has a sentence of its own")
-            XCTAssertTrue(sentence.hasSuffix("."), sentence)
+            // Spec 11 §9 as corrected 2026-11-25 — a macro's refusal "is said the same way", in a short tag.
+            XCTAssertTrue(sentence.hasSuffix(".") || code == "cycle", sentence)
             sentences.insert(sentence)
         }
         XCTAssertEqual(sentences.count, Set(spec5 + spec8).count, "one sentence each")
