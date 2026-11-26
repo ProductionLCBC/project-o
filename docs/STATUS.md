@@ -137,7 +137,10 @@ a tree of the whole vocabulary, for cues and macros alike. The top bar's "Nothin
 lost its hint the same day, on his word (Spec 10 §8; 69a7e8a). Later that day, on his word: a
 grade's tint no longer snaps back while the color panel is open (c5e6dbf), and then, since
 it still did, the real fault: no color well in edit mode had ever sent its color, as a
-well that isn't continuous sends nothing from the color panel (2e4ffc7, hosted CI green); American
+well that isn't continuous sends nothing from the color panel (2e4ffc7, hosted CI green); on
+2026-11-26 a dragged slider holds its value instead of snapping back to the stored one,
+and a grade's hue runs 0° to 360° (Spec 11 §9 corrected first, G-39; 96270b8, hosted CI
+green); American
 spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
 unchanged); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
