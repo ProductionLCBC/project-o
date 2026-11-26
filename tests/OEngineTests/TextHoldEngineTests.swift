@@ -207,8 +207,10 @@ final class TextHoldEngineTests: XCTestCase {
         XCTAssertTrue(lines(late).isEmpty, "not the text the box was drawing: it draws nothing this tick")
         // Stack 1 draws channel 2 as well, through Preset 1: two boxes wait. The clock on stack 2 kept its lines.
         XCTAssertEqual(control.textLateThisBuild, 2)
-        // The render thread counts the boxes that draw nothing: stack 1's is dissolving out of its old lines.
-        XCTAssertEqual(engine.drainMetrics().last?.textLate, 1)
+        // The render thread counts the boxes that draw nothing: both, since Preset 1's body box on stack 1 takes
+        // channel 2's default transition, a cut (Spec 4 §9 as corrected 2026-11-25), and isn't dissolving out of its
+        // old lines.
+        XCTAssertEqual(engine.drainMetrics().last?.textLate, 2)
     }
 
     // MARK: - A stack that changes size (Spec 4 §5)

@@ -213,7 +213,10 @@ final class ApiTopics {
         for line in control.lastResults.flatMap(\.lines) {
             for effect in line.executed.effects {
                 switch effect {
-                case .transition(let transition):
+                case .transition(var transition):
+                    // Spec 10 §3 as corrected 2026-11-25 — "for content a box draws, as text is, the picture's duration
+                    // is that of the longest box transition the change started".
+                    if case .text = transition.to { transition.ms = control.boxTransitionsStarted[transition.channel] ?? 0 }
                     once[transition.channel, default: ApiEvents.ChannelOnce()].transition = transition
                     seqs[transition.channel] = line.seq
                 case .steppedOn(let channel, _):

@@ -94,6 +94,10 @@ final class IdentityTests: XCTestCase {
     func test_renumberingPresetsTransitionsAndGradesRewritesBoxesOutputsRidersAndIndexDefaults() {
         var (library, machine) = roots
         machine.stacks[1].slots[0].preset = 3
+        // Preset 1's body box with a transition of its own; its pixel box takes the channel's (null).
+        if let at = library.presets.firstIndex(where: { $0.number == 1 }) {
+            library.presets[at].layouts[.any]?.boxes[1].transition = BoxTransition(ref: 2, ms: 250)
+        }
 
         XCTAssertEqual(Identity.renumber(.preset, from: 3, to: 9, library: &library, machine: &machine), .renumbered)
         XCTAssertEqual(machine.stack(2)?.slots.map(\.preset), [9, nil])
@@ -103,8 +107,8 @@ final class IdentityTests: XCTestCase {
         XCTAssertEqual(library.channel(1)?.defaultPreset, 1)
 
         XCTAssertEqual(Identity.renumber(.transition, from: 2, to: 4, library: &library, machine: &machine), .renumbered)
-        XCTAssertEqual(library.preset(1)?.layouts[.any]?.boxes[1].transition.ref, 4)
-        XCTAssertEqual(library.preset(1)?.layouts[.any]?.boxes[0].transition.ref, 1)
+        XCTAssertEqual(library.preset(1)?.layouts[.any]?.boxes[1].transition?.ref, 4)
+        XCTAssertNil(library.preset(1)?.layouts[.any]?.boxes[0].transition, "the channel's stays the channel's")
         XCTAssertEqual(machine.output(1)?.transitions, OutputTransitions(switch: 4, blackout: 3))
         XCTAssertEqual(machine.output(2)?.transitions, OutputTransitions(switch: 1, blackout: 4))
         XCTAssertEqual(library.list(number: 42)?.cues[0].commands[0].command.riders?.transition?.ref, 4)

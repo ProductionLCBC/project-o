@@ -5149,6 +5149,18 @@
         }
       }
     },
+    "edit.preset.channelsTransition" : {
+      "comment" : "A box's transition: the channel's, which a cue's transition or the channel's default sets.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel’s"
+          }
+        }
+      }
+    },
     "edit.preset.color" : {
       "comment" : "A text style's colour.",
       "extractionState" : "manual",

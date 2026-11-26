@@ -905,6 +905,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     case editPresetMaxLines = "edit.preset.maxLines"
     case editPresetMinSize = "edit.preset.minSize"
     case editPresetTransition = "edit.preset.transition"
+    case editPresetChannelsTransition = "edit.preset.channelsTransition"
     case editPresetMs = "edit.preset.ms"
     case editPresetOnVariable = "edit.preset.onVariable"
     case editPresetFallback = "edit.preset.fallback"

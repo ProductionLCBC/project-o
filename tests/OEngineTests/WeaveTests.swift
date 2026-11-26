@@ -139,7 +139,9 @@ final class WeaveTests: XCTestCase {
         let engine = try HeadlessEngine(library: EngineFixtures.library(), machine: machine, media: EngineFixtures.media, metal: backend)
         engine.send("channel 2 write text \"Weave\"")
         engine.tick(count: 21)                // tick 20
-        engine.send("channel 2 write text \"Woven\"")   // preset 1's body box dissolves over 250 ms: the picture changes every tick
+        // A cue's 250 ms dissolve, which preset 1's body box runs (it takes the channel's transition, Spec 4 §9 as
+        // corrected 2026-11-25): the picture changes every tick.
+        engine.send("channel 2 write text \"Woven\" transition 2 0.25 once")
         engine.tick()                         // tick 21: the dissolve starts
         XCTAssertEqual(engine.frame, 21)
         engine.tick()                         // tick 22: the first field of the next woven frame

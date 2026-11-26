@@ -203,6 +203,9 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
+    /// Spec 10 §3 as corrected 2026-11-25 — "for content a box draws, as text is, the picture's duration is that of the
+    /// longest box transition the change started": this build's, by channel, in ms.
+    public private(set) var boxTransitionsStarted: [Int: Int] = [:]
     private let builtAt = Atomic<Int64>(0)
     private var slideWarned = false
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
@@ -1352,6 +1355,7 @@ public final class ControlLoop: @unchecked Sendable {
     /// (Spec 4 §4 step 5).
     private func buildPlan(_ frame: Int64) -> FramePlan {
         textLateThisBuild = 0
+        boxTransitionsStarted = [:]
         var scratch = BuildScratch()
         // Due outputs and the stacks they consume, including the old stack of a running switch.
         var dueStacks: Set<Int> = []
@@ -1903,7 +1907,7 @@ public final class ControlLoop: @unchecked Sendable {
     /// textures freed once any box transition between old and new has run.
     private func settleReplaced(_ key: BoxKey, box: Box, frame: Int64) {
         guard var run = model.boxRuns[key], !run.replaced.isEmpty else { return }
-        let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+        let ms = boxTransitionMs(box, channel: key.slot)
         releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
         run.replaced = []
         model.boxRuns[key] = run
@@ -1930,24 +1934,48 @@ public final class ControlLoop: @unchecked Sendable {
             run.outgoing = nil
             return nil
         }
-        if run.previousText != nil, run.previousText != text {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: allowed, frame: frame)
+        // Spec 4 §9 as corrected 2026-11-25 — "A box whose content appears from nothing mixes from transparent, so a
+        // dissolve fades it in": a box that drew nothing since it was claimed, now drawing text.
+        let appears = run.previousText == nil && run.wasEmpty && text != nil
+        if (run.previousText != nil && run.previousText != text) || appears {
+            startBoxRun(&run, from: run.previousContent ?? .lines([]), box: box, channel: key.slot, allowed: allowed, frame: frame)
         }
+        if text != nil { run.wasEmpty = false }
         run.previousContent = content
         run.previousText = text
         return run.state(at: frame)
     }
 
-    private func startBoxRun(_ run: inout BoxRun, from previous: BoxContent?, box: Box, allowed: Bool, frame: Int64) {
-        let object = library.transition(box.transition.ref)
-        let ms = box.transition.ms ?? object?.ms ?? 0
+    /// Spec 4 §9 as corrected 2026-11-25 — the transition a box draws a change with: "the write's `once` rider, else
+    /// the channel's tracked transition, else the box's own transition when it sets one, else the channel's default".
+    /// A pixel box's own is never read (Spec 1 §2: "a pixel box always takes the channel's").
+    func boxTransitionSetting(_ box: Box, channel: Int) -> TransitionSetting {
+        let attribute = model.state.channels[channel]?.attributes.transition
+        if let attribute, attribute.origin != .default { return attribute.value }
+        if box.binding.isText, let own = box.transition { return TransitionSetting(ref: own.ref, ms: own.ms) }
+        if let attribute { return attribute.value }
+        return TransitionSetting(ref: library.channels.first { $0.number == channel }?.defaults.transition ?? 1)
+    }
+
+    /// The chosen transition's length in ms: its own duration, else the transition object's.
+    func boxTransitionMs(_ box: Box, channel: Int) -> Int {
+        let setting = boxTransitionSetting(box, channel: channel)
+        return setting.ms ?? library.transition(setting.ref)?.ms ?? 0
+    }
+
+    private func startBoxRun(_ run: inout BoxRun, from previous: BoxContent?, box: Box, channel: Int, allowed: Bool, frame: Int64) {
+        let setting = boxTransitionSetting(box, channel: channel)
+        let object = library.transition(setting.ref)
+        let ms = setting.ms ?? object?.ms ?? 0
         let type = object?.type ?? .cut
-        if allowed, type != .cut, ms > 0, let previous, !previous.isEmpty {
+        // A box mixes from what it drew, or from transparent when it drew nothing (Spec 4 §9 as corrected 2026-11-25).
+        if allowed, type != .cut, ms > 0, let previous {
             run.type = type
             run.easing = object?.easing ?? .linear
             run.startFrame = frame
             run.durationFrames = pacing.frames(forMs: ms)
             run.outgoing = previous
+            boxTransitionsStarted[channel] = max(boxTransitionsStarted[channel] ?? 0, ms)
         } else {
             run.outgoing = nil
             run.durationFrames = 0
@@ -1962,14 +1990,15 @@ public final class ControlLoop: @unchecked Sendable {
                         into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
+        run.wasEmpty = true
         if !run.replaced.isEmpty {
             // The box draws no text now: the rasters its values replaced go once its way out has run.
-            let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
+            let ms = boxTransitionMs(box, channel: key.slot)
             releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
             run.replaced = []
         }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && allowed, frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, channel: key.slot, allowed: box.offset == 0 && allowed, frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }

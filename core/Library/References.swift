@@ -152,7 +152,9 @@ public enum References {
                 if case .stack(let stack) = key { add(.stack, stack, .layout(preset: preset.number, layout: key)) }
                 for (index, box) in layout.boxes.enumerated() {
                     add(.textStyle, box.textStyle?.fromStyle, .box(preset: preset.number, layout: key, box: index, field: "textStyle.fromStyle"))
-                    add(.transition, box.transition.ref, .box(preset: preset.number, layout: key, box: index, field: "transition.ref"))
+                    if let ref = box.transition?.ref {
+                        add(.transition, ref, .box(preset: preset.number, layout: key, box: index, field: "transition.ref"))
+                    }
                     add(.grade, box.grade, .box(preset: preset.number, layout: key, box: index, field: "grade"))
                 }
             }

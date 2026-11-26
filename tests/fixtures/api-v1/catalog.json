@@ -96,7 +96,7 @@
                 "frame": { "h": 1, "w": 1, "x": 0, "y": 0 },
                 "grade": null,
                 "offset": 0,
-                "transition": { "ms": null, "ref": 1 }
+                "transition": null
               },
               {
                 "binding": { "kind": "field", "name": "body" },
@@ -128,7 +128,7 @@
                   "verticalAlignment": "center",
                   "weight": 700
                 },
-                "transition": { "ms": 250, "ref": 2 },
+                "transition": null,
                 "transitionOnVariableChange": false
               }
             ],

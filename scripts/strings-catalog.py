@@ -962,6 +962,7 @@ ENTRIES = [
     ("edit.preset.maxLines", "Lines", "Text fit: at most this many lines at the style's size."),
     ("edit.preset.minSize", "Min size", "Text fit: the smallest size shrinking goes to."),
     ("edit.preset.transition", "Transition", "A box's transition."),
+    ("edit.preset.channelsTransition", "Channel’s", "A box's transition: the channel's, which a cue's transition or the channel's default sets."),
     ("edit.preset.ms", "ms", "A box transition's own duration, in milliseconds; empty uses the transition's."),
     ("edit.preset.onVariable", "On variable change", "A box transitions when a variable in its text changes."),
     ("edit.preset.fallback", "Fallback", "A box that draws only when no earlier box at its offset drew."),

@@ -180,6 +180,8 @@ public enum PresetEdits {
             changed.fit = .pixels(.fit)
             changed.textStyle = nil
             changed.transitionOnVariableChange = false
+            // Spec 1 §2 as corrected 2026-11-25 — "a pixel box always takes the channel's".
+            changed.transition = nil
         }
         guard let value = try? JSONCoding.encode(changed) else { return nil }
         return edit(.numbered(.preset, preset), .set(path: boxPath(layout, index), value: value))

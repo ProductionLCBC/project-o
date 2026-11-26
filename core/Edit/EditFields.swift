@@ -485,7 +485,8 @@ enum EditFields {
             .record(["policy": .choice(["shrinkToFit", "maxLines"]), "maxLines": .whole(min: 1), "minSize": .number(min: 0)]),
         ]),
         "textStyle": .optional(boxTextStyle),
-        "transition": .record(["ref": .reference(.transition), "ms": .optional(.whole())]),
+        // Spec 1 §2 as corrected 2026-11-25 — "or null": null takes the channel's transition.
+        "transition": .optional(.record(["ref": .reference(.transition), "ms": .optional(.whole())])),
         "transitionOnVariableChange": .flag,
         "fallback": .flag,
         "offset": .whole(min: Box.offsetRange.lowerBound, max: Box.offsetRange.upperBound),

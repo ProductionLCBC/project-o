@@ -296,7 +296,7 @@ struct Checks {
                 for (index, box) in layout.boxes.enumerated() {
                     let subject = "preset \(preset.number) layout \(key.string) box \(index + 1)"
                     if let style = box.textStyle?.fromStyle { reference(.textStyle, style, from: subject) }
-                    reference(.transition, box.transition.ref, from: subject)
+                    if let ref = box.transition?.ref { reference(.transition, ref, from: subject) }
                     if let grade = box.grade { reference(.grade, grade, from: subject) }
                     // Spec 6 §3 — "Outside −2 to +3, the reference report flags the box and it draws nothing."
                     if !Box.offsetRange.contains(box.offset) {

@@ -169,7 +169,7 @@ public enum Identity {
             for (key, var layout) in library.presets[i].layouts {
                 for b in layout.boxes.indices {
                     if let from = layout.boxes[b].textStyle?.fromStyle { layout.boxes[b].textStyle?.fromStyle = number(from, .textStyle) }
-                    layout.boxes[b].transition.ref = number(layout.boxes[b].transition.ref, .transition)
+                    if let ref = layout.boxes[b].transition?.ref { layout.boxes[b].transition?.ref = number(ref, .transition) }
                     if let grade = layout.boxes[b].grade { layout.boxes[b].grade = number(grade, .grade) }
                 }
                 if case .stack(let n) = key {

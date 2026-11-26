@@ -119,10 +119,28 @@ final class EditPresetTests: XCTestCase {
         let asText = edits.apply("edit preset 1 layouts.*.boxes.0 \(try line(textBox()))")
         XCTAssertEqual(edits.library.preset(1)?.layouts[.any]?.boxes[0], textBox())
         XCTAssertEqual(asText.first?.inverse,
-                       set(1, "layouts.*.boxes.0", try JSONCoding.encode(Box(binding: .pixels, frame: .full, fit: .pixels(.fit), transition: BoxTransition(ref: 1)))))
+                       set(1, "layouts.*.boxes.0", try JSONCoding.encode(Box(binding: .pixels, frame: .full, fit: .pixels(.fit)))))
         // Within a kind, the binding alone changes: a field's name, or a field for static text.
         edits.apply("edit preset 1 layouts.*.boxes.0.binding {\"kind\": \"static\", \"text\": \"[Time]\"}")
         XCTAssertEqual(edits.library.preset(1)?.layouts[.any]?.boxes[0].binding, .static(text: "[Time]"))
+    }
+
+    /// Spec 1 §2 as corrected 2026-11-25 — a box's `transition` is "`{ref, ms}`, or null": null "takes the channel's
+    /// transition"; Preset 1's boxes take it (§9).
+    func test_aBoxsTransitionIsItsOwnOrNullForTheChannels() throws {
+        var edits = Edits()
+        XCTAssertNil(edits.library.preset(1)?.layouts[.any]?.boxes[1].transition, "Preset 1's body box takes the channel's")
+        let own = edits.apply("edit preset 1 layouts.*.boxes.1.transition {\"ms\": 500, \"ref\": 2}")
+        XCTAssertEqual(edits.library.preset(1)?.layouts[.any]?.boxes[1].transition, BoxTransition(ref: 2, ms: 500))
+        XCTAssertEqual(own.first?.inverse, set(1, "layouts.*.boxes.1.transition", .null))
+        edits.apply("edit preset 1 layouts.*.boxes.1.transition null")
+        XCTAssertNil(edits.library.preset(1)?.layouts[.any]?.boxes[1].transition)
+        // On disk, null is written; a box that has no `transition` key reads as the channel's.
+        let written = try JSONCoding.encode(Box(binding: .field(name: "body"), fit: .text(TextFit())))
+        XCTAssertEqual(written.objectValue?["transition"], .null)
+        var bare = written.objectValue ?? [:]
+        bare["transition"] = nil
+        XCTAssertNil(try JSONCoding.decode(Box.self, from: .object(bare)).transition)
     }
 
     // MARK: - The box list (Spec 11 §8: add, duplicate, remove, reorder)

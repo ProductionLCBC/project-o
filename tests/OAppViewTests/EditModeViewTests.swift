@@ -903,6 +903,14 @@ final class EditModeViewTests: XCTestCase {
         inspector.anchor.choose(.topLeft)
         inspector.fallback.toggle()
         XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.fallback false"])
+        // Spec 11 §8 as corrected 2026-11-25 — "Channel's, which a new box takes, or cut or dissolve ... as the box's
+        // own": Preset 1's body box takes the channel's; a dissolve chosen is its own, and Channel's takes it back.
+        XCTAssertEqual(inspector.transition.titleOfSelectedItem, "Channel’s")
+        XCTAssertTrue(inspector.transitionMs.isHidden, "no duration of its own while it takes the channel's")
+        inspector.transition.choose(tag: 2)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.transition { \"ms\": null, \"ref\": 2 }"])
+        inspector.transition.choose(tag: 0)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.transition null"])
         // Its text style.
         XCTAssertTrue(inspector.fromStyle.stringValue.hasPrefix("From 1 Body"), inspector.fromStyle.stringValue)
         XCTAssertEqual(inspector.applyStyle.dropMenu?.items.map(\.title), ["1 Body", "2 Caption"], "the menu lists only its choices")

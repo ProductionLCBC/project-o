@@ -394,7 +394,18 @@ final class PresetInspectorView: PanelView {
         }
         c.row(Strings.text(.editPresetFit), [pixelFit, textFit], height: 24)
         fitNumberName = c.row(Strings.text(.editPresetMinSize), [fitNumber], widths: [64], height: 24)
-        transition.onChoose = { [weak self] tag in self?.model.editing.setBox("transition.ref", .number(Double(tag))) }
+        // "Channel's" takes the channel's transition (`transition: null`); a transition chosen is the box's own, which
+        // overrides the channel's default (Spec 1 §2 as corrected 2026-11-25).
+        transition.onChoose = { [weak self] tag in
+            guard let editing = self?.model.editing else { return }
+            if tag == 0 {
+                editing.setBox("transition", .null)
+            } else if editing.selectedBox?.transition == nil {
+                editing.setBox("transition", .object(["ref": .number(Double(tag)), "ms": .null]))
+            } else {
+                editing.setBox("transition.ref", .number(Double(tag)))
+            }
+        }
         transitionMs.setAccessibilityLabel(Strings.text(.editPresetTransition) + " " + Strings.text(.editPresetMs))
         transitionMs.onCommit = { [weak self] text in
             guard let self else { return }
@@ -577,9 +588,13 @@ final class PresetInspectorView: PanelView {
         }
         // "cut or dissolve, the box transitions v1 draws".
         let transitions = (catalog?.transitions ?? []).filter { $0.type.appliesToText }.sorted { $0.number < $1.number }
-        transition.set(transitions.map { (EditModeWording.numbered($0.number, $0.label), $0.number) }, selected: box.transition.ref)
-        let own = transitions.first { $0.number == box.transition.ref }?.ms
-        transitionMs.show(box.transition.ms.map(String.init) ?? "", placeholder: own.map(String.init) ?? Strings.text(.editPresetMs), subject: subject)
+        transition.set([(Strings.text(.editPresetChannelsTransition), 0)] + transitions.map { (EditModeWording.numbered($0.number, $0.label), $0.number) },
+                       selected: box.transition?.ref ?? 0)
+        let own = transitions.first { $0.number == box.transition?.ref }?.ms
+        transitionMs.show(box.transition?.ms.map(String.init) ?? "", placeholder: own.map(String.init) ?? Strings.text(.editPresetMs), subject: subject)
+        // "A pixel box takes the channel's and shows no choice"; the duration is the box's own transition's.
+        transition.isHidden = !box.binding.isText
+        transitionMs.isHidden = !box.binding.isText || box.transition == nil
         onVariable.isHidden = !box.binding.isText
         onVariable.state = box.transitionOnVariableChange ? .on : .off
         fallback.state = box.fallback ? .on : .off

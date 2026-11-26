@@ -267,6 +267,9 @@ public struct BoxIdentity: Equatable, Sendable {
 public struct BoxRun: Sendable {
     /// The box this run is of; a run under the same key for another box starts afresh.
     public var identity: BoxIdentity?
+    /// Spec 4 §9 as corrected 2026-11-25 — whether the box has drawn nothing since it was claimed: its next text
+    /// "appears from nothing", mixing from transparent, where a box just claimed shows its first text at once.
+    public var wasEmpty = false
     public var previousContent: BoxContent?
     public var previousText: String?
     /// Spec 4 §9 — whether the text the box took in this build is the text
