@@ -118,7 +118,8 @@ final class LayoutCanvasView: NSView, EditFocus {
         self.model = model
         super.init(frame: .zero)
         setAccessibilityElement(true)
-        setAccessibilityRole(.image)
+        // A layout area, whose boxes are its elements (Spec 11 §10).
+        setAccessibilityRole(.layoutArea)
         setAccessibilityLabel(Strings.text(.editPresetCanvas))
     }
 
@@ -201,6 +202,59 @@ final class LayoutCanvasView: NSView, EditFocus {
         // "at its stack's size": asked for at the canvas's width in pixels.
         let scale = window?.backingScaleFactor ?? 2
         if stackRect.width > 0 { model.editing.canvasWidth(Int((stackRect.width * scale).rounded())) }
+    }
+
+    // MARK: - VoiceOver (Spec 11 §10)
+
+    /// "On a canvas each box is an element that says its binding, offset and frame in percent, with actions to move
+    /// and resize it by 1% of the stack": the boxes, top first, while the tab's layout is its own.
+    override func accessibilityChildren() -> [Any]? {
+        let page = model.editing.presetPage
+        guard page.ownsLayout, let boxes = page.layout?.boxes else { return [] }
+        return boxes.indices.reversed().map { element(for: $0, boxes[$0]) }
+    }
+
+    /// What a box says: "body +1, x 5%, y 10%, width 90%, height 80%".
+    static func spoken(_ box: Box) -> String {
+        let offset = box.offset == 0 ? "" : (box.offset > 0 ? " +\(box.offset)" : " \(box.offset)")
+        func percent(_ value: Double) -> String { FormNumber.text(value * 100, places: 1) }
+        return tag(of: box.binding.kind) + offset + ", "
+            + Strings.text(.editCanvasBoxFrame, percent(box.frame.x), percent(box.frame.y), percent(box.frame.w), percent(box.frame.h))
+    }
+
+    private func element(for index: Int, _ box: Box) -> NSAccessibilityElement {
+        let element = NSAccessibilityElement()
+        element.setAccessibilityParent(self)
+        element.setAccessibilityRole(.group)
+        // "an overflowing box's red outline with how many lines were cut" (colour is never alone).
+        let overflow = model.editing.presetState.overflow.first { $0.box == index }
+        element.setAccessibilityLabel(Self.spoken(box) + (overflow.map { ", " + Strings.text(.editPresetLinesCut, $0.linesCut) } ?? ""))
+        element.setAccessibilityFrameInParentSpace(rect(of: box.frame))
+        element.setAccessibilitySelected(index == model.editing.presetState.box)
+        let step = 0.01
+        let changes: [(StringKey, (inout Frame) -> Void)] = [
+            (.editCanvasMoveLeft, { $0.x -= step }), (.editCanvasMoveRight, { $0.x += step }),
+            (.editCanvasMoveUp, { $0.y -= step }), (.editCanvasMoveDown, { $0.y += step }),
+            (.editCanvasWider, { $0.w += step }), (.editCanvasNarrower, { $0.w -= step }),
+            (.editCanvasTaller, { $0.h += step }), (.editCanvasShorter, { $0.h -= step }),
+        ]
+        element.setAccessibilityCustomActions(changes.map { key, change in
+            NSAccessibilityCustomAction(name: Strings.text(key)) { [weak self] in
+                MainActor.assumeIsolated { self?.change(box: index, by: change) ?? false }
+            }
+        })
+        return element
+    }
+
+    /// One action's change of a box's frame, sent as a nudge is: one `edit.set` of `frame`.
+    @discardableResult
+    func change(box index: Int, by change: (inout Frame) -> Void) -> Bool {
+        let page = model.editing.presetPage
+        guard page.ownsLayout, let boxes = page.layout?.boxes, boxes.indices.contains(index) else { return false }
+        var frame = boxes[index].frame
+        change(&frame)
+        model.editing.setFrame(LayoutCanvasMath.kept(frame), of: index)
+        return true
     }
 
     // MARK: - Drawing

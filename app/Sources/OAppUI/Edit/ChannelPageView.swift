@@ -296,7 +296,7 @@ final class ChannelWorkspaceView: NSView {
         let x: CGFloat = 14
         let formWidth = formColumn - 28
         formHeading.frame = NSRect(x: x, y: 14, width: 200, height: 14)
-        let nameWidth = min(formWidth / 2.5, max(120, names.map { Kit.width(of: $0) }.max() ?? 0) + 12)
+        let nameWidth = min(formWidth / 2, max(120, names.map { Kit.width(of: $0) }.max() ?? 0) + 12)
         let field = x + nameWidth
         let fieldWidth = min(300, formWidth - nameWidth)
         let right = x + formWidth

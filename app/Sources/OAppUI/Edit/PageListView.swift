@@ -22,6 +22,8 @@ final class PageListRowView: NSView {
     var isSelected = false { didSet { needsDisplay = true } }
     var isLive = false { didSet { needsDisplay = true } }
     var onSelect: (() -> Void)?
+    /// A click gives the list the keys.
+    var onFocus: (() -> Void)?
     /// A row that drags to a new place says where the pointer is, and when it lets go.
     var onDrag: ((NSPoint, Bool) -> Void)?
     private var dragging = false
@@ -52,6 +54,7 @@ final class PageListRowView: NSView {
         more.dropMenu = entry.menu
         more.isHidden = entry.menu == nil
         setAccessibilityLabel([entry.number, entry.name, entry.detail].filter { !$0.isEmpty }.joined(separator: " "))
+        setAccessibilitySelected(entry.isSelected)
         needsLayout = true
     }
 
@@ -86,6 +89,7 @@ final class PageListRowView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         dragging = false
+        onFocus?()
         onSelect?()
     }
 
@@ -111,7 +115,7 @@ final class PageListRowView: NSView {
 /// highlighted and the live dot on what is on air, with a + row at the list's foot that adds one, and on each row a
 /// ⋯ menu". The Presets page shows two: the presets, then the boxes of the layout shown.
 @MainActor
-final class PageListView: PanelView {
+final class PageListView: PanelView, EditFocus {
     /// What a row shows and does.
     struct Entry {
         var key: Int
@@ -177,6 +181,42 @@ final class PageListView: PanelView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
+
+    // MARK: - Keys (Spec 11 §10, "Keyboard")
+
+    override var acceptsFirstResponder: Bool { true }
+
+    /// The list the arrows walk: the one whose row was clicked last, else the first with a row selected. The Objects
+    /// page's groups are one list.
+    private var keyList = 0
+
+    /// "the cue grid, lists and canvases with the arrows (§2)": ↑ and ↓ select the row before or after; ⌃Return opens
+    /// the selected row's menu (Spec 10 §15).
+    override func keyDown(with event: NSEvent) {
+        let rows: [PageListRowView]
+        if model.editing.page == .objects {
+            rows = sections.flatMap(\.rows)
+        } else {
+            let index = sections.indices.contains(keyList) && sections[keyList].rows.contains(where: \.isSelected) ? keyList
+                : sections.firstIndex { $0.rows.contains(where: \.isSelected) } ?? 0
+            rows = sections.indices.contains(index) ? sections[index].rows : []
+        }
+        let at = rows.firstIndex(where: \.isSelected)
+        switch event.keyCode {
+        case 126, 125:
+            let step = event.keyCode == 126 ? -1 : 1
+            let target = at.map { $0 + step } ?? (step > 0 ? 0 : rows.count - 1)
+            guard rows.indices.contains(target) else { return }
+            rows[target].onSelect?()
+            rows[target].scrollToVisible(rows[target].bounds)
+        case 36, 76:
+            guard event.modifierFlags.contains(.control) else { return super.keyDown(with: event) }
+            guard let at, let menu = rows[at].more.dropMenu else { return }
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: rows[at].more.bounds.height + 2), in: rows[at].more)
+        default:
+            super.keyDown(with: event)
+        }
+    }
 
     // MARK: - What each page lists
 
@@ -462,6 +502,11 @@ final class PageListView: PanelView {
             for (row, entry) in zip(views.rows, list.entries) {
                 row.show(entry)
                 row.onSelect = entry.select
+                row.onFocus = { [weak self] in
+                    guard let self else { return }
+                    self.keyList = index
+                    self.window?.makeFirstResponder(self)
+                }
                 row.onDrag = list.move == nil ? nil : { [weak self, weak row] point, ended in
                     guard let self, let row else { return }
                     self.drag(row.key, in: index, to: self.document.convert(point, from: nil), ended: ended)

@@ -1053,6 +1053,79 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit audiotransition create"])
     }
 
+    // MARK: - Accessibility and strings (Spec 11 §10)
+
+    /// Spec 11 §10 — "Spec 10 §15 holds in edit mode, from the first build": on every page, every control has a label,
+    /// and at 1440 by 900, under the accented pseudolanguage and one 40% longer, nothing of the app's own wording is
+    /// clipped (Spec 10 §18). A label that holds what the operator or the library wrote is marked, and may truncate.
+    func test_everyEditPageLabelsItsControlsAndClipsNothingUnderEitherPseudolanguage() throws {
+        let plain: (String) -> String = { $0 }
+        for (index, transform) in [plain, Pseudolanguage.accented, Pseudolanguage.longer].enumerated() {
+            try ViewStrings.install(transform: transform)
+            let rig = try editing()
+            let view = rig.view
+            func check(_ what: String) {
+                view.refreshAll()
+                view.layoutSubtreeIfNeeded()
+                if index == 0 { XCTAssertEqual(Audit.unlabelled(in: view), [], "every control has a label (\(what))") }
+                for button in Audit.all(FlatButton.self, in: view) where button.frame.width > 0 {
+                    XCTAssertTrue(button.titleFits, "\"\(button.title)\" is clipped (\(what))")
+                }
+                for label in Audit.all(NSTextField.self, in: view)
+                where !label.isEditable && label.tag != Kit.mayTruncate && label.maximumNumberOfLines == 1 && label.frame.width > 0 {
+                    XCTAssertFalse(Audit.isCutOff(label), "\"\(label.stringValue)\" is clipped: \(label.frame.width) of \(Kit.width(of: label)) points (\(what))")
+                }
+            }
+            rig.model.editing.click(cue: 2, row: .channel(2))
+            check("cues")
+            rig.model.editing.show(page: .stacks)
+            check("stacks")
+            rig.model.editing.show(page: .channels)
+            check("channels")
+            rig.model.editing.show(page: .presets)
+            rig.model.editing.selectBox(1)
+            check("presets, a text box")
+            rig.model.editing.show(page: .objects)
+            for key in [ObjectKey(.grade, 1), ObjectKey(.transition, 3), ObjectKey(.audioTransition, 2), ObjectKey(.textStyle, 1), ObjectKey(.macro, 2)] {
+                rig.model.editing.selectObject(key)
+                check("objects, \(key.kind) \(key.number)")
+            }
+        }
+        try ViewStrings.install()
+    }
+
+    /// Spec 11 §10, "Keyboard" — "the cue grid, lists and canvases with the arrows (§2) ... a selected thing's menu with
+    /// ⌃Return"; and "On a canvas each box is an element that says its binding, offset and frame in percent, with actions
+    /// to move and resize it by 1% of the stack."
+    func test_theListsTakeTheArrowsAndTheCanvasBoxesAreElementsWithActions() throws {
+        let rig = try editing()
+        let view = rig.view
+        let editing = rig.model.editing
+        editing.show(page: .objects)
+        view.layoutSubtreeIfNeeded()
+        let list = view.pageList
+        // A click gives the list the keys; ↓ walks the groups as one list.
+        list.sections[0].rows[0].mouseDown(with: try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                                                  windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)))
+        XCTAssertTrue(view.window?.firstResponder === list)
+        list.keyDown(with: try key(125))
+        XCTAssertEqual(editing.selectedObject, ObjectKey(.transition, 1), "from the grade into the transitions")
+        list.keyDown(with: try key(125))
+        list.keyDown(with: try key(126))
+        XCTAssertEqual(editing.selectedObject, ObjectKey(.transition, 1))
+        XCTAssertTrue(list.sections[1].rows[0].isAccessibilitySelected())
+        // The canvas: its boxes, top first, each saying itself, each with eight actions.
+        editing.show(page: .presets)
+        view.layoutSubtreeIfNeeded()
+        let canvas = view.workspace.presets.canvas
+        let boxes = try XCTUnwrap(canvas.accessibilityChildren() as? [NSAccessibilityElement])
+        XCTAssertEqual(boxes.map { $0.accessibilityLabel() ?? "" }, ["body, x 5%, y 10%, width 90%, height 80%", "pixels, x 0%, y 0%, width 100%, height 100%"])
+        let actions = boxes[0].accessibilityCustomActions() ?? []
+        XCTAssertEqual(actions.map(\.name), ["Move Left 1%", "Move Right 1%", "Move Up 1%", "Move Down 1%", "Wider 1%", "Narrower 1%", "Taller 1%", "Shorter 1%"])
+        XCTAssertTrue(actions[1].handler?() ?? false)
+        XCTAssertEqual(last(rig), ["edit preset 1 layouts.*.boxes.1.frame { \"h\": 0.8, \"w\": 0.9, \"x\": 0.06, \"y\": 0.1 }"])
+    }
+
     // MARK: - A picture of it
 
     func test_theEditWindowDrawsIntoAPicture() throws {

@@ -95,7 +95,8 @@ final class SlotRowView: NSView {
     let number = Kit.label(size: 12, color: Palette.faintText, mono: true)
     let name = Kit.content(Kit.label(size: 12.5, weight: .medium))
     let preset = ChoicePopUp(label: Strings.text(.editStackPreset))
-    let resolves = Kit.label(size: 10.5, color: Palette.dimText)
+    /// Names the preset by its label, which the library wrote: it may truncate, with the whole in its tooltip.
+    let resolves = Kit.content(Kit.label(size: 10.5, color: Palette.dimText))
     let opacity = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
     let percent = EditField()
     let more = FlatButton("⋯", style: .bare)
@@ -126,6 +127,7 @@ final class SlotRowView: NSView {
         preset.set(choices, selected: row.preset ?? 0)
         let drawn = presets.first { $0.number == row.resolved }
         resolves.stringValue = Strings.text(.editStackResolves, EditModeWording.numbered(row.resolved, drawn?.label ?? ""))
+        resolves.toolTip = resolves.stringValue
         opacity.doubleValue = row.opacity
         percent.show(FormNumber.text(row.opacity * 100, places: 0) + "%", subject: AnyHashable(row.channel))
         opacity.setAccessibilityLabel(Strings.text(.editStackOpacity) + ", " + name.stringValue)
@@ -535,7 +537,14 @@ final class StackOutputsView: NSView {
         }
         let setWidth = setDefault.fitting.width
         setDefault.frame = NSRect(x: pad, y: y + 2, width: setWidth, height: 22)
-        changeInSettings.frame = NSRect(x: pad + setWidth + 8, y: y + 2, width: min(changeInSettings.fitting.width, max(0, inner - setWidth - 8)), height: 22)
+        let settingsWidth = changeInSettings.fitting.width
+        if settingsWidth > inner - setWidth - 8 {
+            // No room beside Set as Default: on the line under it.
+            y += 26
+            changeInSettings.frame = NSRect(x: pad, y: y + 2, width: min(settingsWidth, inner), height: 22)
+        } else {
+            changeInSettings.frame = NSRect(x: pad + setWidth + 8, y: y + 2, width: settingsWidth, height: 22)
+        }
         y += 40
         // Audio routing.
         audioHeading.frame = NSRect(x: pad, y: y, width: inner, height: 14)

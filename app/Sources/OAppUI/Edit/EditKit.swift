@@ -126,6 +126,15 @@ final class SegmentedView: Surface {
         guard !segments.isEmpty else { return }
         var x: CGFloat = 2
         let equal = (bounds.width - 4 - CGFloat(segments.count - 1) * 2) / CGFloat(segments.count)
+        // Equal segments too narrow for a title take a smaller type, down to 10 points, rather than clip it.
+        if fills {
+            var size: CGFloat = 12
+            for button in segments { button.fontSize = size }
+            while size > 10, segments.contains(where: { $0.fitting.width > equal }) {
+                size -= 0.5
+                for button in segments { button.fontSize = size }
+            }
+        }
         for button in segments {
             let width = fills ? equal : button.fitting.width
             button.frame = NSRect(x: x, y: 2, width: width, height: bounds.height - 4)

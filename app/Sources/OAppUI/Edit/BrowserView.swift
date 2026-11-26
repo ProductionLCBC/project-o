@@ -123,6 +123,8 @@ final class BrowserView: PanelView {
         self.model = model
         super.init(title: "")
         setAccessibilityLabel(Strings.text(.editBrowser))
+        tabs.setAccessibilityLabel(Strings.text(.editBrowser))
+        views.setAccessibilityLabel(Strings.text(.editMediaShowAs))
         tabs.fills = true
         tabs.onSelect = { [weak model] index in model?.editing.show(tab: BrowserTab.allCases[index]) }
         search.target = self

@@ -2065,6 +2065,114 @@
         }
       }
     },
+    "edit.canvas.boxFrame" : {
+      "comment" : "VoiceOver: a canvas box's frame, each a percentage of the stack.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "x %1$@%%, y %2$@%%, width %3$@%%, height %4$@%%"
+          }
+        }
+      }
+    },
+    "edit.canvas.moveDown" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Down 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.moveLeft" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Left 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.moveRight" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Right 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.moveUp" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.narrower" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Narrower 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.shorter" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shorter 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.taller" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taller 1%"
+          }
+        }
+      }
+    },
+    "edit.canvas.wider" : {
+      "comment" : "VoiceOver: an action on a canvas box.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wider 1%"
+          }
+        }
+      }
+    },
     "edit.cell.clears" : {
       "comment" : "VoiceOver, in a cell's description.",
       "extractionState" : "manual",
@@ -4665,6 +4773,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "List"
+          }
+        }
+      }
+    },
+    "edit.media.showAs" : {
+      "comment" : "VoiceOver: the Browser's Media tab's choice of grid or list.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show items as"
           }
         }
       }

@@ -141,7 +141,7 @@ final class ObjectWorkspaceView: NSView {
             self?.window?.makeFirstResponder(nil)
             self?.model.editing.runMacro()
         }
-        c.row(nil, [runOnAir], widths: [140], height: 26)
+        c.row(nil, [runOnAir], widths: [max(140, runOnAir.fitting.width + 8)], height: 26)
         wrap(scope)
         c.wide(scope, height: 30)
         c.wide(commands, height: 60)
@@ -180,7 +180,7 @@ final class ObjectWorkspaceView: NSView {
         c.wide(styleBoxes, height: 18)
         reapply.fontSize = 11.5
         reapply.onPress = { [weak model] in model?.editing.reapplyToBoxes() }
-        c.row(nil, [reapply], widths: [150], height: 24)
+        c.row(nil, [reapply], widths: [max(150, reapply.fitting.width + 8)], height: 24)
         c.wide(usedHeading, height: 14)
         wrap(usedBy)
         c.wide(usedBy, height: 18)

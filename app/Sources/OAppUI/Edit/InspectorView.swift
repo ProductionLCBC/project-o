@@ -698,7 +698,8 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
         let rowHeight: CGFloat = 26
         let gap: CGFloat = 8
         let inner = column - 2 * pad
-        let nameWidth: CGFloat = 58
+        // The names as wide as the widest needs, in the wording the catalog gives them (Spec 10 §18), within the column.
+        let nameWidth = min(inner * 0.45, max(58, [labelName, sectionName, noteName].map { Kit.width(of: $0) }.max() ?? 0) + 4)
 
         // Cue.
         var x = pad
@@ -768,15 +769,24 @@ final class InspectorView: PanelView, EditFocus, NSTextViewDelegate {
         if !stateControl.isHidden {
             stateControl.frame = NSRect(x: x, y: y, width: inner, height: 28)
             y += 28 + gap
-            contentName.frame = NSRect(x: x, y: y + 5, width: nameWidth, height: 16)
-            contentButton.frame = NSRect(x: x + nameWidth + 6, y: y, width: inner - nameWidth - 6, height: rowHeight)
+            let contentWidth = min(inner * 0.45, max(58, Kit.width(of: contentName) + 4))
+            contentName.frame = NSRect(x: x, y: y + 5, width: contentWidth, height: 16)
+            contentButton.frame = NSRect(x: x + contentWidth + 6, y: y, width: inner - contentWidth - 6, height: rowHeight)
             y += rowHeight + gap
         }
-        let chipName: CGFloat = 104
+        // The chips' names beside their pills, or over them where the names are too long for that (Spec 10 §18).
+        let widest = max(104, chipNames.map { Kit.width(of: $0) }.max() ?? 0) + 4
+        let stacked = widest > inner * 0.55
+        let chipName = stacked ? inner : widest
         for (index, button) in chipButtons.enumerated() where !button.isHidden {
             chipNames[index].frame = NSRect(x: x, y: y + 2, width: chipName, height: 16)
             let size = button.fitting
-            button.frame = NSRect(x: x + chipName + 6, y: y, width: min(size.width, inner - chipName - 6), height: PillButton.height)
+            if stacked {
+                y += 18
+                button.frame = NSRect(x: x, y: y, width: min(size.width, inner), height: PillButton.height)
+            } else {
+                button.frame = NSRect(x: x + chipName + 6, y: y, width: min(size.width, inner - chipName - 6), height: PillButton.height)
+            }
             y += PillButton.height + 7
         }
     }

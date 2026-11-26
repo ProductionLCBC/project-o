@@ -20,7 +20,8 @@ final class PresetWorkspaceView: NSView {
     let sampleKind = SegmentedView([Strings.text(.editPresetSampleText), Strings.text(.editPresetSampleMedia), Strings.text(.editPresetSampleEmpty)], small: true)
     let sampleText = EditField()
     let sampleMedia = NSPopUpButton(frame: .zero, pullsDown: false)
-    let sampleSource = Kit.label(size: 11, color: Palette.faintText)
+    /// Names the cue's list by its title, which the library wrote: it may truncate.
+    let sampleSource = Kit.content(Kit.label(size: 11, color: Palette.faintText))
     private var tabKeys: [LayoutKey] = []
     var machineRoot: URL? { didSet { canvas.machineRoot = machineRoot } }
 
@@ -429,7 +430,8 @@ final class PresetInspectorView: PanelView {
         reapply.onPress = { [weak model] in model?.editing.reapplyStyle() }
         saveAsStyle.fontSize = 11
         saveAsStyle.onPress = { [weak self] in self?.askStyleName() }
-        c.row(nil, [applyStyle, reapply, saveAsStyle], widths: [nil, nil, nil], height: 24)
+        c.row(nil, [applyStyle, reapply], widths: [nil, nil], height: 24)
+        c.row(nil, [saveAsStyle], widths: [max(120, saveAsStyle.fitting.width + 8)], height: 24)
         style.onSet = { [weak self] field, value in self?.model.editing.setStyle(field, value) }
         style.onCommit = { [weak self] field in self?.lastField = field }
         style.onPutBack = { [weak self] in self?.refresh() }
