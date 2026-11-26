@@ -140,7 +140,11 @@ it still did, the real fault: no color well in edit mode had ever sent its color
 well that isn't continuous sends nothing from the color panel (2e4ffc7, hosted CI green); on
 2026-11-26 a dragged slider holds its value instead of snapping back to the stored one,
 and a grade's hue runs 0° to 360° (Spec 11 §9 corrected first, G-39; 96270b8, hosted CI
-green); American
+green); then, on his word (Spec 11 §2, §6, §8 and §9 corrected first, G-40 to G-42;
+daae6bd, `swift test` and hosted CI green): media is picked in a chooser panel with the
+pool's folders, search, kind filter and tiles, a double-click on a slider puts it back to
+its identity, the style sample's field keeps its focus, and the built-in sample text is
+lorem ipsum; American
 spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
 unchanged); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
