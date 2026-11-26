@@ -134,7 +134,13 @@ label at the top, the rest of the workspace a stage that plays a transition betw
 pool items, draws an audio transition's gains and a text style's sample, or holds a
 macro's commands; short tags for what is wrong with a command; Add Command a browser over
 a tree of the whole vocabulary, for cues and macros alike. The top bar's "Nothing live"
-lost its hint the same day, on his word (Spec 10 §8; 69a7e8a). The try-out app is rebuilt.
+lost its hint the same day, on his word (Spec 10 §8; 69a7e8a). Later that day, on his word: a
+grade's tint no longer snaps back while the color panel is open (c5e6dbf); American
+spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
+unchanged); and new transitions, as objects of the three types, made, copied, renumbered
+and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
+first, G-38; `core/` b197b06, app dfaed29; `swift test` and hosted CI green). The try-out
+app is rebuilt.
 
 The engine side was at its first stop on 2026-11-21. On Adam's word that day ("free to
 do any testing for any amount of time") it ran on the real engine, a release build of
