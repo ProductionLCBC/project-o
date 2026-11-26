@@ -44,6 +44,7 @@ final class WorkspaceView: PanelView {
             grid.host = host
             channels.host = host
             objects.host = host
+            presets.host = host
         }
     }
 

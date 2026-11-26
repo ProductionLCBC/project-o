@@ -141,12 +141,26 @@ class HeldSlider: NSSlider {
     private var sent: (value: Double, at: TimeInterval)?
     /// How long a sent value is held before the model's is shown anyway (the engine may have refused it).
     static let holdSeconds = 2.0
+    /// Spec 11 §6 and §9 (G-40) — where a double-click puts the slider back: a grade's identity, a slot's 100%.
+    var resetValue: Double?
 
     override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2, resetValue != nil {
+            reset()
+            return
+        }
         isDragging = true
         // AppKit tracks the drag here and returns at mouse up.
         super.mouseDown(with: event)
         isDragging = false
+    }
+
+    /// Puts the slider back, as a double-click does, and sends it.
+    func reset() {
+        guard let resetValue else { return }
+        doubleValue = resetValue
+        // Straight to the target: NSApp's sendAction goes nowhere for a slider outside a window.
+        if let action, let target = target as? NSObject { target.perform(action, with: self) }
     }
 
     /// The value this slider has just sent.

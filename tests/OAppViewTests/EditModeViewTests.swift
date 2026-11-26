@@ -1024,7 +1024,13 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(renders.contains(.string("grade")) && renders.contains(.string("ungraded")), "\(renders)")
         // "the item through the grade beside the same item without it, the item picked over them", on the stage.
         XCTAssertFalse(page.stage.graded.isHidden)
-        XCTAssertEqual(page.stage.firstPicker.numberOfItems, editing.gradeMediaChoices.count)
+        // Spec 11 §2, "Picking media" (G-42) — the item is chosen in the media chooser: the pool's tiles that fit, the
+        // folder rail beside them; a double-click takes one.
+        let (gradePanel, gradePicker) = try XCTUnwrap(page.stage.chooser(first: true))
+        XCTAssertEqual(gradePanel.save.title, "Choose")
+        XCTAssertFalse(gradePicker.tiles.isEmpty)
+        XCTAssertTrue(gradePicker.tiles.allSatisfy { [.video, .image].contains($0.tile.kind) }, "videos and images, no sound")
+        XCTAssertEqual(gradePicker.kindFilter.segments.map(\.title), ["All", "Video", "Image"])
         XCTAssertGreaterThan(page.stage.frame.width, page.editor.scroll.frame.width, "the stage takes the rest of the width")
         XCTAssertEqual(page.number.stringValue, "1")
         XCTAssertTrue(page.number.isEnabled)
@@ -1043,7 +1049,13 @@ final class EditModeViewTests: XCTestCase {
         // switch and a scrub bar over the easing curve".
         let stage = page.stage
         XCTAssertFalse(stage.player.isHidden)
-        XCTAssertEqual(stage.firstPicker.titleOfSelectedItem, "dawn.mp4")
+        XCTAssertEqual(stage.firstPicker.title, "dawn.mp4")
+        // Its chooser has black as its first tile; a double-click on it takes black.
+        let (_, toPicker) = try XCTUnwrap(stage.chooser(first: false))
+        XCTAssertEqual(toPicker.tiles.first?.tile.name, "Black")
+        XCTAssertEqual(toPicker.tiles.first?.kind.stringValue, "", "not an item, so no kind")
+        toPicker.onChoose?(nil)
+        XCTAssertEqual(stage.secondPicker.title, "Black")
         XCTAssertEqual(stage.curve.caption.stringValue, "Ease in and out over 0.5 s", "the recorded dissolve, until the library event")
         XCTAssertTrue(rig.sent.contains { $0.fields["canvas"] == .string("from") }, "the engine's picture of the first item")
         stage.show(elapsed: ObjectStageView.holdMs + 250)
@@ -1068,6 +1080,13 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(page.reapply.isEnabled)
         // "The stage draws a sample in the style on the shape of the thumbnail stack".
         XCTAssertFalse(page.stage.sample.isHidden)
+        // The sample's field keeps the keys through the page's redraws (Adam, 2026-11-26).
+        XCTAssertTrue(view.window?.makeFirstResponder(page.stage.sampleField) ?? false)
+        page.refresh()
+        page.stage.refresh()
+        XCTAssertNotNil(page.stage.sampleField.currentEditor(), "still typing")
+        // The built-in sample is placeholder Latin (G-41).
+        XCTAssertTrue(page.stage.sample.text.hasPrefix("Lorem ipsum"))
         XCTAssertEqual(page.stage.sample.text, editing.styleSampleText)
         XCTAssertNotNil(page.stage.sample.attributed(scale: 0.5))
         // A macro: its commands, the palette with a Channels group, the scope, the tile.
@@ -1082,6 +1101,12 @@ final class EditModeViewTests: XCTestCase {
                        ["Write Media…", "Write Text…", "Clear…", "Reset…", "Play, Pause or Stop…", "At the End…", "Lock or Unlock…", "Freeze…",
                         "Grade…", "Transition…", "Audio Transition…", "Gain…"])
         XCTAssertFalse(browser.select("1 · Welcome"), "Recursive and not offered")
+        // A write from the pool picks its item in the chooser, inside the form.
+        XCTAssertTrue(browser.select("Write Media…"))
+        let mediaField = try XCTUnwrap(browser.controls.compactMap { $0 as? MediaPickerView }.first)
+        let first = try XCTUnwrap(mediaField.tiles.first?.tile.id)
+        mediaField.pick(first)
+        XCTAssertEqual(browser.preview.stringValue.hasPrefix("channel 1 write media "), true, browser.preview.stringValue)
         XCTAssertTrue(browser.select("Clear…"))
         XCTAssertEqual(browser.preview.stringValue, "channel 1 clear")
         panel.commit()
@@ -1234,5 +1259,13 @@ final class EditModeViewTests: XCTestCase {
             view.cacheDisplay(in: view.bounds, to: shot)
             try XCTUnwrap(shot.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-objects-\(name).png"))
         }
+        // The media chooser, as a transition's second item opens it (G-42).
+        rig.model.editing.selectObject(ObjectKey(.transition, 3))
+        let (panel, _) = try XCTUnwrap(view.workspace.objects.stage.chooser(first: false))
+        panel.finish()
+        panel.layoutSubtreeIfNeeded()
+        let chooser = try XCTUnwrap(panel.bitmapImageRepForCachingDisplay(in: panel.bounds))
+        panel.cacheDisplay(in: panel.bounds, to: chooser)
+        try XCTUnwrap(chooser.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-chooser.png"))
     }
 }

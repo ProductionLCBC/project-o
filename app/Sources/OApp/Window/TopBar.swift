@@ -391,6 +391,17 @@ public struct PoolTile: Equatable, Sendable {
     public var tile: String?
     public var overlay: Overlay
     public var isOnThisMac: Bool
+
+    /// Spec 11 §2, "Picking media" (G-42) — also the chooser's first tile, which picks nothing.
+    public init(id: String, name: String, kind: MediaKind, durationMs: Int?, tile: String?, overlay: Overlay, isOnThisMac: Bool) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.durationMs = durationMs
+        self.tile = tile
+        self.overlay = overlay
+        self.isOnThisMac = isOnThisMac
+    }
 }
 
 /// Spec 10 §6, "The Media pool panel".

@@ -99,16 +99,16 @@ public struct LayoutSample: Equatable, Sendable {
 
     public init() {}
 
-    /// "a built-in sample, the first verse of "Great Is Thy Faithfulness" (1923, public domain), with a title and a
-    /// copyright line ... For boxes at an offset, ... the built-in sample's next verses."
+    /// Spec 11 §8 as corrected 2026-11-26 (G-41) — "a built-in sample of placeholder Latin, lorem ipsum, with a title and
+    /// a copyright line ... For boxes at an offset, ... the built-in sample's next paragraphs."
     public static let builtInVerses: [String] = [
-        "Great is Thy faithfulness, O God my Father;\nThere is no shadow of turning with Thee;\nThou changest not, Thy compassions, they fail not;\nAs Thou hast been, Thou forever wilt be.",
-        "Great is Thy faithfulness! Great is Thy faithfulness!\nMorning by morning new mercies I see;\nAll I have needed Thy hand hath provided;\nGreat is Thy faithfulness, Lord, unto me!",
-        "Summer and winter and springtime and harvest,\nSun, moon and stars in their courses above\nJoin with all nature in manifold witness\nTo Thy great faithfulness, mercy and love.",
-        "Pardon for sin and a peace that endureth,\nThine own dear presence to cheer and to guide;\nStrength for today and bright hope for tomorrow,\nBlessings all mine, with ten thousand beside!",
+        "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit,\nsed do eiusmod tempor incididunt\nut labore et dolore magna aliqua.",
+        "Ut enim ad minim veniam,\nquis nostrud exercitation ullamco\nlaboris nisi ut aliquip\nex ea commodo consequat.",
+        "Duis aute irure dolor in reprehenderit\nin voluptate velit esse cillum dolore\neu fugiat nulla pariatur.",
+        "Excepteur sint occaecat cupidatat non proident,\nsunt in culpa qui officia deserunt\nmollit anim id est laborum.",
     ]
-    public static let builtInTitle = "Great Is Thy Faithfulness"
-    public static let builtInCopyright = "Thomas O. Chisholm, 1923. Public domain."
+    public static let builtInTitle = "Lorem Ipsum"
+    public static let builtInCopyright = "Sample text"
 
     public static func builtIn(verse: Int) -> [String: String] {
         ["body": builtInVerses[min(verse, builtInVerses.count - 1)], "title": builtInTitle, "copyright": builtInCopyright]

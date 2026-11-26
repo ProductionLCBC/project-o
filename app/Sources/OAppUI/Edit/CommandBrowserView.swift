@@ -25,6 +25,8 @@ final class BrowserNode: NSObject {
 final class CommandBrowserView: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate, NSTextFieldDelegate, NSSearchFieldDelegate {
     private let model: ShowModel
     private let all: [CommandBranch]
+    /// Where the pool's tiles are, for a media field.
+    var machineRoot: URL?
     private(set) var nodes: [BrowserNode] = []
     let search = NSSearchField()
     let outline = NSOutlineView()
@@ -177,6 +179,11 @@ final class CommandBrowserView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
                 return popup
             }
             switch field.kind {
+            case .pick(.media):
+                // "it opens the media chooser" (G-42): here, inside the browser's form.
+                let picker = MediaPickerView(model: model, machineRoot: machineRoot, selected: nil)
+                picker.onPick = { [weak self] _ in self?.refreshPreview() }
+                control = picker
             case .pick(let pick):
                 control = popup(CommandCatalog.choices(pick, catalog: catalog, media: model.store.media).map { ($0.value, $0.title) })
             case .state:
@@ -239,7 +246,9 @@ final class CommandBrowserView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
     var values: [String: CommandValue] {
         var values: [String: CommandValue] = [:]
         for (field, control) in zip(fields, controls) {
-            if let popup = control as? NSPopUpButton, let list = choices[field.id], list.indices.contains(popup.indexOfSelectedItem) {
+            if let picker = control as? MediaPickerView {
+                if let id = picker.selected { values[field.id] = .text(id) }
+            } else if let popup = control as? NSPopUpButton, let list = choices[field.id], list.indices.contains(popup.indexOfSelectedItem) {
                 values[field.id] = list[popup.indexOfSelectedItem]
             } else if let box = control as? NSButton, field.kind == .flag {
                 values[field.id] = .bool(box.state == .on)
@@ -289,8 +298,10 @@ final class CommandBrowserView: NSView, NSOutlineViewDataSource, NSOutlineViewDe
         var y: CGFloat = 30
         for (name, control) in rows {
             name.frame = NSRect(x: x, y: y + 4, width: nameWidth - 6, height: 16)
-            control.frame = NSRect(x: x + nameWidth, y: y, width: max(0, width - nameWidth), height: 24)
-            y += 32
+            // A media field is the picker, as tall as the form has room for.
+            let height: CGFloat = control is MediaPickerView ? max(120, bounds.height - y - 44) : 24
+            control.frame = NSRect(x: x + nameWidth, y: y, width: max(0, width - nameWidth), height: height)
+            y += height + 8
         }
         preview.frame = NSRect(x: x, y: max(y + 6, bounds.height - 34), width: width, height: 32)
     }

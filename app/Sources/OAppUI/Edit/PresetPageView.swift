@@ -19,7 +19,10 @@ final class PresetWorkspaceView: NSView {
     let sampleName = Kit.label(Strings.text(.editPresetSample), size: 11.5, color: Palette.dimText)
     let sampleKind = SegmentedView([Strings.text(.editPresetSampleText), Strings.text(.editPresetSampleMedia), Strings.text(.editPresetSampleEmpty)], small: true)
     let sampleText = EditField()
-    let sampleMedia = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// "the engine's test pattern at first ..., or a pool item chosen after it", in the media chooser (G-42).
+    let sampleMedia = FlatButton("", style: .plain)
+    /// The window, which opens the chooser.
+    weak var host: ShowWindowView?
     /// Names the cue's list by its title, which the library wrote: it may truncate.
     let sampleSource = Kit.content(Kit.label(size: 11, color: Palette.faintText))
     private var tabKeys: [LayoutKey] = []
@@ -40,10 +43,14 @@ final class PresetWorkspaceView: NSView {
         }
         sampleText.setAccessibilityLabel(Strings.text(.editPresetSampleField))
         sampleText.onCommit = { [weak model] text in model?.editing.setSampleText(text) }
-        sampleMedia.font = .systemFont(ofSize: 12)
-        sampleMedia.target = self
-        sampleMedia.action = #selector(pickedMedia)
+        sampleMedia.fontSize = 12
+        sampleMedia.leading = true
+        sampleMedia.chevron = true
         sampleMedia.setAccessibilityLabel(Strings.text(.editPresetSampleMedia))
+        sampleMedia.onPress = { [weak self] in
+            guard let self else { return }
+            self.host?.present(self.mediaChooser().0, at: self.sampleMedia)
+        }
         for view in [otherHeading, layoutNote, copyFromAny, removeLayout, canvas, sampleName, sampleKind, sampleText, sampleMedia, sampleSource] as [NSView] {
             addSubview(view)
         }
@@ -52,8 +59,12 @@ final class PresetWorkspaceView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    @objc private func pickedMedia() {
-        model.editing.setSampleMedia(sampleMedia.selectedItem?.representedObject as? String)
+    /// The chooser for the media sample, the test pattern its first tile.
+    func mediaChooser() -> (PromptView, MediaPickerView) {
+        MediaChooser.panel(model: model, machineRoot: machineRoot, selected: model.editing.layoutSample.media, kinds: [.video, .image],
+                           extra: Strings.text(.editPresetSamplePattern)) { [weak model] id in
+            model?.editing.setSampleMedia(id)
+        }
     }
 
     /// "Any stack: 1 Main, 3 Side"; "2 Confidence"; with the live dot on those an output shows.
@@ -119,17 +130,9 @@ final class PresetWorkspaceView: NSView {
                 sampleSource.stringValue = Strings.text(.editPresetSampleBuiltIn)
             }
         case .media:
-            let items = model.store.media.filter { [.video, .image].contains($0.entry.kind) && $0.presence == "ok" }
-            // The engine's test pattern first, then the pool's videos and images.
-            let titles = [Strings.text(.editPresetSamplePattern)] + items.map { ($0.entry.path as NSString).lastPathComponent }
-            if sampleMedia.itemTitles != titles {
-                sampleMedia.removeAllItems()
-                for (index, title) in titles.enumerated() {
-                    sampleMedia.addItem(withTitle: title)
-                    sampleMedia.lastItem?.representedObject = index == 0 ? nil : items[index - 1].entry.id
-                }
-            }
-            sampleMedia.selectItem(at: (items.firstIndex { $0.entry.id == sample.media }).map { $0 + 1 } ?? 0)
+            // The engine's test pattern, or the item chosen.
+            sampleMedia.title = sample.media.flatMap { id in model.store.media.first { $0.id == id } }.map { MediaPool.name(of: $0.entry) }
+                ?? Strings.text(.editPresetSamplePattern)
             sampleSource.stringValue = ""
         case .empty:
             sampleSource.stringValue = ""

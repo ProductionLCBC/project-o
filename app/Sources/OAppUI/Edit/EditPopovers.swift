@@ -4,33 +4,66 @@ import AppKit
 import OApp
 import OCore
 
-/// Spec 11 §4, "The content popover" — "For media, the pool's search and
-/// tiles to pick from": a search field over the pool's tiles, one of them chosen.
+/// Spec 11 §2, "Picking media" (G-42) — "the pool's folder rail as a tree, its search and kind filter over its tiles
+/// (Spec 10 §6), with only the kinds that fit offered; a click selects a tile, and a double-click or Choose takes it.
+/// Where nothing is a choice (a transition's black, the preset editor's test pattern), it is the first tile." The rail
+/// shows when there is room for it beside the tiles.
 @MainActor
 final class MediaPickerView: Surface {
     private let model: ShowModel
     private let machineRoot: URL?
+    /// The kinds that fit; the filter's All means all of them.
+    let kinds: [ViewSettings.PoolKind]
+    /// The first tile's title, which picks nothing; nil for none.
+    let extra: String?
     let search = Kit.search(placeholder: Strings.text(.poolSearch))
+    let kindFilter: SegmentedView
+    private let railScroll = NSScrollView()
+    private let rail = InspectorDocument()
+    private(set) var folders: [FlatButton] = []
     private let scroll = NSScrollView()
     private let document = InspectorDocument()
     private(set) var tiles: [PoolTileView] = []
-    /// The chosen item's id.
+    private var folder: String?
+    private var kind = ViewSettings.PoolKind.all
+    /// The chosen item's id; nil is the first tile's nothing, when there is one.
     var selected: String? { didSet { rebuild() } }
-    var onPick: ((String) -> Void)?
+    /// A click selects: the item's id, or nil for the first tile.
+    var onPick: ((String?) -> Void)?
+    /// A double-click takes.
+    var onChoose: ((String?) -> Void)?
 
-    init(model: ShowModel, machineRoot: URL?, selected: String?) {
+    static let railWidth: CGFloat = 170
+
+    init(model: ShowModel, machineRoot: URL?, selected: String?, kinds: [ViewSettings.PoolKind] = [.video, .image, .audio], extra: String? = nil) {
         self.model = model
         self.machineRoot = machineRoot
         self.selected = selected
+        self.kinds = kinds
+        self.extra = extra
+        kindFilter = SegmentedView(([.all] + kinds).map { EditModeWording.poolKind($0) }, small: true)
         super.init(frame: .zero)
         search.target = self
         search.action = #selector(searched)
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
+        kindFilter.selected = 0
+        kindFilter.setAccessibilityLabel(Strings.text(.editChooserKind))
+        kindFilter.onSelect = { [weak self] index in
+            let all: [ViewSettings.PoolKind] = [.all] + (self?.kinds ?? [])
+            guard let self, all.indices.contains(index) else { return }
+            self.kind = all[index]
+            self.kindFilter.selected = index
+            self.rebuild()
+        }
+        kindFilter.isHidden = kinds.count < 2
+        for view in [scroll, railScroll] {
+            view.drawsBackground = false
+            view.hasVerticalScroller = true
+            view.autohidesScrollers = true
+        }
         scroll.documentView = document
-        addSubview(search)
-        addSubview(scroll)
+        railScroll.documentView = rail
+        for view in [search, kindFilter, railScroll, scroll] as [NSView] { addSubview(view) }
+        buildRail()
         rebuild()
     }
 
@@ -39,40 +72,123 @@ final class MediaPickerView: Surface {
 
     @objc private func searched() { rebuild() }
 
+    /// "the pool's folder rail as a tree": every media, then each folder indented under the one it is in.
+    private func buildRail() {
+        folders.forEach { $0.removeFromSuperview() }
+        let names: [String?] = [nil] + MediaPool.folders(model.store.media).map { Optional($0) }
+        folders = names.map { path in
+            let depth = path.map { $0.split(separator: "/").count - 1 } ?? 0
+            let title = path.map { String($0.split(separator: "/").last ?? "") } ?? Strings.text(.editChooserAll)
+            let button = FlatButton(String(repeating: "   ", count: depth) + title, style: .bare)
+            button.leading = true
+            button.fontSize = 12
+            button.setAccessibilityLabel(path ?? title)
+            button.onPress = { [weak self] in
+                self?.folder = path
+                self?.rebuild()
+            }
+            rail.addSubview(button)
+            return button
+        }
+    }
+
     private func rebuild() {
         tiles.forEach { $0.removeFromSuperview() }
         var filter = MediaPool.Filter()
         filter.search = search.stringValue
-        tiles = MediaPool.tiles(model.store.media, filter: filter).map { tile in
-            let view = PoolTileView(tile, isSelected: tile.id == selected, machineRoot: machineRoot)
-            view.onClick = { [weak self] _, _ in
-                self?.selected = tile.id
-                self?.onPick?(tile.id)
+        filter.kind = kind
+        filter.folder = folder
+        var shown = MediaPool.tiles(model.store.media, filter: filter)
+        // "with only the kinds that fit offered".
+        let fits = Set(kinds)
+        shown = shown.filter { tile in
+            switch tile.kind {
+            case .video: fits.contains(.video)
+            case .image: fits.contains(.image)
+            case .audio, .audioSet: fits.contains(.audio)
+            default: false
             }
-            document.addSubview(view)
-            return view
+        }
+        var views: [PoolTileView] = []
+        if let extra {
+            let nothing = PoolTile(id: "", name: extra, kind: .image, durationMs: nil, tile: nil, overlay: .none, isOnThisMac: false)
+            let view = PoolTileView(nothing, isSelected: selected == nil, machineRoot: nil)
+            // Not an item in the pool, so no kind under its name.
+            view.kind.stringValue = ""
+            view.onClick = { [weak self] clicks, _ in self?.click(nil, clicks) }
+            views.append(view)
+        }
+        for tile in shown {
+            let view = PoolTileView(tile, isSelected: tile.id == selected, machineRoot: machineRoot)
+            view.onClick = { [weak self] clicks, _ in self?.click(tile.id, clicks) }
+            views.append(view)
+        }
+        tiles = views
+        tiles.forEach { document.addSubview($0) }
+        for (button, path) in zip(folders, [nil] + MediaPool.folders(model.store.media).map { Optional($0) }) {
+            button.isOn = path == folder
         }
         needsLayout = true
     }
 
-    /// Picks an item, as a click on its tile would.
-    func pick(_ id: String) {
-        selected = id
+    private func click(_ id: String?, _ clicks: Int) {
+        if id != selected { selected = id }
         onPick?(id)
+        if clicks >= 2 { onChoose?(id) }
+    }
+
+    /// Picks an item, as a click on its tile would; nil is the first tile.
+    func pick(_ id: String?) {
+        click(id, 1)
     }
 
     override func layout() {
         super.layout()
-        search.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 24)
-        scroll.frame = NSRect(x: 0, y: 30, width: bounds.width, height: max(0, bounds.height - 30))
-        let columns = 3
-        let width = floor((bounds.width - CGFloat(columns - 1) * 6) / CGFloat(columns))
-        let height = floor(width * 9 / 16) + 44
+        let showsRail = bounds.width >= 460 && folders.count > 1
+        railScroll.isHidden = !showsRail
+        let left: CGFloat = showsRail ? Self.railWidth + 8 : 0
+        let filterWidth = kindFilter.isHidden ? 0 : min(kindFilter.fitting.width, (bounds.width - left) * 0.5)
+        search.frame = NSRect(x: left, y: 0, width: max(0, bounds.width - left - filterWidth - (filterWidth > 0 ? 8 : 0)), height: 24)
+        kindFilter.frame = NSRect(x: bounds.width - filterWidth, y: 0, width: filterWidth, height: 24)
+        railScroll.frame = NSRect(x: 0, y: 0, width: Self.railWidth, height: bounds.height)
+        var y: CGFloat = 0
+        for button in folders {
+            button.frame = NSRect(x: 0, y: y, width: Self.railWidth - 4, height: 24)
+            y += 26
+        }
+        rail.frame = NSRect(x: 0, y: 0, width: Self.railWidth, height: max(railScroll.frame.height, y))
+        scroll.frame = NSRect(x: left, y: 30, width: max(0, bounds.width - left), height: max(0, bounds.height - 30))
+        let width = scroll.frame.width
+        let columns = max(2, Int(width / 150))
+        let tileWidth = floor((width - CGFloat(columns - 1) * 6) / CGFloat(columns))
+        let height = floor(tileWidth * 9 / 16) + 44
         for (index, tile) in tiles.enumerated() {
-            tile.frame = NSRect(x: CGFloat(index % columns) * (width + 6), y: CGFloat(index / columns) * (height + 6), width: width, height: height)
+            tile.frame = NSRect(x: CGFloat(index % columns) * (tileWidth + 6), y: CGFloat(index / columns) * (height + 6), width: tileWidth, height: height)
         }
         let rows = CGFloat((tiles.count + columns - 1) / columns)
-        document.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(scroll.frame.height, rows * (height + 6)))
+        document.frame = NSRect(x: 0, y: 0, width: width, height: max(scroll.frame.height, rows * (height + 6)))
+    }
+}
+
+/// Spec 11 §2, "Picking media" (G-42) — the media chooser in its panel: the picker, and Choose, which takes the
+/// selected tile, as a double-click does.
+@MainActor
+enum MediaChooser {
+    static func panel(model: ShowModel, machineRoot: URL?, selected: String?, kinds: [ViewSettings.PoolKind], extra: String? = nil,
+                      choose: @escaping @MainActor (String?) -> Void) -> (PromptView, MediaPickerView) {
+        let panel = PromptView(heading: Strings.text(.editChooserHeading), width: 680)
+        panel.save.title = Strings.text(.editChooserChoose)
+        let picker = MediaPickerView(model: model, machineRoot: machineRoot, selected: selected, kinds: kinds, extra: extra)
+        panel.addRow("", picker, height: 400)
+        panel.onSave = {
+            choose(picker.selected)
+            return nil
+        }
+        picker.onChoose = { [weak panel] id in
+            choose(id)
+            panel?.onClose?()
+        }
+        return (panel, picker)
     }
 }
 
@@ -359,11 +475,12 @@ enum EditPopovers {
             name.stringValue = named(draft.media?.ref)
             let picker = MediaPickerView(model: model, machineRoot: machineRoot, selected: draft.media?.ref)
             picker.onPick = { [weak name] id in
+                guard let id else { return }
                 // Another item starts without the last one's trim.
                 if draft.media?.ref != id { draft.media = MediaContent(ref: id) }
                 name?.stringValue = named(id)
             }
-            panel.addRow("", picker, height: 190)
+            panel.addRow("", picker, height: 260)
             panel.addRow(Strings.text(.editContentFormItem), name)
             let inField = panel.text(Strings.text(.editContentFormIn), SecondsText.text(ms: draft.media?.inMs))
             let outField = panel.text(Strings.text(.editContentFormOut), SecondsText.text(ms: draft.media?.outMs))

@@ -16,9 +16,10 @@ final class ObjectStageView: NSView {
     let heading = Kit.heading("")
     // The pickers over the pictures: a grade's item, or a transition's two.
     let firstName = Kit.label(size: 11.5, color: Palette.dimText)
-    let firstPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// "it opens the media chooser" (Spec 11 §2, G-42): the item's name, and a press opens it.
+    let firstPicker = FlatButton("", style: .plain)
     let secondName = Kit.label(Strings.text(.editObjectTo), size: 11.5, color: Palette.dimText)
-    let secondPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+    let secondPicker = FlatButton("", style: .plain)
     // Grades: "the item through the grade beside the same item without it".
     let graded = NSImageView()
     let ungraded = NSImageView()
@@ -51,10 +52,12 @@ final class ObjectStageView: NSView {
         commands = MacroCommandsView(model: model)
         super.init(frame: .zero)
         for picker in [firstPicker, secondPicker] {
-            picker.font = .systemFont(ofSize: 12)
-            picker.target = self
-            picker.action = #selector(picked(_:))
+            picker.fontSize = 12
+            picker.leading = true
+            picker.chevron = true
         }
+        firstPicker.onPress = { [weak self] in self?.choose(first: true) }
+        secondPicker.onPress = { [weak self] in self?.choose(first: false) }
         firstPicker.setAccessibilityLabel(Strings.text(.editObjectPreviewItem))
         secondPicker.setAccessibilityLabel(Strings.text(.editObjectTo))
         for image in [graded, ungraded] {
@@ -81,28 +84,30 @@ final class ObjectStageView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    @objc private func picked(_ sender: NSPopUpButton) {
-        let id = sender.selectedItem?.representedObject as? String
+    /// The chooser for a grade's item, or a transition's first or second (whose black is its first tile).
+    func chooser(first: Bool) -> (PromptView, MediaPickerView)? {
         let editing = model.editing
-        if editing.selectedGrade != nil, let id {
-            editing.setGradeMedia(id)
-        } else if editing.selectedTransition != nil {
-            if sender === firstPicker { editing.setTransitionMedia(from: id) } else { editing.setTransitionMedia(to: id) }
+        if editing.selectedGrade != nil {
+            return MediaChooser.panel(model: model, machineRoot: machineRoot, selected: editing.gradeMedia, kinds: [.video, .image]) { [weak model] id in
+                if let id { model?.editing.setGradeMedia(id) }
+            }
+        }
+        guard editing.selectedTransition != nil else { return nil }
+        let media = editing.transitionMedia
+        return MediaChooser.panel(model: model, machineRoot: machineRoot, selected: first ? media.from : media.to, kinds: [.video, .image],
+                                  extra: Strings.text(.editObjectBlack)) { [weak model] id in
+            if first { model?.editing.setTransitionMedia(from: id) } else { model?.editing.setTransitionMedia(to: id) }
         }
     }
 
-    private func fill(_ picker: NSPopUpButton, _ items: [MediaItem], selected: String?, black: Bool) {
-        picker.removeAllItems()
-        if black {
-            picker.addItem(withTitle: Strings.text(.editObjectBlack))
-            picker.lastItem?.representedObject = nil
-        }
-        for item in items {
-            picker.addItem(withTitle: (item.entry.path as NSString).lastPathComponent)
-            picker.lastItem?.representedObject = item.id
-        }
-        let index = items.firstIndex { $0.id == selected }.map { $0 + (black ? 1 : 0) } ?? 0
-        picker.selectItem(at: index)
+    private func choose(first: Bool) {
+        guard let (panel, _) = chooser(first: first) else { return }
+        host?.present(panel, at: first ? firstPicker : secondPicker)
+    }
+
+    /// An item's name, or black.
+    private func named(_ id: String?) -> String {
+        id.flatMap { id in model.store.media.first { $0.id == id } }.map { MediaPool.name(of: $0.entry) } ?? Strings.text(.editObjectBlack)
     }
 
     /// An engine picture in an image view, read again only when its file changes.
@@ -127,19 +132,27 @@ final class ObjectStageView: NSView {
         let editing = model.editing
         let all: [NSView] = [firstName, firstPicker, secondName, secondPicker, graded, ungraded, gradedCaption, ungradedCaption, note, player, play,
                              loop, curve, lanes, sampleField, sample, commands]
-        for view in all { view.isHidden = true }
+        // What shows this time; each view is shown or hidden only when that changes, since hiding a field that has the
+        // keys takes them from it (the sample's text lost its selection at every redraw, Adam, 2026-11-26).
+        var showing: [NSView] = []
+        defer {
+            for view in all {
+                let hidden = !showing.contains { $0 === view }
+                if view.isHidden != hidden { view.isHidden = hidden }
+            }
+        }
         heading.isHidden = editing.selectedObject == nil
         let choices = editing.gradeMediaChoices
         if let grade = editing.selectedGrade {
             Kit.setHeading(heading, Strings.text(.editPreview))
             if choices.isEmpty {
                 note.stringValue = Strings.text(.editObjectPreviewNoMedia)
-                note.isHidden = false
+                showing.append(note)
             } else {
                 firstName.stringValue = Strings.text(.editObjectPreviewItem)
-                fill(firstPicker, choices, selected: editing.gradeMedia, black: false)
+                firstPicker.title = named(editing.gradeMedia)
                 gradedCaption.stringValue = Strings.text(.editObjectPreviewGraded, grade.number)
-                for view in [firstName, firstPicker, graded, ungraded, gradedCaption, ungradedCaption] as [NSView] { view.isHidden = false }
+                showing += [firstName, firstPicker, graded, ungraded, gradedCaption, ungradedCaption]
                 _ = show(editing.objectState.graded, in: graded)
                 _ = show(editing.objectState.ungraded, in: ungraded)
             }
@@ -148,9 +161,9 @@ final class ObjectStageView: NSView {
             Kit.setHeading(heading, Strings.text(.editPreview))
             let media = editing.transitionMedia
             firstName.stringValue = Strings.text(.editObjectFrom)
-            fill(firstPicker, choices, selected: media.from, black: true)
-            fill(secondPicker, choices, selected: media.to, black: true)
-            for view in [firstName, firstPicker, secondName, secondPicker, player, play, loop, curve] as [NSView] { view.isHidden = false }
+            firstPicker.title = named(media.from)
+            secondPicker.title = named(media.to)
+            showing += [firstName, firstPicker, secondName, secondPicker, player, play, loop, curve]
             player.from = show(editing.objectState.fromPicture, in: player.fromView)
             player.to = show(editing.objectState.toPicture, in: player.toView)
             player.color = transition.color.map(FormColor.ns) ?? .black
@@ -159,18 +172,18 @@ final class ObjectStageView: NSView {
         } else if let audio = editing.selectedAudioTransition {
             Kit.setHeading(heading, Strings.text(.editPreview))
             lanes.transition = audio
-            for view in [lanes, play, loop] as [NSView] { view.isHidden = false }
+            showing += [lanes, play, loop]
         } else if let style = editing.selectedTextStyle {
             Kit.setHeading(heading, Strings.text(.editPreview))
             sampleField.show(editing.objectState.styleSample ?? "", placeholder: editing.styleSampleText, subject: AnyHashable("style-\(style.number)"))
             sample.values = style.values
             sample.text = editing.styleSampleText
             sample.stackSize = editing.canvasSize
-            for view in [sampleField, sample] as [NSView] { view.isHidden = false }
+            showing += [sampleField, sample]
             stop()
         } else if editing.selectedMacro != nil {
             Kit.setHeading(heading, Strings.text(.editObjectMacroHeading))
-            commands.isHidden = false
+            showing.append(commands)
             commands.refresh()
             stop()
         } else {
@@ -260,7 +273,7 @@ final class ObjectStageView: NSView {
         if !firstPicker.isHidden {
             let nameWidth = Kit.width(of: firstName) + 6
             firstName.frame = NSRect(x: pad, y: y + 4, width: nameWidth, height: 16)
-            let pickerWidth = min(260, (inner - nameWidth * 2 - 24) / (secondPicker.isHidden ? 1 : 2))
+            let pickerWidth = min(280, (inner - nameWidth * 2 - 24) / (secondPicker.isHidden ? 1 : 2))
             firstPicker.frame = NSRect(x: pad + nameWidth, y: y, width: pickerWidth, height: 24)
             if !secondPicker.isHidden {
                 let x = firstPicker.frame.maxX + 16

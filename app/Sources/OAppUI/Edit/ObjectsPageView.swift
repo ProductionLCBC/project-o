@@ -312,6 +312,7 @@ final class GradeSlider: HeldSlider {
         minValue = parameter.range.lowerBound
         maxValue = parameter.range.upperBound
         doubleValue = parameter.identity
+        resetValue = parameter.identity
         isContinuous = false
         controlSize = .small
         target = self

@@ -48,4 +48,15 @@ final class ColorWellTests: XCTestCase {
         XCTAssertTrue(slider.show(90), "then another client's edit shows")
         XCTAssertEqual(slider.doubleValue, 90)
     }
+
+    /// Spec 11 §9 (G-40) — "a double-click putting it back to its identity", sent as one edit.
+    func test_aDoubleClickPutsASliderBack() {
+        let slider = GradeSlider(.contrast)
+        var sent: [Double] = []
+        slider.onRelease = { sent.append($0) }
+        slider.release(at: 150)
+        slider.reset()
+        XCTAssertEqual(sent, [150, 100], "contrast's identity is 100%")
+        XCTAssertEqual(slider.doubleValue, 100)
+    }
 }

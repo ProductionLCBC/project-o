@@ -325,6 +325,16 @@ public enum EditModeWording {
         }
     }
 
+    /// The media chooser's kind filter (Spec 11 §2, G-42), as the pool's says it.
+    public static func poolKind(_ kind: ViewSettings.PoolKind) -> String {
+        switch kind {
+        case .all: Strings.text(.poolKindAll)
+        case .video: Strings.text(.kindVideo)
+        case .image: Strings.text(.kindImage)
+        case .audio: Strings.text(.kindAudio)
+        }
+    }
+
     // MARK: - The Objects page (Spec 11 §9)
 
     /// A group's heading: "Grades", "Transitions", "Audio transitions", "Text styles", "Macros".

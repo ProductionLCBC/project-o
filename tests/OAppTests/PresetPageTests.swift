@@ -69,10 +69,10 @@ final class PresetPageTests: XCTestCase {
         XCTAssertNil(PresetPage.make(catalog: catalog, preset: 99, tab: .any, dots: dots).preset)
     }
 
-    func test_theSampleIsTheCuesTextOrTheBuiltInHymn() {
+    func test_theSampleIsTheCuesTextOrTheBuiltInLoremIpsum() {
         var sample = LayoutSample()
         guard case .object(let builtIn) = sample.value else { return XCTFail("an object") }
-        XCTAssertEqual(builtIn["content"]?.objectValue?["fields"]?.objectValue?["title"], .string("Great Is Thy Faithfulness"))
+        XCTAssertEqual(builtIn["content"]?.objectValue?["fields"]?.objectValue?["title"], .string("Lorem Ipsum"))
         XCTAssertEqual(builtIn["next"]?.arrayValue?.count, 3, "the built-in sample's next verses, for boxes at an offset")
         XCTAssertNil(builtIn["cue"])
         sample.fields = ["body": "Praise God"]

@@ -3541,6 +3541,54 @@
         }
       }
     },
+    "edit.chooser.all" : {
+      "comment" : "The media chooser's folder rail: every folder.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Media"
+          }
+        }
+      }
+    },
+    "edit.chooser.choose" : {
+      "comment" : "The media chooser's button that takes the selected item.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        }
+      }
+    },
+    "edit.chooser.heading" : {
+      "comment" : "The heading of the media chooser.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Media"
+          }
+        }
+      }
+    },
+    "edit.chooser.kind" : {
+      "comment" : "VoiceOver: the media chooser's kind filter.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kind"
+          }
+        }
+      }
+    },
     "edit.column.channel" : {
       "comment" : "The heading of the inspector's fourth column: the selected row's channel.",
       "extractionState" : "manual",
@@ -7550,13 +7598,13 @@
       }
     },
     "edit.preset.sampleBuiltIn" : {
-      "comment" : "Where the sample text comes from: the built-in hymn.",
+      "comment" : "Where the sample text comes from: the built-in placeholder Latin.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Built-in: Great Is Thy Faithfulness"
+            "value" : "Built-in: Lorem Ipsum"
           }
         }
       }

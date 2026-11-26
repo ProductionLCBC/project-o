@@ -108,6 +108,7 @@ final class SlotRowView: NSView {
         super.init(frame: frameRect)
         opacity.controlSize = .small
         opacity.isContinuous = false
+        opacity.resetValue = 1
         percent.alignment = .right
         more.chevron = false
         more.fontSize = 13
