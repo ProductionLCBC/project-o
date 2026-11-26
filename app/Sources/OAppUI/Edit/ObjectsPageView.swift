@@ -208,7 +208,7 @@ final class ObjectWorkspaceView: NSView {
         }
         tint.isHidden = grade == nil
         // "white is identity": a clear tint does nothing, as white does.
-        if let grade { tint.color = grade.tint.a == 0 ? .white : FormColor.ns(grade.tint) }
+        if let grade { tint.show(grade.tint.a == 0 ? .white : FormColor.ns(grade.tint)) }
         // Transitions and audio transitions.
         let transition = editing.selectedTransition
         let audio = editing.selectedAudioTransition
@@ -223,7 +223,7 @@ final class ObjectWorkspaceView: NSView {
             transitionType.stringValue = EditModeWording.transitionType(transition.type)
             ms.show(String(transition.ms), subject: subject)
             easing.set(easings, selected: Self.easings.firstIndex(of: transition.easing) ?? 0)
-            if let color = transition.color { transitionColor.color = FormColor.ns(color) }
+            if let color = transition.color { transitionColor.show(FormColor.ns(color)) }
         }
         if let audio {
             audioType.set(Self.audioTypes.enumerated().map { (EditModeWording.audioTransitionType($0.element), $0.offset) },
@@ -250,7 +250,7 @@ final class ObjectWorkspaceView: NSView {
             scope.title = Strings.text(macro.isMachineLevel ? .editObjectScopeTagMachine : .editObjectScopeTagLibrary)
             scope.toolTip = Strings.text(macro.isMachineLevel ? .editObjectScopeMachine : .editObjectScopeLibrary)
             scope.setAccessibilityLabel(Strings.text(.editObjectScope) + ", " + scope.title)
-            tileColor.color = FormColor.ns(macro.color)
+            tileColor.show(FormColor.ns(macro.color))
             tileLabel.show(macro.tileLabel, subject: subject)
             runOnAir.isEnabled = model.store.cannotSend == nil
             runOnAir.reason = ShowWording.unavailable(model.store.cannotSend)

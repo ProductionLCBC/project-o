@@ -111,17 +111,17 @@ final class StyleForm {
         size.show(FormNumber.text(v.size.value), subject: subject)
         unit.selected = v.size.unit == .percent ? 1 : 0
         weight.show(FormNumber.text(v.weight, places: 0), subject: subject)
-        color.color = FormColor.ns(v.color)
+        color.show(FormColor.ns(v.color))
         align.selected = [TextAlignment.left, .center, .right].firstIndex(of: v.alignment)
         vertical.selected = [VerticalAlignment.top, .center, .bottom].firstIndex(of: v.verticalAlignment)
         lineSpacing.show(FormNumber.text(v.lineSpacing), subject: subject)
         letterSpacing.show(FormNumber.text(v.letterSpacing), subject: subject)
         outlineSize.show(FormNumber.text(v.outline.width), subject: subject)
-        outlineColor.color = FormColor.ns(v.outline.color)
+        outlineColor.show(FormColor.ns(v.outline.color))
         shadowX.show(FormNumber.text(v.shadow.x), subject: subject)
         shadowY.show(FormNumber.text(v.shadow.y), subject: subject)
         shadowBlur.show(FormNumber.text(v.shadow.blur), subject: subject)
-        shadowColor.color = FormColor.ns(v.shadow.color)
+        shadowColor.show(FormColor.ns(v.shadow.color))
         allCaps.state = v.allCaps ? .on : .off
     }
 

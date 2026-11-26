@@ -1009,6 +1009,16 @@ final class EditModeViewTests: XCTestCase {
         opacity.stringValue = "50"
         opacity.sendAction(opacity.action, to: opacity.target)
         XCTAssertEqual(last(rig), ["edit grade 1 opacity 0.5"])
+        // The tint: a colour chosen is sent, and a redraw while the panel is choosing leaves the well alone (Adam,
+        // 2026-11-25: "it keeps resetting").
+        page.tint.choosingForTest = true
+        page.tint.choose(NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1))
+        XCTAssertEqual(last(rig), ["edit grade 1 tint { \"a\": 1, \"b\": 0, \"g\": 0.5, \"r\": 1 }"])
+        page.refresh()
+        XCTAssertEqual(page.tint.color.usingColorSpace(.sRGB)?.greenComponent ?? 0, 0.5, accuracy: 0.01, "not put back while the panel chooses")
+        page.tint.choosingForTest = false
+        page.refresh()
+        XCTAssertEqual(page.tint.color.usingColorSpace(.sRGB)?.greenComponent ?? 0, 0.85, accuracy: 0.01, "the grade's own once the panel is done")
         let renders = rig.sent.filter { $0.fields["what"] == .string("render") }.map { $0.fields["canvas"] }
         XCTAssertTrue(renders.contains(.string("grade")) && renders.contains(.string("ungraded")), "\(renders)")
         // "the item through the grade beside the same item without it, the item picked over them", on the stage.

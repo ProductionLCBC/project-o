@@ -150,4 +150,17 @@ final class FormColorWell: NSColorWell {
         self.color = color
         chose()
     }
+
+    /// Whether the colour panel is choosing for this well, so the model's colour must wait.
+    var isChoosing: Bool { isActive || choosingForTest }
+    /// A test's stand-in for an open colour panel, which needs a screen.
+    var choosingForTest = false
+
+    /// Shows the model's colour, but not while the panel is choosing for the well: the page redraws on every change
+    /// (a picture arriving, another client's edit), and setting the colour then would put the panel back to the old
+    /// one under the operator's hand (Adam, 2026-11-25: "it keeps resetting").
+    func show(_ color: NSColor) {
+        guard !isChoosing else { return }
+        if self.color != color { self.color = color }
+    }
 }
