@@ -151,7 +151,10 @@ tint's color panel (`render` takes a grade's values; the edit is still one, at t
 and plays a video with Play, Loop and a scrub bar (`render` takes `atMs`, from one reader
 the thumbnail job keeps reading forward), at most 15 frames a second at the job's pace of
 30 pictures, two a frame; measured in `swift test` on this Mac, a pair costs about 12 ms
-with a 1080p frame, so the pace is the limit; American
+with a 1080p frame, so the pace is the limit; on 2026-11-27, on his word, edit mode's
+Live toggle sits beside Show and Edit (Spec 11 §2 corrected first, G-44; f065016, hosted CI
+green on a rerun: the first run's one failure was `TickSchedulerTests`' timer counting 24
+ticks in a quarter second on the shared runner, a timing test this area doesn't touch); American
 spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
 unchanged); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
