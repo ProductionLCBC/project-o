@@ -81,6 +81,122 @@ public struct CueGridRow: Equatable, Sendable {
     public var isFolded: Bool
     /// Spec 11 §4 — "an eye that hides the channel from the Preview monitor's picture alone" (corrected 2026-11-24).
     public var isHidden = false
+    /// Spec 11 §4, "Tracking" (G-45) — "a thin lane ... for each of those attributes that some cue of the list sets on
+    /// that channel", in the chips' order; none for a channel number no channel has, which the fold doesn't hold.
+    public var lanes: [TrackingLane] = []
+}
+
+/// Spec 11 §4, "Tracking" (Adam, 2026-11-27, G-45) — one tracked attribute of one channel across the list, "as a
+/// lighting console's tracking sheet does".
+public struct TrackingLane: Equatable, Sendable {
+    /// What the lane shows at one cue.
+    public enum Mark: Equatable, Sendable {
+        /// "the channel's default shows as nothing".
+        case none
+        /// "the cue that sets the attribute shows a block with its value, as its chip words it"; "a redundant write's
+        /// block is amber". The attribute's scope says whether it is a `once` value.
+        case set(CueAttribute, isRedundant: Bool)
+        /// "a line carries it through each cue after that holds it": from the cue (from 0) that set it, dashed for a
+        /// `once` value, which "holds only until the channel's next content write".
+        case carried(from: Int, isOnce: Bool)
+
+        public var isSet: Bool {
+            if case .set = self { return true }
+            return false
+        }
+
+        /// "A click on a block or a line selects the cue that set it": the mark at cue `index`, its setting cue.
+        public func settingCue(at index: Int) -> Int? {
+            switch self {
+            case .none: return nil
+            case .set: return index
+            case .carried(let from, _): return from
+            }
+        }
+    }
+
+    public var kind: CueAttribute.Kind
+    /// One a cue.
+    public var marks: [Mark]
+
+    public init(kind: CueAttribute.Kind, marks: [Mark]) {
+        self.kind = kind
+        self.marks = marks
+    }
+
+    /// The lanes of one channel from the list's fold: each attribute some cue sets, in the chips' order.
+    static func lanes(channel: Int, list: List, steps: [CueView.Step]) -> [TrackingLane] {
+        CueAttribute.Kind.allCases.compactMap { kind in
+            var marks: [Mark] = []
+            // The cue that last set a value from here on, and the one that last set a value for once: a once value
+            // that falls back returns to the tracked one before it (Spec 3 §3 rule 3).
+            var tracked: Int?
+            var once: Int?
+            for (index, cue) in list.cues.enumerated() {
+                guard index < steps.count else {
+                    marks.append(.none)
+                    continue
+                }
+                let step = steps[index]
+                let written = step.chips.first { $0.channel == channel }?.attributes.last { $0.attribute == kind.channelAttribute }
+                let origin = step.state.channels[channel].map { kind.origin(in: $0.attributes) } ?? .default
+                let says = CueSays.about(channel, in: cue)
+                // The cue sets it when its own commands name it. The fold also reports a once value falling back at a
+                // content write and a reset returning it to the default, which set nothing; a change with neither of
+                // those is a macro's that the cue runs.
+                var setting = says.attribute(kind)
+                if setting == nil, let written, origin != .default {
+                    if case .write = says.state {} else { setting = CueAttribute(value: written.value, scope: origin == .once ? .once : .track) }
+                }
+                if let setting {
+                    marks.append(.set(setting, isRedundant: written?.isRedundant ?? false))
+                    if setting.scope == .once { once = index } else { tracked = index }
+                } else if origin == .once, let from = once {
+                    marks.append(.carried(from: from, isOnce: true))
+                } else if origin == .tracked, let from = tracked {
+                    marks.append(.carried(from: from, isOnce: false))
+                } else {
+                    marks.append(.none)
+                }
+            }
+            return marks.contains(where: { $0 != .none }) ? TrackingLane(kind: kind, marks: marks) : nil
+        }
+    }
+}
+
+extension CueAttribute.Kind {
+    /// The channel attribute this kind of chip writes (Spec 3 §2).
+    var channelAttribute: ChannelAttribute {
+        switch self {
+        case .transition: .transition
+        case .audioTransition: .audioTransition
+        case .grade: .grade
+        case .gain: .gain
+        }
+    }
+
+    /// The attribute's origin in a channel's state: "{value, origin}" (Spec 3 §2).
+    func origin(in attributes: ChannelAttributes) -> Origin {
+        switch self {
+        case .transition: attributes.transition.origin
+        case .audioTransition: attributes.audioTransition.origin
+        case .grade: attributes.grade.origin
+        case .gain: attributes.gain.origin
+        }
+    }
+}
+
+extension CueAttribute {
+    /// An attribute as the fold reports a value written, for a cue whose own commands don't name it (a macro's).
+    init(value: AttributeValue, scope: Scope) {
+        switch value {
+        case .grade(let ref): self.init(kind: .grade, ref: ref, scope: scope, isRider: false)
+        case .transition(let setting): self.init(kind: .transition, ref: setting.ref, ms: setting.ms, scope: scope, isRider: false)
+        case .audioTransition(let setting): self.init(kind: .audioTransition, ref: setting.ref, ms: setting.ms, scope: scope, isRider: false)
+        case .gain(let db): self.init(kind: .gain, db: db, scope: scope, isRider: false)
+        case .chase: self.init(kind: .gain, scope: scope, isRider: false)
+        }
+    }
 }
 
 /// What a tile shows, or what a channel holds at a cue.
@@ -212,6 +328,11 @@ public struct CueGridModel: Equatable, Sendable {
             case .input(let item): return .input(item.input)
             case .empty: return nil
             }
+        }
+
+        // Spec 11 §4, "Tracking" (G-45) — each channel's lanes, from the same fold.
+        for index in model.rows.indices where model.rows[index].exists {
+            model.rows[index].lanes = TrackingLane.lanes(channel: model.rows[index].channel, list: list, steps: steps)
         }
 
         model.cells = rows.map { row in
@@ -355,6 +476,8 @@ public struct CueGridGeometry: Equatable, Sendable {
         /// The row's eye, at the channel column's right end.
         case eye(row: Int)
         case cell(cue: Int, row: Int)
+        /// Spec 11 §4, "Tracking" (G-45) — one of a row's lanes, at a cue.
+        case lane(cue: Int, row: Int, lane: Int)
         case nothing
     }
 
@@ -368,14 +491,20 @@ public struct CueGridGeometry: Equatable, Sendable {
     /// The eye's width, at the channel column's right edge (Spec 11 §4, corrected 2026-11-24).
     public static let eyeWidth: Double = 26
 
+    /// Spec 11 §4, "Tracking" (G-45) — a lane's height, under its row's cells.
+    public static let laneHeight: Double = 20
+
     public var column: Double
     public var cues: Int
     public var folded: [Bool]
+    /// How many lanes each row shows: none while the switch is off, and none for a folded row.
+    public var lanes: [Int]
 
-    public init(column: Double, cues: Int, folded: [Bool]) {
+    public init(column: Double, cues: Int, folded: [Bool], lanes: [Int] = []) {
         self.column = CueGridZoom.clamped(column)
         self.cues = max(0, cues)
         self.folded = folded
+        self.lanes = lanes
     }
 
     public var showsText: Bool { CueGridZoom.showsText(column: column) }
@@ -387,8 +516,20 @@ public struct CueGridGeometry: Equatable, Sendable {
         return 8 + 14 + 4 + thumbnail + (showsText ? 4 + 14 : 0) + 8
     }
 
+    /// A row's height: its cells, then its lanes.
     public func rowHeight(_ row: Int) -> Double {
+        cellHeight(row) + Double(laneCount(row)) * Self.laneHeight
+    }
+
+    /// The height of a row's cells alone.
+    public func cellHeight(_ row: Int) -> Double {
         row < folded.count && folded[row] ? Self.foldedRow : CueGridZoom.rowHeight(column: column)
+    }
+
+    /// "a folded row gets none".
+    public func laneCount(_ row: Int) -> Int {
+        guard row < lanes.count, !(row < folded.count && folded[row]) else { return 0 }
+        return max(0, lanes[row])
     }
 
     /// The whole grid's size, unscrolled.
@@ -423,7 +564,13 @@ public struct CueGridGeometry: Equatable, Sendable {
                     if x < Self.foldWidth { return .fold(row: row) }
                     return x >= Self.channelColumn - Self.eyeWidth ? .eye(row: row) : .channel(row: row)
                 }
-                return cue >= 0 && cue < cues ? .cell(cue: cue, row: row) : .nothing
+                guard cue >= 0, cue < cues else { return .nothing }
+                let below = y - top - cellHeight(row)
+                if below >= 0 {
+                    let lane = min(laneCount(row) - 1, Int(below / Self.laneHeight))
+                    return lane >= 0 ? .lane(cue: cue, row: row, lane: lane) : .cell(cue: cue, row: row)
+                }
+                return .cell(cue: cue, row: row)
             }
             top = bottom
         }

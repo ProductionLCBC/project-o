@@ -47,7 +47,9 @@ final class CueGridView: Surface, EditFocus {
     private var selection: CueGridSelection { model.editing.selection }
 
     var geometry: CueGridGeometry {
-        CueGridGeometry(column: model.settings.gridZoom, cues: grid.headers.count, folded: grid.rows.map(\.isFolded))
+        // Spec 11 §4, "Tracking" (G-45) — "On, each open row gets a thin lane under its cells".
+        CueGridGeometry(column: model.settings.gridZoom, cues: grid.headers.count, folded: grid.rows.map(\.isFolded),
+                        lanes: model.editing.isTracking ? grid.rows.map(\.lanes.count) : [])
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -147,6 +149,9 @@ final class CueGridView: Surface, EditFocus {
             if grid.rows[row].exists { model.editing.toggleHidden(row: row) } else { model.editing.select(row: .channel(grid.rows[row].channel)) }
         case .channel(let row):
             model.editing.select(row: .channel(grid.rows[row].channel))
+        case .lane(let cue, let row, let lane):
+            // "A click on a block or a line selects the cue that set it, on that channel's row."
+            model.editing.clickLane(cue: cue, row: row, lane: lane)
         case .corner, .nothing:
             break
         }
@@ -391,14 +396,23 @@ final class CueGridView: Surface, EditFocus {
         for (rowIndex, row) in grid.rows.enumerated() {
             let y = g.y(row: rowIndex) - scrollY
             let eye = CueGridGeometry.eyeWidth
-            element(EditModeWording.rowSpoken(row), NSRect(x: 0, y: y, width: CueGridGeometry.channelColumn - (row.exists ? eye : 0), height: g.rowHeight(rowIndex)),
+            element(EditModeWording.rowSpoken(row), NSRect(x: 0, y: y, width: CueGridGeometry.channelColumn - (row.exists ? eye : 0), height: g.cellHeight(rowIndex)),
                     role: .staticText)
             if row.exists {
-                element(EditModeWording.eye(row), NSRect(x: CueGridGeometry.channelColumn - eye, y: y, width: eye, height: g.rowHeight(rowIndex)), role: .button)
+                element(EditModeWording.eye(row), NSRect(x: CueGridGeometry.channelColumn - eye, y: y, width: eye, height: g.cellHeight(rowIndex)), role: .button)
             }
             for (cue, cell) in grid.cells[rowIndex].enumerated() {
                 element(EditModeWording.cell(cell, cue: cue + 1, row: row, catalog: catalog),
-                        NSRect(x: g.x(cue: cue) - scrollX, y: y, width: g.column, height: g.rowHeight(rowIndex)), role: .button)
+                        NSRect(x: g.x(cue: cue) - scrollX, y: y, width: g.column, height: g.cellHeight(rowIndex)), role: .button)
+            }
+            // G-45 — each lane's marks, where it shows one: the setting cue's value, or what a cue holds from it.
+            for (index, lane) in row.lanes.prefix(g.laneCount(rowIndex)).enumerated() {
+                let laneY = y + g.cellHeight(rowIndex) + Double(index) * CueGridGeometry.laneHeight
+                for (cue, mark) in lane.marks.enumerated() where mark != .none && cue < grid.headers.count {
+                    element(EditModeWording.trackingSpoken(mark, kind: lane.kind, cue: grid.headers[cue].number, row: row,
+                                                           from: mark.settingCue(at: cue).map { grid.headers[$0].number }, catalog: catalog),
+                            NSRect(x: g.x(cue: cue) - scrollX, y: laneY, width: g.column, height: CueGridGeometry.laneHeight), role: .button)
+                }
             }
         }
         elements = built
@@ -560,6 +574,45 @@ final class CueGridView: Surface, EditFocus {
         }
     }
 
+    /// Spec 11 §4, "Tracking" (G-45) — one lane's mark at one cue: "the cue that sets the attribute shows a block with
+    /// its value ...; a line carries it through each cue after that holds it"; "A `once` value's block is outlined and
+    /// its line dashed"; "a redundant write's block is amber".
+    private func drawLane(_ mark: TrackingLane.Mark, in rect: NSRect, showsText: Bool) {
+        let mid = rect.midY
+        switch mark {
+        case .none:
+            break
+        case .carried(_, let isOnce):
+            let line = NSBezierPath()
+            line.move(to: NSPoint(x: rect.minX, y: mid))
+            line.line(to: NSPoint(x: rect.maxX, y: mid))
+            line.lineWidth = 2
+            if isOnce { line.setLineDash([4, 3], count: 2, phase: 0) }
+            NSColor(white: 1, alpha: 0.32).setStroke()
+            line.stroke()
+        case .set(let attribute, let isRedundant):
+            let block = NSRect(x: rect.minX + 3, y: rect.minY + 3, width: rect.width - 3, height: rect.height - 6)
+            let shape = NSBezierPath(roundedRect: block, xRadius: 3, yRadius: 3)
+            let once = attribute.scope == .once
+            if isRedundant {
+                Palette.browsing.withAlphaComponent(once ? 0.12 : 0.3).setFill()
+                shape.fill()
+                Palette.browsing.setStroke()
+            } else {
+                (once ? Palette.panel : Palette.raisedHigh).setFill()
+                shape.fill()
+                (once ? Palette.dimText : Palette.hairlineStrong).setStroke()
+            }
+            shape.lineWidth = 1
+            if once { shape.setLineDash([3, 2], count: 2, phase: 0) }
+            shape.stroke()
+            if showsText {
+                text(EditModeWording.value(attribute, catalog: model.store.catalog), in: NSRect(x: block.minX + 6, y: block.midY - 7, width: block.width - 10, height: 14),
+                     size: 10.5, color: isRedundant ? Palette.browsing : Palette.text)
+            }
+        }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         let g = geometry
@@ -579,8 +632,24 @@ final class CueGridView: Surface, EditFocus {
         NSBezierPath(rect: NSRect(x: left, y: top, width: max(0, bounds.width - left), height: max(0, bounds.height - top))).addClip()
         for (rowIndex, row) in grid.rows.enumerated() {
             let y = CGFloat(g.y(row: rowIndex) - scrollY)
-            let height = CGFloat(g.rowHeight(rowIndex))
-            guard y + height > top, y < bounds.height else { continue }
+            let height = CGFloat(g.cellHeight(rowIndex))
+            let lanes = g.laneCount(rowIndex)
+            guard y + CGFloat(g.rowHeight(rowIndex)) > top, y < bounds.height else { continue }
+            // G-45 — the lanes, under the cells.
+            if lanes > 0 {
+                let laneHeight = CGFloat(CueGridGeometry.laneHeight)
+                let area = NSRect(x: left, y: y + height, width: max(0, bounds.width - left), height: laneHeight * CGFloat(lanes))
+                Palette.well.withAlphaComponent(0.55).setFill()
+                area.fill()
+                for (index, lane) in row.lanes.prefix(lanes).enumerated() {
+                    let laneY = y + height + laneHeight * CGFloat(index)
+                    for cue in visible where cue < lane.marks.count {
+                        drawLane(lane.marks[cue], in: NSRect(x: x(cue), y: laneY, width: column, height: laneHeight), showsText: showsText)
+                    }
+                }
+                Palette.hairline.setFill()
+                NSRect(x: left, y: area.maxY - 1, width: area.width, height: 1).fill()
+            }
             for cue in visible {
                 let rect = NSRect(x: x(cue), y: y, width: column, height: height)
                 if selected.contains(cue) {
@@ -617,11 +686,24 @@ final class CueGridView: Surface, EditFocus {
         NSBezierPath(rect: NSRect(x: 0, y: top, width: left, height: max(0, bounds.height - top))).addClip()
         for (rowIndex, row) in grid.rows.enumerated() {
             let y = CGFloat(g.y(row: rowIndex) - scrollY)
-            let height = CGFloat(g.rowHeight(rowIndex))
-            guard y + height > top, y < bounds.height else { continue }
+            let height = CGFloat(g.cellHeight(rowIndex))
+            let lanes = g.laneCount(rowIndex)
+            guard y + CGFloat(g.rowHeight(rowIndex)) > top, y < bounds.height else { continue }
             let rect = NSRect(x: 0, y: y, width: left, height: height)
             (selection.row == .channel(row.channel) ? Palette.raised : Palette.panel).setFill()
             rect.fill()
+            // G-45 — "named in the channel column".
+            if lanes > 0 {
+                let laneHeight = CGFloat(CueGridGeometry.laneHeight)
+                Palette.panel.setFill()
+                NSRect(x: 0, y: rect.maxY, width: left, height: laneHeight * CGFloat(lanes)).fill()
+                for (index, lane) in row.lanes.prefix(lanes).enumerated() {
+                    text(EditModeWording.name(lane.kind), in: NSRect(x: 50, y: rect.maxY + laneHeight * CGFloat(index) + (laneHeight - 13) / 2, width: left - 58, height: 13),
+                         size: 10.5, color: Palette.faintText)
+                }
+                Palette.hairline.setFill()
+                NSRect(x: 0, y: rect.maxY + laneHeight * CGFloat(lanes) - 1, width: left, height: 1).fill()
+            }
             // The fold control: an arrow that points across while the row is folded and down while it is open.
             let arrow = NSBezierPath()
             if row.isFolded {

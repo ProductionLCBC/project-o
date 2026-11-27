@@ -495,6 +495,25 @@ public final class EditModel {
         model.changed([.edit])
     }
 
+    /// Spec 11 §4, "Tracking" (G-45) — the switch beside the zoom.
+    public var isTracking: Bool { model.settings.gridTracking }
+
+    public func setTracking(_ on: Bool) {
+        guard on != model.settings.gridTracking else { return }
+        model.settings.gridTracking = on
+        model.changed([.edit])
+    }
+
+    /// "A click on a block or a line selects the cue that set it, on that channel's row"; elsewhere in a lane, the
+    /// cue's cell.
+    public func clickLane(cue: Int, row: Int, lane: Int) {
+        guard grid.rows.indices.contains(row) else { return }
+        let channel = grid.rows[row].channel
+        let lanes = grid.rows[row].lanes
+        let mark = lanes.indices.contains(lane) && lanes[lane].marks.indices.contains(cue) ? lanes[lane].marks[cue] : .none
+        click(cue: mark.settingCue(at: cue) ?? cue, row: .channel(channel))
+    }
+
     /// The header's slider.
     public func zoom(to column: Double) {
         let column = CueGridZoom.clamped(column)

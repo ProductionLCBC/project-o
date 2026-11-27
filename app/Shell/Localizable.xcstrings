@@ -4549,6 +4549,18 @@
         }
       }
     },
+    "edit.cues.tracking" : {
+      "comment" : "The switch beside the cue grid's zoom that shows how each channel's transition, audio transition, grade and gain carry through the cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracking"
+          }
+        }
+      }
+    },
     "edit.cues.unfold" : {
       "comment" : "Tooltip and VoiceOver: the control that opens a folded channel's row.",
       "extractionState" : "manual",
@@ -8745,6 +8757,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Playlists"
+          }
+        }
+      }
+    },
+    "edit.tracking.carried" : {
+      "comment" : "VoiceOver for a tracking lane's line: the cue, the channel, the attribute, and the cue that set it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld, %2$@, %3$@ from cue %4$lld"
+          }
+        }
+      }
+    },
+    "edit.tracking.redundant" : {
+      "comment" : "VoiceOver for a tracking block that writes the value the channel already had.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@, already so"
+          }
+        }
+      }
+    },
+    "edit.tracking.set" : {
+      "comment" : "VoiceOver for a tracking lane's block: the cue, the channel, the attribute and its value with its scope.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld, %2$@, %3$@: %4$@"
           }
         }
       }

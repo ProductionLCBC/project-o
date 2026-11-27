@@ -138,6 +138,83 @@ final class CueGridTests: XCTestCase {
         XCTAssertFalse(try grid42().cells[0][1].hasMark)
     }
 
+    // MARK: - Tracking (Spec 11 §4, "Tracking", G-45)
+
+    private typealias Mark = TrackingLane.Mark
+
+    /// "each open row gets a thin lane under its cells for each of those attributes that some cue of the list sets on
+    /// that channel"; "the cue that sets the attribute shows a block with its value"; "a line carries it through each
+    /// cue after that holds it"; "A `once` value's block is outlined and its line dashed, since it holds only until the
+    /// channel's next content write".
+    func test_aLaneForEachAttributeACueSetsWithItsBlockAndItsLine() throws {
+        let grid = try grid42()
+        // Channel 1: cue 1's write dissolves once (transition 2 for 1 s), and nothing writes the channel after it, so
+        // the once value holds to the end; cue 4 sets its gain from there on.
+        XCTAssertEqual(grid.rows[0].lanes.map(\.kind), [.transition, .gain])
+        XCTAssertEqual(grid.rows[0].lanes[0].marks, [
+            .set(CueAttribute(kind: .transition, ref: 2, ms: 1000, scope: .once, isRider: true), isRedundant: false),
+            .carried(from: 0, isOnce: true), .carried(from: 0, isOnce: true), .carried(from: 0, isOnce: true),
+        ])
+        XCTAssertEqual(grid.rows[0].lanes[1].marks, [.none, .none, .none,
+                                                     .set(CueAttribute(kind: .gain, db: -6, scope: .track, isRider: false), isRedundant: false)])
+        // Channel 2: cue 4's text writes an audio transition once and grade 1 from here on.
+        XCTAssertEqual(grid.rows[1].lanes.map(\.kind), [.audioTransition, .grade])
+        XCTAssertEqual(grid.rows[1].lanes[0].marks.last, .set(CueAttribute(kind: .audioTransition, ref: 2, scope: .once, isRider: true), isRedundant: false))
+        XCTAssertEqual(grid.rows[1].lanes[1].marks.last, .set(CueAttribute(kind: .grade, ref: 1, ms: 2000, scope: .track, isRider: true), isRedundant: false))
+        XCTAssertEqual(grid.rows[1].lanes[1].marks.dropLast(), [.none, .none, .none], "the channel's default shows as nothing")
+        // Channel 3: nothing sets anything, so no lane.
+        XCTAssertEqual(grid.rows[2].lanes, [])
+    }
+
+    /// "stops where another cue sets it, a reset returns it to the channel's default, or a write's `once` value falls
+    /// back"; "a redundant write's block is amber".
+    func test_aLineStopsAtTheNextSettingAResetOrTheFallBackAndARedundantWriteIsMarked() throws {
+        let grid = try grid42 { document, _ in
+            // Cue 2 sets channel 2's grade 1 from here on; cue 3 sets it again, to the same; cue 4's rider sets grade 1 too.
+            document.list.cues[1].commands.append(GuardedCommand(.channelGrade(channel: .number(2), ref: 1, ms: nil)))
+            document.list.cues[2].commands.append(GuardedCommand(.channelGrade(channel: .number(2), ref: 1, ms: nil)))
+            // Cue 2 writes channel 1 again: cue 1's once transition falls back there.
+            document.list.cues[1].commands.append(GuardedCommand(.channelWrite(ChannelWrite(channel: .number(1), content: .text(fields: ["body": "Again"])))))
+            // Cue 3 resets channel 1: its gain, set by nothing yet, stays default; cue 4 sets it.
+            document.list.cues[2].commands.append(GuardedCommand(.channelReset(channel: .number(1))))
+        }
+        let transition = try XCTUnwrap(grid.rows[0].lanes.first { $0.kind == .transition })
+        XCTAssertEqual(transition.marks.map(\.isSet), [true, false, false, false])
+        XCTAssertEqual(transition.marks[1], .none, "the once value fell back at cue 2's write")
+        let grade = try XCTUnwrap(grid.rows[1].lanes.first { $0.kind == .grade })
+        XCTAssertEqual(grade.marks[0], .none)
+        XCTAssertEqual(grade.marks[1], .set(CueAttribute(kind: .grade, ref: 1, scope: .track, isRider: false), isRedundant: false))
+        XCTAssertEqual(grade.marks[2], .set(CueAttribute(kind: .grade, ref: 1, scope: .track, isRider: false), isRedundant: true), "the value it already had")
+        // A reset ends a line: cue 2 sets channel 1's gain, cue 3 resets the channel.
+        let reset = try grid42 { document, _ in
+            document.list.cues[1].commands.append(GuardedCommand(.channelGain(channel: .number(1), db: -3)))
+            document.list.cues[2].commands.append(GuardedCommand(.channelReset(channel: .number(1))))
+        }
+        let gain = try XCTUnwrap(reset.rows[0].lanes.first { $0.kind == .gain })
+        XCTAssertEqual(gain.marks[0], .none)
+        XCTAssertTrue(gain.marks[1].isSet)
+        XCTAssertEqual(gain.marks[2], .none, "a reset returns it to the channel's default")
+        XCTAssertTrue(gain.marks[3].isSet)
+        // "A click on a block or a line selects the cue that set it".
+        XCTAssertEqual(TrackingLane.Mark.carried(from: 1, isOnce: false).settingCue(at: 3), 1)
+        XCTAssertEqual(gain.marks[1].settingCue(at: 1), 1)
+        XCTAssertNil(gain.marks[0].settingCue(at: 0))
+    }
+
+    /// "a folded row gets none": the geometry gives an open row its lanes while the switch is on, and a folded one none.
+    func test_theSwitchGivesOpenRowsTheirLanesInTheGeometry() throws {
+        let grid = try grid42()
+        let off = CueGridGeometry(column: 140, cues: 4, folded: grid.rows.map(\.isFolded))
+        let on = CueGridGeometry(column: 140, cues: 4, folded: grid.rows.map(\.isFolded), lanes: grid.rows.map { $0.isFolded ? 0 : $0.lanes.count })
+        XCTAssertEqual(on.rowHeight(0), off.rowHeight(0) + 2 * CueGridGeometry.laneHeight)
+        XCTAssertEqual(on.rowHeight(2), off.rowHeight(2), "a folded row has no lane")
+        // Under a row's cells, a point is over a lane; in the channel column, over the row.
+        let laneY = on.y(row: 0) + off.rowHeight(0) + CueGridGeometry.laneHeight * 1.5
+        XCTAssertEqual(on.hit(x: CueGridGeometry.channelColumn + 140 * 2 + 10, y: laneY), .lane(cue: 2, row: 0, lane: 1))
+        XCTAssertEqual(on.hit(x: 60, y: laneY), .channel(row: 0))
+        XCTAssertEqual(on.hit(x: CueGridGeometry.channelColumn + 10, y: on.y(row: 0) + 10), .cell(cue: 0, row: 0))
+    }
+
     func test_aClearEndsTheBarAtACap() throws {
         let grid = try grid7()
         // Doxology's last cue clears channel 2, which held text, and writes a slide on channel 1.

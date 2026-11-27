@@ -16,6 +16,8 @@ final class WorkspaceView: PanelView {
     let zoom = NSSlider(value: CueGridZoom.standard, minValue: CueGridZoom.range.lowerBound, maxValue: CueGridZoom.range.upperBound, target: nil, action: nil)
     let openText = FlatButton(Strings.text(.editCuesOpenText), style: .plain)
     let renumber = FlatButton(Strings.text(.editCuesRenumber), style: .plain)
+    /// Spec 11 §4, "Tracking" (G-45) — "A Tracking switch beside the zoom".
+    let tracking = ChoiceBox(Strings.text(.editCuesTracking))
     /// What stands in the workspace when there is no grid to show: no list chosen, a page not built yet, a list deleted.
     let message = Kit.label(size: 13)
     /// "A page whose object is deleted under it says "Deleted", with Undo while that delete is the history's top group."
@@ -69,6 +71,8 @@ final class WorkspaceView: PanelView {
         openText.reason = Strings.text(.unavailableLater)
         openText.fontSize = 11.5
         renumber.fontSize = 11.5
+        tracking.font = .systemFont(ofSize: 11.5)
+        tracking.onToggle = { [weak model] on in model?.editing.setTracking(on) }
         renumber.onPress = { [weak self] in self?.askRenumber() }
         message.textColor = Palette.faintText
         message.alignment = .center
@@ -77,7 +81,7 @@ final class WorkspaceView: PanelView {
         message.cell?.wraps = true
         undo.onPress = { [weak model] in model?.undo() }
         notice.isHidden = true
-        for view in [meta, zoom, openText, renumber, grid, stacks, channels, presets, objects, notice, message, undo] as [NSView] { addSubview(view) }
+        for view in [meta, zoom, tracking, openText, renumber, grid, stacks, channels, presets, objects, notice, message, undo] as [NSView] { addSubview(view) }
         refresh()
     }
 
@@ -140,7 +144,8 @@ final class WorkspaceView: PanelView {
         if hasList, cannot == nil, let number = editing.grid.listNumber, sharesNumber(number) { words.append(EditModeWording.sharedNumber(number)) }
         meta.stringValue = words.joined(separator: " · ")
         meta.textColor = cannot == nil ? Palette.dimText : Palette.browsing
-        for view in [zoom, openText, renumber] as [NSView] { view.isHidden = !hasList }
+        for view in [zoom, tracking, openText, renumber] as [NSView] { view.isHidden = !hasList }
+        tracking.state = model.editing.isTracking ? .on : .off
         zoom.doubleValue = model.settings.gridZoom
         zoom.setAccessibilityValueDescription(Strings.text(.editCuesZoomValue, Int(model.settings.gridZoom)))
         // "the other's opens read-only, offering to renumber the first".
@@ -166,7 +171,7 @@ final class WorkspaceView: PanelView {
     /// and the stack's fields fill the body.
     private func refreshStacks() {
         let page = model.editing.stackPage
-        for view in [meta, zoom, openText, renumber, grid, undo, channels, presets, objects] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, channels, presets, objects] as [NSView] { view.isHidden = true }
         title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? EditModeWording.page(.stacks)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -180,7 +185,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
     private func refreshChannels() {
         let page = model.editing.channelPage
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, presets, objects] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, presets, objects] as [NSView] { view.isHidden = true }
         title.stringValue = page.channel.map { EditModel.name(of: $0) } ?? EditModeWording.page(.channels)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -194,7 +199,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §8 and G-32 — "a header naming the preset, with a picker of every preset and the preset's menu".
     private func refreshPresets() {
         let page = model.editing.presetPage
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, channels, objects, notice] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, objects, notice] as [NSView] { view.isHidden = true }
         title.stringValue = page.preset.map { EditModel.name(of: $0) } ?? EditModeWording.page(.presets)
         title.isHidden = false
         presets.isHidden = page.preset == nil
@@ -207,7 +212,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §9 — the header names the selected object, with the notice line; its editor and what it shares fill the body.
     private func refreshObjects() {
         let editing = model.editing
-        for view in [meta, zoom, openText, renumber, grid, undo, stacks, channels, presets] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets] as [NSView] { view.isHidden = true }
         title.stringValue = editing.selectedObject.map { editing.objectName($0) } ?? EditModeWording.page(.objects)
         title.isHidden = false
         NoticeLine.show(editing.notice, in: notice, from: self)
@@ -234,6 +239,11 @@ final class WorkspaceView: PanelView {
         if !zoom.isHidden {
             zoom.frame = NSRect(x: right - 96, y: (h - 18) / 2, width: 96, height: 18)
             right -= 96 + 12
+        }
+        if !tracking.isHidden {
+            let width = tracking.fittingSize.width + 4
+            tracking.frame = NSRect(x: right - width, y: (h - 20) / 2, width: width, height: 20)
+            right -= width + 12
         }
         let titleWidth = min(Kit.width(of: title), max(0, right - 12 - 40))
         title.frame = NSRect(x: 12, y: (h - 16) / 2, width: titleWidth, height: 16)

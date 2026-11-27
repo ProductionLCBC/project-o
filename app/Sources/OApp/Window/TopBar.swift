@@ -234,6 +234,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var gridZoom = CueGridZoom.standard
     /// Spec 11 §4 — "a row the operator folds or opens stays so for every list, by channel number".
     public var foldedRows: [Int: Bool] = [:]
+    /// Spec 11 §4, "Tracking" (G-45) — "The switch is off at first, and `view.json` keeps it, one setting for every list."
+    public var gridTracking = false
     /// Spec 11 §4 — "Hidden rows are kept by channel number for every list, in `view.json`, as folded ones are"
     /// (corrected 2026-11-24); in number order.
     public var hiddenRows: [Int] = []
@@ -303,6 +305,7 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.mediaView, into: &mediaView)
         read(.gridZoom, into: &gridZoom)
         read(.foldedRows, into: &foldedRows)
+        read(.gridTracking, into: &gridTracking)
         read(.hiddenRows, into: &hiddenRows)
         hiddenRows = Array(Set(hiddenRows)).sorted()
         read(.editBrowserWidth, into: &editBrowserWidth)

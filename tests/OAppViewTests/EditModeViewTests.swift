@@ -442,6 +442,39 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertTrue(grid.spoken.contains("Hide 2 Foreground from the Preview"))
     }
 
+    /// Spec 11 §4, "Tracking" (G-45) — "A Tracking switch beside the zoom"; "each open row gets a thin lane under its
+    /// cells ..., named in the channel column"; "A click on a block or a line selects the cue that set it".
+    func test_theTrackingSwitchShowsEachRowsLanesAndAClickSelectsTheSettingCue() throws {
+        let rig = try editing()
+        let grid = rig.view.workspace.grid
+        let switchBox = rig.view.workspace.tracking
+        XCTAssertFalse(switchBox.isHidden)
+        XCTAssertEqual(switchBox.title, "Tracking")
+        XCTAssertEqual(switchBox.state, .off, "off at first")
+        XCTAssertEqual(grid.geometry.laneCount(0), 0)
+        let plain = grid.geometry.rowHeight(0)
+        switchBox.toggle()
+        XCTAssertTrue(rig.model.settings.gridTracking, "view.json keeps it")
+        rig.view.layoutSubtreeIfNeeded()
+        // List 42's channel 1: cue 1's once transition and cue 4's gain; channel 3, never written, folded and lane-less.
+        let g = grid.geometry
+        XCTAssertEqual(g.laneCount(0), 2)
+        XCTAssertEqual(g.rowHeight(0), plain + 2 * CueGridGeometry.laneHeight)
+        XCTAssertEqual(g.laneCount(2), 0)
+        // A click on cue 3's transition line selects cue 1, on channel 1's row.
+        let lineY = g.y(row: 0) + g.cellHeight(0) + CueGridGeometry.laneHeight / 2
+        try click(grid, x: g.x(cue: 2) + g.column / 2, y: lineY)
+        let headers = rig.model.editing.grid.headers
+        XCTAssertEqual(rig.model.editing.selection.cues, [headers[0].uuid])
+        XCTAssertEqual(rig.model.editing.selection.row, .channel(1))
+        XCTAssertEqual(count(rig), 0, "nothing goes to air")
+        // VoiceOver hears each block and each line.
+        XCTAssertTrue(grid.spoken.contains { $0.hasPrefix("Cue 1, ") && $0.contains("this cue only") }, "\(grid.spoken)")
+        XCTAssertTrue(grid.spoken.contains { $0.hasPrefix("Cue 3, ") && $0.hasSuffix("from cue 1") }, "\(grid.spoken)")
+        switchBox.toggle()
+        XCTAssertEqual(grid.geometry.laneCount(0), 0)
+    }
+
     /// Spec 11 §2 as corrected 2026-11-24 — "The gaps beside the Browser, the monitors and the inspector drag to resize
     /// them ... `view.json` keeps the sizes."
     func test_theGapsDragToResizeTheBrowserTheMonitorsAndTheInspector() throws {
@@ -1246,6 +1279,13 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertGreaterThan(data.count, 20_000, "something was drawn")
         guard let folder = ProcessInfo.processInfo.environment["O_RENDER_DIR"] else { return }
         try data.write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window.png"))
+        // The same grid with Tracking on (G-45).
+        rig.model.editing.setTracking(true)
+        rig.view.layoutSubtreeIfNeeded()
+        let tracked = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: tracked)
+        try XCTUnwrap(tracked.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-tracking.png"))
+        rig.model.editing.setTracking(false)
         // The Media tab, the chorus's held channel selected, and the grid zoomed out.
         rig.model.editing.show(tab: .media)
         rig.model.editing.click(cue: 3, row: .channel(1))

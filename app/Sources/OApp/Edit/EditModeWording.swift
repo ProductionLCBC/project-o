@@ -182,6 +182,23 @@ public enum EditModeWording {
 
     // MARK: - VoiceOver for the grid (Spec 11 §10)
 
+    /// Spec 11 §4, "Tracking" (G-45) — a lane's mark as VoiceOver says it: "Cue 4, Foreground, grade: Warm, from here
+    /// on", or for a cue that holds it, "..., from cue 3".
+    public static func trackingSpoken(_ mark: TrackingLane.Mark, kind: CueAttribute.Kind, cue: Int, row: CueGridRow, from: Int?,
+                                      catalog: Catalog?, locale: Locale = .current) -> String {
+        let name = self.name(kind)
+        switch mark {
+        case .none:
+            return ""
+        case .set(let attribute, let isRedundant):
+            let words = Strings.text(.editChipScoped, value(attribute, catalog: catalog, spoken: true, locale: locale), scope(attribute.scope))
+            let said = Strings.text(.editTrackingSet, cue, self.row(row), name, words)
+            return isRedundant ? Strings.text(.editTrackingRedundant, said) : said
+        case .carried:
+            return Strings.text(.editTrackingCarried, cue, self.row(row), name, from ?? 0)
+        }
+    }
+
     /// "a cell says what the cue does there ("Cue 3, channel 2 Foreground:
     /// writes text, That saved a wretch like me, dissolve 0.5 seconds";
     /// "holds Amber Haze from cue 1"; "clears"), with its attribute writes

@@ -62,6 +62,7 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.gridZoom = 88
         settings.foldedRows = [2: true]
         settings.hiddenRows = [2, 3]
+        settings.gridTracking = true
         settings.editStack = 2
         settings.editOutput = 1
         settings.editSheetChannel = 3
