@@ -614,16 +614,23 @@ public final class ControlLoop: @unchecked Sendable {
                 rt.live = .media(m)
                 if var t = rt.transition, t.startFrame == nil {
                     // Spec 4 §6 — "starts its transition when the first decoded frame arrives", from the previous
-                    // picture it held while it waited.
-                    t.startFrame = frame
+                    // picture it held while it waited; Spec 4 §11 as corrected 2026-11-27 — a J cut's no earlier
+                    // than its delay.
+                    t.startFrame = max(frame, t.notBefore ?? frame)
                     rt.transition = t
                 }
             }
             if let t = rt.transition, t.isComplete(at: frame) {
-                if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
+                if case .content(let c)? = rt.outgoing { releasePicture(c, frame: frame, soundUntil: rt.outgoingSoundUntil, in: &rt) }
                 rt.outgoing = nil
+                rt.outgoingSoundUntil = nil
                 rt.transition = nil
                 rt.snapshotPending = false
+            }
+            // Spec 4 §11 as corrected 2026-11-27 — a tail's sound goes "when the fade ends".
+            if rt.soundTails.contains(where: { $0.until <= frame }) {
+                for tail in rt.soundTails where tail.until <= frame { release(.media(tail.media), frame: frame) }
+                rt.soundTails.removeAll { $0.until <= frame }
             }
             if rt.grade.isComplete(at: frame), rt.grade.durationFrames > 0 {
                 rt.grade = GradeRun(targetRef: rt.grade.targetRef, from: rt.grade.to, to: rt.grade.to, startFrame: frame, durationFrames: 0)
@@ -1053,23 +1060,32 @@ public final class ControlLoop: @unchecked Sendable {
         var rt = model.channels[e.channel] ?? ChannelRuntime()
         let previous = rt.live
         let interrupted = rt.transition.map { $0.isRunning(at: frame) } ?? false
-        if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
+        if case .content(let c)? = rt.outgoing { releasePicture(c, frame: frame, soundUntil: rt.outgoingSoundUntil, in: &rt) }
         rt.outgoing = nil
+        rt.outgoingSoundUntil = nil
         rt.snapshotPending = false
 
         let incoming = makeRuntime(for: e.to, channel: e.channel, frame: frame)
-        let cutLike = type == .cut || durationFrames <= 0
         let previousHasPicture = previous.hasPixels
+        // Spec 4 §11 as corrected 2026-11-27 — a J cut "starts it at the trigger and the channel's picture transition
+        // that long after it, ..., the outgoing picture held until then" (the projection's `pictureDelayMs`).
+        let delayFrames = e.pictureDelayMs > 0 ? pacing.frames(forMs: e.pictureDelayMs) : 0
+        let cutLike = (type == .cut || durationFrames <= 0) && delayFrames == 0
 
-        // Spec 4 §11 — the audio transition "between the outgoing and incoming instance of a channel, with its offset".
+        // Spec 4 §11 — the audio transition "between the outgoing and incoming instance of a channel, with its offset",
+        // its gains following its easing; the outgoing's sound plays until its part of it ends.
+        var soundUntil: Int64?
         if let audio, previous.media?.audio != nil || incoming.media?.audio != nil {
             let object = library.audioTransition(e.audioTransition)
             audio.startTransition(outgoing: previous.media?.audio, incoming: incoming.media?.audio, type: object?.type ?? .cut,
-                                  ms: e.audioMs, offsetMs: e.audioOffsetMs)
+                                  ms: e.audioMs, offsetMs: e.audioOffsetMs, easing: object?.easing ?? .linear)
+            if previous.media?.audio != nil {
+                soundUntil = frame + pacing.frames(forMs: max(0, e.audioOffsetMs)) + pacing.frames(forMs: max(0, e.audioMs))
+            }
         }
 
         if case .text = incoming {
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
             rt.live = incoming
             rt.transition = nil
             model.channels[e.channel] = rt
@@ -1083,15 +1099,18 @@ public final class ControlLoop: @unchecked Sendable {
             // an empty channel, so the transition mixes the previous picture with the new item's frames ..., never
             // with its poster."
             if cutLike {
-                release(previous, frame: frame)
+                releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
             } else if previousHasPicture {
                 rt.outgoing = .content(previous)
+                rt.outgoingSoundUntil = soundUntil
             } else {
-                release(previous, frame: frame)
+                releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
                 rt.outgoing = .nothing
             }
             rt.live = incoming
-            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: cutLike ? 0 : durationFrames, startFrame: nil)
+            let isCut = type == .cut || durationFrames <= 0
+            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: isCut ? 0 : durationFrames, startFrame: nil,
+                                          notBefore: delayFrames > 0 ? frame + delayFrames : nil)
             model.channels[e.channel] = rt
             return
         }
@@ -1100,18 +1119,21 @@ public final class ControlLoop: @unchecked Sendable {
         // dissolve fades the new content in"; a transition from nothing to nothing (a clear of an empty channel) cuts.
         let fadesIn = !cutLike && !previousHasPicture && incoming.hasPixels
         if cutLike || !previousHasPicture {
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
             if fadesIn { rt.outgoing = .nothing }
         } else if interrupted || e.restart {
             rt.outgoing = .snapshot
             rt.snapshotPending = true
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
         } else {
             rt.outgoing = .content(previous)
+            rt.outgoingSoundUntil = soundUntil
         }
         rt.live = incoming
+        let isCut = type == .cut || durationFrames <= 0
         rt.transition = TransitionRun(type: type, easing: easing, color: color,
-                                      durationFrames: cutLike || (!previousHasPicture && !fadesIn) ? 0 : durationFrames, startFrame: frame)
+                                      durationFrames: isCut || (!previousHasPicture && !fadesIn) ? 0 : durationFrames, startFrame: frame + delayFrames,
+                                      notBefore: delayFrames > 0 ? frame + delayFrames : nil)
         model.channels[e.channel] = rt
     }
 
@@ -1299,6 +1321,22 @@ public final class ControlLoop: @unchecked Sendable {
         guard let source = m.source else { return }
         source.release()
         pendingSourceRemovals.append((m.handle, frame))
+    }
+
+    /// Spec 4 §11 as corrected 2026-11-27 — "However its picture goes (at the end of a picture transition, at once for
+    /// a cut, or snapshotted when interrupted), an outgoing item's sound plays until its part of the audio transition
+    /// ends: its video decoder is released with its picture, and its sound when the fade ends." Content without sound,
+    /// or whose fade has ended, is released whole.
+    func releasePicture(_ content: ContentRuntime, frame: Int64, soundUntil: Int64?, in rt: inout ChannelRuntime) {
+        guard case .media(var m) = content, m.audio != nil, let until = soundUntil, until > frame else {
+            return release(content, frame: frame)
+        }
+        if let source = m.source {
+            source.release()
+            pendingSourceRemovals.append((m.handle, frame))
+            m.source = nil
+        }
+        rt.soundTails.append(SoundTail(media: m, until: until))
     }
 
     // MARK: - Media time (Spec 4 §2, §6)
@@ -1495,7 +1533,7 @@ public final class ControlLoop: @unchecked Sendable {
             // Not running. A transition waiting on a cold write's first frame holds the previous picture, never the new
             // item's poster (Spec 4 §6 as corrected 2026-11-24); otherwise the previous picture holds only while there
             // is nothing new.
-            let waiting = rt.transition.map { $0.startFrame == nil } ?? false
+            let waiting = rt.transition.map { $0.isWaiting(at: frame) } ?? false
             if let held = outgoing, waiting || incoming == nil { incoming = held }
             outgoing = nil
         } else if transition?.type == .cut {

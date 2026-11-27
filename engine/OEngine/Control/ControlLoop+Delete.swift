@@ -99,6 +99,8 @@ extension ControlLoop {
         for rt in model.channels.values {
             if case .media(let m) = rt.live, m.source != nil || m.parkedOpen, let id = m.entry?.id { ids.insert(id) }
             if case .content(let c)? = rt.outgoing, case .media(let m) = c, m.source != nil, let id = m.entry?.id { ids.insert(id) }
+            // A sound tail still reads its file (Spec 4 §11 as corrected 2026-11-27).
+            for tail in rt.soundTails where tail.media.audioDecoder != nil { if let id = tail.media.entry?.id { ids.insert(id) } }
         }
         ids.formUnion(sourceFactory.prefetchedIDs)
         return ids

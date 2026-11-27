@@ -117,6 +117,25 @@ public struct TransitionRun: Equatable, Sendable {
     public var color: ColorValue?
     public var durationFrames: Int64
     public var startFrame: Int64?
+    /// Spec 4 §11 as corrected 2026-11-27 — a J cut's picture transition starts "that long after" the trigger: no
+    /// earlier than this frame, even when a cold write's first frame comes sooner.
+    public var notBefore: Int64?
+
+    public init(type: TransitionType, easing: Easing, color: ColorValue?, durationFrames: Int64, startFrame: Int64?, notBefore: Int64? = nil) {
+        self.type = type
+        self.easing = easing
+        self.color = color
+        self.durationFrames = durationFrames
+        self.startFrame = startFrame
+        self.notBefore = notBefore
+    }
+
+    /// Whether the picture still holds what the channel showed: a cold write's first frame not yet come, or a J
+    /// cut's delay not yet run.
+    public func isWaiting(at frame: Int64) -> Bool {
+        guard let start = startFrame else { return true }
+        return frame < start
+    }
 
     public func state(at frame: Int64) -> TransitionState? {
         guard let start = startFrame, frame >= start else { return nil }
@@ -132,9 +151,10 @@ public struct TransitionRun: Equatable, Sendable {
         return frame > start && frame - start >= durationFrames
     }
 
+    /// Running, or waiting to run: a write meanwhile interrupts it.
     public func isRunning(at frame: Int64) -> Bool {
-        guard let start = startFrame else { return true }
-        return frame >= start && !isComplete(at: frame)
+        guard startFrame != nil else { return true }
+        return !isComplete(at: frame)
     }
 }
 
@@ -167,8 +187,22 @@ public struct ChannelRuntime: Sendable {
     public var snapshotPending = false
     public var grade: GradeRun = .none
     public var gainDb: Double = 0
+    /// Spec 4 §11 as corrected 2026-11-27 — when the outgoing's part of the audio transition ends, for an outgoing
+    /// with sound.
+    public var outgoingSoundUntil: Int64?
+    /// "an outgoing item's sound plays until its part of the audio transition ends: its video decoder is released
+    /// with its picture, and its sound when the fade ends."
+    public var soundTails: [SoundTail] = []
 
     public init() {}
+}
+
+/// Spec 4 §11 as corrected 2026-11-27 — an outgoing item whose picture is gone and whose sound plays to the end of
+/// its fade: its video decoder released, its audio still attached.
+public struct SoundTail: Sendable {
+    public var media: MediaRuntime
+    /// The frame its fade has ended by.
+    public var until: Int64
 }
 
 /// Spec 4 §10 — "A stack switch mixes old and new stack textures over the

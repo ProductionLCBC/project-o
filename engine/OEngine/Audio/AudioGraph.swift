@@ -158,13 +158,16 @@ public final class AudioInstance: @unchecked Sendable {
         var lengthFrames: Int64
         /// Silence until `startFrame` (a fade-through-silence incoming, a J cut).
         var silentBefore: Bool
+        /// Spec 4 §11 as corrected 2026-11-27 — "The outgoing and incoming gains follow the audio transition's easing".
+        var easing: Easing = .linear
 
         static func flat(_ value: Float) -> Envelope { Envelope(from: value, to: value, startFrame: 0, lengthFrames: 0, silentBefore: false) }
 
+        /// On the audio callback: arithmetic alone.
         func value(at frame: Int64) -> Float {
             if frame < startFrame { return silentBefore ? 0 : from }
             guard lengthFrames > 0 else { return to }
-            let t = min(1, Float(frame - startFrame) / Float(lengthFrames))
+            let t = easing.apply(min(1, Float(frame - startFrame) / Float(lengthFrames)))
             return from + (to - from) * t
         }
 
@@ -375,7 +378,12 @@ public final class AudioGraph: @unchecked Sendable {
     /// Spec 4 §11 — the audio transition between a channel's outgoing and
     /// incoming instance: "crossfade or fade-through-silence ..., with its
     /// offset" (Spec 1 §2: `offsetMs` "signed; measured from the trigger").
-    public func startTransition(outgoing: AudioInstance?, incoming: AudioInstance?, type: AudioTransitionType, ms: Int, offsetMs: Int) {
+    /// As corrected 2026-11-27: the gains "follow the audio transition's
+    /// easing ...; a fade through silence eases each half", and a negative
+    /// offset (a J cut) changes the sound at the trigger, delaying the
+    /// picture instead, which the control loop does.
+    public func startTransition(outgoing: AudioInstance?, incoming: AudioInstance?, type: AudioTransitionType, ms: Int, offsetMs: Int,
+                                easing: Easing = .linear) {
         let start = currentFrame + Int64(max(0, offsetMs)) * 48
         let length = Int64(max(0, ms)) * 48
         lock.lock()
@@ -385,12 +393,12 @@ public final class AudioGraph: @unchecked Sendable {
             outgoing?.envelope = .init(from: 1, to: 0, startFrame: start, lengthFrames: 0, silentBefore: false)
             incoming?.envelope = .init(from: 0, to: 1, startFrame: start, lengthFrames: 0, silentBefore: true)
         case .crossfade:
-            outgoing?.envelope = .init(from: 1, to: 0, startFrame: start, lengthFrames: length, silentBefore: false)
-            incoming?.envelope = .init(from: 0, to: 1, startFrame: start, lengthFrames: length, silentBefore: true)
+            outgoing?.envelope = .init(from: 1, to: 0, startFrame: start, lengthFrames: length, silentBefore: false, easing: easing)
+            incoming?.envelope = .init(from: 0, to: 1, startFrame: start, lengthFrames: length, silentBefore: true, easing: easing)
         case .fadeThroughSilence:
             let half = length / 2
-            outgoing?.envelope = .init(from: 1, to: 0, startFrame: start, lengthFrames: half, silentBefore: false)
-            incoming?.envelope = .init(from: 0, to: 1, startFrame: start + half, lengthFrames: half, silentBefore: true)
+            outgoing?.envelope = .init(from: 1, to: 0, startFrame: start, lengthFrames: half, silentBefore: false, easing: easing)
+            incoming?.envelope = .init(from: 0, to: 1, startFrame: start + half, lengthFrames: half, silentBefore: true, easing: easing)
         }
     }
 

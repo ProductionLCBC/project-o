@@ -233,6 +233,7 @@ extension ControlLoop {
     private func dropChannel(_ number: Int, frame: Int64) {
         if let runtime = model.channels.removeValue(forKey: number) {
             if case .content(let content)? = runtime.outgoing { release(content, frame: frame) }
+            for tail in runtime.soundTails { release(.media(tail.media), frame: frame) }
             release(runtime.live, frame: frame)
         }
         lastSampled[number] = nil
