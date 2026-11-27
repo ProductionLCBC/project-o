@@ -21,7 +21,7 @@ import OCore
 /// Spec 9 §2 — notes share the lines' `seq`: "the engine stamps `ts`, `seq`
 /// and the client's source, writes the line, and answers `ok` with the `seq`".
 public final class CommandLog: @unchecked Sendable {
-    public static let defaultCapacity = 10_000
+    public static let defaultCapacity = 500
     /// Spec 5 §5 — "closes one second later", on engine time.
     public static let typingRunNanoseconds: Int64 = 1_000_000_000
 

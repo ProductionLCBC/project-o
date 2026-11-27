@@ -38,7 +38,7 @@ The black box writes about 100 MB an hour, so its size cap keeps only hours of i
 
 Not in it: rejected commands, which are answered at the API and the command bar only (Spec 2 §9), and the index changes of an import or the walk, which aren't commands (Spec 8 §2).
 
-**Runs.** `seq` counts from 1 at each launch. The engine's `start` note opens each run with the run's uuid, so a run and a `seq` name one line, whichever day's file it is in.
+**Runs.** `seq` counts from 1 at each launch. Beside the file, the engine keeps the run's last 500 lines in memory (Adam, 2026-11-27, so a soak's memory is flat within its first minutes); a full disk holds the lines waiting to be written apart from them (§7). The engine's `start` note opens each run with the run's uuid, so a run and a `seq` name one line, whichever day's file it is in.
 
 **Notes.** Some things worth a line aren't commands: a client's UI-only actions, which Spec 2 §9 calls browsing, and the engine's own events. A client sends `{ "id": 31, "type": "note", "note": { … }, "text": "…" }`; the engine stamps `ts`, `seq` and the client's source, writes the line, and answers `ok` with the `seq`. A note line carries `ts`, `seq`, `source`, `kind`, `note` and `text`, and `dropped` when notes were dropped before it; it has no `group`, `command`, `undo` or `result`:
 
