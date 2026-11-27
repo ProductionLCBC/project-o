@@ -358,10 +358,10 @@ final class TopBarView: Surface {
         hint.frame = NSRect(x: start + countdownWidth + gap, y: (h - 16) / 2, width: hintWidth, height: 16)
     }
 
-    /// Spec 11 §2, "The top bar in edit mode" — Show and Edit and what is
-    /// edited at the left; the page picker in the middle; at the right the
-    /// time, the saving pill and the engine pill, with what needs a look
-    /// before them.
+    /// Spec 11 §2, "The top bar in edit mode" — Show and Edit, the Live
+    /// toggle beside them (G-44) and what is edited at the left; the page
+    /// picker in the middle; at the right the time, the saving pill and the
+    /// engine pill, with what needs a look before them.
     private func layoutEdit(_ h: CGFloat) {
         var x: CGFloat = 12
         let showSize = show.fitting
@@ -369,11 +369,12 @@ final class TopBarView: Surface {
         modeWell.frame = NSRect(x: x, y: (h - 28) / 2, width: showSize.width + editSize.width + 6, height: 28)
         show.frame = NSRect(x: x + 2, y: (h - 24) / 2, width: showSize.width, height: 24)
         edit.frame = NSRect(x: x + 4 + showSize.width, y: (h - 24) / 2, width: editSize.width, height: 24)
-        x = modeWell.frame.maxX + 12
+        x = modeWell.frame.maxX + 8
+        let toggleSize = liveToggle.fitting
+        liveToggle.frame = NSRect(x: x, y: (h - toggleSize.height) / 2, width: toggleSize.width, height: toggleSize.height)
+        x = liveToggle.frame.maxX + 12
         let picker = pagePicker.fitting
         pagePicker.frame = NSRect(x: floor((bounds.width - picker.width) / 2), y: (h - picker.height) / 2, width: picker.width, height: picker.height)
-        let toggleSize = liveToggle.fitting
-        liveToggle.frame = NSRect(x: pagePicker.frame.maxX + 12, y: (h - toggleSize.height) / 2, width: toggleSize.width, height: toggleSize.height)
         var right = bounds.width - 12
         for pill in [engine, saved] {
             let size = pill.fitting

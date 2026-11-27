@@ -123,9 +123,13 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertEqual(bar.pagePicker.segments.map(\.title), ["Cues", "Text", "Stacks", "Channels", "Presets", "Objects"])
         XCTAssertEqual(bar.pagePicker.selected, 0)
         XCTAssertEqual(bar.pagePicker.segments.map(\.isEnabled), [true, false, true, true, true, true])
-        // "Beside it, the Live toggle": off, "which edit mode always opens with"; "drawn in the live red while it is on".
+        // "beside it the Live toggle" (G-44): off, "which edit mode always opens with"; "drawn in the live red while it is on".
         XCTAssertEqual(bar.liveToggle.title, "Live")
         XCTAssertFalse(bar.liveToggle.isHidden)
+        rig.view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(bar.liveToggle.frame.minX, bar.edit.frame.maxX, accuracy: 16, "beside Show and Edit")
+        XCTAssertLessThan(bar.liveToggle.frame.maxX, bar.crumb.frame.minX, "before what is edited")
+        XCTAssertLessThan(bar.liveToggle.frame.maxX, bar.pagePicker.frame.minX)
         XCTAssertEqual(bar.liveToggle.style, .quiet)
         XCTAssertEqual(bar.liveToggle.accessibilityValue() as? Int, 0)
         bar.liveToggle.press()
