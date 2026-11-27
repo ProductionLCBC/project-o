@@ -154,9 +154,21 @@ the thumbnail job keeps reading forward), at most 15 frames a second at the job'
 with a 1080p frame, so the pace is the limit; on 2026-11-27, on his word, edit mode's
 Live toggle sits beside Show and Edit (Spec 11 §2 corrected first, G-44; f065016, hosted CI
 green on a rerun: the first run's one failure was `TickSchedulerTests`' timer counting 24
-ticks in a quarter second on the shared runner, a timing test this area doesn't touch); American
-spellings throughout the app's wording and the code (c3d415a; the specs in `docs/` are
-unchanged); and new transitions, as objects of the three types, made, copied, renumbered
+ticks in a quarter second on the shared runner, a timing test this area doesn't touch); then,
+on his go of 2026-11-27 (each spec corrected first; 3df85af, `swift test` 2,376 green and
+hosted CI green): the specs in American spelling (672f688, 94 words in Specs 1–7, 10, 11
+and the UX spec); the cue grid's Tracking switch, lanes under each open row showing where
+a cue sets a transition, audio transition, grade or gain and a line through the cues it
+carries into, dashed for a once value (Spec 11 §4, G-45; 9865b35); the engine's audio
+transitions fixed (Spec 4 §11, Spec 3 §4; 96d6afc): the gains follow the easing, a J cut
+changes the sound at the trigger and holds the picture for the offset when either side
+has sound, and an outgoing item's sound plays to the end of its fade however its picture
+goes, which an L cut needed (it was cut short with the picture, at once after a cut); and
+the engine keeps the last 500 command-log lines in memory, not 10,000 (Spec 9 §2;
+3df85af). The bench's golden images run green on the branch (46 tests; none to
+regenerate). The three-hour soak is still owed: on 2026-11-27 a remote-control session
+was capturing the screens, so it waits for a window with none; American
+spellings throughout the app's wording and the code (c3d415a); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
 first, G-38; `core/` b197b06, app dfaed29; `swift test` and hosted CI green). The try-out
 app is rebuilt.
@@ -234,17 +246,16 @@ the pilot.
   - *A look at the Objects page,* which he hasn't seen: in the try-out app, or in the
     brief's description. Recommended: a try before `approved`, as with the other pages.
   - *The soak before the merge.* The frame path changed after the soaks of 2026-11-21
-    (the media transitions, the fade-in from empty, a box's transition as an override), so
-    a green soak is owed, in a window he sets. Its memory lines wait on his decision on
-    the command log's size (Decisions). Recommended: keep far fewer lines in memory, then
-    one three-hour soak of the branch.
-  - *The bench's golden images* haven't been run against the Preset 1 change (its `*`
-    boxes take the channel's transition). Recommended: with the bench run.
-  - *Two faults of the engine's audio transitions, found building their preview* (on
-    `main` since Area 16): the gains ramp in a straight line whatever the object's easing,
-    and a negative offset is taken as none, so a J cut never delays the picture as the UX
-    spec says. The preview draws what the object asks. Recommended: fix both, with a plan,
-    in this area or as a follow-up.
+    (the media transitions, the fade-in from empty, a box's transition as an override, and
+    on 2026-11-27 the J cut's held picture and the sound tails), so a green soak is owed.
+    He said go on 2026-11-27 and the command log now keeps 500 lines (decided); it was not
+    started because a remote-control session was capturing both screens, which the soak
+    covers and which spoils its GPU line. It waits for a window with no remote session.
+  - *The bench's golden images:* run on the branch on 2026-11-27, 46 tests green, none to
+    regenerate. Done.
+  - *The engine's audio transitions:* fixed on his go of 2026-11-27 (96d6afc), with a
+    third fault found on the way: an outgoing item's sound was released with its picture,
+    which cut every L cut short. Done.
 
 ### Decisions
 
