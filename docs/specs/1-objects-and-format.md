@@ -101,7 +101,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Numbers.** Each numbered type has its own space of positive integers. Numbers are unique within a type and a library (or a machine, for machine-level types), gaps are allowed, and the default ordering everywhere is by number. A reference from one object to another is the target's number, nothing else.
 
-**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. A machine-level object (a stack, output, audio output or input) is the exception: portable documents name its number so that they meet it at every campus, so only references in the machine root are rewritten, and the edit warns about portable references that now name something else (Spec 5 §4). The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognise an object across renumbering.
+**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. A machine-level object (a stack, output, audio output or input) is the exception: portable documents name its number so that they meet it at every campus, so only references in the machine root are rewritten, and the edit warns about portable references that now name something else (Spec 5 §4). The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognize an object across renumbering.
 
 **Cue addressing.** A cue's number is its 1-based position in its list, recomputed whenever cues are inserted, removed or reordered; it is never stored. A cue's `uuid` is stored and stable, and is what thumbnail caches, undo and the fire log reference. The two user-facing addresses from the UX spec are both resolved at the moment of use: `list 42 cue 3` through list number and position, `item 4 cue 3` through playlist position and cue position.
 
@@ -245,7 +245,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Migrations** are forward-only functions from schema N to N+1, applied in order on load, each one small and tested against a fixture from before the change. A document is migrated in memory and written back at the current schema the next time it is saved, never on load alone, so opening a library with a newer app is not itself a write.
 
-**Unknown fields** are preserved: every object keeps an opaque bag of keys it did not recognise and writes them back unchanged. An older app can round-trip a newer library without losing data it does not understand, which is what makes mixed versions across 20 campuses survivable.
+**Unknown fields** are preserved: every object keeps an opaque bag of keys it did not recognize and writes them back unchanged. An older app can round-trip a newer library without losing data it does not understand, which is what makes mixed versions across 20 campuses survivable.
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 

@@ -436,7 +436,7 @@ The top bar is status only, persistent in both modes, and the keyboard is a rebi
 
 - Left: show/edit toggle; the live playlist, item and cue as text; "back to live" when the grid is browsing elsewhere; a role and lock badge.
 - Center: timecode readout when a timeline is armed, with clock state (locked, free-running, no signal in red), and the armed auto-trigger countdown.
-- Right: one dot per output labelled with its current stack (green linked and outputting, red otherwise; click opens the output's details); a group for inputs so a dropped camera is visible; an activity dot that flashes on each received remote command; time of day.
+- Right: one dot per output labeled with its current stack (green linked and outputting, red otherwise; click opens the output's details); a group for inputs so a dropped camera is visible; an activity dot that flashes on each received remote command; time of day.
 - Nothing here is a control except the output click; clear all and blackout stay in the strip.
 
 **Keyboard**

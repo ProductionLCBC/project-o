@@ -271,7 +271,7 @@ when [Channel 2 Content] is empty channel 2 write text "Welcome"
 
 In the object form a guard is a `when` field: `{"var": "Timer 1", "op": "is", "value": "0:00"}`. Values compare as durations when both sides parse as durations, as numbers when both parse as numbers, otherwise as case-insensitive strings. `[Channel N Content]` reads as the content kind plus its label (`"text: Verse 1"`), so `is empty` is the useful comparison.
 
-Guards are evaluated at the moment the command would run, inside the macro's group, against the state as earlier commands in the same group have changed it. The palette shows a guard as a chip; the raw view shows the `when` clause. Guards on cue commands are reserved in the schema and rejected by the v1 validator, so the field exists without the behaviour.
+Guards are evaluated at the moment the command would run, inside the macro's group, against the state as earlier commands in the same group have changed it. The palette shows a guard as a chip; the raw view shows the `when` clause. Guards on cue commands are reserved in the schema and rejected by the v1 validator, so the field exists without the behavior.
 
 ## 8. Execution semantics
 
@@ -289,7 +289,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 
 **Timing.** Commands take effect on the next engine frame boundary after they are accepted, so a group of writes lands on the same frame. A `transition` rider's duration starts at that boundary; an audio transition offset is measured from the same point, which is what makes J and L cuts identical from a key, a Time trigger or timecode.
 
-**Idempotence rules from the UX spec** are honoured at execution, not at validation: writing the media already on a channel restarts it from its in-point with a dissolve from the current frame; writing identical text is a no-op with no transition; writing the same designed slide with a different build index animates to that build.
+**Idempotence rules from the UX spec** are honored at execution, not at validation: writing the media already on a channel restarts it from its in-point with a dissolve from the current frame; writing identical text is a no-op with no transition; writing the same designed slide with a different build index animates to that build.
 
 **Results.** Every executed command yields one of `ok`, `blocked`, `noop` or `steppedOn`; a rejected command yields `rejected` with a reason and is logged only at the API and command-bar boundary, never in the runtime log.
 

@@ -24,7 +24,7 @@ This spec defines what is on a channel at any moment, how commands change it, an
 | Tracked attributes | `grade`, `transition`, `audioTransition`, `gain`, `chase` (reserved) | Each holds until written again, or until a list boundary resets it to the channel default |
 | Operator state | `lock` | Outside tracking entirely; never reset, never restored by undo |
 
-Each tracked attribute is stored with how it was set: `{value, origin}` where origin is `default`, `tracked` (from a `track` write) or `once` (from a rider on the current content write). The origin is what lets the cue grid colour a chip as new, held or redundant, and what lets a `once` value fall back when the content changes.
+Each tracked attribute is stored with how it was set: `{value, origin}` where origin is `default`, `tracked` (from a `track` write) or `once` (from a rider on the current content write). The origin is what lets the cue grid color a chip as new, held or redundant, and what lets a `once` value fall back when the content changes.
 
 **Content instances**
 
@@ -52,7 +52,7 @@ Tracking is the lighting-console idea that a cue only has to say what changes. T
 8. **Build is an attribute of slide content.** A `build` rider or `channel N build K` changes the build index of the current slide; it has no meaning for other content kinds and is ignored with a `noop` effect.
 9. **Lock is not tracked.** It is operator state, set only by `channel N lock` and `unlock` and by restore-last-state, which brings back the locks it held (Spec 9 §4); it ignores boundaries, resets, clears and the restores of undo.
 
-**What a chip colour means.** The cue grid asks the projection for each cue's state and the state before it. An attribute whose value changed and whose origin is `tracked` or `once` from this cue is *new*; one whose value is unchanged and was not written by this cue is *held*; one written by this cue to the value it already had is *redundant*, a write worth removing. Content follows the same three rules.
+**What a chip color means.** The cue grid asks the projection for each cue's state and the state before it. An attribute whose value changed and whose origin is `tracked` or `once` from this cue is *new*; one whose value is unchanged and was not written by this cue is *held*; one written by this cue to the value it already had is *redundant*, a write worth removing. Content follows the same three rules.
 
 ## 4. Write semantics
 
@@ -132,7 +132,7 @@ func project(_ state: ShowState,
 | `pointer` | old, new, armed | UI moves the live marker; the scheduler arms or disarms its timer |
 | `steppedOn` | channel, dropped ref | Engine cuts the content; strip flashes; log records it |
 | `blocked` | channel, command | Log records it; the strip shows a lock glint |
-| `applied` | command | State changed with nothing to animate (transport, end behaviour, lock, freeze, a text write's provenance alone, §4); logged as `ok` |
+| `applied` | command | State changed with nothing to animate (transport, end behavior, lock, freeze, a text write's provenance alone, §4); logged as `ok` |
 | `noop` | command | Nothing, but logged |
 | `passthrough` | command | The caller (engine, history, scheduler) handles it |
 
@@ -144,9 +144,9 @@ func project(_ state: ShowState,
 
 The same function, run from three different starting states.
 
-**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colours. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states. An offset box in a projected state folds that many more cues of the same list, and draws nothing past its end (Spec 6 §3).
+**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colors. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states. An offset box in a projected state folds that many more cues of the same list, and draws nothing past its end (Spec 6 §3).
 
-**Lookahead for offset boxes.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` box shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behaviour a confidence monitor wants. Past the end of the playlist the box is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
+**Lookahead for offset boxes.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` box shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behavior a confidence monitor wants. Past the end of the playlist the box is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
 
 **Timecode seek** (v2). Fold the list's cues whose Timecode triggers fall at or before the target time, in order, from the state at the list's start, and apply the result in one step with every transition effect collapsed to a cut, so a seek never replays a minute of dissolves.
 
