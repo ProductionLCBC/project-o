@@ -35,6 +35,11 @@ final class WorkspaceView: PanelView {
     let text: TextWorkspaceView
     /// Spec 11 §5, "Which text" — "The header's channel picker lists the channels, those whose `usualContent` is text first."
     let channelPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// Spec 11 §5, "The sheet view" (G-50) — "A Sheet toggle in the page's header".
+    let sheetToggle = ChoiceBox(Strings.text(.textSheet))
+    /// In the sheet view, "Cue removed" with "Add as New Cue and Copy" stand in the header.
+    let addRemoved = FlatButton(Strings.text(.textAddAsNewCue), style: .plain)
+    let copyRemoved = FlatButton(Strings.text(.textCopy), style: .plain)
     /// Spec 11 §2, "Rejections and warnings" — on a page with no inspector, the notice line stands in this header.
     let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
     var machineRoot: URL? {
@@ -92,7 +97,18 @@ final class WorkspaceView: PanelView {
         channelPicker.target = self
         channelPicker.action = #selector(pickedChannel)
         channelPicker.setAccessibilityLabel(Strings.text(.textChannelPicker))
-        for view in [meta, zoom, tracking, openText, renumber, grid, stacks, channels, presets, objects, text, channelPicker, notice, message, undo] as [NSView] {
+        sheetToggle.font = .systemFont(ofSize: 11.5)
+        sheetToggle.onToggle = { [weak model] on in model?.editing.text.setSheet(on) }
+        addRemoved.fontSize = 11.5
+        copyRemoved.fontSize = 11.5
+        addRemoved.onPress = { [weak model] in model?.editing.text.addRemovedAsNewCue() }
+        copyRemoved.onPress = { [weak self] in
+            guard let self, let text = self.model.editing.text.copyRemoved() else { return }
+            self.text.sheet.pasteboard.clearContents()
+            self.text.sheet.pasteboard.setString(text, forType: .string)
+        }
+        for view in [meta, zoom, tracking, openText, renumber, grid, stacks, channels, presets, objects, text, channelPicker, sheetToggle,
+                     addRemoved, copyRemoved, notice, message, undo] as [NSView] {
             addSubview(view)
         }
         refresh()
@@ -148,7 +164,7 @@ final class WorkspaceView: PanelView {
             return
         }
         text.isHidden = true
-        channelPicker.isHidden = true
+        for view in [channelPicker, sheetToggle, addRemoved, copyRemoved] as [NSView] { view.isHidden = true }
         objects.isHidden = true
         stacks.isHidden = true
         channels.isHidden = true
@@ -195,7 +211,7 @@ final class WorkspaceView: PanelView {
     /// and the stack's fields fill the body.
     private func refreshStacks() {
         let page = model.editing.stackPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, channels, presets, objects, text, channelPicker] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, channels, presets, objects, text, channelPicker, sheetToggle, addRemoved, copyRemoved] as [NSView] { view.isHidden = true }
         title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? EditModeWording.page(.stacks)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -209,7 +225,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
     private func refreshChannels() {
         let page = model.editing.channelPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, presets, objects, text, channelPicker] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, presets, objects, text, channelPicker, sheetToggle, addRemoved, copyRemoved] as [NSView] { view.isHidden = true }
         title.stringValue = page.channel.map { EditModel.name(of: $0) } ?? EditModeWording.page(.channels)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -223,7 +239,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §8 and G-32 — "a header naming the preset, with a picker of every preset and the preset's menu".
     private func refreshPresets() {
         let page = model.editing.presetPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, objects, notice, text, channelPicker] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, objects, notice, text, channelPicker, sheetToggle, addRemoved, copyRemoved] as [NSView] { view.isHidden = true }
         title.stringValue = page.preset.map { EditModel.name(of: $0) } ?? EditModeWording.page(.presets)
         title.isHidden = false
         presets.isHidden = page.preset == nil
@@ -236,7 +252,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §9 — the header names the selected object, with the notice line; its editor and what it shares fill the body.
     private func refreshObjects() {
         let editing = model.editing
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets, text, channelPicker] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets, text, channelPicker, sheetToggle, addRemoved, copyRemoved] as [NSView] { view.isHidden = true }
         title.stringValue = editing.selectedObject.map { editing.objectName($0) } ?? EditModeWording.page(.objects)
         title.isHidden = false
         NoticeLine.show(editing.notice, in: notice, from: self)
@@ -266,15 +282,22 @@ final class WorkspaceView: PanelView {
         meta.stringValue = words.joined(separator: " · ")
         meta.textColor = cannot == nil ? Palette.dimText : Palette.browsing
         meta.isHidden = false
-        // The page's own notice ("Select within one cue."), else the edit's.
-        if let said = editing.text.notice {
+        // The page's own notice ("Select within one cue."), else the edit's; in the sheet view, else what the caret's
+        // cue would say beside its chunk (G-50).
+        let tag = editing.text.isSheet ? sheetTag() : nil
+        if let said = editing.text.notice ?? tag {
             notice.stringValue = said
-            notice.textColor = Palette.browsing
+            notice.textColor = editing.text.removed != nil && editing.text.notice == nil ? Palette.live : Palette.browsing
             notice.toolTip = said
             notice.isHidden = false
         } else {
             NoticeLine.show(editing.notice, in: notice, from: self)
         }
+        let showsRemoved = editing.text.isSheet && editing.text.removed != nil
+        addRemoved.isHidden = !showsRemoved
+        copyRemoved.isHidden = !showsRemoved
+        sheetToggle.isHidden = !hasList
+        sheetToggle.state = editing.text.isSheet ? .on : .off
         if !notice.isHidden { meta.isHidden = true }
         channelPicker.removeAllItems()
         for channel in editing.text.channels {
@@ -291,6 +314,16 @@ final class WorkspaceView: PanelView {
         needsLayout = true
     }
 
+    /// G-50 — "What the chunks say beside their text ("On the confidence screen", "Changed elsewhere", "Cue removed"
+    /// with Add as New Cue and Copy) the page's header says for the cue with the caret."
+    private func sheetTag() -> String? {
+        let editor = model.editing.text
+        if editor.removed != nil { return Strings.text(.textCueRemoved) }
+        guard let caret = editor.caret, let chunk = editor.document.chunk(caret) else { return nil }
+        let tags = TextWording.tags(chunk, editor: editor)
+        return tags.isEmpty ? nil : tags.joined(separator: " · ")
+    }
+
     /// Whether another master has this list's number: "that list's page says "Another list shares number 57"".
     private func sharesNumber(_ number: Int) -> Bool {
         (model.store.catalog?.lists.filter { $0.number == number && !$0.local }.count ?? 0) > 1
@@ -304,6 +337,16 @@ final class WorkspaceView: PanelView {
             let width = min(220, channelPicker.fittingSize.width + 8)
             channelPicker.frame = NSRect(x: right - width, y: (h - 22) / 2, width: width, height: 22)
             right -= width + 12
+        }
+        if !sheetToggle.isHidden {
+            let width = sheetToggle.fittingSize.width + 4
+            sheetToggle.frame = NSRect(x: right - width, y: (h - 20) / 2, width: width, height: 20)
+            right -= width + 12
+        }
+        for button in [copyRemoved, addRemoved] where !button.isHidden {
+            let size = button.fitting
+            button.frame = NSRect(x: right - size.width, y: (h - 24) / 2, width: size.width, height: 24)
+            right -= size.width + 8
         }
         for button in [renumber, openText] where !button.isHidden {
             let size = button.fitting

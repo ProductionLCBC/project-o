@@ -238,8 +238,21 @@ public final class TextEditor {
 
     // MARK: - The caret (Spec 11 §5, "Typing")
 
-    /// The caret entered a chunk.
-    public func enter(_ uuid: String) {
+    /// Spec 11 §5, "The sheet view" (G-50) — whether the page shows the
+    /// document as one field of text; `view.json` keeps it, off at first.
+    public var isSheet: Bool { editing.model.settings.textSheet }
+
+    /// The page's Sheet toggle. The caret leaves its chunk first, as it would for any other view.
+    public func setSheet(_ on: Bool) {
+        guard on != isSheet else { return }
+        leave()
+        editing.model.settings.textSheet = on
+        editing.model.changed([.edit])
+    }
+
+    /// The caret entered a chunk. In the sheet view (`sheet`) held text shows
+    /// as a blank line, so the chunk's text starts empty there (G-50).
+    public func enter(_ uuid: String, sheet: Bool = false) {
         guard uuid != caret else { return }
         leave()
         if uuid == Self.emptyChunk {
@@ -251,9 +264,14 @@ public final class TextEditor {
             cadence.start("", holdsBack: false)
             return
         }
+        if let ghost = removed, ghost.cue == uuid {
+            caret = uuid
+            caretText = ghost.text
+            return
+        }
         guard let chunk = document.chunk(uuid), chunk.isEditable else { return }
         caret = uuid
-        caretText = Self.editable(chunk)
+        caretText = sheet ? chunk.text : Self.editable(chunk)
         dirty = false
         changedElsewhere = false
         known = cue(uuid).map { CueSays.about(channel, in: $0) }

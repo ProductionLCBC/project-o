@@ -1007,16 +1007,16 @@ final class MenuBar: NSObject, NSMenuDelegate {
         let down = String(utf16CodeUnits: [unichar(NSDownArrowFunctionKey)], count: 1)
         return [
             .separator(),
-            item(.menuSplitCue, key: "\r", modifiers: [.option], enabled: { [weak self] in self?.view?.workspace.text.document.focusedChunk?.isEditable ?? false }) { [weak self] in
-                self?.view?.workspace.text.document.splitAtCaret()
+            item(.menuSplitCue, key: "\r", modifiers: [.option], enabled: { [weak self] in self?.view?.workspace.text.isEditing ?? false }) { [weak self] in
+                self?.view?.workspace.text.splitAtCaret()
             },
             item(.menuMoveLinePrevious, key: up, modifiers: [.option, .command],
-                 enabled: { [weak self] in self?.view?.workspace.text.document.canMoveLineAtCaret(previous: true) ?? false }) { [weak self] in
-                self?.view?.workspace.text.document.moveLineAtCaret(previous: true)
+                 enabled: { [weak self] in self?.view?.workspace.text.canMoveLineAtCaret(previous: true) ?? false }) { [weak self] in
+                self?.view?.workspace.text.moveLineAtCaret(previous: true)
             },
             item(.menuMoveLineNext, key: down, modifiers: [.option, .command],
-                 enabled: { [weak self] in self?.view?.workspace.text.document.canMoveLineAtCaret(previous: false) ?? false }) { [weak self] in
-                self?.view?.workspace.text.document.moveLineAtCaret(previous: false)
+                 enabled: { [weak self] in self?.view?.workspace.text.canMoveLineAtCaret(previous: false) ?? false }) { [weak self] in
+                self?.view?.workspace.text.moveLineAtCaret(previous: false)
             },
         ]
     }

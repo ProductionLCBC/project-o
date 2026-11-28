@@ -217,6 +217,9 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var editChannel: Int?
     /// The Text page's channel (Spec 11 §5, "Which text"), once the picker or a double-click chose one.
     public var editTextChannel: Int?
+    /// Spec 11 §5, "The sheet view" (G-50) — "A Sheet toggle in the page's header, off when the page first opens and
+    /// kept in `view.json`".
+    public var textSheet = false
     /// The Stacks page's selection (Spec 11 §6): the stack, and the output whose properties show.
     public var editStack: Int?
     public var editOutput: Int?
@@ -296,6 +299,7 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editCue, into: &editCue)
         read(.editChannel, into: &editChannel)
         read(.editTextChannel, into: &editTextChannel)
+        read(.textSheet, into: &textSheet)
         read(.editStack, into: &editStack)
         read(.editOutput, into: &editOutput)
         read(.editSheetChannel, into: &editSheetChannel)

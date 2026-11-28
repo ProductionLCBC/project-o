@@ -1448,6 +1448,7 @@ ENTRIES = [
     ("menu.splitCue", "Split Cue", "Edit menu, in the text editor: a new cue takes the text after the caret."),
     ("menu.moveLinePrevious", "Move Line to Previous Cue", "Edit menu, in the text editor: the caret's first line moves to the end of the cue above."),
     ("menu.moveLineNext", "Move Line to Next Cue", "Edit menu, in the text editor: the caret's last line moves to the start of the cue below."),
+    ("text.sheet", "Sheet", "The text editor's toggle: shows the song's text as one field, as a printed lyric sheet reads, with a mark at each cue."),
 ]
 
 

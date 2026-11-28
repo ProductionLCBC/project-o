@@ -1382,6 +1382,7 @@ public enum StringKey: String, CaseIterable, Sendable {
     case menuSplitCue = "menu.splitCue"
     case menuMoveLinePrevious = "menu.moveLinePrevious"
     case menuMoveLineNext = "menu.moveLineNext"
+    case textSheet = "text.sheet"
 }
 
 /// The table the keys are looked up in, and what is done to a string on its

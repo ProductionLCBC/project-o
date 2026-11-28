@@ -15589,6 +15589,18 @@
         }
       }
     },
+    "text.sheet" : {
+      "comment" : "The text editor's toggle: shows the song's text as one field, as a printed lyric sheet reads, with a mark at each cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sheet"
+          }
+        }
+      }
+    },
     "time.seconds" : {
       "comment" : "A number of seconds. %@ is the number, already formatted.",
       "extractionState" : "manual",

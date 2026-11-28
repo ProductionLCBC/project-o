@@ -209,8 +209,6 @@ final class TextDocumentView: NSView {
         dropLine.layer?.cornerRadius = 1
         dropLine.isHidden = true
         addSubview(dropLine)
-        // A split, a merge or a moved line puts the caret in another chunk.
-        model.editing.text.onCaret = { [weak self] cue, location in self?.focus(cue, at: location) }
     }
 
     @available(*, unavailable)
@@ -582,6 +580,9 @@ final class TextWorkspaceView: NSView {
     private let model: ShowModel
     let scroll = NSScrollView()
     let document: TextDocumentView
+    /// Spec 11 §5, "The sheet view" (G-50) — the same document as one field of text.
+    let sheetScroll = NSScrollView()
+    let sheet: SheetTextView
     let column = FormColumn()
     let listHeading = Kit.heading(Strings.text(.textColumnList))
     let titleField = EditField()
@@ -599,17 +600,36 @@ final class TextWorkspaceView: NSView {
     private var cueNames: [NSTextField] = []
     var machineRoot: URL? {
         get { document.machineRoot }
-        set { document.machineRoot = newValue }
+        set {
+            document.machineRoot = newValue
+            sheet.machineRoot = newValue
+        }
     }
 
     static let columnWidth: CGFloat = 248
+
+    /// Whether the sheet view shows (G-50).
+    var isSheet: Bool { model.editing.text.isSheet }
 
     override var isFlipped: Bool { true }
 
     init(model: ShowModel) {
         self.model = model
         document = TextDocumentView(model: model)
+        sheet = SheetTextView(model: model)
         super.init(frame: .zero)
+        sheetScroll.documentView = sheet
+        sheetScroll.hasVerticalScroller = true
+        sheetScroll.autohidesScrollers = true
+        sheetScroll.drawsBackground = false
+        sheetScroll.borderType = .noBorder
+        sheetScroll.scrollerStyle = .overlay
+        sheet.autoresizingMask = [.width]
+        // A split, a merge or a moved line puts the caret in another chunk, in whichever view shows.
+        model.editing.text.onCaret = { [weak self] cue, location in
+            guard let self else { return }
+            if self.isSheet { self.sheet.focus(cue, at: location) } else { self.document.focus(cue, at: location) }
+        }
         scroll.documentView = document
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
@@ -645,6 +665,7 @@ final class TextWorkspaceView: NSView {
         sectionMenu.onPress = { [weak self] in self?.showSections() }
         hold.onPress = { [weak model] in model?.editing.text.hold() }
         addSubview(scroll)
+        addSubview(sheetScroll)
         addSubview(column.scroll)
         NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.document.relayout() }
@@ -665,7 +686,9 @@ final class TextWorkspaceView: NSView {
 
     func refresh() {
         let editor = model.editing.text
-        document.apply()
+        scroll.isHidden = isSheet
+        sheetScroll.isHidden = !isSheet
+        if isSheet { sheet.apply() } else { document.apply() }
         let list = model.editing.list
         let cannot = editor.cannotEdit
         let subject = list?.uuid
@@ -702,8 +725,48 @@ final class TextWorkspaceView: NSView {
         let width = Self.columnWidth
         let gap: CGFloat = 4
         scroll.frame = NSRect(x: 0, y: 0, width: max(0, bounds.width - width - gap), height: bounds.height)
+        sheetScroll.frame = scroll.frame
+        sheet.frame.size.width = sheetScroll.contentSize.width
+        sheet.minSize = NSSize(width: 0, height: sheetScroll.contentSize.height)
         column.scroll.frame = NSRect(x: bounds.width - width, y: 0, width: width, height: bounds.height)
         column.place()
         document.relayout()
+    }
+
+    // MARK: - The Edit menu, in whichever view shows (Spec 11 §5, G-48, G-50)
+
+    /// Whether the editor has the focus and the caret is in a cue's text that takes typing.
+    var isEditing: Bool {
+        if isSheet { return sheet.caretInCue != nil && sheet.isEditable }
+        return document.focusedChunk?.isEditable ?? false
+    }
+
+    /// Edit ▸ Split Cue.
+    func splitAtCaret() {
+        if isSheet {
+            guard let place = sheet.caretInCue, sheet.isEditable else { return }
+            model.editing.text.split(at: place.location)
+        } else {
+            document.splitAtCaret()
+        }
+    }
+
+    /// Whether Edit ▸ Move Line to Previous Cue or Next Cue can move a line now.
+    func canMoveLineAtCaret(previous: Bool) -> Bool {
+        if isSheet {
+            guard let place = sheet.caretInCue, sheet.isEditable, model.editing.text.caret == place.cue else { return false }
+            return model.editing.text.canMoveLine(previous: previous, at: place.location)
+        }
+        return document.canMoveLineAtCaret(previous: previous)
+    }
+
+    /// Edit ▸ Move Line to Previous Cue (⌥⌘↑) and Move Line to Next Cue (⌥⌘↓).
+    func moveLineAtCaret(previous: Bool) {
+        if isSheet {
+            guard let place = sheet.caretInCue, sheet.isEditable, model.editing.text.caret == place.cue else { return }
+            model.editing.text.moveLine(previous: previous, at: place.location)
+        } else {
+            document.moveLineAtCaret(previous: previous)
+        }
     }
 }
