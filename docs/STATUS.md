@@ -25,7 +25,7 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress | In progress on `area/sinks` since 2026-11-22, as bench verification and fixes (Adam's answer of 2026-11-04). That day a DeckLink SDI 4K went into the bench Mac with its SDI output cabled to its input, and a loopback test passed in every mode tried; its block in `docs/build-order.md` was written from that test and Adam said go the same day, taking every recommendation (Now). **Paused on 2026-11-22** while Adam moves the card's chassis; it resumes when he has reconnected it. On the branch (fb607d1, pushed): three of the loopback's faults fixed with tests, the frame stamp, `oengine capture`, the bench machine root and `soak.sh --capture`. The first ten-minute run with capture, at 1080p60, passed A/V and failed frame accuracy, and found a fifth and a sixth fault in the engine, not yet fixed (Now). The sinks, the encode pass and the switch and blackout mixes are on `main` since Area 4, the weave since Area 5, the embedded audio feed since Area 16. |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | merged | Adam's `approved` on 2026-11-14 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/media` merged into `main` with `--no-ff` (2c1b3d6), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | merged | Adam's `approved` on 2026-11-10 as built, with every reading in the brief and its recommended answers; `area/playlists` merged into `main` with `--no-ff` (af2209e), with its Spec 1 §4, §5 and Spec 5 §2, §4 corrections (e538f2b); `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. The gaps it named are accepted: a folder operation that fails on disk is only logged, and Area 12 takes the kept copies when it restores the last state. |
-| 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started | Its block in `docs/build-order.md`; Area 14, whose frame and Cues page it joins, is on `main` since 2026-11-28. It still waits for the bench run (Spec 4 §15's gate) unless Adam lifts the gate for it, as he did for Areas 13 and 14. |
+| 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | in progress | In progress on `area/text` since 2026-11-28. Adam approved the plan that day with six answers: the bench-run gate lifted for this area (c290bc4); the list's and the cue's fields in a tall column beside the document, with no inspector on the Text page; a SongSelect sheet's title line dropped with its footer; a break moved from the keyboard too, by Edit ▸ Move Line to Previous Cue and Next Cue (⌥⌘↑, ⌥⌘↓); the three chunks after the live cue holding back their typing only while an output shows a box at +1 to +3; and `main`'s status commits pushed this session. The spec corrections those take go on the branch first; then the document and typing, with stops for review after typing, after breaks and after paste. |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | merged | Adam's `approved` on 2026-11-11 as built, with every reading in the brief and its recommended answers, and no spec correction proposed; `area/variables` merged into `main` with `--no-ff` (d4333fa), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | merged | Adam's `approved` on 2026-11-15 as built, with every reading in the brief and its recommended answers; the Spec 9 §6 and §10 correction applied on the branch (7dbdf7d), `area/saving` merged into `main` with `--no-ff` (327454f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | merged | Adam's `approved` on 2026-11-18 as built, with every reading in the brief and its recommended answers; the Spec 10 §14, §15 and §18 corrections applied on the branch (51abfca), `area/show` merged into `main` with `--no-ff` (02bff6f), `swift test` green on the merged tree, pushed, branch and worktree removed, task `shipped`. He went over the app himself that day and found it generally ok, with problems pausing and seeking to track down later (Needs Adam, Decisions). The last stage's checks on a screen and the system's accessibility audit are still owed; Adam lifted his pause on display tests on 2026-11-18, in the Area 14 session, and neither has been run yet. Edit mode's entries are on since Area 14; Open in Text Editor waits for Area 10, Settings… and Bind a Key… for Area 17, and Lock Station and the lock tag for Area 18: each is there and disabled. |
@@ -39,6 +39,13 @@ State is one of `not started`, `in progress`, `brief waiting for approval`, `mer
 | v2 | Slide designer, timelines and clocks, custom transitions, CCLI reporting | `docs/build-order.md` | not started | Deferred. |
 
 ## Now
+
+**Area 10, the text editor, is in progress on `area/text`** since 2026-11-28. Adam approved
+its plan that day and lifted the bench-run gate for it, on his word and with the date, in
+each place the gate is written (Spec 4 §15, Spec 11 §11, `docs/build-order.md`,
+`app/README.md`; c290bc4). The session starts with the spec corrections his answers take
+(row 10 above), then builds the document and typing; no code is on the branch yet.
+Nothing is in review.
 
 **Area 14, edit mode, shipped on 2026-11-28** (a08c5d2, on `main` and pushed), on Adam's
 `approved` with the twenty-minute soak of ef279ac accepted in place of a green three-hour
@@ -55,8 +62,8 @@ line. The runs' records are in the main checkout's `tests/soak-output/` and
 `.build/area-edit-scratch/`. **Area 7, output sinks, is paused on `area/sinks`** (fb607d1)
 since 2026-11-22, while Adam moves the card's chassis: three of the loopback's faults are
 fixed with tests and the capture check is built; faults 5 and 6 and the runs at 1080p60,
-1080i60 and 2160p30 wait for the card. Nothing else is in progress. Adam's try-out app is
-rebuilt from `main` in the main checkout's `.build/xcode`.
+1080i60 and 2160p30 wait for the card. Adam's try-out app is rebuilt from `main` in the
+main checkout's `.build/xcode`.
 
 ## Needs Adam
 
@@ -97,7 +104,7 @@ None. Area 14's was answered with `approved` on 2026-11-28.
   or kept once builds are signed. It belongs with ADR 0007's revisit when the pilot is
   scheduled. Area 8 built the check (`MediaPlaces`, on `main`) and Area 17 opens the edit.
 
-- **When the bench run happens, or whether Area 10 starts without it.** Deferred by Adam on 2026-11-03 ("later") to a window he
+- **When the bench run happens.** Deferred by Adam on 2026-11-03 ("later") to a window he
   sets aside: the bench machine root (a copy of `tests/fixtures/spike/machine/` with the
   main output at the LED wall's format, as a DeckLink output if the bench has 12G) and
   `scripts/soak.sh tests/soak/spike.json`. He can run it without a session; its record
@@ -111,8 +118,8 @@ None. Area 14's was answered with `approved` on 2026-11-28.
   lands each generated file on its fixed id; the bench run is the first end-to-end run of
   that script change. Since Area 12, an `oengine run` on that root also writes its
   logs, its hourly black box, its snapshots and `state/last.json` there; the soak keeps its
-  own black box folder. Area 10, next, waits on it by its block; Adam lifted the gate for Areas 13
-  and 14 on his word, and could for Area 10. Since Area 19 a display output opens only on the screen its device
+  own black box folder. Adam lifted the gate for Areas 13, 14 and 10 on his word (Area 10's
+  on 2026-11-28); Areas 17 and 18 wait on it by their blocks. Since Area 19 a display output opens only on the screen its device
   names, so `oengine soak` gives its display outputs the screens `--screens` names, or
   every screen of the Mac left to right; it holds the engine's Mach channel with a client
   of its own for the whole run, so the previews and the channel pictures are in the GPU
@@ -239,7 +246,7 @@ None. Area 14's was answered with `approved` on 2026-11-28.
 - **The Build tracker mirrors `docs/build-order.md`** (5291cef, 2026-11-08): every task
   whose area has a block holds the common preamble and that block verbatim, with its
   dependencies from the block's "Starts after" line. Area 14's task is `shipped` since
-  2026-11-28, with the merge commit linked; Area 7's is `in progress`.
+  2026-11-28, with the merge commit linked; Areas 7 and 10 are `in progress`.
 - **Interaction limit expires 2027-04-30** (16:00 UTC). Until then only collaborators can
   open issues and pull requests or comment on the public repository. Renew it before that
   date (Settings, Moderation options, Interaction limits: collaborators only, six months),
@@ -292,10 +299,9 @@ and with G-36 Specs 1, 3, 6 and 10; and every spec in American spelling (672f688
 
 ## Next
 
-**Area 10 — Text editor** (branch `area/text`) is next: the text editor is edit mode's Text
-page and joins its frame and Cues page, on `main` since 2026-11-28. Its block still has it
-wait for the bench run (Spec 4 §15's gate), which Adam may lift for it as he did for Areas
-13 and 14. It runs in its own session from the common preamble in `docs/build-order.md`
+**Area 10 — Text editor** (branch `area/text`) is in progress; the bench-run gate was
+lifted for it on Adam's word, 2026-11-28, and Area 14, whose frame and Cues page it joins,
+is merged. It runs in its own session from the common preamble in `docs/build-order.md`
 and its own block there, verbatim:
 
 ```
@@ -341,13 +347,13 @@ after breaks, and after paste.
 - **What Area 14 hands Area 10**, on `main`: edit mode's frame with the Text page in its
   page picker, disabled, and Open in Text Editor in the list menus, disabled; the cue grid
   and the app's fold of a list; the edit path with typing folded a second at a time.
-- **The app's areas.** 10 follows 14; 17 follows 13 and 14; 18 follows 17; each waits for
-  the bench run as its block says. Area 7 resumes on `area/sinks` in its own session when
-  the card is reconnected.
+- **The app's areas.** 10 follows 14 and is in progress, the gate lifted for it; 17 follows
+  13 and 14; 18 follows 17; 17 and 18 wait for the bench run as their blocks say. Area 7
+  resumes on `area/sinks` in its own session when the card is reconnected.
 - **The bench run with the card** happens whenever Adam sets a window, with the bench
-  machine root copied again from the spike fixtures first. It must pass before Areas 10,
-  17 and 18 start, unless he lifts the gate for one, and before Area 7's bench
-  verification; its DeckLink and capture lines are owed before the pilot.
+  machine root copied again from the spike fixtures first. It must pass before Areas 17
+  and 18 start, unless he lifts the gate for one, and before Area 7's bench verification;
+  its DeckLink and capture lines are owed before the pilot.
 - **Spec 5 has no area of its own.** Its engine side landed with Area 9 (the edit path, the
   writer and changes on disk), Area 8 (the media edits and the defaults edits), Area 12
   (edit undo and redo, and the restores) and Area 14 (the edits of the library's and the

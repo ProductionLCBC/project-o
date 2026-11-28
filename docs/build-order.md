@@ -17,7 +17,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 7 | Output sinks: display per screen, DeckLink with weave, output transitions | `specs/4-render-pipeline.md` §10 | in progress |
 | 8 | Media pool: hash IDs, index, import by copy, poster frames, missing state | `specs/8-media-pool.md` | shipped |
 | 9 | Cues, lists and playlists: write/clear/hold, Go and Time triggers, sections, linked items, live pointer, next | `specs/7-cues-lists-and-playlists.md` | shipped |
-| 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | not started |
+| 10 | Text editor: whole-list text document with cue breaks | `specs/11-edit-mode.md` | in progress |
 | 11 | Variables: Time, Date, Timer and Popup slots, captions over OSC | `specs/6-presets-and-text.md` | shipped |
 | 12 | Log and saving: command log with sources, continuous save, launch snapshots | `specs/9-log-and-saving.md` | shipped |
 | 13 | Show-mode UI (`app/`): three columns, grid, strip, preview and multiviewer, tabs, top bar, keyboard | `specs/10-show-mode-ui.md` | shipped |
@@ -28,7 +28,7 @@ To start an area: open its task in the Build tracker and start a new Nimbalyst w
 | 18 | Operator lock: passcode in the Keychain, edit mode blocked | `specs/10-show-mode-ui.md` | not started |
 | 19 | Engine API and first run: the local socket and the LAN API, topics and queries, the preview channel, first run | `specs/10-show-mode-ui.md` §2, §3 and §13 | shipped |
 
-Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15. Lifted for Area 13 on Adam's word, 2026-11-17, and for Area 14 on his word, 2026-11-18 (Spec 4 §15); Areas 10, 17 and 18, and Area 7's bench verification, still wait for the bench run.
+Gate between 4 and 5: nothing in `app/` starts until the spike passes every criterion in Spec 4 §15. Lifted for Area 13 on Adam's word, 2026-11-17, for Area 14 on his word, 2026-11-18, and for Area 10 on his word, 2026-11-28 (Spec 4 §15); Areas 17 and 18, and Area 7's bench verification, still wait for the bench run.
 
 ## v1.5 — after the pilot
 
