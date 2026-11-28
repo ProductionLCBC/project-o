@@ -64,6 +64,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 2 §9 — every executed command's line, in memory (Area 12 writes
     /// the day's file); Spec 5 §5 — typing's runs.
     public let commandLog = CommandLog()
+    /// Each audio instance's underruns as last read, so a rise is said once.
+    private var underrunsSeen: [ObjectIdentifier: Int64] = [:]
     /// Spec 5 §2 — the `library` events of this build, in order, for the
     /// engine to publish once the plan is built. Reset every build.
     public internal(set) var lastLibraryEvents: [LibraryEvent] = []
@@ -481,6 +483,7 @@ public final class ControlLoop: @unchecked Sendable {
         backend.resources.noteBuild(frame: frame)
         sweepReleases(before: frame)
         advanceRuntimes(frame)
+        noteUnderruns(frame)
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
@@ -587,6 +590,33 @@ public final class ControlLoop: @unchecked Sendable {
             }
         }
         pendingSourceRemovals = keep
+    }
+
+    /// Found on the soak of 2026-11-27, which counted 94 underruns in one minute and could not say where: every half
+    /// second, each channel's missed samples since the last look, in the log with the item and the device (Spec 4
+    /// §13: "the log sees the detail").
+    private func noteUnderruns(_ frame: Int64) {
+        guard audio != nil, frame % 30 == 0 else { return }
+        var seen: [ObjectIdentifier: Int64] = [:]
+        for (channel, rt) in model.channels {
+            var media: [MediaRuntime] = rt.soundTails.map(\.media)
+            if case .media(let m) = rt.live { media.append(m) }
+            if case .content(.media(let m))? = rt.outgoing { media.append(m) }
+            for m in media {
+                guard let attachment = m.audio else { continue }
+                for member in attachment.members {
+                    let key = ObjectIdentifier(member.instance)
+                    let count = member.instance.underruns
+                    seen[key] = count
+                    let before = underrunsSeen[key] ?? 0
+                    if count > before {
+                        let name = m.entry.map { URL(fileURLWithPath: $0.path).lastPathComponent } ?? m.ref
+                        log.warning("audio: channel \(channel) missed \(count - before) samples of \(name) on \(member.graph.key)")
+                    }
+                }
+            }
+        }
+        underrunsSeen = seen
     }
 
     /// Spec 4 §6 — readiness of cold writes; Spec 4 §7 — transitions and grades ending.

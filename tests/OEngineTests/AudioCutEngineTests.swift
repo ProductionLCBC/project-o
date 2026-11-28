@@ -93,6 +93,20 @@ final class AudioCutEngineTests: XCTestCase {
         XCTAssertEqual(engine.control.model.channels[1]?.soundTails.count, 0, "released once the fade ends")
     }
 
+    /// Found on the soak of 2026-11-27, which counted 94 underruns in one minute and could not say where: the engine
+    /// names a channel's missed samples in its log, with the item, within half a second.
+    func test_underrunsAreNamedInTheLogByChannelAndItem() throws {
+        let engine = try engine()
+        XCTAssertNil(engine.send("channel 1 write media \(Self.first)"))
+        untilLive(engine, Self.first)
+        let instance = try XCTUnwrap(engine.control.model.channels[1]?.live.media?.audio?.members.first?.instance)
+        instance.underrunCount.add(7, ordering: .relaxed)
+        engine.tick(count: 31)
+        XCTAssertTrue(engine.log.contains("audio: channel 1 missed 7 samples of clapper"), engine.log.recent.map(\.message).joined(separator: "\n"))
+        engine.tick(count: 31)
+        XCTAssertFalse(engine.log.recent.filter { $0.message.contains("missed") }.count > 1, "said once")
+    }
+
     /// "between two items without sound it changes nothing".
     func test_withoutSoundTheOffsetChangesNothing() throws {
         let engine = try engine(sound: false)
