@@ -182,7 +182,7 @@ public struct CueInspector: Equatable, Sendable {
     }
 
     /// The list's sections in the order they first appear, then E3's names it doesn't use yet.
-    private static func sections(of list: List) -> [String] {
+    static func sections(of list: List) -> [String] {
         var names: [String] = []
         for cue in list.cues {
             if let section = cue.section, !section.isEmpty, !names.contains(section) { names.append(section) }

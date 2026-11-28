@@ -1218,6 +1218,18 @@ final class EditModeViewTests: XCTestCase {
             }
             rig.model.editing.click(cue: 2, row: .channel(2))
             check("cues")
+            // Spec 11 §5 — the Text page, with the caret in a chunk so the top bar says what the editor's keys do.
+            rig.model.editing.show(page: .text)
+            if let chunk = view.workspace.text.document.chunkViews.dropFirst().first { rig.window.window.makeFirstResponder(chunk.text) }
+            check("text")
+            // A hint longer than the edit bar's room wraps to two lines, every word of it inside them.
+            let hint = view.topBar.hint
+            XCTAssertFalse(hint.isHidden, "Editing text: ⌥Return splits · Esc leaves")
+            if hint.maximumNumberOfLines == 2, let cell = hint.cell {
+                let needed = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: hint.frame.width, height: 1000)).height
+                XCTAssertLessThanOrEqual(needed, hint.frame.height + 0.5, "the hint wraps whole (\(index))")
+            }
+            rig.window.window.makeFirstResponder(nil)
             rig.model.editing.show(page: .stacks)
             check("stacks")
             rig.model.editing.show(page: .channels)

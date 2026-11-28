@@ -304,6 +304,7 @@ final class TopBarView: Surface {
         super.layout()
         let h = bounds.height
         notActive.frame = NSRect(x: 12, y: (h - 18) / 2, width: bounds.width - 24, height: 18)
+        wrapHint(false)
         if model.mode == .edit { return layoutEdit(h) }
         var x: CGFloat = 10
         for button in [show, edit] {
@@ -395,13 +396,37 @@ final class TopBarView: Surface {
             dot.frame = NSRect(x: 9, y: 8, width: 10, height: 10)
             right -= size.width + 2
         }
-        // What is edited, then what a focused field's keys do, in the room left before the page picker.
+        // What is edited, then what a focused field's keys do, in the room left before the page picker. The hint is the
+        // app's own words and must read whole ("Editing text: ⌥Return splits · Esc leaves", Spec 11 §5); the crumb is a
+        // title, which may be cut short.
+        let hintNeed = hint.isHidden ? 0 : Kit.width(of: hint) + 14
+        // The page picker gives way to the right while the hint needs the room, as far as the status at the right allows.
+        if hintNeed > 0, pagePicker.frame.minX < x + hintNeed + 12 {
+            pagePicker.frame.origin.x = max(pagePicker.frame.minX, min(x + hintNeed + 12, right - 12 - pagePicker.frame.width))
+        }
         let limit = min(pagePicker.frame.minX, right) - 12
-        let crumbWidth = min(Kit.width(of: crumb), max(0, limit - x))
+        let crumbWidth = min(Kit.width(of: crumb), max(0, limit - x - hintNeed))
         crumb.frame = NSRect(x: x, y: (h - 16) / 2, width: crumbWidth, height: 16)
         x += crumbWidth + 14
-        let hintWidth = hint.isHidden ? 0 : min(Kit.width(of: hint), max(0, limit - x))
-        hint.frame = NSRect(x: x, y: (h - 16) / 2, width: hintWidth, height: 16)
+        let room = max(0, limit - x)
+        let single = hint.isHidden ? 0 : Kit.width(of: hint)
+        if single <= room {
+            hint.frame = NSRect(x: x, y: (h - 16) / 2, width: single, height: 16)
+        } else {
+            // A longer language than the bar has room for on one line: two lines, never cut (Spec 10 §18).
+            wrapHint(true)
+            hint.frame = NSRect(x: x, y: (h - 30) / 2, width: room, height: 30)
+        }
+    }
+
+    /// The hint on one line, or on two in a smaller size where the edit bar's room is short.
+    private func wrapHint(_ wrapped: Bool) {
+        guard (hint.maximumNumberOfLines == 2) != wrapped else { return }
+        hint.maximumNumberOfLines = wrapped ? 2 : 1
+        hint.lineBreakMode = wrapped ? .byWordWrapping : .byTruncatingTail
+        hint.cell?.wraps = wrapped
+        hint.alignment = wrapped ? .left : .center
+        hint.font = .systemFont(ofSize: wrapped ? 11 : 12, weight: .medium)
     }
 
     override func draw(_ dirtyRect: NSRect) {

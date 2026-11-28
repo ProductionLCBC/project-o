@@ -124,7 +124,7 @@ final class PreviewPanelView: PanelView {
             }
         }
         let number = editing.selection.first(in: editing.grid.headers.map(\.uuid)).flatMap { editing.grid.cue(of: $0) }.map { $0 + 1 }
-        frame_.setAccessibilityLabel(EditModeWording.previewSpoken(cue: editing.page == .cues ? number : nil, stack: selected,
+        frame_.setAccessibilityLabel(EditModeWording.previewSpoken(cue: editing.page == .cues || editing.page == .text ? number : nil, stack: selected,
                                                                    label: stacks.first { $0.number == selected }?.label ?? ""))
         // Spec 10 §2 — "Text gets no picture, since it has no look until a box gives it one": the channel's text shows
         // in its place, as the strip's cell shows it; an empty channel says so.
@@ -143,7 +143,7 @@ final class PreviewPanelView: PanelView {
             }
         }
         // Spec 11 §2 — "and a pill while channels are hidden ("Hiding 2 channels")", so a partial picture is never taken for the whole.
-        let hidden = editing.page == .cues ? editing.hiddenChannels.count : 0
+        let hidden = editing.page == .cues || editing.page == .text ? editing.hiddenChannels.count : 0
         hiding.isHidden = hidden == 0
         if hidden > 0 { hiding.title = EditModeWording.hiding(hidden) }
         needsLayout = true

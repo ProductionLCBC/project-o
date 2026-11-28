@@ -31,6 +31,10 @@ final class WorkspaceView: PanelView {
     let presets: PresetWorkspaceView
     /// Spec 11 §9 — the Objects page's workspace.
     let objects: ObjectWorkspaceView
+    /// Spec 11 §5 — the Text page's workspace: the document and the fields column beside it (G-46).
+    let text: TextWorkspaceView
+    /// Spec 11 §5, "Which text" — "The header's channel picker lists the channels, those whose `usualContent` is text first."
+    let channelPicker = NSPopUpButton(frame: .zero, pullsDown: false)
     /// Spec 11 §2, "Rejections and warnings" — on a page with no inspector, the notice line stands in this header.
     let notice = Kit.content(Kit.label(size: 11.5, weight: .medium))
     var machineRoot: URL? {
@@ -38,6 +42,7 @@ final class WorkspaceView: PanelView {
             grid.machineRoot = machineRoot
             presets.machineRoot = machineRoot
             objects.machineRoot = machineRoot
+            text.machineRoot = machineRoot
         }
     }
     /// The window, which opens the popovers the page's controls ask for.
@@ -57,6 +62,7 @@ final class WorkspaceView: PanelView {
         channels = ChannelWorkspaceView(model: model)
         presets = PresetWorkspaceView(model: model)
         objects = ObjectWorkspaceView(model: model)
+        text = TextWorkspaceView(model: model)
         super.init(title: "")
         Kit.content(title)
         meta.textColor = Palette.dimText
@@ -81,7 +87,14 @@ final class WorkspaceView: PanelView {
         message.cell?.wraps = true
         undo.onPress = { [weak model] in model?.undo() }
         notice.isHidden = true
-        for view in [meta, zoom, tracking, openText, renumber, grid, stacks, channels, presets, objects, notice, message, undo] as [NSView] { addSubview(view) }
+        channelPicker.controlSize = .small
+        channelPicker.font = .systemFont(ofSize: 11.5)
+        channelPicker.target = self
+        channelPicker.action = #selector(pickedChannel)
+        channelPicker.setAccessibilityLabel(Strings.text(.textChannelPicker))
+        for view in [meta, zoom, tracking, openText, renumber, grid, stacks, channels, presets, objects, text, channelPicker, notice, message, undo] as [NSView] {
+            addSubview(view)
+        }
         refresh()
     }
 
@@ -90,6 +103,11 @@ final class WorkspaceView: PanelView {
 
     @objc private func zoomed() {
         model.editing.zoom(to: zoom.doubleValue)
+    }
+
+    @objc private func pickedChannel() {
+        guard let item = channelPicker.selectedItem else { return }
+        model.editing.text.choose(channel: item.tag)
     }
 
     /// "Renumber… (`edit list N renumber M`, or Swap for a taken number)": a small panel with the number.
@@ -125,6 +143,12 @@ final class WorkspaceView: PanelView {
             refreshObjects()
             return
         }
+        if editing.page == .text {
+            refreshText()
+            return
+        }
+        text.isHidden = true
+        channelPicker.isHidden = true
         objects.isHidden = true
         stacks.isHidden = true
         channels.isHidden = true
@@ -171,7 +195,7 @@ final class WorkspaceView: PanelView {
     /// and the stack's fields fill the body.
     private func refreshStacks() {
         let page = model.editing.stackPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, channels, presets, objects] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, channels, presets, objects, text, channelPicker] as [NSView] { view.isHidden = true }
         title.stringValue = page.stack.map { EditModel.name(of: $0) } ?? EditModeWording.page(.stacks)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -185,7 +209,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §7 and G-31 — the header names the page and holds its menu; the list and the form fill the body.
     private func refreshChannels() {
         let page = model.editing.channelPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, presets, objects] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, presets, objects, text, channelPicker] as [NSView] { view.isHidden = true }
         title.stringValue = page.channel.map { EditModel.name(of: $0) } ?? EditModeWording.page(.channels)
         title.isHidden = false
         NoticeLine.show(model.editing.notice, in: notice, from: self)
@@ -199,7 +223,7 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §8 and G-32 — "a header naming the preset, with a picker of every preset and the preset's menu".
     private func refreshPresets() {
         let page = model.editing.presetPage
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, objects, notice] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, objects, notice, text, channelPicker] as [NSView] { view.isHidden = true }
         title.stringValue = page.preset.map { EditModel.name(of: $0) } ?? EditModeWording.page(.presets)
         title.isHidden = false
         presets.isHidden = page.preset == nil
@@ -212,13 +236,55 @@ final class WorkspaceView: PanelView {
     /// Spec 11 §9 — the header names the selected object, with the notice line; its editor and what it shares fill the body.
     private func refreshObjects() {
         let editing = model.editing
-        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets] as [NSView] { view.isHidden = true }
+        for view in [meta, zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets, text, channelPicker] as [NSView] { view.isHidden = true }
         title.stringValue = editing.selectedObject.map { editing.objectName($0) } ?? EditModeWording.page(.objects)
         title.isHidden = false
         NoticeLine.show(editing.notice, in: notice, from: self)
         objects.isHidden = false
         objects.refresh()
         message.isHidden = true
+        needsLayout = true
+    }
+
+    /// Spec 11 §5 — the header names the list, its cue count and version, and
+    /// why it is read-only; the channel picker stands at its right; the
+    /// document and the fields column fill the body.
+    private func refreshText() {
+        let editing = model.editing
+        for view in [zoom, tracking, openText, renumber, grid, undo, stacks, channels, presets, objects] as [NSView] { view.isHidden = true }
+        let deleted = editing.isListDeleted
+        let hasList = editing.listUuid != nil && !deleted && editing.list != nil
+        title.stringValue = hasList ? editing.grid.title : EditModeWording.page(.text)
+        title.isHidden = false
+        var words: [String] = []
+        if hasList, let version = editing.grid.version { words.append(EditModeWording.meta(cues: editing.grid.cueCount, version: version)) }
+        let cannot = hasList ? editing.cannotEdit : nil
+        if let cannot { words.append(EditModeWording.readOnly(cannot)) }
+        meta.stringValue = words.joined(separator: " · ")
+        meta.textColor = cannot == nil ? Palette.dimText : Palette.browsing
+        meta.isHidden = false
+        // The page's own notice ("Select within one cue."), else the edit's.
+        if let said = editing.text.notice {
+            notice.stringValue = said
+            notice.textColor = Palette.browsing
+            notice.toolTip = said
+            notice.isHidden = false
+        } else {
+            NoticeLine.show(editing.notice, in: notice, from: self)
+        }
+        if !notice.isHidden { meta.isHidden = true }
+        channelPicker.removeAllItems()
+        for channel in editing.text.channels {
+            channelPicker.addItem(withTitle: TextWording.channel(channel))
+            channelPicker.lastItem?.tag = channel.number
+        }
+        channelPicker.selectItem(withTag: editing.text.channel)
+        channelPicker.isHidden = !hasList
+        text.isHidden = !hasList
+        if hasList { text.refresh() }
+        message.stringValue = hasList ? "" : (deleted ? Strings.text(.editDeleted) : Strings.text(.textNoList))
+        message.isHidden = message.stringValue.isEmpty
+        undo.isHidden = !(deleted && editing.canUndoDelete)
         needsLayout = true
     }
 
@@ -231,6 +297,11 @@ final class WorkspaceView: PanelView {
         super.layout()
         let h = Self.headerHeight
         var right = bounds.width - 12
+        if !channelPicker.isHidden {
+            let width = min(220, channelPicker.fittingSize.width + 8)
+            channelPicker.frame = NSRect(x: right - width, y: (h - 22) / 2, width: width, height: 22)
+            right -= width + 12
+        }
         for button in [renumber, openText] where !button.isHidden {
             let size = button.fitting
             button.frame = NSRect(x: right - size.width, y: (h - 24) / 2, width: size.width, height: 24)
@@ -249,12 +320,13 @@ final class WorkspaceView: PanelView {
         title.frame = NSRect(x: 12, y: (h - 16) / 2, width: titleWidth, height: 16)
         meta.frame = NSRect(x: title.frame.maxX + 10, y: (h - 16) / 2, width: max(0, right - title.frame.maxX - 16), height: 16)
         // The notice line beside the title, on a page with no inspector.
-        notice.frame = NSRect(x: title.frame.maxX + 14, y: (h - 15) / 2, width: max(0, bounds.width - title.frame.maxX - 28), height: 15)
+        notice.frame = NSRect(x: title.frame.maxX + 14, y: (h - 15) / 2, width: max(0, right - title.frame.maxX - 20), height: 15)
         grid.frame = body
         stacks.frame = body
         channels.frame = body
         presets.frame = body
         objects.frame = body
+        text.frame = body
         let width = min(360, bounds.width - 40)
         // Under the grid's band and headers, where an empty list has nothing.
         let top = grid.isHidden ? body.midY - 18 : body.minY + CGFloat(CueGridGeometry.band + grid.geometry.header) + 28

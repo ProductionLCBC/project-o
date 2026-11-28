@@ -206,6 +206,8 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
         model.onFollowLive = { [weak self] in self?.grid.scrollToLive() }
         // Spec 10 §15 — what VoiceOver is told as the show moves.
         model.onAnnounce = { [weak self] announcement in self?.say(AnnounceWording.text(announcement)) }
+        // Spec 11 §10 — the text editor's words: "Select within one cue.", and later what a split, merge or moved break did.
+        model.editing.text.onSay = { [weak self] words in self?.say(words) }
         // The regions the keyboard's focus rests in, by name.
         for (list, name) in [(left.playlists, StringKey.focusPlaylists), (left.library, .focusLibrary), (pool.rail, .focusPoolFolders)] {
             list.setAccessibilityLabel(Strings.text(name))
@@ -587,7 +589,7 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
             guard let self else { return true }
             guard self.commitOpenField() else { return false }
             // A field of edit mode's commits as the cursor leaves it; what can't be sent keeps edit mode open.
-            if let editor = self.window?.firstResponder as? NSText, editor.isDescendant(of: self.inspector) || editor.isFieldEditor {
+            if let editor = self.window?.firstResponder as? NSText, editor.isDescendant(of: self.inspector) || editor.isFieldEditor || editor is any TextEditorField {
                 self.window?.makeFirstResponder(self)
             }
             if case .notSent? = self.model.editing.notice { return false }
@@ -601,8 +603,11 @@ final class ShowWindowView: Surface, NSPopoverDelegate {
     /// with Copy, since the engine would refuse it."
     private func offerUnsentText() {
         closePrompt()
-        guard let editor = window?.firstResponder as? NSText, editor.isDescendant(of: inspector) || (editor.isFieldEditor && (editor.delegate as? NSView)?.isDescendant(of: inspector) == true) else { return }
-        let text = editor.string
+        guard let editor = window?.firstResponder as? NSText,
+              editor.isDescendant(of: inspector) || editor is any TextEditorField
+                || (editor.isFieldEditor && (editor.delegate as? NSView)?.isDescendant(of: inspector) == true) else { return }
+        // Spec 11 §5 — the text editor's chunk has sent what it could; what waits to be sent is what the lock refuses.
+        let text = editor is any TextEditorField ? (model.editing.text.unsent ?? "") : editor.string
         guard !text.isEmpty else { return }
         unsentText = text
         window?.makeFirstResponder(self)

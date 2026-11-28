@@ -166,10 +166,11 @@ public final class EditModel {
         standing = nil
         set(source: source, item: item, list: list, cue: cue)
         if wasShow { model.note?(["event": .string("editMode"), "on": .bool(true)], "Edit mode opened") }
+        // The Text page's document is made before the window draws it.
+        if page == .text { text.opened() }
         model.changed([.layout, .edit, .top])
         if page == .presets { presetsOpened() }
         if page == .objects { objectsOpened() }
-        if page == .text { text.opened() }
     }
 
     /// Makes a list the Cues page's, on a cue of it: the one named, else its first.
@@ -251,11 +252,11 @@ public final class EditModel {
         acted()
         if self.page == .text { text.leave() }
         model.settings.editPage = page
+        if page == .text { text.opened() }
         model.changed([.edit, .top])
         askPreview()
         if page == .presets { presetsOpened() }
         if page == .objects { objectsOpened() }
-        if page == .text { text.opened() }
     }
 
     public func show(tab: BrowserTab) {

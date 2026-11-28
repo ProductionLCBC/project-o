@@ -46,6 +46,11 @@ public final class TextEditor {
     public private(set) var removed: RemovedChunk?
     /// Called when an undo or a redo replaced the caret's chunk: "keeping the caret's place in its text where it can".
     public var onReplaced: ((String) -> Void)?
+    /// What the page says for a moment in its header, as "Select within one cue." (Spec 11 §5, "Selection").
+    public private(set) var notice: String?
+    private var noticeTask: (any ClockTask)?
+    /// Called with what VoiceOver should hear as the page changes (Spec 11 §10).
+    public var onSay: ((String) -> Void)?
 
     /// Typed since the caret entered: "A chunk the caret passes through without typing sends nothing."
     private var dirty = false
@@ -398,6 +403,49 @@ public final class TextEditor {
         refresh()
         editing.model.changed([.edit])
         return ghost.text
+    }
+
+    // MARK: - Selection (Spec 11 §5)
+
+    /// Says something in the page's header for three seconds, and to VoiceOver.
+    public func say(_ text: String) {
+        notice = text
+        noticeTask?.cancel()
+        noticeTask = editing.model.later(3) { [weak self] in
+            self?.notice = nil
+            self?.editing.model.changed([.edit])
+        }
+        onSay?(text)
+        editing.model.changed([.edit])
+    }
+
+    /// Spec 11 §5, "Selection" — "Typing, Delete, Cut or Paste over a
+    /// selection that crosses a break does nothing and says "Select within one cue.""
+    public func refuseAcrossBreaks() {
+        say(Strings.text(.textSelectWithinOneCue))
+    }
+
+    /// "A second ⌘A selects the whole document, for Copy only": each run's
+    /// section on a line of its own, then its chunks' own text, the chunks
+    /// apart by a blank line, so the copy pastes back as the same cues (Area 10
+    /// reading). Holds, clears and rows of other content copy nothing.
+    public func documentText() -> String {
+        var paragraphs: [String] = []
+        var section: String?
+        for chunk in document.chunks {
+            if chunk.startsRun { section = chunk.section }
+            var own = chunk.text
+            if chunk.cue == caret, dirty || chunk.kind == .write(body: chunk.text) { own = caretText }
+            guard !own.isEmpty else { continue }
+            paragraphs.append(([section].compactMap { $0 } + [own]).joined(separator: "\n"))
+            section = nil
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// The section combo's choices: "a combo box with the list's sections and E3's names".
+    public var sectionChoices: [String] {
+        editing.list.map(CueInspector.sections) ?? CueInspector.sectionNames
     }
 
     // MARK: - The fields column (Spec 11 §5, G-46)

@@ -61,6 +61,8 @@ final class KeyTap {
     /// pickers, steppers' fields, combo boxes and the key recorder."
     static func fieldKind(_ responder: NSResponder?) -> FieldKind? {
         if let field = field(responder) { return field.fieldKind }
+        // Spec 11 §5, "Keys" — "The editor is a text field (Spec 10 §9)".
+        if responder is any TextEditorField { return .textEditor }
         if responder is NSText || responder is NSDatePicker { return .other }
         return nil
     }

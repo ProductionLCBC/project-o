@@ -15001,6 +15001,306 @@
         }
       }
     },
+    "text.addAsNewCue" : {
+      "comment" : "The text editor: a button on a removed cue's chunk that adds its text back as a new cue.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add as New Cue"
+          }
+        }
+      }
+    },
+    "text.changedElsewhere" : {
+      "comment" : "The text editor: the chunk being typed in was changed by another station or source meanwhile.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changed elsewhere"
+          }
+        }
+      }
+    },
+    "text.channel" : {
+      "comment" : "The text editor's channel picker: one channel. %1$lld is its number, %2$@ its label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel %1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "text.channelPicker" : {
+      "comment" : "The text editor: VoiceOver's name for the channel picker.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Channel"
+          }
+        }
+      }
+    },
+    "text.clears" : {
+      "comment" : "The text editor: the placeholder of a cue's chunk when the cue clears the channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clears"
+          }
+        }
+      }
+    },
+    "text.column.cue" : {
+      "comment" : "The heading of the text editor's fields for the cue with the caret. %lld is its number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %lld"
+          }
+        }
+      }
+    },
+    "text.column.list" : {
+      "comment" : "The heading of the text editor's column of the list's fields.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "List"
+          }
+        }
+      }
+    },
+    "text.confidence" : {
+      "comment" : "The text editor: a chunk that shows ahead of time on an output, which sends only when the caret leaves it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the confidence screen"
+          }
+        }
+      }
+    },
+    "text.content" : {
+      "comment" : "The text editor: content that isn't text, as its kind and its name, \"Video: Ocean loop\". %1$@ is the kind, %2$@ the name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "text.copy" : {
+      "comment" : "The text editor: a button on a removed cue's chunk that copies its text.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        }
+      }
+    },
+    "text.cue.spoken" : {
+      "comment" : "VoiceOver: a chunk of the text editor, by its cue's number and section or label, \"Cue 4, Chorus\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld, %2$@"
+          }
+        }
+      }
+    },
+    "text.cue.spoken.plain" : {
+      "comment" : "VoiceOver: a chunk of the text editor whose cue has no section or label.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %lld"
+          }
+        }
+      }
+    },
+    "text.cueRemoved" : {
+      "comment" : "The text editor: the cue of the chunk being typed in was removed elsewhere; its text is kept.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue removed"
+          }
+        }
+      }
+    },
+    "text.document.spoken" : {
+      "comment" : "VoiceOver: the text editor's document.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text of the list on channel %lld"
+          }
+        }
+      }
+    },
+    "text.empty" : {
+      "comment" : "The text editor: the one chunk of a list with no cues.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type or paste the song’s text"
+          }
+        }
+      }
+    },
+    "text.field.author" : {
+      "comment" : "The text editor's field for the list's author.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Author"
+          }
+        }
+      }
+    },
+    "text.field.ccli" : {
+      "comment" : "The text editor's field for the list's CCLI song number.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CCLI number"
+          }
+        }
+      }
+    },
+    "text.field.copyright" : {
+      "comment" : "The text editor's field for the list's copyright.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copyright"
+          }
+        }
+      }
+    },
+    "text.field.title" : {
+      "comment" : "The text editor's field for the list's title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Title"
+          }
+        }
+      }
+    },
+    "text.field.trackThrough" : {
+      "comment" : "The text editor's checkbox: tracked attributes don't reset when the list is entered.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track through"
+          }
+        }
+      }
+    },
+    "text.hold" : {
+      "comment" : "The text editor's button: the cue with the caret leaves the channel as it is.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold"
+          }
+        }
+      }
+    },
+    "text.holds" : {
+      "comment" : "The text editor: the placeholder of a cue's chunk over held media. %@ is what is held, as \"Video: Ocean loop\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Holds %@"
+          }
+        }
+      }
+    },
+    "text.holdsNothing" : {
+      "comment" : "The text editor: the placeholder of a cue's chunk when the channel holds nothing there.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Holds nothing"
+          }
+        }
+      }
+    },
+    "text.noList" : {
+      "comment" : "The text editor when no list is chosen.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a list in the Browser to edit its text"
+          }
+        }
+      }
+    },
+    "text.selectWithinOneCue" : {
+      "comment" : "The text editor: said when typing, Delete, Cut or Paste meets a selection that crosses a cue break.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select within one cue."
+          }
+        }
+      }
+    },
     "time.seconds" : {
       "comment" : "A number of seconds. %@ is the number, already formatted.",
       "extractionState" : "manual",

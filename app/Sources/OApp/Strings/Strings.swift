@@ -1333,6 +1333,33 @@ public enum StringKey: String, CaseIterable, Sendable {
     case editFormAudioTransition = "edit.form.audioTransition"
     case editFormGain = "edit.form.gain"
     case editFormMs = "edit.form.ms"
+
+    // The text editor (Spec 11 §5)
+    case textClears = "text.clears"
+    case textHoldsNothing = "text.holdsNothing"
+    case textHolds = "text.holds"
+    case textContent = "text.content"
+    case textEmpty = "text.empty"
+    case textNoList = "text.noList"
+    case textConfidence = "text.confidence"
+    case textChangedElsewhere = "text.changedElsewhere"
+    case textCueRemoved = "text.cueRemoved"
+    case textAddAsNewCue = "text.addAsNewCue"
+    case textCopy = "text.copy"
+    case textSelectWithinOneCue = "text.selectWithinOneCue"
+    case textChannel = "text.channel"
+    case textChannelPicker = "text.channelPicker"
+    case textColumnList = "text.column.list"
+    case textColumnCue = "text.column.cue"
+    case textFieldTitle = "text.field.title"
+    case textFieldAuthor = "text.field.author"
+    case textFieldCopyright = "text.field.copyright"
+    case textFieldCCLI = "text.field.ccli"
+    case textFieldTrackThrough = "text.field.trackThrough"
+    case textHold = "text.hold"
+    case textCueSpoken = "text.cue.spoken"
+    case textCueSpokenPlain = "text.cue.spoken.plain"
+    case textDocumentSpoken = "text.document.spoken"
 }
 
 /// The table the keys are looked up in, and what is done to a string on its
