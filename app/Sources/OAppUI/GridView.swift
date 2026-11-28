@@ -36,7 +36,7 @@ final class PictureStore {
                         return
                     }
                     self.pictures[key] = picture
-                    if key.contains("/thumbnails/render/") { self.keepRender(key) }
+                    if key.contains("/thumbnails/render/") { self.keepRender(key) } else { self.keepNewestVersion(key) }
                     for call in self.waiting.removeValue(forKey: key) ?? [] { call(picture) }
                 }
             }
@@ -60,6 +60,26 @@ final class PictureStore {
 
     /// How many edit-mode pictures are kept, for the tests.
     var rendersHeld: Int { renders.filter { pictures[$0] != nil }.count }
+
+    /// Spec 4 §10 — a cue thumbnail is `thumbnails/<stack>/<cue uuid>-<library version>.png`, "a stale version
+    /// removed when the new one is written": a version read before is forgotten when its cue's next one is read, or
+    /// typing in the text editor, which makes a cue's and every later cue's next version a few times a second (Spec
+    /// 11 §5), would keep every one of them.
+    private func keepNewestVersion(_ key: String) {
+        let url = URL(fileURLWithPath: key)
+        let folder = url.deletingLastPathComponent()
+        guard folder.deletingLastPathComponent().lastPathComponent == "thumbnails", folder.lastPathComponent != "pool",
+              let dash = url.lastPathComponent.range(of: "-", options: .backwards) else { return }
+        let prefix = folder.appendingPathComponent(String(url.lastPathComponent[..<dash.lowerBound]) + "-").path
+        for other in pictures.keys where other != key && other.hasPrefix(prefix) && !other.dropFirst(prefix.count).contains("/") {
+            pictures[other] = nil
+        }
+    }
+
+    /// How many cue thumbnails are kept, for the tests.
+    var thumbnailsHeld: Int {
+        pictures.keys.filter { URL(fileURLWithPath: $0).deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "thumbnails" }.count
+    }
 }
 
 /// Spec 10 §6, "The chips" — "each state with its own shape: filled blue for
