@@ -1,6 +1,6 @@
 # Spec 4: Render pipeline
 
-Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-11-16 from the Area 19 review (§12, audio devices at launch) , 2026-11-17 on Adam's answer to the Area 13 plan (§15, the gate lifted for Area 13) and 2026-11-18 on his answers to the Area 14 plan (§15, the gate lifted for Area 14; §5, a stack's size at a switch; §8 and §9, a box keeps its previous lines) · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
+Oct 25, 2026 · @Adam Granby · Status: accepted 2026-10-25; corrected 2026-11-16 from the Area 19 review (§12, audio devices at launch) , 2026-11-17 on Adam's answer to the Area 13 plan (§15, the gate lifted for Area 13) , 2026-11-18 on his answers to the Area 14 plan (§15, the gate lifted for Area 14; §5, a stack's size at a switch; §8 and §9, a box keeps its previous lines) and 2026-11-28 on his answer to the Area 10 plan (§15, the gate lifted for Area 10) · Consumes ShowState and Effects from Spec 3; defines the engine the spike builds
 
 ## 1. Purpose and scope
 
@@ -348,7 +348,7 @@ The spike is the smallest build that exercises every guarantee in section 1 on r
 - The DeckLink output is frame-accurate against the capture; the 1080i weave, added right after the spike, is verified field-correct on a motion fixture the same way.
 - The headless harness reproduces a tick from a saved frame plan and matches the golden images.
 
-Until every line above is green, no UI work starts. If one cannot be made green on this hardware, that is the moment to revisit the architecture, before anything is built on top of it. Lifted for Area 13 on Adam's word, 2026-11-17: the show-mode app starts on the display-side record of the soaks of 2026-11-02 and 2026-11-16. Lifted for Area 14 on his word, 2026-11-18, on the same record: edit mode starts before the bench run, and Areas 10, 17 and 18 and Area 7's bench verification still wait for it. The DeckLink and capture lines, and the late-text and memory lines the second soak failed, are still owed before Area 7 and the pilot.
+Until every line above is green, no UI work starts. If one cannot be made green on this hardware, that is the moment to revisit the architecture, before anything is built on top of it. Lifted for Area 13 on Adam's word, 2026-11-17: the show-mode app starts on the display-side record of the soaks of 2026-11-02 and 2026-11-16. Lifted for Area 14 on his word, 2026-11-18, on the same record: edit mode starts before the bench run. Lifted for Area 10 on his word, 2026-11-28: the text editor, which changes nothing in the engine, starts before it too, and Areas 17 and 18 and Area 7's bench verification still wait for it. The DeckLink and capture lines, and the late-text and memory lines the second soak failed, are still owed before Area 7 and the pilot.
 
 ## 16. Tests, forward hooks and open questions
 
