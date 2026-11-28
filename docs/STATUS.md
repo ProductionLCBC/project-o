@@ -169,7 +169,8 @@ the engine keeps the last 500 command-log lines in memory, not 10,000 (Spec 9 §
 regenerate). The three-hour soak of 3df85af ran on his go after he disconnected
 (2026-11-27 18:44:45 to 21:44:59, `tests/soak-output/2026-11-27-184445`, the run's files in
 the worktree's `.build/area-edit-scratch/soak-1127/`) and fails three lines by their letter
-(below, Needs Adam); American
+(below, Needs Adam); on 2026-11-28, on his word, the built-in sample's paragraphs are a line
+or two long (Spec 11 §8, G-41; a37131d); American
 spellings throughout the app's wording and the code (c3d415a); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
 first, G-38; `core/` b197b06, app dfaed29; `swift test` and hosted CI green). The try-out
