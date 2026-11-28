@@ -263,11 +263,13 @@ the pilot.
     times clean; cause not found, nothing in the system log, and the soak never reached the
     J or L paths (the fixture's channels default to a cut, and its J-cut object is never
     called), so of the 2026-11-27 audio change it ran only the eased crossfade. The
-    2026-11-21 soaks had none. *Footprint less graphics 318 to 336 MB (+5.8%)*, the
-    purgeable zone rising to its 57 MB cap as on every soak since 2026-11-16.
-    Recommended: count the purgeable zone out of §13's footprint line (the system takes it
-    back under pressure), quit ScreenConnect for the run rather than disconnect, and run
-    once more to see whether the underruns come back.
+    2026-11-21 soaks had none. *Footprint less graphics 318 to 336 MB (+5.8%)*: about 12 MB
+    more in exactly the same nineteen minutes as the GPU stretch (326 MB at minute 48, 339
+    at 55, 327 at 68), gone when it ended; outside it the line held 322 to 330 MB, within
+    5%. (First read as the purgeable zone, which rose 21 to 57 MB and stopped, but the
+    footprint leaves that out, Spec 4 §13.) He can't quit ScreenConnect and wants the
+    program to work regardless (2026-11-28): through the stretch no frame was dropped or
+    late. Open: the underrun minute, which the next soak should name by channel and item.
   - *The bench's golden images:* run on the branch on 2026-11-27, 46 tests green, none to
     regenerate. Done.
   - *The engine's audio transitions:* fixed on his go of 2026-11-27 (96d6afc), with a
