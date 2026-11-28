@@ -269,7 +269,16 @@ the pilot.
     5%. (First read as the purgeable zone, which rose 21 to 57 MB and stopped, but the
     footprint leaves that out, Spec 4 §13.) He can't quit ScreenConnect and wants the
     program to work regardless (2026-11-28): through the stretch no frame was dropped or
-    late. Open: the underrun minute, which the next soak should name by channel and item.
+    late. The underruns, found 2026-11-28 on his go: 94 samples (about 2 ms), and the
+    cause most likely a looping clip's audio reader reopened only once the last pass ran
+    out, with the 250 ms ring as the only margin, where Spec 4 §11 asks for video's
+    two-reader hand-off. Fixed (ef279ac, hosted CI green): the next pass's reader opens
+    while the current one decodes, and with every reopen held 400 ms a one-second loop
+    misses no sample where the old way missed 24,000; the engine now logs each channel's
+    missed samples with the item and device. A twenty-minute soak of ef279ac on both
+    screens (2026-11-28 10:30 to 10:50, `tests/soak-output/` of that time) passed every
+    Spec 4 §13 line: GPU p99 6.47 ms, no frame dropped, no underrun, no miss logged over
+    eight writes of the looping clip, footprint +0.6% and heap +0.3%.
   - *The bench's golden images:* run on the branch on 2026-11-27, 46 tests green, none to
     regenerate. Done.
   - *The engine's audio transitions:* fixed on his go of 2026-11-27 (96d6afc), with a
