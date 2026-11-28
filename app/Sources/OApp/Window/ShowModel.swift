@@ -127,6 +127,9 @@ public final class ShowModel {
     /// The app's clock, for a view that times something of its own.
     public var now: TimeInterval { clock.now }
 
+    /// The clock itself, for a model that paces what it sends (Spec 11 §5's typing).
+    var appClock: any AppClock { clock }
+
     /// Runs `work` on the app's clock, `seconds` from now.
     @discardableResult
     func later(_ seconds: TimeInterval, _ work: @escaping @MainActor () -> Void) -> any ClockTask {
@@ -219,6 +222,8 @@ public final class ShowModel {
             after(RemoteDot.glow) { [weak self] in self?.changed([.top]) }
             changed([.top])
         case .library(let event):
+            // Spec 11 §5 — the Text page reads each event for its caret's chunk.
+            if mode == .edit { editing.libraryChanged(event) }
             // Spec 5 §2 — cause `file`: a master reloaded from disk (Spec 1 §8).
             guard event.cause == "file" else { return }
             for change in event.changed where change.object == "list" || change.object == "cue" {

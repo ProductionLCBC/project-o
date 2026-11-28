@@ -16,16 +16,18 @@ public enum EditPage: String, Codable, CaseIterable, Sendable {
     /// The digit of its View menu shortcut, with ⌥⌘.
     public var shortcut: Int { (Self.allCases.firstIndex(of: self) ?? 0) + 1 }
 
-    /// "Text is disabled until Area 10 lands (§11)."
-    public var isBuilt: Bool { self != .text }
+    /// Whether the page can be opened: every page since Area 10 built the
+    /// Text page (Spec 11 §11). Kept for a page a later area adds.
+    public var isBuilt: Bool { true }
 
     /// Spec 11 §2, "Where a page's parts sit" — "The Cues and Text pages keep the Browser ...; The Stacks, Channels,
     /// Presets and Objects pages put their own list in its place".
     public var usesBrowser: Bool { self == .cues || self == .text }
 
     /// "the Cues and Presets pages keep the inspector under the workspace and the monitors; the Stacks and Channels
-    /// pages have none". The Objects page's is settled with its stage (§9).
-    public var hasInspector: Bool { self == .cues || self == .text || self == .presets }
+    /// pages have none ...; nor has the Text page, which sets its fields in a tall column beside its document (§5;
+    /// Adam, 2026-11-28, G-46)". The Objects page's is settled with its stage (§9).
+    public var hasInspector: Bool { self == .cues || self == .presets }
 }
 
 /// Spec 11 §2, "The Browser" — "Three tabs: Playlists, Library and Media".

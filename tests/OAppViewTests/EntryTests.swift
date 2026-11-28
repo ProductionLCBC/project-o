@@ -120,7 +120,7 @@ final class EntryTests: XCTestCase {
         // "in edit mode, its six pages, ⌥⌘1 to ⌥⌘6 (Spec 11 §2)".
         XCTAssertEqual(entries("View"), ["Multiviewer m", "Show Archived Playlists", "Compact Grid", "Collapse Panel", "Reset Layout", "Enter Full Screen",
                                          "Cues 1", "Text 2", "Stacks 3", "Channels 4", "Presets 5", "Objects 6"])
-        XCTAssertEqual(bar.entries(of: "View").first { $0.title == "Text" }?.isEnabled, false, "the text editor is Area 10's")
+        XCTAssertEqual(bar.entries(of: "View").first { $0.title == "Text" }?.isEnabled, true, "the text editor, since Area 10")
         XCTAssertEqual(bar.entries(of: "View").first { $0.title == "Cues" }?.keyEquivalentModifierMask, [.option, .command])
         XCTAssertEqual(entries("Go"), ["Back to Live l", "Go to Cue… j", "Hold Auto-Advance", "Command Bar k"])
         XCTAssertEqual(entries("Mode"), ["Show 1", "Edit 2"])

@@ -57,6 +57,7 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.editList = Recorded.list7
         settings.editCue = Recorded.cues42[1]
         settings.editChannel = 3
+        settings.editTextChannel = 1
         settings.browserTab = .media
         settings.mediaView = .list
         settings.gridZoom = 88

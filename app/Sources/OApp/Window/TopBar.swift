@@ -215,6 +215,8 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var editList: String?
     public var editCue: String?
     public var editChannel: Int?
+    /// The Text page's channel (Spec 11 §5, "Which text"), once the picker or a double-click chose one.
+    public var editTextChannel: Int?
     /// The Stacks page's selection (Spec 11 §6): the stack, and the output whose properties show.
     public var editStack: Int?
     public var editOutput: Int?
@@ -293,6 +295,7 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.editList, into: &editList)
         read(.editCue, into: &editCue)
         read(.editChannel, into: &editChannel)
+        read(.editTextChannel, into: &editTextChannel)
         read(.editStack, into: &editStack)
         read(.editOutput, into: &editOutput)
         read(.editSheetChannel, into: &editSheetChannel)

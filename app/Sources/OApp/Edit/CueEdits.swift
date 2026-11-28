@@ -101,6 +101,13 @@ public enum CueEdits {
         return cueChannel(channel, .write(content, riders), says.attributes, cue: cue, list: list)
     }
 
+    /// A write with the riders given, beside the cue's attribute writes: Spec
+    /// 11 §5's "a copy of the held write with the typing in its body". Nil
+    /// when the cue writes that already.
+    public static func write(_ content: ContentExpression, riders: Riders, channel: Int, cue: Cue, list: Int) -> Sending? {
+        cueChannel(channel, .write(content, riders), CueSays.about(channel, in: cue).attributes, cue: cue, list: list)
+    }
+
     /// A media item picked in the popover or dropped on a cell: Spec 10
     /// §10's drop, "with the item's default grade as a `grade G once` rider".
     public static func pick(media id: String, defaultGrade: Int?, channel: Int, cue: Cue, list: Int) -> Sending {

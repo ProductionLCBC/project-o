@@ -84,6 +84,8 @@ public final class EditModel {
     public internal(set) var presetState = PresetEditorState()
     /// Spec 11 §9 — the Objects page's own state: Used by, the grade's two pictures and the item they show.
     public internal(set) var objectState = ObjectEditorState()
+    /// Spec 11 §5 — the Text page: the list's text on one channel, the caret's chunk and what it has sent.
+    public private(set) lazy var text = TextEditor(editing: self)
 
     private var standing: EditNotice?
     private var triedLeaving = false
@@ -167,10 +169,12 @@ public final class EditModel {
         model.changed([.layout, .edit, .top])
         if page == .presets { presetsOpened() }
         if page == .objects { objectsOpened() }
+        if page == .text { text.opened() }
     }
 
     /// Makes a list the Cues page's, on a cue of it: the one named, else its first.
     private func set(source: GridContext?, item: String?, list: String?, cue: String?) {
+        if list != listUuid { text.leave() }
         self.source = source
         itemUuid = item
         listUuid = list
@@ -241,15 +245,17 @@ public final class EditModel {
 
     // MARK: - The pages and the Browser (Spec 11 §2)
 
-    /// The page picker, and ⌥⌘1 to ⌥⌘6. "Text is disabled until Area 10 lands".
+    /// The page picker, and ⌥⌘1 to ⌥⌘6.
     public func show(page: EditPage) {
         guard page.isBuilt, page != self.page else { return }
         acted()
+        if self.page == .text { text.leave() }
         model.settings.editPage = page
         model.changed([.edit, .top])
         askPreview()
         if page == .presets { presetsOpened() }
         if page == .objects { objectsOpened() }
+        if page == .text { text.opened() }
     }
 
     public func show(tab: BrowserTab) {
@@ -349,12 +355,19 @@ public final class EditModel {
             pendingSelect = nil
         }
         selection.reconcile(order: order, channels: channels, was: was)
+        if page == .text { text.refresh() }
     }
 
     /// What the store changed, while edit mode is open.
     func storeChanged(_ changes: Set<StoreChange>) {
         if changes.contains(.engine), cannotOpen != nil {
             lockCameOn()
+            return
+        }
+        // Spec 11 §5, "Near the live cue" — the Text page's chunks hold back while an output shows a box ahead.
+        if page == .text, changes.isDisjoint(with: [.connection, .catalog, .lists, .live, .thumbnails, .media]),
+           !changes.isDisjoint(with: [.outputs, .stacks]) {
+            text.refresh()
             return
         }
         guard !changes.isDisjoint(with: [.connection, .catalog, .lists, .live, .thumbnails, .media]) else { return }
@@ -374,6 +387,13 @@ public final class EditModel {
             askObjectUses(again: true)
             askGrade(again: true)
         }
+    }
+
+    /// Spec 5 §2 — a `library` event, which the Text page reads for its
+    /// caret's chunk (Spec 11 §5, "Other clients" and "Undo"); the documents
+    /// it names come after it, asked for again by the session.
+    func libraryChanged(_ event: LibraryChangeEvent) {
+        text.event(event)
     }
 
     /// The preview stack or another setting changed.
@@ -440,6 +460,23 @@ public final class EditModel {
     public func select(row: CueGridSelection.Row) {
         selection.set(row)
         selectionChanged()
+    }
+
+    /// Spec 11 §5 — the caret entered a cue's chunk: the cue is the page's
+    /// selection, which the Preview monitor shows and leaving edit mode
+    /// returns to (Spec 11 §2). Typing never fires, Live or not: Live is the
+    /// cue grid's (Area 10 reading).
+    func selectFromText(cue: String) {
+        let order = grid.headers.map(\.uuid)
+        guard selection.lead != cue || selection.isMulti else { return }
+        if order.contains(cue) {
+            selection.click(cue: cue, row: .channel(text.channel))
+        } else {
+            pendingSelect = cue
+        }
+        remember()
+        model.changed([.edit])
+        askPreview()
     }
 
     /// The arrows, with the grid focused.
@@ -565,7 +602,7 @@ public final class EditModel {
     /// draw changes; `again` asks even for the same subject, since the list
     /// itself changed.
     private func askPreview(again: Bool = false) {
-        guard model.mode == .edit, page == .cues, previewPixels > 0, let listUuid,
+        guard model.mode == .edit, page == .cues || page == .text, previewPixels > 0, let listUuid,
               let cue = selection.first(in: grid.headers.map(\.uuid)) else { return }
         let isLocal = store.lists[listUuid]?.local ?? store.catalog?.list(uuid: listUuid)?.local ?? false
         var subject: [String: JSONValue] = ["kind": .string("cue"), "cue": .string(cue), "stack": .number(Double(model.previewStack)),
@@ -612,7 +649,7 @@ public final class EditModel {
         model.dismissNotice(at: .inspector)
         // A list that can't be edited holds back the Cues page's edits alone: a stack, a channel or a preset is the
         // library's, whichever list the Cues page last showed.
-        if page == .cues, let cannot = cannotEdit {
+        if page == .cues || page == .text, let cannot = cannotEdit {
             model.say(.notSent(cannot), at: .inspector)
             return cannot
         }

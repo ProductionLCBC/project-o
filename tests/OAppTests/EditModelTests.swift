@@ -206,15 +206,19 @@ final class EditModelTests: XCTestCase {
 
     // MARK: - The pages and the Browser (Spec 11 §2)
 
-    func test_thePagePickerPicksThePagesAndTextWaits() throws {
+    func test_thePagePickerPicksThePages() throws {
         let rig = try Rig()
         rig.model.editing.open()
         rig.model.editing.show(page: .stacks)
         XCTAssertEqual(rig.model.editing.page, .stacks)
         XCTAssertEqual(rig.model.settings.editPage, .stacks, "kept for the next time")
-        // "Text is disabled until Area 10 lands".
+        // The Text page, on the list the Cues page edits (Spec 11 §2: "The Cues and Text pages keep the Browser,
+        // since they edit the list it picks").
         rig.model.editing.show(page: .text)
-        XCTAssertEqual(rig.model.editing.page, .stacks)
+        XCTAssertEqual(rig.model.editing.page, .text)
+        XCTAssertEqual(rig.model.editing.text.document.listUuid, Recorded.list42)
+        XCTAssertEqual(rig.model.editing.text.document.chunks.count, 4)
+        rig.model.editing.show(page: .stacks)
         // A page opened from show mode opens edit mode on it.
         rig.model.editing.leave()
         XCTAssertTrue(rig.model.editing.open(page: .objects))

@@ -30,6 +30,40 @@ public enum EditOnAir {
     /// `isLive` says the list is the live one, where it is live; `isNext`
     /// that it is the list after it in the live playlist. `liveIndex` and
     /// `liveCount` are the live cue's place in its list and that list's length.
+    /// Spec 11 §5, "Near the live cue" — the cues of the list `uuid`, by their
+    /// uuids, among "the three cues after the live cue, in playlist order;
+    /// near a song's end they are the next song's first cues (Spec 3 §7)".
+    /// They are counted across the items after the live one as Spec 3 §5's
+    /// `next` walks them, past headers, missing lists and lists with no cues,
+    /// a local copy's cues counting as any list's; a list fired from the
+    /// library stays inside itself. `lists` holds the lists the app has whole;
+    /// another list counts by the catalog's summary.
+    public static func ahead(of uuid: String, live: LiveStatus, catalog: Catalog, lists: [String: ListDocument]) -> Set<String> {
+        guard let liveList = live.listUuid, let liveCue = live.cue else { return [] }
+        func count(_ list: String) -> Int {
+            lists[list]?.list.cues.count ?? catalog.list(uuid: list)?.cues ?? 0
+        }
+        let cues = lists[uuid]?.list.cues.map { $0.uuid.uuidString.lowercased() } ?? []
+        let liveIndex = lists[liveList]?.list.cues.firstIndex { $0.uuid.uuidString.lowercased() == liveCue } ?? (live.cuePosition - 1)
+        guard liveIndex >= 0 else { return [] }
+        var result = Set<String>()
+        var remaining = 3
+        let after = max(0, count(liveList) - liveIndex - 1)
+        let here = min(remaining, after)
+        if liveList == uuid, here > 0 { result.formUnion(cues[min(cues.count, liveIndex + 1)..<min(cues.count, liveIndex + 1 + here)]) }
+        remaining -= here
+        guard remaining > 0, let playlist = live.playlist, let entry = catalog.playlist(uuid: playlist)?.playlist,
+              let at = entry.items.firstIndex(where: { $0.uuid.uuidString.lowercased() == live.item }) else { return result }
+        for item in entry.items[(at + 1)...] {
+            guard remaining > 0 else { break }
+            guard let list = GridModel.listUuid(of: item, catalog: catalog) else { continue }
+            let take = min(remaining, count(list))
+            if list == uuid, take > 0 { result.formUnion(cues.prefix(take)) }
+            remaining -= take
+        }
+        return result
+    }
+
     public static func lookahead(isLive: Bool, isNext: Bool, liveIndex: Int?, liveCount: Int) -> Range<Int> {
         guard let liveIndex else { return 0..<0 }
         if isLive { return (liveIndex + 1)..<(liveIndex + 4) }

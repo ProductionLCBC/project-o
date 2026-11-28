@@ -119,10 +119,10 @@ final class EditModeViewTests: XCTestCase {
         XCTAssertFalse(bar.show.isOn)
         XCTAssertEqual(bar.crumb.stringValue, "Sunday › Great Is Thy Faithfulness")
         XCTAssertTrue(bar.position.isHidden, "the live position is said under the Program monitor")
-        // "Center: the page picker: Cues, Text, Stacks, Channels, Presets, Objects. Text is disabled until Area 10 lands".
+        // "Center: the page picker: Cues, Text, Stacks, Channels, Presets, Objects", every one enabled since Area 10.
         XCTAssertEqual(bar.pagePicker.segments.map(\.title), ["Cues", "Text", "Stacks", "Channels", "Presets", "Objects"])
         XCTAssertEqual(bar.pagePicker.selected, 0)
-        XCTAssertEqual(bar.pagePicker.segments.map(\.isEnabled), [true, false, true, true, true, true])
+        XCTAssertEqual(bar.pagePicker.segments.map(\.isEnabled), [true, true, true, true, true, true])
         // "beside it the Live toggle" (G-44): off, "which edit mode always opens with"; "drawn in the live red while it is on".
         XCTAssertEqual(bar.liveToggle.title, "Live")
         XCTAssertFalse(bar.liveToggle.isHidden)

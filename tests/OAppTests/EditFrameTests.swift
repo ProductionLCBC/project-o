@@ -88,12 +88,15 @@ final class EditFrameTests: XCTestCase {
 
     // MARK: - The pages (Spec 11 §2)
 
-    func test_thePagesInTheirOrderWithTextWaitingForArea10() {
+    func test_thePagesInTheirOrder() {
         XCTAssertEqual(EditPage.allCases, [.cues, .text, .stacks, .channels, .presets, .objects])
         // "in the View menu with ⌥⌘1 to ⌥⌘6".
         XCTAssertEqual(EditPage.allCases.map(\.shortcut), [1, 2, 3, 4, 5, 6])
-        // "Text is disabled until Area 10 lands".
-        XCTAssertEqual(EditPage.allCases.filter(\.isBuilt), [.cues, .stacks, .channels, .presets, .objects])
+        // Area 10 built the Text page (Spec 11 §11): every page opens.
+        XCTAssertEqual(EditPage.allCases.filter(\.isBuilt), EditPage.allCases)
+        // "the Cues and Presets pages keep the inspector ...; nor has the Text page" (§2, G-46).
+        XCTAssertEqual(EditPage.allCases.filter(\.hasInspector), [.cues, .presets])
+        XCTAssertEqual(EditPage.allCases.filter(\.usesBrowser), [.cues, .text])
         XCTAssertEqual(BrowserTab.allCases, [.playlists, .library, .media])
     }
 
