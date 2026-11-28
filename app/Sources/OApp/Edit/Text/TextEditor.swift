@@ -315,8 +315,10 @@ public final class TextEditor {
 
     /// Puts the caret in a chunk with `text` as its own, already sent, and tells the page where it goes.
     private func moveCaret(to uuid: String, text: String, at location: Int) {
-        refresh()
+        // The caret moves first: the chunk it leaves may be one this editor's own edit removed, which is no cue
+        // removed elsewhere.
         caret = uuid
+        refresh()
         caretText = text
         dirty = false
         changedElsewhere = false

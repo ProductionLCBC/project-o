@@ -257,7 +257,10 @@ final class WorkspaceView: PanelView {
         title.stringValue = hasList ? editing.grid.title : EditModeWording.page(.text)
         title.isHidden = false
         var words: [String] = []
-        if hasList, let version = editing.grid.version { words.append(EditModeWording.meta(cues: editing.grid.cueCount, version: version)) }
+        // The cues as the document shows them, the editor's own split or merge included before the list comes back.
+        if hasList, let version = editing.grid.version {
+            words.append(EditModeWording.meta(cues: editing.text.list?.cues.count ?? editing.grid.cueCount, version: version))
+        }
         let cannot = hasList ? editing.cannotEdit : nil
         if let cannot { words.append(EditModeWording.readOnly(cannot)) }
         meta.stringValue = words.joined(separator: " · ")

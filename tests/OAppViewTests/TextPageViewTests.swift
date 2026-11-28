@@ -272,6 +272,179 @@ final class TextPageViewTests: XCTestCase {
         XCTAssertEqual(last(rig), ["edit list 42 cue \(c[1]) section \"Verse 2\"", "edit list 42 cue \(c[2]) section \"Verse 2\""])
     }
 
+    // MARK: - Breaks (Spec 11 §5)
+
+    private let made = UUID(uuidString: "eeee0030-0000-4000-8000-000000000000") ?? UUID()
+
+    private func insert(_ cue: Cue, at: Int) throws -> String {
+        try XCTUnwrap(CommandText.print(TextEdits.insert(cue, at: at, list: 42)))
+    }
+
+    private func remove(_ cue: String) throws -> String {
+        try XCTUnwrap(CommandText.print(.edit(EditCommand(.cue(list: 42, cue: try XCTUnwrap(UUID(uuidString: cue))), .remove(path: nil, at: nil)))))
+    }
+
+    /// A press on a cue's rule, a drag to a point of the document, and a release, as the pointer would make them.
+    private func drag(_ rig: Rig, rule: BreakView, to point: NSPoint, release: Bool = true) throws {
+        let window = rig.window.window
+        func event(_ type: NSEvent.EventType, _ at: NSPoint) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                             context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        }
+        let start = rule.convert(NSPoint(x: rule.ruleX + 40, y: rule.bounds.midY), to: nil)
+        let end = page(rig).document.convert(point, to: nil)
+        rule.mouseDown(with: try event(.leftMouseDown, start))
+        rule.mouseDragged(with: try event(.leftMouseDragged, end))
+        if release { rule.mouseUp(with: try event(.leftMouseUp, end)) }
+    }
+
+    /// The middle of a line of a chunk's text, in the document's coordinates.
+    private func line(_ chunk: ChunkView, at index: Int, in rig: Rig) -> NSPoint {
+        let rect = chunk.text.lineRect(at: index)
+        let origin = chunk.text.textContainerOrigin
+        return page(rig).document.convert(NSPoint(x: rect.midX + origin.x, y: rect.midY + origin.y), from: chunk.text)
+    }
+
+    func test_optionReturnSplitsAndTheCaretGoesOnInTheNewChunk() throws {
+        let rig = try editing()
+        rig.model.editing.makeUuid = { [made] in made }
+        let views = chunks(rig)
+        focus(rig, views[1])
+        views[1].text.placeCaret(at: ("There is no shadow\n" as NSString).length)
+        views[1].text.insertNewlineIgnoringFieldEditor(nil)
+        let cue = Cue(uuid: made, label: "Verse 1", section: "Verse 1", commands: [GuardedCommand(Self.write(2, Self.text("of turning with Thee")))])
+        XCTAssertEqual(last(rig), [try cueChannel(c[1], .write(Self.text("There is no shadow"), .none)), try insert(cue, at: 2)])
+        // "the caret goes on": a new chunk, between cue 2 and cue 3, with the focus at its start.
+        let after = chunks(rig)
+        XCTAssertEqual(after.map(\.cue), [c[0], c[1], made.uuidString.lowercased(), c[2], c[3]])
+        XCTAssertTrue(rig.window.window.firstResponder === after[2].text)
+        XCTAssertEqual(after[2].text.selectedRange(), NSRange(location: 0, length: 0))
+        XCTAssertEqual(after[1].text.string, "There is no shadow")
+        XCTAssertEqual(after[2].rule.number.stringValue, "3")
+        XCTAssertEqual(rig.view.spoken.last, "New cue 3 after cue 2")
+        redraw(rig)
+        XCTAssertEqual(rig.view.workspace.meta.stringValue, "5 cues · version 17", "the header counts the cue split off before the list comes back")
+        XCTAssertEqual(page(rig).cueHeading.accessibilityLabel(), "Cue 3", "the column names the new cue")
+        // Typing goes on in the new cue.
+        rig.clock.advance(by: 1)
+        type(after[2], "!")
+        XCTAssertEqual(last(rig), [try cueChannel(made.uuidString.lowercased(), .write(Self.text("!of turning with Thee"), .none))])
+    }
+
+    func test_backspaceAtTheStartAndDeleteAtTheEndMergeOnAFreshPressOnly() throws {
+        let rig = try editing()
+        var views = chunks(rig)
+        focus(rig, views[1])
+        views[1].text.placeCaret(at: 0)
+        // "A merge takes a fresh press: a held key stops at the chunk's edge."
+        views[1].text.lastKeyWasRepeat = true
+        views[1].text.deleteBackward(nil)
+        XCTAssertEqual(count(rig), 0)
+        views[1].text.lastKeyWasRepeat = false
+        views[1].text.deleteBackward(nil)
+        let joined = "Great is Thy faithfulness,\nO God my Father\nThere is no shadow\nof turning with Thee"
+        XCTAssertEqual(last(rig), [try cueChannel(c[0], .write(Self.text(joined), .none)), try remove(c[1])])
+        views = chunks(rig)
+        XCTAssertEqual(views.map(\.cue), [c[0], c[2], c[3]])
+        XCTAssertTrue(rig.window.window.firstResponder === views[0].text, "the caret goes to the chunk the text joined")
+        XCTAssertEqual(views[0].text.selectedRange().location, ("Great is Thy faithfulness,\nO God my Father\n" as NSString).length)
+        XCTAssertEqual(rig.view.spoken.last, "Cue 2 joined to cue 1")
+        // Forward Delete at the end of a chunk joins the one below: cue 3, which asks first (its trigger and advance-after).
+        views[0].text.placeCaret(at: (joined as NSString).length)
+        views[0].text.deleteForward(nil)
+        XCTAssertEqual(rig.asked, [.mergeCues(MergeQuestion(cue: 2, into: 1, reasons: [.trigger, .advanceAfter]))],
+                       "the window asks, and the rig answers Merge")
+        XCTAssertEqual(last(rig), [try cueChannel(c[0], .write(Self.text(joined + "\nThou changest not,\nThy compassions, they fail not"), .none)), try remove(c[2])])
+        // In the middle of a chunk, Backspace deletes a character as ever.
+        views = chunks(rig)
+        views[0].text.placeCaret(at: 5)
+        views[0].text.deleteBackward(nil)
+        XCTAssertTrue(views[0].text.string.hasPrefix("Grea is"))
+    }
+
+    func test_aBreakDragsToALineBoundaryShowingWhereItLands() throws {
+        let rig = try editing()
+        var views = chunks(rig)
+        XCTAssertFalse(views[0].rule.isDraggable, "the first chunk's rule isn't a break")
+        XCTAssertTrue(views[1].rule.isDraggable)
+        // Down past cue 2's first line: that line goes up to cue 1. While dragged, the drop line shows where.
+        let below = line(views[1], at: 0, in: rig)
+        try drag(rig, rule: views[1].rule, to: NSPoint(x: below.x, y: below.y + 12), release: false)
+        let document = page(rig).document
+        XCTAssertEqual(document.dragging?.lines, 1)
+        XCTAssertFalse(document.dropLine.isHidden)
+        try drag(rig, rule: views[1].rule, to: NSPoint(x: below.x, y: below.y + 12))
+        XCTAssertTrue(document.dropLine.isHidden)
+        XCTAssertEqual(last(rig), [try cueChannel(c[1], .write(Self.text("of turning with Thee"), .none)),
+                                   try cueChannel(c[0], .write(Self.text("Great is Thy faithfulness,\nO God my Father\nThere is no shadow"), .none))])
+        // Up into cue 3's chunk above cue 4: cue 3's last line goes down to the chorus.
+        views = chunks(rig)
+        let above = line(views[2], at: ("Thou changest not,\n" as NSString).length, in: rig)
+        try drag(rig, rule: views[3].rule, to: NSPoint(x: above.x, y: above.y - 2))
+        XCTAssertEqual(last(rig), [try cueChannel(c[2], .write(Self.text("Thou changest not,"), .none)),
+                                   try cueChannel(c[3], .write(Self.text("Thy compassions, they fail not\nGreat is Thy faithfulness!\nGreat is Thy faithfulness!"),
+                                                               Riders(audioTransition: TransitionRider(ref: 2, scope: .once), grade: GradeRider(ref: 1, ms: 2000, scope: .track))))])
+        // Let go where it started: nothing moves.
+        let sent = count(rig)
+        views = chunks(rig)
+        try drag(rig, rule: views[1].rule, to: NSPoint(x: below.x, y: views[1].frame.minY + ChunkView.ruleHeight / 2 + 1))
+        XCTAssertEqual(count(rig), sent)
+    }
+
+    func test_moveLineToPreviousAndNextCueFromTheEditMenu() throws {
+        let rig = try editing()
+        let views = chunks(rig)
+        let document = page(rig).document
+        focus(rig, views[1])
+        views[1].text.placeCaret(at: 4)
+        XCTAssertTrue(document.canMoveLineAtCaret(previous: true))
+        XCTAssertFalse(document.canMoveLineAtCaret(previous: false), "the caret isn't on the last line")
+        document.moveLineAtCaret(previous: true)
+        XCTAssertEqual(last(rig), [try cueChannel(c[1], .write(Self.text("of turning with Thee"), .none)),
+                                   try cueChannel(c[0], .write(Self.text("Great is Thy faithfulness,\nO God my Father\nThere is no shadow"), .none))])
+        // The caret follows its line into cue 1, on its last line.
+        let after = chunks(rig)
+        XCTAssertTrue(rig.window.window.firstResponder === after[0].text)
+        XCTAssertEqual(after[0].text.selectedRange().location, ("Great is Thy faithfulness,\nO God my Father\n" as NSString).length + 4)
+        // And back down: it is cue 1's last line now.
+        XCTAssertTrue(document.canMoveLineAtCaret(previous: false))
+        document.moveLineAtCaret(previous: false)
+        XCTAssertEqual(last(rig), [try cueChannel(c[0], .write(Self.text("Great is Thy faithfulness,\nO God my Father"), .none)),
+                                   try cueChannel(c[1], .write(Self.text("There is no shadow\nof turning with Thee"), .none))])
+        XCTAssertTrue(rig.window.window.firstResponder === chunks(rig)[1].text)
+        XCTAssertEqual(chunks(rig)[1].text.selectedRange().location, 4)
+        // With no chunk focused there is nothing to move.
+        rig.window.window.makeFirstResponder(nil)
+        XCTAssertFalse(document.canMoveLineAtCaret(previous: true))
+    }
+
+    /// For review: the page after a split, and while a break is dragged.
+    func test_theBreaksDrawIntoPictures() throws {
+        let rig = try editing()
+        rig.model.editing.makeUuid = { [made] in made }
+        func picture(_ name: String) throws {
+            redraw(rig)
+            let view = rig.view
+            let bitmap = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+            XCTAssertGreaterThan(png.count, 20_000)
+            if let folder = ProcessInfo.processInfo.environment["O_RENDER_DIR"] {
+                try png.write(to: URL(fileURLWithPath: folder).appendingPathComponent("edit-window-text-\(name).png"))
+            }
+        }
+        let views = chunks(rig)
+        focus(rig, views[1])
+        views[1].text.placeCaret(at: ("There is no shadow\n" as NSString).length)
+        try picture("before-split")
+        views[1].text.insertNewlineIgnoringFieldEditor(nil)
+        try picture("after-split")
+        let after = chunks(rig)
+        let below = line(after[3], at: 0, in: rig)
+        try drag(rig, rule: after[3].rule, to: NSPoint(x: below.x, y: below.y + 12), release: false)
+        try picture("drag")
+    }
+
     // MARK: - Other clients (Spec 11 §5)
 
     func test_aCueRemovedElsewhereKeepsItsTextWithAddAsNewCueAndCopy() throws {

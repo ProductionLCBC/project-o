@@ -1000,6 +1000,27 @@ final class MenuBar: NSObject, NSMenuDelegate {
              })
     }
 
+    /// Spec 10 §4's Edit menu — "in edit mode's text editor, Split Cue ⌥Return, Move Line to Previous Cue ⌥⌘↑, Move
+    /// Line to Next Cue ⌥⌘↓" (Spec 11 §5, G-48): there always, enabled while the editor has the focus.
+    private func textEditorItems() -> [NSMenuItem] {
+        let up = String(utf16CodeUnits: [unichar(NSUpArrowFunctionKey)], count: 1)
+        let down = String(utf16CodeUnits: [unichar(NSDownArrowFunctionKey)], count: 1)
+        return [
+            .separator(),
+            item(.menuSplitCue, key: "\r", modifiers: [.option], enabled: { [weak self] in self?.view?.workspace.text.document.focusedChunk?.isEditable ?? false }) { [weak self] in
+                self?.view?.workspace.text.document.splitAtCaret()
+            },
+            item(.menuMoveLinePrevious, key: up, modifiers: [.option, .command],
+                 enabled: { [weak self] in self?.view?.workspace.text.document.canMoveLineAtCaret(previous: true) ?? false }) { [weak self] in
+                self?.view?.workspace.text.document.moveLineAtCaret(previous: true)
+            },
+            item(.menuMoveLineNext, key: down, modifiers: [.option, .command],
+                 enabled: { [weak self] in self?.view?.workspace.text.document.canMoveLineAtCaret(previous: false) ?? false }) { [weak self] in
+                self?.view?.workspace.text.document.moveLineAtCaret(previous: false)
+            },
+        ]
+    }
+
     private func standard(_ title: StringKey, _ action: Selector, key: String) -> NSMenuItem {
         NSMenuItem(title: Strings.text(title), action: action, keyEquivalent: key)
     }
@@ -1033,7 +1054,7 @@ final class MenuBar: NSObject, NSMenuDelegate {
             standard(.menuPaste, #selector(NSText.paste(_:)), key: "v"), standard(.menuSelectAll, #selector(NSText.selectAll(_:)), key: "a"),
             .separator(),
             item(.menuFindInList, key: "f", enabled: { [weak self] in self?.model?.grid.context != nil }) { [weak self] in self?.view?.grid.focusSearch() },
-        ]
+        ] + textEditorItems()
         add(.menuEdit, to: edit)
         // The text items find their target along the responder chain: AppKit enables Cut, Copy, Paste and Select All
         // by asking it, and leaves Undo, Redo and Find in List, whose targets are their own, as the app set them.

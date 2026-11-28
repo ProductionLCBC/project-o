@@ -116,7 +116,17 @@ final class EntryTests: XCTestCase {
         func entries(_ menu: String) -> [String] { bar.entries(of: menu).map { $0.title + ($0.keyEquivalent.isEmpty ? "" : " " + $0.keyEquivalent) } }
         XCTAssertEqual(entries("Project O"), ["About Project O", "Settings… ,", "Lock Station l", "Quit Project O q"])
         XCTAssertEqual(entries("File"), ["New Playlist n", "New List n", "Import Media… i", "Take Snapshot", "Restore a Snapshot…"])
-        XCTAssertEqual(entries("Edit"), ["Undo z", "Redo z", "Cut x", "Copy c", "Paste v", "Select All a", "Find in List f"])
+        // Spec 10 §4 — "in edit mode's text editor, Split Cue ⌥Return, Move Line to Previous Cue ⌥⌘↑, Move Line to Next Cue ⌥⌘↓".
+        let up = String(utf16CodeUnits: [unichar(NSUpArrowFunctionKey)], count: 1)
+        let down = String(utf16CodeUnits: [unichar(NSDownArrowFunctionKey)], count: 1)
+        XCTAssertEqual(entries("Edit"), ["Undo z", "Redo z", "Cut x", "Copy c", "Paste v", "Select All a", "Find in List f",
+                                         "Split Cue \r", "Move Line to Previous Cue \(up)", "Move Line to Next Cue \(down)"])
+        for title in ["Split Cue", "Move Line to Previous Cue", "Move Line to Next Cue"] {
+            let item = bar.entries(of: "Edit").first { $0.title == title }
+            XCTAssertEqual(item?.isEnabled, false, "\(title) waits for the text editor's focus")
+        }
+        XCTAssertEqual(bar.entries(of: "Edit").first { $0.title == "Split Cue" }?.keyEquivalentModifierMask, [.option])
+        XCTAssertEqual(bar.entries(of: "Edit").first { $0.title == "Move Line to Next Cue" }?.keyEquivalentModifierMask, [.option, .command])
         // "in edit mode, its six pages, ⌥⌘1 to ⌥⌘6 (Spec 11 §2)".
         XCTAssertEqual(entries("View"), ["Multiviewer m", "Show Archived Playlists", "Compact Grid", "Collapse Panel", "Reset Layout", "Enter Full Screen",
                                          "Cues 1", "Text 2", "Stacks 3", "Channels 4", "Presets 5", "Objects 6"])

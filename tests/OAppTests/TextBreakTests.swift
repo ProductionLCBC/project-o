@@ -171,6 +171,7 @@ final class TextBreakTests: XCTestCase {
         XCTAssertEqual(text.caretText, joined12)
         XCTAssertEqual(heard.carets.last?.1, length("Great is Thy faithfulness,\nO God my Father\n"), "the caret where the texts meet")
         XCTAssertEqual(text.document.chunks.map(\.cue), [c[0], c[2], c[3]])
+        XCTAssertNil(text.removed, "the editor's own merge removed cue 2: no \"Cue removed\" chunk")
         XCTAssertEqual(heard.said.last, "Cue 2 joined to cue 1")
     }
 

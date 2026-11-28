@@ -14,6 +14,13 @@ final class BreakView: NSView {
     /// Where the rule starts across the row: the text column's left edge.
     var ruleX: CGFloat = 0
     var ruleEnd: CGFloat = 0
+    /// Spec 11 §5, "Moving a break" — "a break drags to another line boundary". The first chunk's rule isn't a
+    /// break, and a break with no line to move doesn't drag.
+    var isDraggable = false {
+        didSet { if isDraggable != oldValue { window?.invalidateCursorRects(for: self) } }
+    }
+    /// A press, a drag and a release on the rule, at a point in the window.
+    var onDrag: ((NSEvent.EventType, NSPoint) -> Void)?
 
     override var isFlipped: Bool { true }
 
@@ -41,6 +48,25 @@ final class BreakView: NSView {
         let width: CGFloat = 40
         number.frame = NSRect(x: ruleX - width - 8, y: (bounds.height - 14) / 2, width: width, height: 14)
         dot.frame = NSRect(x: ruleX - width - 22, y: (bounds.height - 7) / 2, width: 7, height: 7)
+    }
+
+    override func resetCursorRects() {
+        if isDraggable { addCursorRect(NSRect(x: ruleX, y: 0, width: max(0, ruleEnd - ruleX), height: bounds.height), cursor: .resizeUpDown) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isDraggable else { return super.mouseDown(with: event) }
+        onDrag?(.leftMouseDown, event.locationInWindow)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isDraggable else { return super.mouseDragged(with: event) }
+        onDrag?(.leftMouseDragged, event.locationInWindow)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isDraggable else { return super.mouseUp(with: event) }
+        onDrag?(.leftMouseUp, event.locationInWindow)
     }
 }
 
@@ -166,6 +192,10 @@ final class TextDocumentView: NSView {
     private(set) var isDocumentSelected = false
     /// Where Copy puts text: the system's pasteboard, or a test's own.
     var pasteboard = NSPasteboard.general
+    /// Spec 11 §5, "Moving a break" — where a dragged break would land, drawn while it is dragged.
+    let dropLine = NSView()
+    /// The break being dragged, by the cue below it, and how many lines it would move.
+    private(set) var dragging: (cue: String, lines: Int)?
 
     override var isFlipped: Bool { true }
 
@@ -174,6 +204,13 @@ final class TextDocumentView: NSView {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
+        dropLine.wantsLayer = true
+        dropLine.layer?.backgroundColor = Palette.selection.cgColor
+        dropLine.layer?.cornerRadius = 1
+        dropLine.isHidden = true
+        addSubview(dropLine)
+        // A split, a merge or a moved line puts the caret in another chunk.
+        model.editing.text.onCaret = { [weak self] cue, location in self?.focus(cue, at: location) }
     }
 
     @available(*, unavailable)
@@ -211,8 +248,13 @@ final class TextDocumentView: NSView {
             }
         }
         order = ids
+        // "The first chunk's rule isn't a break": the others drag while a line can move across them.
+        for (index, id) in ids.enumerated() {
+            rows[id]?.rule.isDraggable = index > 0 && !readOnly && editor.breakRange(above: id) != 0...0
+        }
         setAccessibilityLabel(Strings.text(.textDocumentSpoken, document.channel))
         place(anchor: anchor)
+        addSubview(dropLine, positioned: .above, relativeTo: nil)
     }
 
     private func make(_ id: String) -> ChunkView {
@@ -231,6 +273,11 @@ final class TextDocumentView: NSView {
         text.onCopyDocument = { [weak self] in self?.copyDocument() }
         text.onRefused = { [weak self] in self?.editor.refuseAcrossBreaks() }
         text.onSelectionMoved = { [weak self] in self?.endDocumentSelection() }
+        text.onSplit = { [weak self] _, location in self?.editor.split(at: location) }
+        text.onMerge = { [weak self] _, up in
+            if up { self?.editor.mergeUp() } else { self?.editor.mergeDown() }
+        }
+        view.rule.onDrag = { [weak self] phase, point in self?.dragged(break: id, phase, at: point) }
         view.add.onPress = { [weak self] in self?.editor.addRemovedAsNewCue() }
         view.copy.onPress = { [weak self] in
             guard let self, let text = self.editor.copyRemoved() else { return }
@@ -407,6 +454,100 @@ final class TextDocumentView: NSView {
         view.scrollToVisible(view.bounds)
     }
 
+    // MARK: - Breaks (Spec 11 §5)
+
+    /// The chunk view with the caret, if the editor has the focus.
+    var focusedChunk: ChunkTextView? {
+        guard let text = window?.firstResponder as? ChunkTextView, rows[text.cue]?.text === text else { return nil }
+        return text
+    }
+
+    /// Edit ▸ Split Cue.
+    func splitAtCaret() {
+        guard let text = focusedChunk else { return }
+        editor.split(at: text.selectedRange().location)
+    }
+
+    /// Whether Edit ▸ Move Line to Previous Cue or Next Cue can move a line now.
+    func canMoveLineAtCaret(previous: Bool) -> Bool {
+        guard let text = focusedChunk, text.isEditable else { return false }
+        return editor.canMoveLine(previous: previous, at: text.selectedRange().location)
+    }
+
+    /// Edit ▸ Move Line to Previous Cue (⌥⌘↑) and Move Line to Next Cue (⌥⌘↓) (G-48).
+    func moveLineAtCaret(previous: Bool) {
+        guard let text = focusedChunk, text.isEditable else { return }
+        editor.moveLine(previous: previous, at: text.selectedRange().location)
+    }
+
+    /// The paragraphs of a chunk's own text, as its text view lays them out, in this view's coordinates.
+    private func paragraphs(of cue: String) -> [NSRect] {
+        guard let view = rows[cue], let layout = view.text.layoutManager, let container = view.text.textContainer else { return [] }
+        let own = TextBreaks.lines(editor.ownText(cue))
+        guard !own.isEmpty, view.text.string == editor.ownText(cue) else { return [] }
+        layout.ensureLayout(for: container)
+        var rects: [NSRect] = []
+        var start = 0
+        for line in own {
+            let length = (line as NSString).length
+            var rect: NSRect
+            if length == 0 {
+                rect = view.text.lineRect(at: start)
+            } else {
+                let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: start, length: length), actualCharacterRange: nil)
+                rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
+            }
+            rect.origin.x += view.text.textContainerOrigin.x
+            rect.origin.y += view.text.textContainerOrigin.y
+            rects.append(convert(rect, from: view.text))
+            start += length + 1
+        }
+        return rects
+    }
+
+    /// How far the break above `cue`'s chunk moves for the pointer at `y`:
+    /// past the middle of each of the chunk's paragraphs below the rule, down
+    /// one line; past the middle of each of the upper chunk's above it, up one.
+    func lines(forBreakAbove cue: String, at y: CGFloat) -> Int {
+        guard let index = order.firstIndex(of: cue), index > 0, let lower = rows[cue] else { return 0 }
+        let range = editor.breakRange(above: cue)
+        if y >= lower.frame.minY + ChunkView.ruleHeight / 2 {
+            return min(range.upperBound, paragraphs(of: cue).filter { $0.midY < y }.count)
+        }
+        return -min(-range.lowerBound, paragraphs(of: order[index - 1]).filter { $0.midY > y }.count)
+    }
+
+    /// Where the break above `cue`'s chunk lands after moving `lines`.
+    private func boundary(forBreakAbove cue: String, lines: Int) -> CGFloat? {
+        guard let index = order.firstIndex(of: cue), let lower = rows[cue] else { return nil }
+        if lines == 0 { return lower.frame.minY + ChunkView.ruleHeight / 2 }
+        if lines > 0 {
+            let below = paragraphs(of: cue)
+            return below.indices.contains(lines - 1) ? below[lines - 1].maxY : nil
+        }
+        guard index > 0 else { return nil }
+        let above = paragraphs(of: order[index - 1])
+        return above.indices.contains(above.count + lines) ? above[above.count + lines].minY : nil
+    }
+
+    /// "a break drags to another line boundary": the drop line shows where it would land; letting go moves it.
+    private func dragged(break cue: String, _ phase: NSEvent.EventType, at point: NSPoint) {
+        let y = convert(point, from: nil).y
+        let lines = lines(forBreakAbove: cue, at: y)
+        switch phase {
+        case .leftMouseUp:
+            dropLine.isHidden = true
+            dragging = nil
+            if lines != 0 { editor.moveBreak(above: cue, by: lines) }
+        default:
+            dragging = (cue, lines)
+            if let at = boundary(forBreakAbove: cue, lines: lines), let row = rows[cue] {
+                dropLine.frame = NSRect(x: row.textX - 6, y: at - 1, width: row.textWidth + 12, height: 2)
+                dropLine.isHidden = false
+            }
+        }
+    }
+
     // MARK: - The whole document's selection (Spec 11 §5, "Selection")
 
     private func selectDocument() -> Bool {
@@ -534,7 +675,8 @@ final class TextWorkspaceView: NSView {
         ccliField.show(list?.ccli ?? "", subject: subject)
         trackThrough.state = list?.trackThrough == true ? .on : .off
         let cue = editor.columnCue
-        let number = cue.flatMap { list?.position(of: $0.uuid) }
+        // Numbered as the document shows the cues, a cue the editor just split off included.
+        let number = cue.flatMap { editor.list?.position(of: $0.uuid) }
         Kit.setHeading(cueHeading, number.map { Strings.text(.textColumnCue, $0) } ?? "")
         labelField.show(cue?.label ?? "", subject: cue?.uuid)
         sectionField.show(cue?.section ?? "", subject: cue?.uuid)

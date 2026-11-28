@@ -47,8 +47,12 @@ final class ChunkTextView: NSTextView, TextEditorField {
     var onRefused: (() -> Void)?
     /// Anything that moves the caret or the selection while the whole document is selected ends that selection.
     var onSelectionMoved: (() -> Void)?
+    /// Spec 11 §5, "Split" — ⌥Return, at the caret's place in the text.
+    var onSplit: ((ChunkTextView, Int) -> Void)?
+    /// Spec 11 §5, "Merge" — Backspace at the chunk's start (up) or forward Delete at its end (down).
+    var onMerge: ((ChunkTextView, _ up: Bool) -> Void)?
     /// Whether the last key down was a key held: "A merge takes a fresh press: a held key stops at the chunk's edge."
-    private(set) var lastKeyWasRepeat = false
+    var lastKeyWasRepeat = false
     /// Set while the page puts text or a selection in, which is no typing and no move of the operator's.
     private var isSettingProgrammatically = false
 
@@ -194,6 +198,47 @@ final class ChunkTextView: NSTextView, TextEditorField {
             return
         }
         super.cut(sender)
+    }
+
+    // MARK: - Breaks (Spec 11 §5)
+
+    /// "⌥Return, or Edit ▸ Split Cue, at the caret": AppKit reads ⌥Return as a
+    /// line break a field editor ignores, which here is the split. With a
+    /// selection, at its start (Area 10 reading).
+    override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {
+        if isDocumentSelected() {
+            onRefused?()
+            return
+        }
+        guard isEditable else { return }
+        onSplit?(self, selectedRange().location)
+    }
+
+    /// "Backspace at the start of a chunk joins it to the chunk above ... A
+    /// merge takes a fresh press: a held key stops at the chunk's edge."
+    override func deleteBackward(_ sender: Any?) {
+        if isDocumentSelected() {
+            onRefused?()
+            return
+        }
+        if selectedRange() == NSRange(location: 0, length: 0) {
+            if isEditable, !lastKeyWasRepeat { onMerge?(self, true) }
+            return
+        }
+        super.deleteBackward(sender)
+    }
+
+    /// "and forward Delete at the end of a chunk joins the one below to it".
+    override func deleteForward(_ sender: Any?) {
+        if isDocumentSelected() {
+            onRefused?()
+            return
+        }
+        if selectedRange() == NSRange(location: (string as NSString).length, length: 0) {
+            if isEditable, !lastKeyWasRepeat { onMerge?(self, false) }
+            return
+        }
+        super.deleteForward(sender)
     }
 
     /// "Text can't be dragged".
