@@ -74,6 +74,8 @@ final class PresetPageTests: XCTestCase {
         guard case .object(let builtIn) = sample.value else { return XCTFail("an object") }
         XCTAssertEqual(builtIn["content"]?.objectValue?["fields"]?.objectValue?["title"], .string("Lorem Ipsum"))
         XCTAssertEqual(builtIn["next"]?.arrayValue?.count, 3, "the built-in sample's next verses, for boxes at an offset")
+        // G-41 as corrected 2026-11-28 — "in paragraphs a line or two long".
+        for verse in LayoutSample.builtInVerses { XCTAssertLessThanOrEqual(verse.split(separator: "\n").count, 2, verse) }
         XCTAssertNil(builtIn["cue"])
         sample.fields = ["body": "Praise God"]
         sample.listUuid = "a9f00000-0000-4000-8000-000000000007"

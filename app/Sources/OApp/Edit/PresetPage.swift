@@ -102,10 +102,10 @@ public struct LayoutSample: Equatable, Sendable {
     /// Spec 11 §8 as corrected 2026-11-26 (G-41) — "a built-in sample of placeholder Latin, lorem ipsum, with a title and
     /// a copyright line ... For boxes at an offset, ... the built-in sample's next paragraphs."
     public static let builtInVerses: [String] = [
-        "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit,\nsed do eiusmod tempor incididunt\nut labore et dolore magna aliqua.",
-        "Ut enim ad minim veniam,\nquis nostrud exercitation ullamco\nlaboris nisi ut aliquip\nex ea commodo consequat.",
-        "Duis aute irure dolor in reprehenderit\nin voluptate velit esse cillum dolore\neu fugiat nulla pariatur.",
-        "Excepteur sint occaecat cupidatat non proident,\nsunt in culpa qui officia deserunt\nmollit anim id est laborum.",
+        "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit.",
+        "Sed do eiusmod tempor incididunt\nut labore et dolore magna aliqua.",
+        "Ut enim ad minim veniam,\nquis nostrud exercitation.",
+        "Duis aute irure dolor\nin reprehenderit in voluptate.",
     ]
     public static let builtInTitle = "Lorem Ipsum"
     public static let builtInCopyright = "Sample text"

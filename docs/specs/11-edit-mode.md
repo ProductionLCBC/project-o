@@ -314,7 +314,7 @@ The Presets page edits a preset's layouts and their boxes, and the text styles b
 
 **The sample** (UX spec: real text and a real frame) is chosen under the canvas, and is the app's alone, never saved in the preset. Kind: text, media or empty.
 
-- **Text:** the fields of the cue selected in the Cues page when it writes text, with that cue as the sample's `listUuid` and `cue` (§3); else a built-in sample of placeholder Latin, lorem ipsum, with a title and a copyright line (Adam, 2026-11-26, G-41: sample text that isn't a song). Either can be changed in the sample's own field. For boxes at an offset, the next cues' text, or the built-in sample's next paragraphs.
+- **Text:** the fields of the cue selected in the Cues page when it writes text, with that cue as the sample's `listUuid` and `cue` (§3); else a built-in sample of placeholder Latin, lorem ipsum, in paragraphs a line or two long, with a title and a copyright line (Adam, 2026-11-26, G-41: sample text that isn't a song; 2026-11-28: "only a line or two long"). Either can be changed in the sample's own field. For boxes at an offset, the next cues' text, or the built-in sample's next paragraphs.
 - **Media:** the engine's test pattern at first (§3), or a pool item chosen after it, as its poster or still (§3).
 
 **The preset and Used by,** the inspector's last column:
@@ -535,7 +535,7 @@ What the drawing and those answers left open, the session settled in the drawing
 | G-38 | New transitions | Objects of the three types, made, duplicated, renumbered and deleted as grades are; 1–3 protected as Spec 5 §6 says, their type fixed and their duration, easing and color editable (Adam, 2026-11-25: "we should have the ability to add new ones", "just new objects not new types") | 1–3 alone, as built |
 | G-39 | A grade's hue on its slider | 0° to 360°, 0° no change, the slider filling from its start (Adam, 2026-11-26: "or it should just start at 0 and go up to 360") | −180° to 180°, filled from the middle |
 | G-40 | Putting a slider back | A double-click on a grade's slider puts it back to its identity, on a slot's opacity to 100%, as one edit (Adam, 2026-11-26: "Double clicking a bar should reset its value") | Typing the value |
-| G-41 | The built-in sample text | Placeholder Latin, lorem ipsum, in four paragraphs with a title and a copyright line (Adam, 2026-11-26: "not church coded") | A public-domain hymn's verses |
+| G-41 | The built-in sample text | Placeholder Latin, lorem ipsum, in four paragraphs a line or two long, with a title and a copyright line (Adam, 2026-11-26: "not church coded"; 2026-11-28: "only a line or two long") | A public-domain hymn's verses |
 | G-42 | Picking media | One media chooser with the pool's folder tree, search, kind filter and tiles, for every pool item a page asks for (Adam, 2026-11-26: the dropdown "basically impossible to use") | A menu of file names |
 | G-43 | A grade's stage while a slider moves, and for a video | Still the engine's pictures (A-1): `render` takes a grade's values, drawn while a slider is dragged, and a video's time, so the stage plays with Play, a loop switch and a scrub bar as fast as the engine draws (Adam, 2026-11-26: "Engine draws it") | The app plays the item and applies the grade itself with Spec 4 §7's math: smooth, but not the engine's picture |
 | G-44 | Where the Live toggle sits | Beside Show and Edit, at the top bar's left (Adam, 2026-11-27: "weird it being on the right") | Beside the page picker |
