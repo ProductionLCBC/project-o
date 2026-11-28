@@ -15,7 +15,7 @@ The app's code is targets of the package at the repository root, so `swift build
 | `OAppScripted` | `Sources/OAppScripted/` | The scripted engine on a local socket that the tests drive (Spec 10 §16). It shares no code with `OApp`, and plays back the engine's own answers as `tests/fixtures/api-v1/` records them. |
 | `Project O.app` | `ProjectO.xcodeproj`, `Shell/`, `Info.plist`, `Config/` | `main.swift` (one call), the string catalog, the settings, and the build phase that embeds the engine. |
 
-Tests are in `tests/OAppTests` (behaviour, and the contract suite that holds the app's client to the real API hub) and `tests/OAppViewTests` (the views, laid out offscreen).
+Tests are in `tests/OAppTests` (behavior, and the contract suite that holds the app's client to the real API hub) and `tests/OAppViewTests` (the views, laid out offscreen).
 
 ## Building the app
 

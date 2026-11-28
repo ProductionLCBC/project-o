@@ -178,6 +178,16 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
         let loopLength = max(0, end - inMs)
         var pending: [DecodedFrame] = []   // decoded, waiting for room (display order)
         var atEnd = false
+        // Spec 4 §6 — "Seamless loops need the in-point ready before the out-point arrives." A reader opened at an
+        // in point decodes its run from the keyframe before it and drops those frames (its pre-roll); the queue's
+        // few frames don't outlast a long one. So the pre-roll is timed, at the start and at each pass, and near the
+        // out point the thread decodes that far ahead and more into `pending`, which carries the picture while the
+        // next pass pre-rolls. During a pre-roll it decodes whatever `pending` holds: those frames are dropped.
+        var prerolling = true
+        var prerollStart = MonotonicClock.now().nanoseconds
+        var prerollMs = 0.0
+        var lastMs = inMs                                    // the media time of the latest frame kept, in its pass
+        let frameMs = stream.rate > 0 ? 1000 / stream.rate : 1000.0 / 30
 
         while running.load(ordering: .relaxed) {
             // Hand over what the queue has room for.
@@ -185,7 +195,10 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
                 queue.push(next)
                 pending.removeFirst()
             }
-            if !pending.isEmpty || atEnd {
+            let coverMs = min(1500, max(250, prerollMs * 2 + frameMs))
+            let nearOut = loop && loopLength > 0 && lastMs >= end - coverMs - 250
+            let room = prerolling ? Int.max : (nearOut ? min(30, Int((coverMs / frameMs).rounded(.up))) : 1)
+            if pending.count >= room || atEnd {
                 if atEnd && pending.isEmpty { queue.markEnded() }
                 Thread.sleep(forTimeInterval: 0.002)
                 continue
@@ -195,6 +208,7 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
                 // End of the reader: loop or end.
                 if loop, loopLength > 0 {
                     reader = switchReader(from: reader, standby: &standby, loopLength: loopLength)
+                    (prerolling, prerollStart) = (true, MonotonicClock.now().nanoseconds)
                     continue
                 }
                 atEnd = true
@@ -203,6 +217,7 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
             if sample.presentationMs >= end, end.isFinite {
                 if loop, loopLength > 0 {
                     reader = switchReader(from: reader, standby: &standby, loopLength: loopLength)
+                    (prerolling, prerollStart) = (true, MonotonicClock.now().nanoseconds)
                     continue
                 }
                 atEnd = true
@@ -217,6 +232,11 @@ public final class VideoFileSource: ContentSource, @unchecked Sendable {
             let decoded = autoreleasepool { decode(sample, offsetMs: reader.offsetMs) }
             for frame in decoded where frame.presentationMs - reader.offsetMs >= inMs - 0.001 {
                 pending.append(frame)
+                lastMs = frame.presentationMs - reader.offsetMs
+                if prerolling {
+                    prerolling = false
+                    prerollMs = max(prerollMs, Double(MonotonicClock.now().nanoseconds - prerollStart) / 1e6)
+                }
             }
         }
         reader.session.close()

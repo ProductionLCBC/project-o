@@ -48,7 +48,7 @@ Portable objects live in the library and travel between campuses. Every one has 
 | `frame` | `{x, y, w, h}` normalized 0–1 of the stack's output size | Resolution-independent |
 | `fit` | pixels: `fill`, `fit`, `stretch`, `crop`; text: `{policy: "shrinkToFit" or "maxLines", maxLines, minSize}` |  |
 | `textStyle` | an inline Text Style value, plus `fromStyle` (style number or null) | Copied on apply; `fromStyle` only records provenance for re-apply |
-| `transition` | `{ref: transition number, ms: override or null}` | References the same Transition objects channels use; v1 implements cut and dissolve for boxes, and text-specific types join the Transition type set later |
+| `transition` | `{ref: transition number, ms: override or null}`, or null | Null takes the channel's transition (Spec 3 §4). Set on a text or static box, it overrides the channel's default transition, never one a cue sets (Adam, 2026-11-25); a pixel box always takes the channel's, which its channel pass draws (Spec 4 §7). References the same Transition objects channels use; v1 implements cut and dissolve for boxes, and text-specific types join the Transition type set later |
 | `transitionOnVariableChange` | bool | Default false; a popup box wants true |
 | `fallback` | bool | Renders only if no earlier box at the same offset drew |
 | `offset` | integer, −2 to +3, default 0; written on every box | Draws the slot's channel as it will be after this many cues (Spec 6 §3); v1 draws 0 to +3 |
@@ -101,7 +101,7 @@ Machine-level objects describe one machine's hardware, mappings and local show s
 
 **Numbers.** Each numbered type has its own space of positive integers. Numbers are unique within a type and a library (or a machine, for machine-level types), gaps are allowed, and the default ordering everywhere is by number. A reference from one object to another is the target's number, nothing else.
 
-**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. A machine-level object (a stack, output, audio output or input) is the exception: portable documents name its number so that they meet it at every campus, so only references in the machine root are rewritten, and the edit warns about portable references that now name something else (Spec 5 §4). The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognise an object across renumbering.
+**Renumbering** is a library edit, not a rename. When an object's number changes, every internal reference in the library and the machine root is rewritten in the same save. A machine-level object (a stack, output, audio output or input) is the exception: portable documents name its number so that they meet it at every campus, so only references in the machine root are rewritten, and the edit warns about portable references that now name something else (Spec 5 §4). The editor warns that external references (OSC maps, console cues, Stream Deck profiles) cannot be followed. Moving to a number that is already taken offers a swap, which renumbers both objects and rewrites both sets of references. The `uuid` never changes, which is how caches, logs and version history recognize an object across renumbering.
 
 **Cue addressing.** A cue's number is its 1-based position in its list, recomputed whenever cues are inserted, removed or reordered; it is never stored. A cue's `uuid` is stored and stable, and is what thumbnail caches, undo and the fire log reference. The two user-facing addresses from the UX spec are both resolved at the moment of use: `list 42 cue 3` through list number and position, `item 4 cue 3` through playlist position and cue position.
 
@@ -245,7 +245,7 @@ The media root is a plain folder tree the user organizes freely. The index maps 
 
 **Migrations** are forward-only functions from schema N to N+1, applied in order on load, each one small and tested against a fixture from before the change. A document is migrated in memory and written back at the current schema the next time it is saved, never on load alone, so opening a library with a newer app is not itself a write.
 
-**Unknown fields** are preserved: every object keeps an opaque bag of keys it did not recognise and writes them back unchanged. An older app can round-trip a newer library without losing data it does not understand, which is what makes mixed versions across 20 campuses survivable.
+**Unknown fields** are preserved: every object keeps an opaque bag of keys it did not recognize and writes them back unchanged. An older app can round-trip a newer library without losing data it does not understand, which is what makes mixed versions across 20 campuses survivable.
 
 **Unknown commands** (section 6) are kept verbatim and flagged, never dropped.
 
@@ -295,7 +295,7 @@ The first-run library, as the engine writes it on a fresh install (Spec 10 §13)
       "boxes": [
         { "binding": { "kind": "pixels" }, "fallback": false, "fit": "fit",
           "frame": { "h": 1, "w": 1, "x": 0, "y": 0 }, "grade": null, "offset": 0,
-          "transition": { "ms": null, "ref": 1 } },
+          "transition": null },
         { "binding": { "kind": "field", "name": "body" }, "fallback": true,
           "fit": { "maxLines": 6, "minSize": 24, "policy": "shrinkToFit" },
           "frame": { "h": 0.8, "w": 0.9, "x": 0.05, "y": 0.1 }, "grade": null, "offset": 0,
@@ -304,7 +304,7 @@ The first-run library, as the engine writes it on a fresh install (Spec 10 §13)
                          "outline": { "color": { "a": 1, "b": 0, "g": 0, "r": 0 }, "width": 0 },
                          "shadow": { "blur": 8, "color": { "a": 0.6, "b": 0, "g": 0, "r": 0 }, "x": 0, "y": 2 },
                          "size": { "unit": "pt", "value": 72 }, "verticalAlignment": "center", "weight": 700 },
-          "transition": { "ms": 250, "ref": 2 }, "transitionOnVariableChange": false }
+          "transition": null, "transitionOnVariableChange": false }
       ]
     }
   },

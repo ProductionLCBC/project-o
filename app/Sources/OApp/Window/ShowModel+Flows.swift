@@ -68,12 +68,15 @@ extension ShowModel {
         }
     }
 
-    /// "New List ... sends `edit list create folder "PATH"` for the selected
-    /// folder, or `edit list create` at the top, and browses the new, empty
-    /// list, which its result names (§3)".
+    /// Spec 10 §5 — New List "opens a title field in the tree ... Return
+    /// sends `edit list create folder "PATH" {"title": "TITLE"}`, or `edit
+    /// list create {"title": "TITLE"}` at the top, the field's text or "New
+    /// List" if it was emptied ... The app browses the new, empty list, which
+    /// its result names (§3)".
     @discardableResult
-    public func newList(in folder: String?) -> CannotEdit? {
-        commit(Edits.newList(in: folder), master: true, at: .left) { [weak self] outcome in
+    public func newList(in folder: String?, title: String) -> CannotEdit? {
+        let typed = trimmed(title)
+        return commit(Edits.newList(in: folder, title: typed.isEmpty ? Strings.text(.fieldNewList) : typed), master: true, at: .left) { [weak self] outcome in
             // "`create` keeps its picks where they live: a list's number in its address and its uuid in its body" (Spec 5 §4).
             guard let created = outcome.applied.first?.command.objectValue, let uuid = created["value"]?.objectValue?["uuid"]?.stringValue else { return }
             self?.browse(.list(uuid.lowercased()))
@@ -186,7 +189,7 @@ extension ShowModel {
         let cannotFire: CannotEdit? = store.cannotSend.map(CannotEdit.unavailable) ?? section.refusal.map(CannotEdit.fire) ?? (section.isRemoved ? .removed : nil)
         return Menus.CueContext(fire: cannotFire, edit: section.isRemoved ? .removed : cannotEdit(listUuid: section.listUuid),
                                 hasText: textBody(of: cell, in: section) != nil, trigger: cell.trigger, advanceAfterMs: cell.advanceAfterMs,
-                                isArmed: cell.isArmed, cannotSend: store.cannotSend)
+                                isArmed: cell.isArmed, cannotSend: store.cannotSend, editCue: editing.cannotOpen.map(CannotEdit.unavailable))
     }
 
     private func cueEdit(_ cell: CueCell, _ section: GridSection, _ make: (Cue, Int) -> Sending?) -> CannotEdit? {

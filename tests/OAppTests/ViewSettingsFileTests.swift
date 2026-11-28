@@ -50,6 +50,30 @@ final class ViewSettingsFileTests: XCTestCase {
         settings.lastBrowsedPlaylist = Recorded.sundayNight
         settings.lastBrowsedList = Recorded.list42
         settings.dismissedRestoreRun = "51e2"
+        // Spec 11 §2 — edit mode's place.
+        settings.editPage = .presets
+        settings.editPlaylist = Recorded.sunday
+        settings.editItem = "ae3aafe3-0000-4000-8000-000000000000"
+        settings.editList = Recorded.list7
+        settings.editCue = Recorded.cues42[1]
+        settings.editChannel = 3
+        settings.browserTab = .media
+        settings.mediaView = .list
+        settings.gridZoom = 88
+        settings.foldedRows = [2: true]
+        settings.hiddenRows = [2, 3]
+        settings.gridTracking = true
+        settings.editStack = 2
+        settings.editOutput = 1
+        settings.editSheetChannel = 3
+        settings.editPreset = 3
+        settings.editLayout = 2
+        settings.boxAnchor = .center
+        settings.editObjectKind = .macro
+        settings.editObject = 4
+        settings.editBrowserWidth = 300
+        settings.editMonitorsWidth = 420
+        settings.editInspectorHeight = 320
         return settings
     }
 
@@ -72,7 +96,7 @@ final class ViewSettingsFileTests: XCTestCase {
     /// The repository's JSON on disk: sorted keys, two-space indent, LF.
     func test_theFileIsWrittenAsTheRepositoryWritesJSON() throws {
         let text = try XCTUnwrap(String(data: try ViewSettingsFile.data(changed()), encoding: .utf8))
-        XCTAssertTrue(text.hasPrefix("{\n  \"dismissedRestoreRun\" : \"51e2\",\n  \"lastBrowsedList\""), String(text.prefix(80)))
+        XCTAssertTrue(text.hasPrefix("{\n  \"boxAnchor\" : 4,\n  \"browserTab\" : \"media\",\n  \"dismissedRestoreRun\" : \"51e2\",\n  \"editBrowserWidth\" : 300,\n  \"editChannel\""), String(text.prefix(80)))
         XCTAssertTrue(text.hasSuffix("\n}\n"))
         XCTAssertFalse(text.contains("\r"))
         XCTAssertFalse(text.contains("\\/"), "a folder's path is written plain")

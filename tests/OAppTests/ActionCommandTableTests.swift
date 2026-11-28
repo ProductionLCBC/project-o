@@ -41,9 +41,9 @@ final class ActionCommandTableTests: XCTestCase {
             Row(action: "Play, one channel", sending: Actions.transport(.play, channels: [1]), text: ["channel 1 play"], group: false),
             Row(action: "Pause, several channels", sending: Actions.transport(.pause, channels: [3, 1]), text: ["channel 1 pause", "channel 3 pause"], group: true),
             Row(action: "Stop, one channel", sending: Actions.transport(.stop, channels: [1]), text: ["channel 1 stop"], group: false),
-            Row(action: "end behaviour Loop", sending: Actions.end(.loop, channel: 1), text: ["channel 1 end loop"], group: false),
-            Row(action: "end behaviour Hold", sending: Actions.end(.hold, channel: 1), text: ["channel 1 end hold"], group: false),
-            Row(action: "end behaviour Clear", sending: Actions.end(.clear, channel: 1), text: ["channel 1 end clear"], group: false),
+            Row(action: "end behavior Loop", sending: Actions.end(.loop, channel: 1), text: ["channel 1 end loop"], group: false),
+            Row(action: "end behavior Hold", sending: Actions.end(.hold, channel: 1), text: ["channel 1 end hold"], group: false),
+            Row(action: "end behavior Clear", sending: Actions.end(.clear, channel: 1), text: ["channel 1 end clear"], group: false),
             // §7, Clears (choice U-4)
             Row(action: "Clear All", sending: Actions.clearAll(), text: ["system clearall"], group: false),
             Row(action: "Blackout Stack 2", sending: Actions.blackout(stack: 2), text: ["stack 2 blackout toggle"], group: false),

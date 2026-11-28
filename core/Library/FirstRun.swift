@@ -17,7 +17,7 @@ public enum FirstRun {
 
     /// Spec 10 §13 — "the first-run library: Spec 6 §9's channels 1 to 3,
     /// Presets 1 and 2 and text styles 1 and 2; Spec 1 §2's built-in
-    /// transitions 1 to 3 (cut, dissolve, fade through a colour); audio
+    /// transitions 1 to 3 (cut, dissolve, fade through a color); audio
     /// transitions 1 to 3 (cut, crossfade, fade through silence); all with
     /// the fixture library's values (Spec 1 §10); empty grades and macros; an
     /// empty media index". The folders (`media/` with `imports/` and
@@ -50,7 +50,7 @@ public enum FirstRun {
         UUID(uuidString: text) ?? UUID()
     }
 
-    /// Spec 1 §2 — "Transitions 1–3 ship built in": cut, dissolve, fade through a colour.
+    /// Spec 1 §2 — "Transitions 1–3 ship built in": cut, dissolve, fade through a color.
     static let transitions: [Transition] = [
         Transition(number: 1, type: .cut, ms: 0, label: "Cut", uuid: fixed("7a110000-0000-4000-8000-000000000001"), easing: .linear, builtIn: true),
         Transition(number: 2, type: .dissolve, ms: 500, label: "Dissolve", uuid: fixed("7a110000-0000-4000-8000-000000000002"), easing: .easeInOut, builtIn: true),
@@ -185,7 +185,7 @@ public enum FirstRun {
     /// Spec 10 §13 — "Stack 1, Main (channels 1 and 2), output 1's default;
     /// stack 2, Confidence (channels 2 and 3), on no output; then one stack
     /// per further output with channels 1 and 2, output N's being stack N +
-    /// 1, labelled like its output (Spec 6 §9)".
+    /// 1, labeled like its output (Spec 6 §9)".
     public static func stacks(for outputs: [Output], uuid: () -> UUID) -> [Stack] {
         var stacks = [
             Stack(number: 1, slots: [StackSlot(channel: 1), StackSlot(channel: 2)], label: "Main", uuid: uuid()),

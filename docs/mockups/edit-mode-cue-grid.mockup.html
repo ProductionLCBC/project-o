@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Edit mode · Cue grid (Spec 11 concept)</title>
+<style>
+  :root {
+    --gut: #060708;
+    --window: #0E0F12; --panel: #15171B; --raised: #1E2127; --raised-high: #282C34; --well: #08090B;
+    --hairline: rgba(255,255,255,0.07); --hairline-strong: rgba(255,255,255,0.13);
+    --text: #ECEEF2; --dim: #9AA0AB; --faint: #626975;
+    --live: #F2453D; --live-text: #FF8D87; --live-tint: rgba(242,69,61,0.14); --live-edge: rgba(242,69,61,0.5);
+    --outputting: #30C36B; --warn-text: #F3C06B;
+    --selection: #4C8DFF; --selection-tint: rgba(76,141,255,0.16); --selection-wash: rgba(76,141,255,0.06);
+    --s-verse: #2CB5A9; --s-chorus: #8B6CF6; --s-bridge: #D45DB5; --s-intro: #5B74E8;
+    --r-sm: 4px; --r: 6px;
+    --ctl: 28px; --ctl-sm: 24px;
+    --fs-xs: 11px; --fs: 12px; --fs-lg: 14px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #000; font: var(--fs)/1.35 -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif; color: var(--text); }
+  button { font: inherit; }
+  [hidden] { display: none !important; }
+  .window { min-width: 1180px; height: 100vh; min-height: 820px; background: var(--gut); display: grid; grid-template-rows: 44px minmax(0, 1fr); overflow: hidden; }
+  .spacer { flex: 1; }
+  .dim { color: var(--dim); } .faint { color: var(--faint); }
+  .num { color: var(--faint); font-variant-numeric: tabular-nums; }
+
+  /* Placeholder media */
+  .m-blue  { background: linear-gradient(135deg, #25364a, #0c1118 70%); }
+  .m-amber { background: linear-gradient(135deg, #5b3a1a, #1a1206 75%); }
+  .m-green { background: linear-gradient(135deg, #1f4a3a, #08130f 75%); }
+  .m-black { background: #000; }
+
+  .sect { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+
+  /* Buttons */
+  .btn { height: var(--ctl); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; flex: none;
+         font-weight: 500; color: var(--text); background: var(--raised); border: 1px solid var(--hairline); border-radius: var(--r); white-space: nowrap; cursor: pointer; }
+  .btn:disabled { color: var(--faint); cursor: default; }
+  .btn.sm { height: var(--ctl-sm); padding: 0 10px; }
+  .btn.icon { width: var(--ctl); padding: 0; } .btn.sm.icon { width: var(--ctl-sm); }
+  .btn.strong { background: var(--raised-high); font-weight: 600; }
+  .btn.danger { background: var(--live-tint); border-color: var(--live-edge); color: var(--live-text); font-weight: 600; }
+
+  /* Segmented control */
+  .seg { height: var(--ctl); display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border-radius: var(--r); flex: none; }
+  .seg.sm { height: var(--ctl-sm); }
+  .seg > span { display: grid; place-items: center; padding: 0 12px; border-radius: var(--r-sm); color: var(--dim); cursor: pointer; }
+  .seg > span.on { background: var(--raised-high); color: var(--text); font-weight: 600; }
+  .seg > span.disabled { color: var(--faint); opacity: .55; cursor: default; }
+  .seg.fill { display: flex; width: 100%; } .seg.fill > span { flex: 1; padding: 0; }
+
+  /* Inputs */
+  .input { height: var(--ctl); display: flex; align-items: center; gap: 6px; padding: 0 8px; min-width: 0;
+           background: var(--well); border: 1px solid var(--hairline); border-radius: var(--r); white-space: nowrap; overflow: hidden; }
+  .input.sm { height: var(--ctl-sm); }
+  .input .hint { color: var(--faint); }
+  .input .caret { margin-left: auto; padding-left: 4px; color: var(--faint); font-size: 10px; }
+  .input.area { height: auto; min-height: 40px; align-items: flex-start; padding: 6px 8px; white-space: normal; color: var(--dim); }
+  .input.short { width: 60px; flex: none; margin-left: auto; justify-content: flex-end; }
+
+  /* Pills */
+  .pill { height: 20px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; flex: none; border-radius: 999px;
+          background: var(--raised); color: var(--dim); font-size: var(--fs-xs); white-space: nowrap; }
+  .pill.set { color: var(--text); }
+  .pill.add { background: transparent; border: 1px dashed var(--hairline-strong); color: var(--faint); }
+  .pill.live { background: var(--live-tint); color: var(--live-text); }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--live); flex: none; }
+  .dot.ok { background: var(--outputting); }
+
+  /* Top bar */
+  .topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--hairline); }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .tb-right { justify-self: end; }
+  .crumb { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .clock { color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+  /* Panels: one chrome for every region */
+  .body { display: grid; grid-template-columns: 260px minmax(0, 1fr) clamp(300px, 25vw, 380px); grid-template-rows: minmax(0, 1fr) 250px; gap: 4px; padding: 4px; min-height: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--hairline); border-radius: var(--r); display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+  .phead { height: 36px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--hairline); }
+  .ptitle { font-weight: 600; white-space: nowrap; }
+  .ptitle .of { color: var(--faint); font-weight: 400; }
+  .pbody { flex: 1; min-height: 0; overflow: auto; }
+  .pad { padding: 12px; }
+
+  /* Browser */
+  .browser { grid-row: 1 / 3; }
+  .rows { padding: 8px 0; }
+  .rows > .sect { padding: 4px 12px 6px; }
+  .row { height: 26px; padding: 0 12px; display: flex; gap: 8px; align-items: center; color: var(--dim); cursor: default; }
+  .row .num { width: 22px; text-align: right; }
+  .row.group { color: var(--text); font-weight: 600; }
+  .row.group ~ .row.group { margin-top: 8px; }
+  .row.sel { background: var(--selection-tint); color: var(--text); box-shadow: inset 2px 0 0 var(--selection); }
+  .mtools { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 10px; border-bottom: 1px solid var(--hairline); }
+  .mtools .line { display: flex; align-items: center; gap: 8px; }
+  #mitems { padding: 12px; }
+  #mitems.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 8px; }
+  #mitems.grid2 .mi .mt { width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); border: 1px solid var(--hairline); }
+  #mitems.grid2 .mi .mn { margin-top: 5px; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mitems.grid2 .mi .md { font-size: var(--fs-xs); color: var(--faint); }
+  #mitems.list { display: flex; flex-direction: column; gap: 2px; padding: 8px 6px; }
+  #mitems.list .mi { display: grid; grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 5px 6px; border-radius: var(--r-sm); }
+  #mitems.list .mi:hover { background: var(--raised); }
+  #mitems.list .mi .mt { grid-row: 1 / 3; width: 56px; aspect-ratio: 16/9; border-radius: 3px; border: 1px solid var(--hairline); }
+  #mitems.list .mi .mn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: end; }
+  #mitems.list .mi .md { font-size: var(--fs-xs); color: var(--faint); align-self: start; }
+  .mi { cursor: grab; }
+
+  /* Cue grid */
+  .gridwrap { flex: 1; min-height: 0; overflow: auto; }
+  .grid { --col: 140px; --row: calc((var(--col) - 12px) * 0.5625 + 12px);
+          position: relative; display: grid; width: max-content;
+          grid-template-columns: 136px repeat(var(--n), var(--col)) 60px;
+          grid-template-rows: 26px 66px repeat(3, var(--row)) 40px; }
+  .g { position: relative; min-width: 0; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .gl { position: sticky; left: 0; z-index: 3; background: var(--panel); display: flex; align-items: center; gap: 8px; padding: 0 12px;
+        border-right: 1px solid var(--hairline-strong); }
+  .gl .num { width: 12px; text-align: right; }
+  .gsec { border-top: 3px solid var(--sc); border-right: 1px solid var(--hairline); padding: 4px 8px 0; font-size: var(--fs-xs); color: var(--dim); white-space: nowrap; overflow: hidden; }
+  .gh { padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+  .gh .top { display: flex; align-items: center; gap: 5px; font-size: var(--fs-xs); }
+  .gh .trig { margin-left: auto; color: var(--faint); }
+  .gh .lab { font-size: var(--fs-xs); color: var(--dim); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gh:hover { background: var(--raised); }
+  .gh.live { box-shadow: inset 0 -2px 0 var(--live); }
+  .gh.sel { background: var(--selection-tint); box-shadow: inset 0 -2px 0 var(--selection); }
+  .gh.sel .lab { color: var(--text); }
+  .gc { padding: 6px; cursor: pointer; }
+  .gc.colsel { background: var(--selection-wash); }
+  .gc.sel { box-shadow: inset 0 0 0 2px var(--selection); }
+  .gc.drop { box-shadow: inset 0 0 0 2px var(--selection); background: var(--selection-tint); }
+  .th { position: relative; z-index: 1; width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hairline); }
+  .th .nm { position: absolute; left: 6px; bottom: 4px; right: 6px; font-size: var(--fs-xs); color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th.txt { display: grid; place-items: center; padding: 6px 8px; text-align: center; }
+  .th.txt span { font-size: var(--fs-xs); font-weight: 600; line-height: 1.25; color: #fff; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .th .fx { position: absolute; top: 4px; right: 4px; height: 16px; padding: 0 5px; border-radius: 999px; background: rgba(0,0,0,.65); font-size: var(--fs-xs); line-height: 16px; color: var(--text); }
+  .bar { position: absolute; top: 50%; height: 3px; margin-top: -1.5px; left: 0; right: -1px; background: rgba(255,255,255,.17); }
+  .bar.tail { left: auto; width: 8px; }
+  .bar.half { right: 50%; }
+  .cap { position: absolute; left: 50%; top: 50%; width: 2px; height: 16px; margin: -8px 0 0 -1px; background: var(--dim); border-radius: 1px; }
+  .clr { position: absolute; left: calc(50% + 8px); top: 50%; transform: translateY(-50%); font-size: var(--fs-xs); color: var(--faint); }
+  .fold { width: 18px; height: 18px; margin-left: -6px; padding: 0; flex: none; display: grid; place-items: center; border: none; border-radius: var(--r-sm);
+          background: none; color: var(--faint); font-size: 10px; cursor: pointer; }
+  .fold:hover { background: var(--raised); color: var(--text); }
+  .gl .cn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gl.folded { color: var(--dim); }
+  .gc.folded { padding: 0; }
+  .strip { position: absolute; z-index: 1; left: 5px; right: 5px; top: 50%; height: 12px; margin-top: -6px; border-radius: 3px; border: 1px solid var(--hairline); }
+  .strip.txt { background: #000; border-color: rgba(255,255,255,.3); }
+  .gc.folded .cap { height: 12px; margin-top: -6px; }
+  .gadd { display: grid; place-items: center; }
+  .gadd span { width: 36px; height: 36px; display: grid; place-items: center; border: 1px dashed var(--hairline-strong); border-radius: var(--r); color: var(--faint); font-size: 18px; }
+  .gnone { border-right: none; }
+  .zoom { display: flex; align-items: center; gap: 6px; flex: none; }
+  .phead .meta { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .zoom input { width: 90px; accent-color: var(--selection); }
+
+  /* Monitors */
+  .monitors { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .monitors .grow { flex: 1; }
+  .mon { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); border: 1px solid var(--hairline); display: grid; place-items: center; text-align: center; }
+  .mon p { margin: 0; padding: 0 10%; font-size: 15px; font-weight: 600; line-height: 1.3; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+  .mon .lt { position: absolute; left: 5%; bottom: 8%; padding: 3px 8px; background: rgba(0,0,0,.6); font-size: var(--fs-xs); font-weight: 600; }
+  .mon.prev { outline: 2px solid var(--selection); outline-offset: 1px; }
+  .mon.prog { outline: 2px solid var(--live); outline-offset: 1px; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .ctlrow { display: flex; gap: 8px; align-items: center; }
+  .ctlrow .input { flex: 1; }
+
+  /* Inspector */
+  .inspector { grid-column: 2 / 4; }
+  .icols { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .icol { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; }
+  .icol + .icol { border-left: 1px solid var(--hairline); }
+  .icol > .sect { margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .field { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: center; min-height: var(--ctl); }
+  .field > label { color: var(--dim); }
+  .field.top { align-items: start; } .field.top > label { padding-top: 6px; }
+  .field .val { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; }
+  .field .val .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .mini { width: 34px; height: 20px; border-radius: 3px; flex: none; border: 1px solid var(--hairline); display: grid; place-items: center; font-size: 10px; color: var(--dim); font-weight: 600; }
+  .radio { height: var(--ctl); display: flex; align-items: center; gap: 8px; color: var(--dim); white-space: nowrap; }
+  .radio i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--faint); flex: none; }
+  .radio.on { color: var(--text); }
+  .radio.on i { border-color: var(--selection); background: radial-gradient(circle, var(--selection) 0 2.5px, transparent 3px); }
+  .radio.disabled { opacity: .45; }
+  .radio.plain { padding-left: 20px; }
+  .cmd { min-height: var(--ctl); display: flex; align-items: center; gap: 8px; padding: 0 4px 0 10px; background: var(--raised); border-radius: var(--r); flex: none; }
+  .cmd.two { padding-top: 6px; padding-bottom: 6px; }
+  .cmd .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmd .t small { display: block; margin-top: 1px; font-size: var(--fs-xs); color: var(--warn-text); overflow: hidden; text-overflow: ellipsis; }
+  .cmd .more { width: 22px; text-align: center; color: var(--faint); }
+  .addrow { height: var(--ctl); flex: none; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--hairline-strong); border-radius: var(--r); color: var(--faint); }
+  .toggle { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 4px; color: var(--dim); }
+  .switch { position: relative; width: 30px; height: 18px; flex: none; border-radius: 999px; background: var(--raised-high); }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--dim); }
+</style>
+</head>
+<body>
+<div class="window" id="edit-mode-window">
+
+  <!-- Top bar: mode, context, edit pages, status -->
+  <header class="topbar" id="top-bar">
+    <div class="tb-left">
+      <div class="seg" id="mode"><span>Show</span><span class="on">Edit</span></div>
+      <div class="crumb"><span class="dim">Sunday 9:00</span><span class="faint">›</span><span>Amazing Grace</span></div>
+    </div>
+    <div class="seg" id="page-picker">
+      <span class="on">Cues</span><span class="disabled" title="Area 10">Text</span><span>Stacks</span><span>Channels</span><span>Presets</span><span>Objects</span>
+    </div>
+    <div class="tb-right">
+      <span class="clock">10:42:07</span>
+      <span class="pill">Saved</span>
+      <span class="pill"><span class="dot ok"></span>Engine</span>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- Browser: Playlists, Library, Media -->
+    <section class="panel browser" id="browser">
+      <div class="phead">
+        <div class="seg sm fill" id="browser-tabs">
+          <span data-tab="playlists">Playlists</span><span data-tab="library">Library</span><span data-tab="media" class="on">Media</span>
+        </div>
+      </div>
+      <div class="pbody rows" id="tab-playlists" hidden>
+        <div class="sect">Playlists</div>
+        <div class="row group">Sunday 9:00</div>
+        <div class="row"><span class="num">1</span>Welcome</div>
+        <div class="row sel"><span class="num">2</span>Amazing Grace<span class="spacer"></span><span class="dot"></span></div>
+        <div class="row"><span class="num">3</span>Be Thou My Vision</div>
+        <div class="row"><span class="num">4</span>Message</div>
+        <div class="row"><span class="num">5</span>Holy, Holy, Holy</div>
+        <div class="row group">Sunday 11:00</div>
+        <div class="row"><span class="num">1</span>Welcome</div>
+        <div class="row"><span class="num">2</span>Amazing Grace</div>
+      </div>
+      <div class="pbody rows" id="tab-library" hidden>
+        <div class="sect">Library</div>
+        <div class="row group">Hymns</div>
+        <div class="row"><span class="num">42</span>Amazing Grace</div>
+        <div class="row"><span class="num">43</span>Be Thou My Vision</div>
+        <div class="row"><span class="num">57</span>Holy, Holy, Holy</div>
+        <div class="row group">Service</div>
+        <div class="row"><span class="num">7</span>Welcome</div>
+        <div class="row"><span class="num">8</span>Message</div>
+      </div>
+      <div class="pbody" id="tab-media">
+        <div class="mtools">
+          <div class="input"><span class="hint">Search media</span></div>
+          <div class="line">
+            <div class="input sm">All<span class="caret">▾</span></div>
+            <span class="faint">48 items</span>
+            <span class="spacer"></span>
+            <div class="seg sm" id="mview"><span data-view="grid2" class="on">Grid</span><span data-view="list">List</span></div>
+          </div>
+        </div>
+        <div id="mitems" class="grid2"></div>
+      </div>
+    </section>
+
+    <!-- Cue grid: cues across, channels down -->
+    <section class="panel" id="cue-grid-panel">
+      <div class="phead">
+        <span class="ptitle">Amazing Grace</span><span class="dim meta">14 cues · version 17</span>
+        <span class="spacer"></span>
+        <label class="zoom" title="Thumbnail size"><input type="range" id="zoom" min="104" max="200" step="4" value="140"></label>
+        <button class="btn sm" disabled title="Area 10">Open in Text Editor</button>
+        <button class="btn sm">Renumber…</button>
+      </div>
+      <div class="gridwrap" id="gridwrap"><div class="grid" id="grid"></div></div>
+    </section>
+
+    <!-- Monitors: preview of the selected cue, program, show controls -->
+    <div class="monitors">
+      <section class="panel" id="preview-panel">
+        <div class="phead">
+          <span class="ptitle">Preview</span><span class="spacer"></span>
+          <div class="input sm">Stack 1 · Main<span class="caret">▾</span></div>
+        </div>
+        <div class="pad"><div class="mon prev" id="pv"></div></div>
+      </section>
+      <section class="panel grow" id="program-panel">
+        <div class="phead">
+          <span class="ptitle">Program</span><span class="spacer"></span>
+          <span class="pill live"><span class="dot"></span>On air · Out 1, 2</span>
+        </div>
+        <div class="pad col" style="flex:1">
+          <div class="mon prog" id="pg"></div>
+          <div class="ctlrow">
+            <div class="input"><span class="hint">Go to cue…</span></div>
+            <button class="btn strong">Next</button>
+            <button class="btn danger">Clear All</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Inspector: the selected cue and channel -->
+    <section class="panel inspector" id="inspector">
+      <div class="phead" id="insp-head"></div>
+      <div class="icols" id="insp"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+// Media library: key, name, look, kind
+const LIBRARY = [
+  ['haze', 'Amber Haze', 'm-amber', 'Loop · 0:30'], ['clouds', 'Slow Clouds', 'm-blue', 'Loop · 1:00'],
+  ['forest', 'Forest Light', 'm-green', 'Loop · 0:45'], ['gold', 'Grain Gold', 'm-amber', 'Loop · 0:20'],
+  ['night', 'Night Sky', 'm-blue', 'Still'], ['welcome', 'Welcome Loop', 'm-green', 'Loop · 2:00'],
+  ['countdown', 'Countdown 5 min', 'm-blue', 'Video · 5:00'], ['wash', 'Stage Wash', 'm-amber', 'Still'],
+  ['water', 'Deep Water', 'm-blue', 'Loop · 0:40'], ['moss', 'Moss', 'm-green', 'Still'],
+  ['ember', 'Ember', 'm-amber', 'Loop · 0:25'], ['fog', 'Fog Bank', 'm-blue', 'Loop · 1:10'],
+];
+const MEDIA = Object.fromEntries(LIBRARY.map(([k, name, look]) => [k, [name, look]]));
+const SECTIONS = {
+  intro: ['Intro',   'var(--s-intro)'],
+  v1:    ['Verse 1', 'var(--s-verse)'],
+  v2:    ['Verse 2', 'var(--s-verse)'],
+  v3:    ['Verse 3', 'var(--s-verse)'],
+  outro: ['Outro',   'var(--s-intro)'],
+};
+const CHANNELS = [
+  { name: 'Background',  props: ['transition', 'grade', 'gain'] },
+  { name: 'Foreground',  props: ['transition', 'grade'] },
+  { name: 'Clock',       props: ['grade'], folded: true },
+  { name: 'Lower third', props: ['transition', 'grade'], lower: true, folded: true },
+  { name: 'Overlay',     props: ['transition', 'grade', 'gain'], folded: true },
+];
+// Cell values: {m} writes media, {t} writes text (either can carry fx), 'C' clears, null holds.
+// A cue's label is its own field; the text lives in the channel.
+const cue = (label, sec, trig, cells, extra = {}) =>
+  ({ label, sec, trig, cells: CHANNELS.map((_, r) => cells[r] ?? null), ...extra });
+const T = t => ({ t });
+const cues = [
+  cue('Intro', 'intro', 'Go', [{ m: 'haze' }, null, 'C', T('Amazing Grace · John Newton')], { cmds: [['Run macro 2 · House to half']] }),
+  cue('Verse 1', 'v1', 'Go', [null, T('Amazing grace, how sweet the sound'), null, 'C']),
+  cue('Band drop', 'v1', 'Go', [null, { t: 'That saved a wretch like me', fx: 'Dissolve 0.5 s' }, null], {
+    note: 'Band drops out on the last line',
+    cmds: [['Start timer 1'], ['Run macro 4 · Lights to verse', 'Referenced in 2 other places']] }),
+  cue('I once was lost', 'v1', 'Go', [null, T('I once was lost, but now am found'), null]),
+  cue('Was blind', 'v1', '8 s', [null, T('Was blind, but now I see'), null]),
+  cue('Verse 2 · clouds', 'v2', 'Go', [{ m: 'clouds', fx: 'Dissolve 2 s' }, T("'Twas grace that taught my heart to fear"), null]),
+  cue('And grace my fears', 'v2', 'Go', [null, T('And grace my fears relieved'), null]),
+  cue('How precious', 'v2', 'Go', [null, T('How precious did that grace appear'), null]),
+  cue('First believed', 'v2', 'Go', [null, T('The hour I first believed'), null]),
+  cue('Verse 3 · forest', 'v3', 'Go', [{ m: 'forest', fx: 'Dissolve 2 s' }, T("When we've been there ten thousand years"), null]),
+  cue('Bright shining', 'v3', 'Go', [null, T('Bright shining as the sun'), null]),
+  cue('No less days', 'v3', 'Go', [null, T("We've no less days to sing God's praise"), null]),
+  cue('Last line', 'v3', 'Go', [null, T("Than when we'd first begun"), null]),
+  cue('Outro', 'outro', 'Go', [null, 'C', null]),
+];
+const LIVE = 1;
+const sel = { c: 2, r: 1 };
+
+const isText  = v => !!v && typeof v === 'object' && 't' in v;
+const isMedia = v => !!v && typeof v === 'object' && 'm' in v;
+const isWrite = v => isText(v) || isMedia(v);
+function active(ci, r) {
+  for (let i = ci; i >= 0; i--) {
+    const v = cues[i].cells[r];
+    if (v === 'C') return null;
+    if (v !== null) return { ci: i, v };
+  }
+  return null;
+}
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const look = v => isMedia(v) ? MEDIA[v.m][1] : 'm-black';
+const miniFor = v => isMedia(v) ? `<span class="mini ${look(v)}"></span>` : '<span class="mini m-black">Aa</span>';
+
+function renderGrid() {
+  const g = document.getElementById('grid');
+  g.style.setProperty('--n', cues.length);
+  g.style.gridTemplateRows = ['26px', '66px', ...CHANNELS.map(ch => ch.folded ? '28px' : 'var(--row)'), '40px'].join(' ');
+  const last = cues.length + 2;
+  let h = '';
+  // Section band
+  h += `<div class="g gl" style="grid-column:1;grid-row:1"></div>`;
+  for (let i = 0; i < cues.length;) {
+    let j = i; while (j < cues.length && cues[j].sec === cues[i].sec) j++;
+    const [name, color] = SECTIONS[cues[i].sec];
+    h += `<div class="gsec" style="grid-column:${i + 2} / span ${j - i};grid-row:1;--sc:${color}">${name}</div>`;
+    i = j;
+  }
+  // Cue headers
+  h += `<div class="g gl" style="grid-column:1;grid-row:2"><span class="sect">Channel</span></div>`;
+  cues.forEach((c, i) => {
+    const cls = ['g', 'gh', i === sel.c ? 'sel' : '', i === LIVE ? 'live' : ''].join(' ');
+    h += `<div class="${cls}" data-c="${i}" style="grid-column:${i + 2};grid-row:2">
+      <div class="top"><span class="num">${i + 1}</span>${i === LIVE ? '<span class="dot"></span>' : ''}<span class="trig">${c.trig}</span></div>
+      <div class="lab">${esc(c.label)}</div></div>`;
+  });
+  h += `<div class="g gh gadd gnone" style="grid-column:${last};grid-row:2"><span>+</span></div>`;
+  // Channel rows
+  CHANNELS.forEach((ch, r) => {
+    h += `<div class="g gl${ch.folded ? ' folded' : ''}" style="grid-column:1;grid-row:${r + 3}">
+      <button class="fold" data-fold="${r}" title="${ch.folded ? 'Expand' : 'Collapse'}">${ch.folded ? '▸' : '▾'}</button>
+      <span class="num">${r + 1}</span><span class="cn">${ch.name}</span></div>`;
+    cues.forEach((c, i) => {
+      const v = c.cells[r];
+      const cls = ['g', 'gc', ch.folded ? 'folded' : '', i === sel.c ? 'colsel' : '', i === sel.c && r === sel.r ? 'sel' : ''].join(' ');
+      const next = cues[i + 1] ? cues[i + 1].cells[r] : 'C';
+      let inner = '';
+      if (isWrite(v)) {
+        if (next === null) inner += '<div class="bar tail"></div>';
+        const fx = v.fx ? `<span class="fx">${v.fx.replace('Dissolve ', '')}</span>` : '';
+        if (ch.folded) inner += `<div class="strip ${isText(v) ? 'txt' : look(v)}"></div>`;
+        else inner += isMedia(v)
+          ? `<div class="th ${look(v)}">${fx}<span class="nm">${MEDIA[v.m][0]}</span></div>`
+          : `<div class="th txt m-black">${fx}<span>${esc(v.t)}</span></div>`;
+      } else if (v === 'C') {
+        if (i > 0 && active(i - 1, r)) inner += '<div class="bar half"></div>';
+        inner += ch.folded ? '<div class="cap"></div>' : '<div class="cap"></div><span class="clr">Clear</span>';
+      } else if (active(i, r)) {
+        inner += '<div class="bar"></div>';
+      }
+      h += `<div class="${cls}" data-c="${i}" data-r="${r}" style="grid-column:${i + 2};grid-row:${r + 3}">${inner}</div>`;
+    });
+    h += `<div class="g gnone" style="grid-column:${last};grid-row:${r + 3}"></div>`;
+  });
+  h += `<div class="g gl" style="grid-column:1;grid-row:${CHANNELS.length + 3};border-bottom:none"><span class="pill add">+ Channel</span></div>`;
+  g.innerHTML = h;
+}
+
+// Stack 1 draws channels in order; the top media sets the picture, the top text sits over it
+function composite(ci) {
+  let cls = 'm-black', txt = '', lower = '';
+  CHANNELS.forEach((ch, r) => {
+    const a = active(ci, r);
+    if (!a) return;
+    if (isMedia(a.v)) cls = look(a.v);
+    else if (isText(a.v)) { if (ch.lower) lower = esc(a.v.t); else txt = esc(a.v.t); }
+  });
+  return { cls, txt, lower };
+}
+function paintMonitor(id, ci, extra) {
+  const { cls, txt, lower } = composite(ci);
+  const el = document.getElementById(id);
+  el.className = `mon ${extra} ${cls}`;
+  el.innerHTML = (txt ? `<p>${txt}</p>` : '') + (lower ? `<span class="lt">${lower}</span>` : '');
+}
+
+function chip(prop, v) {
+  if (prop === 'transition' && v && v.fx) return `<span class="pill set">${v.fx}</span>`;
+  return `<span class="pill add">+ ${prop}</span>`;
+}
+
+function renderInspector() {
+  const c = cues[sel.c], ch = CHANNELS[sel.r], v = c.cells[sel.r];
+  const [secName, secColor] = SECTIONS[c.sec];
+  document.getElementById('insp-head').innerHTML =
+    `<span class="ptitle">Cue ${sel.c + 1} <span class="of">of ${cues.length}</span></span><span class="spacer"></span>
+     <button class="btn sm icon" data-nav="-1">‹</button><button class="btn sm icon" data-nav="1">›</button>
+     <button class="btn sm danger">Fire</button>`;
+
+  const timed = c.trig !== 'Go';
+  const cmds = (c.cmds || []).map(([t, warn]) => warn
+    ? `<div class="cmd two"><div class="t">${t}<small>${warn}</small></div><span class="more">⋯</span></div>`
+    : `<div class="cmd"><span class="t">${t}</span><span class="more">⋯</span></div>`).join('');
+
+  const state = isWrite(v) ? 'Write' : v === 'C' ? 'Clear' : 'Hold';
+  let content = '<span class="faint">—</span>';
+  if (isMedia(v)) content = `${miniFor(v)}<span class="tx">${MEDIA[v.m][0]}</span>`;
+  else if (isText(v)) content = `${miniFor(v)}<span class="tx">${esc(v.t)}</span>`;
+  else if (v === null) {
+    const a = active(sel.c, sel.r);
+    if (a) content = `${miniFor(a.v)}<span class="tx dim">From cue ${a.ci + 1}</span>`;
+  }
+  const props = ch.props.map(p =>
+    `<div class="field"><label>${p[0].toUpperCase() + p.slice(1)}</label><div class="val">${chip(p, v)}</div></div>`).join('');
+
+  document.getElementById('insp').innerHTML = `
+    <div class="icol">
+      <div class="sect">Cue</div>
+      <div class="field"><label>Label</label><div class="input">${esc(c.label)}</div></div>
+      <div class="field"><label>Section</label><div class="input"><span class="swatch" style="background:${secColor}"></span>${secName}<span class="caret">▾</span></div></div>
+      <div class="field top"><label>Note</label><div class="input area">${c.note ? esc(c.note) : '<span class="hint">Add a note</span>'}</div></div>
+    </div>
+    <div class="icol">
+      <div class="sect">Trigger</div>
+      <div class="radio ${timed ? '' : 'on'}"><i></i>Go</div>
+      <div class="radio ${timed ? 'on' : ''}"><i></i>Time after previous<div class="input short">${timed ? c.trig : '<span class="hint">s</span>'}</div></div>
+      <div class="radio disabled" title="v2"><i></i>Timecode</div>
+      <div class="radio plain">Advance after<div class="input short"><span class="hint">None</span></div></div>
+    </div>
+    <div class="icol">
+      <div class="sect">Commands</div>
+      ${cmds}
+      <div class="addrow">+ Add command</div>
+      <div class="toggle"><span class="spacer">Commands as text</span><span class="switch"></span></div>
+    </div>
+    <div class="icol">
+      <div class="sect">Channel ${sel.r + 1} · ${ch.name}</div>
+      <div class="seg fill" id="wch">${['Write', 'Clear', 'Hold'].map(s => `<span data-state="${s}" class="${s === state ? 'on' : ''}">${s}</span>`).join('')}</div>
+      <div class="field"><label>Content</label><div class="val">${content}</div></div>
+      ${props}
+    </div>`;
+}
+
+function keepInView() {
+  const wrap = document.getElementById('gridwrap');
+  const el = document.querySelector('.gh.sel');
+  if (!el) return;
+  const left = el.offsetLeft - 136, right = el.offsetLeft + el.offsetWidth;
+  if (left < wrap.scrollLeft) wrap.scrollLeft = left;
+  else if (right > wrap.scrollLeft + wrap.clientWidth) wrap.scrollLeft = right - wrap.clientWidth;
+}
+
+function render() {
+  renderGrid();
+  renderInspector();
+  paintMonitor('pv', sel.c, 'prev');
+  paintMonitor('pg', LIVE, 'prog');
+  keepInView();
+}
+
+function select(c, r) {
+  sel.c = Math.max(0, Math.min(cues.length - 1, c));
+  if (r !== undefined) sel.r = Math.max(0, Math.min(CHANNELS.length - 1, r));
+  render();
+}
+
+// Media items
+document.getElementById('mitems').innerHTML = LIBRARY.map(([k, n, c, d]) =>
+  `<div class="mi" draggable="true" data-m="${k}"><div class="mt ${c}"></div><div class="mn">${n}</div><div class="md">${d}</div></div>`).join('');
+
+// Wiring
+document.getElementById('browser-tabs').addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]'); if (!t) return;
+  document.querySelectorAll('#browser-tabs span').forEach(s => s.classList.toggle('on', s === t));
+  ['playlists', 'library', 'media'].forEach(k => document.getElementById('tab-' + k).hidden = k !== t.dataset.tab);
+});
+document.getElementById('mview').addEventListener('click', e => {
+  const t = e.target.closest('[data-view]'); if (!t) return;
+  document.querySelectorAll('#mview span').forEach(s => s.classList.toggle('on', s === t));
+  document.getElementById('mitems').className = t.dataset.view;
+});
+document.getElementById('zoom').addEventListener('input', e => {
+  document.getElementById('grid').style.setProperty('--col', e.target.value + 'px');
+});
+const grid = document.getElementById('grid');
+grid.addEventListener('click', e => {
+  const f = e.target.closest('[data-fold]');
+  if (f) { const ch = CHANNELS[+f.dataset.fold]; ch.folded = !ch.folded; render(); return; }
+  const t = e.target.closest('[data-c]'); if (!t) return;
+  select(+t.dataset.c, t.dataset.r !== undefined ? +t.dataset.r : undefined);
+});
+document.getElementById('insp-head').addEventListener('click', e => {
+  const t = e.target.closest('[data-nav]'); if (t) select(sel.c + +t.dataset.nav);
+});
+// Write / Clear / Hold on the selected cell
+document.getElementById('insp').addEventListener('click', e => {
+  const t = e.target.closest('[data-state]'); if (!t) return;
+  const c = cues[sel.c], cells = c.cells, v = cells[sel.r];
+  c.kept = c.kept || {};
+  if (isWrite(v)) c.kept[sel.r] = v;           // remember what this cell wrote
+  if (t.dataset.state === 'Clear') cells[sel.r] = 'C';
+  else if (t.dataset.state === 'Hold') cells[sel.r] = null;
+  else if (!isWrite(v)) {
+    if (c.kept[sel.r]) cells[sel.r] = c.kept[sel.r];
+    else {
+      const before = sel.c > 0 ? active(sel.c - 1, sel.r) : null;
+      if (!before) return;
+      cells[sel.r] = isMedia(before.v) ? { m: before.v.m } : { t: before.v.t };
+    }
+  }
+  render();
+});
+// Drag media from the browser onto any cell
+document.getElementById('mitems').addEventListener('dragstart', e => {
+  const t = e.target.closest('[data-m]'); if (!t) return;
+  e.dataTransfer.setData('text/plain', t.dataset.m);
+  e.dataTransfer.effectAllowed = 'copy';
+});
+const clearDrop = () => grid.querySelectorAll('.drop').forEach(n => n.classList.remove('drop'));
+grid.addEventListener('dragover', e => {
+  const t = e.target.closest('.gc'); if (!t) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+  if (!t.classList.contains('drop')) { clearDrop(); t.classList.add('drop'); }
+});
+grid.addEventListener('dragleave', e => { if (!grid.contains(e.relatedTarget)) clearDrop(); });
+grid.addEventListener('drop', e => {
+  const t = e.target.closest('.gc'); if (!t) return;
+  e.preventDefault();
+  const key = e.dataTransfer.getData('text/plain'); if (!MEDIA[key]) return;
+  const c = +t.dataset.c, r = +t.dataset.r, prev = cues[c].cells[r];
+  cues[c].cells[r] = prev && prev.fx ? { m: key, fx: prev.fx } : { m: key };
+  select(c, r);
+});
+document.addEventListener('dragend', clearDrop);
+// Arrow keys move the selection
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea')) return;
+  const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const m = moves[e.key]; if (!m) return;
+  e.preventDefault(); select(sel.c + m[0], sel.r + m[1]);
+});
+
+render();
+</script>
+</body>
+</html>

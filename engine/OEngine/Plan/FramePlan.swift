@@ -3,7 +3,7 @@
 import Foundation
 import OCore
 
-/// Spec 4 §7 stage 1 — the source layouts the channel shader is specialised
+/// Spec 4 §7 stage 1 — the source layouts the channel shader is specialized
 /// for: "NV12, P010, 4:2:2 10-bit, RGBA16, still". `linearRGBA16` is a still
 /// already converted to premultiplied linear light (stage 2 still applies);
 /// `bgra8sRGB` is a poster or text texture the GPU linearizes on sample;
@@ -76,7 +76,7 @@ extension SourceRef: Codable {
 }
 
 /// Spec 4 §4 — a source bound for one pass: the reference, its plane layout,
-/// colour matrix and range for stage 1, and its pixel size for the
+/// color matrix and range for stage 1, and its pixel size for the
 /// letterboxed fit of Spec 4 §7.
 public struct SourceBinding: Equatable, Codable, Sendable {
     public var source: SourceRef
@@ -95,7 +95,7 @@ public struct SourceBinding: Equatable, Codable, Sendable {
 }
 
 /// Spec 4 §4 — "the transition (type, progress 0–1 for this tick, easing,
-/// colour)". Progress is already eased on the control thread.
+/// color)". Progress is already eased on the control thread.
 public struct TransitionState: Equatable, Codable, Sendable {
     public var type: TransitionType
     public var progress: Float

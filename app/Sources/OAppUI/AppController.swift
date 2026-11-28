@@ -59,6 +59,10 @@ final class AppController {
         model.confirm = { [weak self] confirmation, answer in self?.ask(confirmation, answer) }
         windowController.regions.chooseFiles = { [weak self] choice, answer in self?.chooseFiles(choice, answer) }
         windowController.regions.reveal = { url in NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        // Spec 10 §8, §9 — an output's menu releases its screen as ⌃⌥⌘⎋ does, and puts it back.
+        windowController.regions.onScreen = { [weak self] screen, putBack in
+            if putBack { self?.releaser.putBack(screen: screen) } else { self?.releaser.release(screen: screen) }
+        }
         releaser.onRaised = { [weak self] raised in self?.raiseWindow(raised) }
         // "If the engine doesn't answer within two seconds, the window stays raised with the not-responding banner (§2)".
         releaser.onSilent = { [weak self] in self?.supervisor?.engineIsSilent() }
@@ -84,6 +88,8 @@ final class AppController {
     /// Spec 10 §2 — with roots in the preferences the engine is found or
     /// started; without, Spec 10 §13's sheet asks for them first.
     func start(showWindow: Bool = true) {
+        // Spec 11 §8, "Fonts in the app" — the engine's bundled faces, so the font menus draw each in itself.
+        AppFonts.register()
         if showWindow {
             windowController.window.center()
             windowController.window.makeKeyAndOrderFront(nil)
@@ -344,7 +350,7 @@ final class AppController {
         return .terminateLater
     }
 
-    /// Whether Quit has been asked and not cancelled.
+    /// Whether Quit has been asked and not canceled.
     private(set) var isQuitting = false
 
     private func quitAnswered(_ response: NSApplication.ModalResponse) {

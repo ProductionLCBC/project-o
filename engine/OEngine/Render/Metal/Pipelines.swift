@@ -1,4 +1,4 @@
-// OEngine — Spec 4 §7, "Shader variants. One channel shader, specialised with
+// OEngine — Spec 4 §7, "Shader variants. One channel shader, specialized with
 // Metal function constants ... compiled at launch into a small pipeline
 // cache, so the per-tick work is a pipeline lookup and no branching in the
 // shader."
@@ -183,6 +183,13 @@ final class PipelineCache: @unchecked Sendable {
             blur[vertical ? 1 : 0] = try device.makeRenderPipelineState(descriptor: descriptor)
             compiled += 1
         }
+    }
+
+    /// Whether the channel variant has been built, as warm-up should have built every one a plan can name.
+    func hasChannel(_ variant: ChannelVariant) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return channel[variant.index] != nil
     }
 
     /// Make sure the channel variant exists; compiles on the caller's thread.

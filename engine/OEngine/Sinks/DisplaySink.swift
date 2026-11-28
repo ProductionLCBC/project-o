@@ -66,9 +66,20 @@ public struct DisplaySinkState: Equatable, Sendable {
     }
 
     /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
-    /// `released`": from any phase, and no change of screens brings it back.
+    /// `released`": from any phase, and no change of screens brings it back;
+    /// only `retakeScreen` does (`retaken()`).
     public mutating func released() {
         phase = .released
+    }
+
+    /// Spec 10 §9 — "Put Back on This Screen sends `retakeScreen` with it: the
+    /// engine opens those outputs' windows again, reports them `presenting`"
+    /// (corrected 2026-11-24). A released sink waits for its screen again,
+    /// `absent`, and its screen opens it as one that appears does, from the
+    /// newest frame; a sink that isn't released is left as it is.
+    public mutating func retaken() {
+        guard phase == .released else { return }
+        phase = .absent
     }
 
     /// Spec 10 §3 — the output's state as the `outputs` topic reports it.
@@ -137,7 +148,7 @@ public struct DisplaySinkState: Equatable, Sendable {
 /// the screen's current mode, on every Space, above every other window but
 /// the few of the operator app's that must sit over an output (Spec 10 §2,
 /// §11), hosting a CAMetalLayer: pixel format bgr10a2Unorm (10-bit;
-/// bgra8Unorm_srgb as a fallback the sink reports), colour space
+/// bgra8Unorm_srgb as a fallback the sink reports), color space
 /// sRGB/Rec.709, extended dynamic range off, displaySyncEnabled on,
 /// presentsWithTransaction off, maximumDrawableCount 3. ... The sink's
 /// CADisplayLink callback, not the render thread, takes the newest completed
@@ -281,7 +292,19 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
     }
 
     /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
-    /// `released`": for the rest of the run, whatever the screens do.
+    /// `released`": until `retakeScreen` puts them back, or for the rest of
+    /// the run, whatever the screens do.
+    @MainActor
+    public func retake() {
+        lock.lock()
+        state.retaken()
+        let phase = state.phase
+        lock.unlock()
+        if phase == .absent { log.info("display sink \(output): put back; waiting for its screen") }
+    }
+
+    /// Spec 10 §9 — "the engine closes those outputs' windows, reports them
+    /// `released`": until `retakeScreen` puts them back (`retake()`).
     @MainActor
     public func release() {
         detach()
@@ -460,7 +483,16 @@ public final class DisplaySink: NSObject, OutputSink, @unchecked Sendable {
                 return
             }
             guard let buffer = queue.makeCommandBuffer() else { return }
-            backend.encodeDisplay(frame, into: drawable.texture, command: buffer)
+            guard backend.encodeDisplay(frame, into: drawable.texture, command: buffer) else {
+                // Spec 4 §1 — "A missing frame is a repeat, never black": nothing was drawn into this drawable
+                // (the frame's stack texture is gone, Spec 4 §5), so it is not presented and the last one stays.
+                if lastTick >= 0 {
+                    presents.write(PresentRecord(output: output, frame: lastTick, rePresented: true, latencyNs: 0, completion: nil,
+                                                 dropsSinceStart: currentState.drops))
+                }
+                lastPresentNs.store(now.nanoseconds, ordering: .releasing)
+                return
+            }
             buffer.present(drawable)
             buffer.commit()
             presents.write(PresentRecord(output: output, frame: frame.tick, rePresented: false,

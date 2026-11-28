@@ -21,6 +21,10 @@ public final class HeadlessEngine: @unchecked Sendable {
     public let sinks: [Int: CapturingSink]
     private var stallTicks = 0
     private var ticksRun = 0
+    /// A build asked to run late, and the one in hand: its plan, the ticks the render thread still runs
+    /// without it, and what to check before the render thread's next tick.
+    private var lateRequested: (reuses: Int, check: () -> Void)?
+    private var late: (plan: FramePlan, reuses: Int, check: () -> Void)?
 
     public var control: ControlLoop { engine.control }
     public var renderLoop: RenderLoop { engine.render }
@@ -110,9 +114,29 @@ public final class HeadlessEngine: @unchecked Sendable {
 
     private func handleTick(_ time: TickTime) {
         fakeSources?.advance()
-        let build = stallTicks == 0
-        if !build { stallTicks -= 1 }
-        engine.runTick(time, buildPlan: build)
+        if let request = lateRequested {
+            lateRequested = nil
+            late = (engine.buildPlan(time), request.reuses, request.check)
+        }
+        if var held = late {
+            if held.reuses > 0 {
+                // The build is still running: the render thread reuses the plan it has.
+                held.reuses -= 1
+                late = held
+                engine.runTick(time, buildPlan: false)
+            } else {
+                // The late plan is published; the control thread, behind, builds again at once; then the render thread's tick.
+                late = nil
+                engine.publish(held.plan)
+                engine.publish(engine.buildPlan(time))
+                held.check()
+                engine.runTick(time, buildPlan: false)
+            }
+        } else {
+            let build = stallTicks == 0
+            if !build { stallTicks -= 1 }
+            engine.runTick(time, buildPlan: build)
+        }
         for sink in sinks.values { sink.present(now: time.wake) }
         ticksRun += 1
     }
@@ -288,6 +312,19 @@ public final class HeadlessEngine: @unchecked Sendable {
     /// Spec 4 §3 — the control thread stalls for the next `ticks` ticks.
     public func stallControl(ticks: Int) {
         stallTicks = max(0, ticks)
+    }
+
+    /// Spec 4 §3 — a build that takes longer than its tick, as the threaded
+    /// engine runs it. The build for the next tick starts on it, and the
+    /// render thread runs that tick and `ticks - 1` more on the plan it had.
+    /// Then, before the render thread's next tick, the late plan is published
+    /// and the control thread, behind, builds again at once. `check` runs at
+    /// that moment: both builds done, the render thread still on its old
+    /// plan. That tick's render then takes the newest plan. Runs `ticks + 1`
+    /// ticks in all.
+    public func tickWithLateBuild(reusing ticks: Int, beforeNextRender check: @escaping () -> Void = {}) {
+        lateRequested = (max(1, ticks), check)
+        tick(count: max(1, ticks) + 1)
     }
 
     // MARK: - Reading

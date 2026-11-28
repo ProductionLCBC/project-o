@@ -21,7 +21,7 @@ uuid, §5), list 7 (*Doxology*, Thomas Ken, 1674; a timecode trigger, a missing 
 write, a macro call), and `media-index.json`.
 
 `library/media/` holds synthetic media only: `backgrounds/dawn.mp4` (64×36, eight frames of a
-colour wash, written by AVAssetWriter), `backgrounds/cross.png`, dawn's poster frame at
+color wash, written by AVAssetWriter), `backgrounds/cross.png`, dawn's poster frame at
 `.posters/<hex>-0.png` (Spec 8 §5: the frame at the default in-point, named by the hash and the
 in-point, beside its media), and `slides/welcome.oslide` (the §7 envelope). The index also lists
 `backgrounds/mountains.mp4`, whose video and poster (`.posters/<hex>-1500.png`, at its 1500 ms

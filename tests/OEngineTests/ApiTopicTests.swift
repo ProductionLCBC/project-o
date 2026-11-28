@@ -56,6 +56,21 @@ final class ApiTopicTests: XCTestCase {
         XCTAssertEqual(cleared["state"], .string("empty"))
     }
 
+    /// Spec 10 §3 as corrected 2026-11-25 — "for content a box draws, as text is, the picture's duration is that of the
+    /// longest box transition the change started": the strip's bar runs as long as the text dissolves on air.
+    func test_aTextChangesTransitionIsAsLongAsItsBoxesDissolve() throws {
+        let api = try ApiFixture()
+        let client = subscribed(api, to: ["channels"])
+        try api.engine.send("channel 2 write text \"One\"", source: .ui).map { throw $0 }
+        api.tick()
+        let first = try XCTUnwrap(client.next().events("channels").first)
+        XCTAssertEqual(first["transition"]?.objectValue?["ms"], .number(0), "channel 2's default cuts, and Preset 1's boxes take it")
+        try api.engine.send("channel 2 write text \"Two\" transition 2 0.5 once", source: .ui).map { throw $0 }
+        api.tick()
+        let second = try XCTUnwrap(client.next().events("channels").first)
+        XCTAssertEqual(second["transition"]?.objectValue?["ms"], .number(500), "the cue's dissolve, which the boxes now run")
+    }
+
     func test_timedMediaSendsItsPositionOnceASecondWhileItPlays() throws {
         let api = try ApiFixture()
         let client = subscribed(api, to: ["channels"])

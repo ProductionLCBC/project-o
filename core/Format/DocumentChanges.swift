@@ -4,12 +4,13 @@
 import Foundation
 
 /// Spec 1 §5 — "Saves are debounced per document": one document the writer
-/// saves on its own. These are the documents Area 9's edits change, directly
-/// or through the references a list renumber or swap rewrites (Spec 1 §4):
-/// list masters, macros of either root, playlists, local copies and the key
-/// bindings. The catalogs come with the areas that edit them (Spec 7 §7).
-/// Spec 8 §2 — the two media indexes, which media edits, imports and the
-/// walk change through the one queue.
+/// saves on its own. These are the documents the edits change, directly or
+/// through the references a renumber or swap rewrites (Spec 1 §4): list
+/// masters, macros of either root, playlists, local copies and the key
+/// bindings (Area 9); the library's catalogs and presets, and the machine's
+/// stacks, outputs and settings (Area 14, Spec 7 §7). Audio outputs and
+/// inputs come with Area 17. Spec 8 §2 — the two media indexes, which media
+/// edits, imports and the walk change through the one queue.
 public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
     case list(UUID)
     case libraryMacro(Int)
@@ -30,6 +31,14 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
     case transitions
     case audioTransitions
     case preset(Int)
+    /// `machine/stacks.json` (Spec 1 §3), which stack and slot edits change.
+    case stacks
+    /// `machine/outputs.json`: an output's default stack and transitions (Spec 11 §6).
+    case outputs
+    /// `machine/machine.json`: the settings a renumber's rewritten references
+    /// reach, the drop channels, the thumbnail stack and the startup and
+    /// shutdown macros (Spec 1 §4).
+    case machineSettings
 
     public var description: String {
         switch self {
@@ -48,6 +57,9 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
         case .keys: return "key bindings"
         case .mediaIndex: return "the library media index"
         case .mediaLocal: return "the machine media index"
+        case .stacks: return "the stacks"
+        case .outputs: return "the outputs"
+        case .machineSettings: return "the machine settings"
         }
     }
 
@@ -56,7 +68,7 @@ public enum DocumentRef: Hashable, Sendable, CustomStringConvertible {
         switch self {
         case .list, .libraryMacro, .mediaIndex, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions, .preset:
             return true
-        case .playlist, .localList, .machineMacro, .keys, .mediaLocal: return false
+        case .playlist, .localList, .machineMacro, .keys, .mediaLocal, .stacks, .outputs, .machineSettings: return false
         }
     }
 }
@@ -106,6 +118,16 @@ public enum DocumentChanges {
         }
         let presets = Dictionary(old.library.presets.map { ($0.number, $0) }, uniquingKeysWith: { first, _ in first })
         for preset in new.library.presets where presets[preset.number] != preset { out.append(.preset(preset.number)) }
+        // Spec 11 §6 — what the stack editor edits, and what a renumber rewrites in the machine root.
+        if old.machine.stacks != new.machine.stacks || old.machine.documentExtras[.stacks] != new.machine.documentExtras[.stacks] {
+            out.append(.stacks)
+        }
+        if old.machine.outputs != new.machine.outputs || old.machine.documentExtras[.outputs] != new.machine.documentExtras[.outputs] {
+            out.append(.outputs)
+        }
+        if old.machine.settings != new.machine.settings || old.machine.documentExtras[.machine] != new.machine.documentExtras[.machine] {
+            out.append(.machineSettings)
+        }
         return out
     }
 
@@ -119,7 +141,9 @@ public enum DocumentChanges {
         case .localList(let uuid): return machine.localList(uuid: uuid) != nil
         case .machineMacro(let number): return machine.macro(number) != nil
         case .preset(let number): return library.preset(number) != nil
-        case .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions: return true
+        case .keys, .mediaIndex, .mediaLocal, .libraryInfo, .channels, .textStyles, .grades, .transitions, .audioTransitions,
+             .stacks, .outputs, .machineSettings:
+            return true
         }
     }
 }

@@ -117,11 +117,16 @@ final class EntryTests: XCTestCase {
         XCTAssertEqual(entries("Project O"), ["About Project O", "Settings… ,", "Lock Station l", "Quit Project O q"])
         XCTAssertEqual(entries("File"), ["New Playlist n", "New List n", "Import Media… i", "Take Snapshot", "Restore a Snapshot…"])
         XCTAssertEqual(entries("Edit"), ["Undo z", "Redo z", "Cut x", "Copy c", "Paste v", "Select All a", "Find in List f"])
-        XCTAssertEqual(entries("View"), ["Multiviewer m", "Show Archived Playlists", "Compact Grid", "Collapse Panel", "Reset Layout", "Enter Full Screen"])
+        // "in edit mode, its six pages, ⌥⌘1 to ⌥⌘6 (Spec 11 §2)".
+        XCTAssertEqual(entries("View"), ["Multiviewer m", "Show Archived Playlists", "Compact Grid", "Collapse Panel", "Reset Layout", "Enter Full Screen",
+                                         "Cues 1", "Text 2", "Stacks 3", "Channels 4", "Presets 5", "Objects 6"])
+        XCTAssertEqual(bar.entries(of: "View").first { $0.title == "Text" }?.isEnabled, false, "the text editor is Area 10's")
+        XCTAssertEqual(bar.entries(of: "View").first { $0.title == "Cues" }?.keyEquivalentModifierMask, [.option, .command])
         XCTAssertEqual(entries("Go"), ["Back to Live l", "Go to Cue… j", "Hold Auto-Advance", "Command Bar k"])
         XCTAssertEqual(entries("Mode"), ["Show 1", "Edit 2"])
         XCTAssertEqual(entries("Help"), ["Keys /", "Release Output from This Screen \u{1B}"])
-        let later = ["Settings…", "Lock Station", "Edit"]
+        XCTAssertEqual(bar.entries(of: "Mode").first { $0.title == "Edit" }?.isEnabled, true, "Mode ▸ Edit opens edit mode (Spec 11 §2)")
+        let later = ["Settings…", "Lock Station"]
         for menu in bar.titles {
             for item in bar.entries(of: menu) where later.contains(item.title) && item.submenu == nil {
                 XCTAssertFalse(item.isEnabled, "\(item.title) waits for its area")
@@ -311,7 +316,7 @@ final class EntryTests: XCTestCase {
         let window = MainWindowController()
         for phase: EngineSupervisor.Phase in [.starting, .notResponding, .noSocket(console: ["a line"]), .restarting(ends: 4, console: ["a line"]), .wrongAPI(engine: "0.9.0")] {
             window.show(phase)
-            XCTAssertEqual(Audit.unlabelled(in: try XCTUnwrap(window.window.contentView)), [], "Spec 10 §15: every control has a label (\(phase))")
+            XCTAssertEqual(Audit.unlabeled(in: try XCTUnwrap(window.window.contentView)), [], "Spec 10 §15: every control has a label (\(phase))")
             XCTAssertEqual(window.banner.accessibilityLabel(), window.banner.shownText)
         }
     }

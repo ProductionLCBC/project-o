@@ -37,7 +37,7 @@ public enum AssetLoading {
 /// Spec 4 §6 — "Demux with AVFoundation's AVAssetReader in passthrough mode
 /// (compressed samples out) ... Using Apple's demuxer with a direct decoder
 /// session keeps the frame queue, the output pixel format and the seek
-/// behaviour under the engine's control".
+/// behavior under the engine's control".
 public final class AVAssetReaderDemuxer: Demuxer, @unchecked Sendable {
     public let name = "avassetreader"
 

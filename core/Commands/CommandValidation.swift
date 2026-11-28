@@ -113,14 +113,14 @@ struct Checker {
             }
         case .stackMute(let stack, _, _) where machineLevel:
             guard machine.stack(stack) != nil else { throw reject(.noSuchTarget, "stack \(stack) does not exist") }
-        case .cue(let n):
+        case .cue(let n, _):
             guard n >= 1 else { throw reject(.noSuchTarget, "cue \(n) does not exist; cues count from 1") }
             try liveCue(n)
-        case .itemCue(let item, let cue):
+        case .itemCue(let item, let cue, _):
             try liveItem(item, cue: cue, section: nil)
         case .itemSection(let item, let section):
             try liveItem(item, cue: nil, section: section)
-        case .listCue(let list, _):
+        case .listCue(let list, _, _):
             guard library.list(number: list) != nil else { throw reject(.noSuchTarget, "list \(list) does not exist") }
         case .playlistLoad(let title) where machineLevel:
             guard machine.playlist(titled: title) != nil else {
@@ -223,7 +223,7 @@ struct Checker {
             guard machine.stack(stack) != nil else { throw reject(.noSuchReference, "stack \(stack) does not exist") }
         case .stackMute(_, let channel, _):
             guard library.channel(channel) != nil else { throw reject(.noSuchReference, "channel \(channel) does not exist") }
-        case .listCue(let list, let cue):
+        case .listCue(let list, let cue, _):
             if let master = library.list(number: list) {
                 guard cue >= 1, cue <= master.cues.count else {
                     throw reject(.noSuchReference, "cue \(cue) does not exist in list \(list) (\(master.title) has \(master.cues.count) cues)")

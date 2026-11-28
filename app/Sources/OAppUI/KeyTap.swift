@@ -80,6 +80,10 @@ final class KeyTap {
         context.sheet = elsewhere || window.attachedSheet != nil || regions.hasPopover
         context.dialog = key is NSSavePanel || window.attachedSheet is NSSavePanel || (context.sheet && Self.isList(responder))
         context.overlay = regions.isShowingKeys
+        // Spec 11 §2, "Keys" — "a focused cue grid, canvas, or list in the workspace or the inspector takes the arrow
+        // keys ... and Delete and Forward Delete"; and plain Escape, with nothing else to close, leaves edit mode.
+        context.editMode = regions.model.mode == .edit
+        context.editFocus = context.editMode && !elsewhere && responder is any EditFocus
         return context
     }
 
@@ -97,6 +101,9 @@ final class KeyTap {
             return true
         case .escape(.overlay):
             regions.hideKeys()
+            return true
+        case .escape(.editMode):
+            regions.leaveEdit()
             return true
         case .escape(.field):
             guard let field = Self.field(responder) else { return false }

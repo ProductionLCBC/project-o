@@ -66,6 +66,27 @@ final class EditGroupTests: XCTestCase {
             body: .object(["uuid": .string(Self.u(F.uuid("e0e0", 2)))]), folder: nil, title: nil))), "what the engine picked")
     }
 
+    /// Spec 5 §1 as corrected 2026-11-18 — "a channel or a stack that an edit
+    /// makes gets its empty entry in ShowState, and one that an edit deletes
+    /// loses it": the group's later commands reach what it just made.
+    func test_aGroupThatMakesAChannelOrAStackUsesItAtOnce() throws {
+        let outcome = try run(["edit channel 6 create", "channel 6 write text \"Hello\"", "edit stack create",
+                               "edit stack 3 insert slots 0 {\"channel\": 6, \"mute\": false, \"opacity\": 1, \"preset\": null}",
+                               "stack 3 mute 6 on", "stack 3 blackout on"]).get()
+        XCTAssertEqual(outcome.executed.map(\.result), [.ok, .ok, .ok, .ok, .ok, .ok])
+        XCTAssertEqual(outcome.state.channels[6]?.content.kind, "text")
+        XCTAssertEqual(outcome.state.stacks[3], StackState(blackout: true, muted: [6]))
+        XCTAssertEqual(outcome.state.channels.keys.sorted(), [1, 2, 3, 6])
+
+        // And what it deletes is gone from the state with it: channel 3 held text in a stack no output shows.
+        var state = ShowState.fresh(library: library, machine: machine)
+        state.channels[3]?.content = .text(TextInstance(fields: ["body": "9:55"]))
+        let gone = try run(["edit channel 3 delete", "edit stack 2 delete"], state: state).get()
+        XCTAssertNil(gone.state.channels[3])
+        XCTAssertNil(gone.state.stacks[2])
+        XCTAssertEqual(gone.state.channels[1], state.channels[1])
+    }
+
     /// Spec 2 §8 — "A group validates as a whole, each command against the
     /// state the commands before it leave, so `playlist "TITLE"` then `item N
     /// cue M` fires a cue of that playlist (Spec 10 §6)".

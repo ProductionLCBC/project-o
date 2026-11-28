@@ -32,7 +32,7 @@ fragment float4 downscaleFragment(VertexOut in [[stage_in]],
     int across = max(1, int(u.taps.x));
     int down = max(1, int(u.taps.y));
     float2 texel = u.taps.zw;
-    // The target pixel's centre maps to the centre of its source block; step back to the block's first texel centre.
+    // The target pixel's center maps to the center of its source block; step back to the block's first texel center.
     float2 origin = in.uv - float2(across - 1, down - 1) * 0.5 * texel;
     float4 sum = float4(0);
     for (int y = 0; y < down; y++) {

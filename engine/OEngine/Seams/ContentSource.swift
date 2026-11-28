@@ -12,7 +12,7 @@ import Synchronization
 /// Spec 4 §14 — v1: "Video file, still, empty"; later "Live inputs, Hap,
 /// designed slides, audio sets".
 public protocol ContentSource: AnyObject, Sendable {
-    /// Spec 4 §7 — the plane layout the channel shader is specialised for.
+    /// Spec 4 §7 — the plane layout the channel shader is specialized for.
     var layout: SourceLayout { get }
     var size: PixelSize { get }
     /// Spec 4 §6 — true once the first frame is available, which is when a
@@ -113,7 +113,14 @@ public final class PickedFrames: @unchecked Sendable {
 
     /// Drop every retained plane, so sources can be released.
     public func clearAll() {
-        for i in 0..<capacity {
+        clear(first: capacity)
+    }
+
+    /// Drop the retained planes of the first `count` slots: the ones a tick
+    /// filled. The buffer is sized for every channel the engine could hold
+    /// (Spec 4 §5), so the render thread clears what it used, not all of it.
+    public func clear(first count: Int) {
+        for i in 0..<min(max(0, count), capacity) {
             frames[i].clear()
             results[i] = .nothing
         }

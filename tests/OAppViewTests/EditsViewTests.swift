@@ -95,7 +95,7 @@ final class EditsViewTests: XCTestCase {
         XCTAssertEqual(editor.field.fieldKind, .edit)
         XCTAssertEqual(rig.window.firstResponder, editor.field.currentEditor(), "with the cursor in it")
         XCTAssertEqual(rig.view.topBar.hint.stringValue, "Editing: Return saves · Esc discards")
-        XCTAssertEqual(Audit.unlabelled(in: editor), [])
+        XCTAssertEqual(Audit.unlabeled(in: editor), [])
         try rig.retype("Sunday PM")
         XCTAssertEqual(rig.sent.count, 0, "nothing is sent while typing")
         rig.pressReturn(in: editor.field)
@@ -143,7 +143,7 @@ final class EditsViewTests: XCTestCase {
         XCTAssertEqual(editor.field.stringValue, "Sunday PM")
         XCTAssertGreaterThan(editor.frame.height, height, "a line taller, for the reason and Copy")
         XCTAssertEqual(rig.sent.count, 0)
-        XCTAssertEqual(Audit.unlabelled(in: editor), [])
+        XCTAssertEqual(Audit.unlabeled(in: editor), [])
         XCTAssertFalse(rig.view.commitOpenField(), "what waits on the field, ⌘Q among it, waits")
         // The lock comes off: the same Return saves it.
         try rig.lock(false)
@@ -199,7 +199,7 @@ final class EditsViewTests: XCTestCase {
         try XCTUnwrap(row.menuNow?.entry("Duplicate…")).choose()
         let panel = try XCTUnwrap(rig.view.prompt)
         XCTAssertEqual(panel.heading.stringValue, "Duplicate “Sunday Night” as")
-        XCTAssertEqual(Audit.unlabelled(in: panel), [])
+        XCTAssertEqual(Audit.unlabeled(in: panel), [])
         let title = try XCTUnwrap(panel.firstField as? ShowField)
         panel.commit()
         XCTAssertEqual(panel.shownProblem, "It needs a name.")
@@ -261,13 +261,17 @@ final class EditsViewTests: XCTestCase {
         XCTAssertEqual(menu.items.first { $0.title == "Open in Text Editor" }?.toolTip, "Not in this build yet.")
         try XCTUnwrap(menu.entry("Sunday Night")).choose()
         try XCTUnwrap(menu.entry("Duplicate")).choose()
+        // Spec 10 §5 as corrected 2026-11-24 — the title field opens "holding "New List"", and Return names the list.
         try XCTUnwrap(menu.entry("New List Here")).choose()
+        XCTAssertEqual(rig.view.inlineEditor?.field.stringValue, "New List")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
         try XCTUnwrap(menu.entry("Rename")).choose()
         try rig.retype("Great Is Thy Faithfulness (Runyan)")
         rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
         XCTAssertEqual(rig.commands, [
             ["edit playlist \(Self.sundayNight) insert items 4 { \"kind\": \"linked\", \"list\": 42, \"listUuid\": \"\(Self.list42)\" }"],
-            ["edit list 42 duplicate"], ["edit list create folder \"Hymns\""], ["edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""],
+            ["edit list 42 duplicate"], ["edit list create folder \"Hymns\" { \"title\": \"New List\" }"],
+            ["edit list 42 title \"Great Is Thy Faithfulness (Runyan)\""],
         ])
         // "Delete… (`edit list N delete`, after a confirmation naming the playlists that link it, from `listUse`)".
         try XCTUnwrap(menu.entry("Delete…")).choose()
@@ -299,8 +303,18 @@ final class EditsViewTests: XCTestCase {
         // The tree's empty space: a folder or a list at the top.
         let top = try XCTUnwrap(rig.view.left.library.makeMenu?())
         XCTAssertEqual(top.titles, ["New Folder", "New List Here"])
+        // Spec 10 §5 as corrected 2026-11-24 — New List "opens a title field in the tree ... holding "New List"", and
+        // Return sends the field's text, "or "New List" if it was emptied".
         try XCTUnwrap(top.entry("New List Here")).choose()
-        XCTAssertEqual(rig.commands, [["edit folder \"Hymns\" rename \"Old Hymns\""], ["edit folder \"Hymns/Carols\" create"], ["edit list create"]])
+        XCTAssertEqual(rig.view.inlineEditor?.field.stringValue, "New List")
+        try rig.retype("Amazing Grace")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
+        try XCTUnwrap(menu.entry("New List Here")).choose()
+        try rig.retype("")
+        rig.pressReturn(in: try XCTUnwrap(rig.view.inlineEditor).field)
+        XCTAssertEqual(rig.commands, [["edit folder \"Hymns\" rename \"Old Hymns\""], ["edit folder \"Hymns/Carols\" create"],
+                                      ["edit list create { \"title\": \"Amazing Grace\" }"],
+                                      ["edit list create folder \"Hymns\" { \"title\": \"New List\" }"]])
     }
 
     // MARK: - A cue (§6, §10)
@@ -311,7 +325,7 @@ final class EditsViewTests: XCTestCase {
         let c = cell.cell.uuid
         let menu = rig.view.grid.cueMenu(for: cell)
         XCTAssertEqual(menu.titles, ["Fire", "Edit Text", "Edit Cue", "Note…", "Trigger", "  Go", "  Time after Previous…", "  Advance After…", "Duplicate Section"])
-        XCTAssertEqual(menu.items.first { $0.title == "Edit Cue" }?.isEnabled, false, "edit mode is Area 14's")
+        XCTAssertEqual(menu.items.first { $0.title == "Edit Cue" }?.isEnabled, true, "it opens edit mode's Cues page on the cue (Spec 11 §2)")
         XCTAssertEqual(menu.items.first { $0.title == "Trigger" }?.submenu?.items.first?.state, .on, "its trigger, Go, is ticked")
         try XCTUnwrap(menu.entry("Note…")).choose()
         let note = try XCTUnwrap(rig.view.prompt)
@@ -439,7 +453,7 @@ final class EditsViewTests: XCTestCase {
         XCTAssertTrue(sheet.titles[0].stringValue.hasPrefix("Version 16, kept "), sheet.titles[0].stringValue)
         XCTAssertEqual(sheet.details[0].stringValue, "“Great Is Thy Faithfulness” · 14 cues")
         XCTAssertEqual(sheet.note.stringValue, "This list is on air: each cue takes a restored version at its next fire.", "the recorded state has it live")
-        XCTAssertEqual(Audit.unlabelled(in: sheet), [])
+        XCTAssertEqual(Audit.unlabeled(in: sheet), [])
         sheet.buttons[0].press()
         guard case .restoreVersion(let version, let title, _, let cues, let onAir)? = rig.asked.last else { return XCTFail("\(rig.asked)") }
         XCTAssertEqual([version, cues], [16, 14])
@@ -575,15 +589,22 @@ final class EditMenuTests: XCTestCase {
         newPlaylist.choose()
         XCTAssertEqual(rig.controller.windowController.regions.inlineEditor?.field.placeholderString, "Playlist title", "⌘N opens the title field in the tree")
         rig.controller.windowController.regions.inlineEditor?.close()
-        // "New List (⇧⌘N ...) sends ... `edit list create` at the top".
+        // Spec 10 §5 as corrected 2026-11-24 — "New List (⇧⌘N ...) opens a title field in the tree ... holding "New
+        // List"", and Return sends "`edit list create {"title": "TITLE"}` at the top".
         let newList = try rig.entry("File", 1)
         XCTAssertEqual(newList.keyEquivalentModifierMask, [.shift, .command])
         newList.choose()
-        XCTAssertEqual(rig.commands, ["edit list create"])
+        let field = try XCTUnwrap(rig.controller.windowController.regions.inlineEditor?.field)
+        XCTAssertEqual(field.stringValue, "New List")
+        XCTAssertEqual(rig.commands, [], "nothing is made until Return")
+        field.sendAction(field.action, to: field.target)
+        XCTAssertEqual(rig.commands, ["edit list create { \"title\": \"New List\" }"])
         // The selected folder is the one the browsed library list is in.
         rig.controller.model.browse(.list(EditsViewTests.list42))
         try rig.entry("File", 1).choose()
-        XCTAssertEqual(rig.commands.last, "edit list create folder \"Hymns\"")
+        let second = try XCTUnwrap(rig.controller.windowController.regions.inlineEditor?.field)
+        second.sendAction(second.action, to: second.target)
+        XCTAssertEqual(rig.commands.last, "edit list create folder \"Hymns\" { \"title\": \"New List\" }")
     }
 
     /// Spec 10 §10 — "⌘Q, ⌘2 and Lock Station commit an open field first."

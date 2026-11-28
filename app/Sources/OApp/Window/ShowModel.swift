@@ -19,7 +19,21 @@ public final class ShowModel {
         case layout
         /// Only what a cue's cell or a strip's cell says about a drop: an import's progress, or why nothing was sent.
         case dropNotes
+        /// Edit mode's regions: its Browser, workspace, monitors and inspector (Spec 11 §2).
+        case edit
+        /// Only the Objects page's stage: a grade's pictures as they come, while a video plays (Spec 11 §9, G-43).
+        case stage
     }
+
+    /// Spec 10 §4, the Mode menu — "Show ⌘1; Edit ⌘2". Edit mode's own model
+    /// opens and closes it (Spec 11 §2).
+    public internal(set) var mode = WindowMode.show
+    /// Spec 11 — edit mode, beside this model.
+    public private(set) lazy var editing = EditModel(model: self)
+    /// Leaving edit mode: "the grid browses where its list came from ... and
+    /// scrolls to it, firing nothing" (Spec 11 §2). The playlist's item, or
+    /// nil from the Library window; the list; the cue.
+    public var onRevealCue: ((_ item: String?, _ list: String, _ cue: String) -> Void)?
 
     public let store: ShowStore
     private let clock: any AppClock
@@ -53,7 +67,7 @@ public final class ShowModel {
 
     public private(set) var browse = BrowseState()
     public private(set) var selection = StripSelection()
-    public private(set) var settings = ViewSettings() {
+    public internal(set) var settings = ViewSettings() {
         didSet { if settings != oldValue, !isLoadingSettings { onSettings?(settings) } }
     }
     private var isLoadingSettings = false
@@ -170,6 +184,11 @@ public final class ShowModel {
         if changes.contains(.engine) { out.formUnion([.left, .pool, .grid]) }
         if out.contains(.grid) { rebuildGrid() }
         if changes.contains(.live), grid.liveCell != nil { followLiveSoon() }
+        // Spec 11 §2 — edit mode follows the store too, and the lock closes it.
+        if mode == .edit {
+            editing.storeChanged(changes)
+            out.insert(.edit)
+        }
         changed(out)
     }
 
@@ -220,7 +239,30 @@ public final class ShowModel {
     }
 
     private func holdLists() {
-        hold?(GridModel.listsNeeded(shown: browse.shown, live: store.live, catalog: store.catalog))
+        var needed = GridModel.listsNeeded(shown: browse.shown, live: store.live, catalog: store.catalog)
+        // Spec 11 §4 — the list the Cues page edits, and its playlist's, are held while edit mode is open.
+        if mode == .edit {
+            needed.formUnion(GridModel.listsNeeded(shown: editing.source, live: store.live, catalog: store.catalog))
+            if let list = editing.listUuid { needed.insert(list) }
+        }
+        hold?(needed)
+    }
+
+    /// Edit mode chose another list: the app holds it.
+    func holdEditLists() {
+        holdLists()
+    }
+
+    /// The grid's model for a context other than the one the show grid
+    /// browses: edit mode's list, where it came from (Spec 11 §4).
+    func gridModel(for context: GridContext?) -> GridModel {
+        var inputs = GridInputs(context: context, catalog: store.catalog)
+        inputs.lists = store.lists
+        inputs.thumbnails = store.thumbnails
+        inputs.media = store.media
+        inputs.live = store.live
+        inputs.updated = updated
+        return GridModel.make(inputs)
     }
 
     private func rebuildGrid() {
@@ -320,6 +362,21 @@ public final class ShowModel {
     public func choose(playlist uuid: String, option: Bool) {
         expandedPlaylists = PlaylistTree.expanding(uuid, in: expandedPlaylists, option: option)
         browse(.playlist(uuid))
+    }
+
+    /// Spec 11 §2 — in edit mode's Browser a click on a playlist opens it
+    /// to its items by §5's rule, and the show grid stays on what it browses.
+    public func expand(playlist uuid: String, option: Bool) {
+        expandedPlaylists = PlaylistTree.expanding(uuid, in: expandedPlaylists, option: option)
+        changed([.left])
+    }
+
+    /// Edit mode's list came from this playlist: the Browser's tree opens it
+    /// to its items, so the row of the list being edited shows (Spec 11 §2).
+    func showItems(ofPlaylist uuid: String) {
+        guard !expandedPlaylists.contains(uuid) else { return }
+        expandedPlaylists = [uuid]
+        changed([.left])
     }
 
     public func toggle(folder path: String) {
@@ -490,14 +547,21 @@ public final class ShowModel {
 
     /// What firing this cue sends, or nil when it can't be fired (Spec 10 §6, "Clicking").
     public func fire(_ cell: CueCell, in section: GridSection) -> Sending? {
+        fire(cell, in: section, context: grid.context)
+    }
+
+    /// The same for a list shown from `context`, which edit mode's Fire
+    /// uses: "sends what a click on that cue sends where the page's list
+    /// came from" (Spec 11 §4).
+    func fire(_ cell: CueCell, in section: GridSection, context: GridContext?, withState: Bool = false) -> Sending? {
         guard section.refusal == nil, !section.isRemoved, let catalog = store.catalog else { return nil }
-        switch grid.context {
+        switch context {
         case .playlist(let uuid):
             guard let playlist = catalog.playlist(uuid: uuid), let item = section.item else { return nil }
-            return try? GridFire.playlistCue(playlist, item: item, cue: cell.number, live: store.live).get()
+            return try? GridFire.playlistCue(playlist, item: item, cue: cell.number, live: store.live, state: withState).get()
         case .list(let uuid):
             guard let list = catalog.list(uuid: uuid) else { return nil }
-            return try? GridFire.libraryCue(list, cue: cell.number).get()
+            return try? GridFire.libraryCue(list, cue: cell.number, state: withState).get()
         case nil:
             return nil
         }
@@ -577,7 +641,9 @@ public final class ShowModel {
     public func change(_ edit: (inout ViewSettings) -> Void) {
         edit(&settings)
         rebuildGrid()
-        changed([.grid, .left, .right, .strip, .top, .pool])
+        // Spec 11 §2 — the monitors show show mode's preview stack, "one choice for both modes".
+        if mode == .edit { self.editing.settingsChanged() }
+        changed([.grid, .left, .right, .strip, .top, .pool, .edit])
     }
 
     /// A divider moved: the settings change and the regions are placed again, with nothing redrawn.
@@ -586,6 +652,7 @@ public final class ShowModel {
         settings.leftColumnWidth = ViewSettings.clampedLeft(settings.leftColumnWidth)
         settings.rightColumnWidth = ViewSettings.clampedRight(settings.rightColumnWidth)
         settings.leftSplit = min(0.8, max(0.2, settings.leftSplit))
+        settings.clampEditSizes()
         changed([.layout])
     }
 

@@ -95,7 +95,23 @@ public final class Engine: @unchecked Sendable {
                     "file": .string(ApiQueries.relative(result.url, to: self.machineRoot)),
                 ], seq: self.control.commandLog.lastSeq))
             }
+            setUpRenders()
         }
+    }
+    /// Spec 11 §3 — the `render` query's canvases and files: there once the
+    /// engine has a thumbnail job to draw with and knows its machine root.
+    var renders: RenderQueue?
+
+    /// Spec 11 §3 — "The files. `machine/thumbnails/render/` ...; the folder
+    /// is emptied at launch": makes the `render` query's queue over the
+    /// thumbnail job, once, when both the job and the machine root are
+    /// known. A test gives its own folder.
+    func setUpRenders(folder: URL? = nil) {
+        guard renders == nil, let thumbnails else { return }
+        guard let folder = folder ?? machineRoot?.appendingPathComponent("thumbnails").appendingPathComponent("render") else { return }
+        renders = RenderQueue(folder: folder, machineRoot: machineRoot, log: log,
+                              schedule: { [thumbnails] work in thumbnails.performAhead(work) },
+                              draw: { [thumbnails] job in thumbnails.draw(job) })
     }
     /// Spec 10 §2 — "while any output presents it keeps the displays and the
     /// system from sleeping": told the outputs' states after every build.
@@ -127,8 +143,11 @@ public final class Engine: @unchecked Sendable {
             }
         }
         self.sinks = byOutput
-        let capacity = max(8, library.channels.count * 4)
-        sources = SourceTable(capacity: capacity)
+        // Spec 4 §5 — "from pools sized for the current show", and an edit can add a channel to the show (Spec 5
+        // §2): the tables the render thread reads without a lock are sized once, for every channel the texture table
+        // could hold (five textures a channel), so a new channel never asks them to grow.
+        let channelLimit = max(4, library.channels.count, backend.resources.capacity / 5)
+        sources = SourceTable(capacity: max(8, channelLimit * 2))
         metrics = MetricsRing(capacity: 4096)
         watchdog = Watchdog(log: log)
         // Spec 4 §12 — an audio device lost while running is a recovery the soak counts (Spec 4 §13).
@@ -139,7 +158,9 @@ public final class Engine: @unchecked Sendable {
                               sources: sources, sourceFactory: sourceFactory, posters: posters, text: text, variables: variables,
                               encodeKinds: byOutput.mapValues(\.encode), audio: audio, mediaCache: mediaCache, log: log)
         render = RenderLoop(backend: backend, planRing: planRing, sources: sources, sinks: byOutput, metrics: metrics, pacing: pacing,
-                            maxChannelPasses: max(4, library.channels.count))
+                            maxChannelPasses: channelLimit)
+        // Spec 4 §3 — what the render thread has taken decides when a released source's slot is used again.
+        control.planTaken = { [render] in render.lastTakenPlanFrame }
         // Spec 4 §2 — "the wall clock is read only to stamp log lines": the engine's own, so its log's lines and
         // the command log's are stamped by one clock.
         log.setClock { variables.now() }
@@ -240,15 +261,24 @@ public final class Engine: @unchecked Sendable {
     /// side is stalled on purpose and the render loop reuses its last plan
     /// (Spec 4 §3).
     public func runTick(_ time: TickTime, buildPlan: Bool = true) {
-        if buildPlan {
-            recoverIfNeeded()
-            api.buildWillStart()
-            planRing.publish(control.build(for: time.tick, now: time.reference))
-            finishBuild()
-        }
+        if buildPlan { publish(self.buildPlan(time)) }
         render.tick(time)
         // Spec 9 §2 — "each file is synced once a second", on the harness's engine time.
         logs?.pulse(now: time.reference)
+    }
+
+    /// The control side's build for one tick, the plan not yet published: the
+    /// harness holds it back to run a build that takes longer than its tick.
+    func buildPlan(_ time: TickTime) -> FramePlan {
+        recoverIfNeeded()
+        api.buildWillStart()
+        return control.build(for: time.tick, now: time.reference)
+    }
+
+    /// Spec 4 §3 — the finished plan handed to the render thread, and the control side's work after it.
+    func publish(_ plan: FramePlan) {
+        planRing.publish(plan)
+        finishBuild()
     }
 
     /// The control side's work once a plan is published: OSC's feedback and
@@ -260,6 +290,13 @@ public final class Engine: @unchecked Sendable {
         // the answers to the requests this build took (at the end, below).
         api.deliverResults(control)
         afterBuild?(control)
+        // Spec 10 §2 — "when a channel is removed, a message names it and the app drops its surfaces", and the
+        // surfaces are sent again "whenever a stack's surfaces are made again" and "when a channel is added or
+        // renumbered": after an edit or a stack switch that made textures again (Spec 4 §5).
+        if let rebuild = control.lastRebuild {
+            for channel in rebuild.channelsGone { mach?.channelRemoved(channel) }
+            if rebuild.surfacesChanged { mach?.resendSurfaces() }
+        }
         for event in control.lastLibraryEvents { publisher.publish(event.json) }
         // Spec 8 §7 — the `media` topic: jobs, the walk, and changes in missing state.
         for event in control.lastMediaEvents { publisher.publish(event) }
@@ -318,7 +355,6 @@ public final class Engine: @unchecked Sendable {
         let backend = self.backend
         if let surface { surfaceSource = surface }
         let find = surfaceSource ?? { handle in (backend as? MetalBackend)?.surface(of: handle) }
-        let previews = control.previewSurfaces, pictures = control.pictureSurfaces
         @Sendable func sets(_ handles: [Int: [TextureHandle]]) -> [MachSurfaceSet] {
             handles.keys.sorted().compactMap { number in
                 let surfaces = (handles[number] ?? []).compactMap(find)
@@ -329,7 +365,8 @@ public final class Engine: @unchecked Sendable {
         let audio = self.audio
         let control = self.control
         let render = self.render
-        let source = MachChannel.Source(previews: { sets(previews) }, pictures: { sets(pictures) },
+        // The sets as the last build left them: an edit or a stack switch makes them again (Spec 4 §5).
+        let source = MachChannel.Source(previews: { sets(control.publishedSurfaces.previews) }, pictures: { sets(control.publishedSurfaces.pictures) },
                                         finished: { receipt in backend.completion(of: receipt).map { !$0.failed } },
                                         meters: { audio?.takeMeters() ?? [] })
         let channel = MachChannel(service: service, name: MachServiceName.engine(run: run), notices: render.auxNotices, source: source, log: log,
@@ -390,11 +427,14 @@ public final class Engine: @unchecked Sendable {
     /// the last plan that named it has been consumed": once a build, on the
     /// control side, the text cache and the resource table free what was
     /// released the ring's depth ago. The threaded engine did not do this before
-    /// the first soak, so nothing deferred was ever freed.
+    /// the first soak, so nothing deferred was ever freed. Reckoned by the
+    /// frame of the newest plan the render thread has taken, not by the ticks
+    /// it has rendered: while the control thread is behind, the render thread
+    /// reuses a plan, and what that plan names stays.
     func sweepReleases() {
-        let consumed = render.lastConsumedTick
-        control.text.sweep(consumedTick: consumed)
-        backend.resources.sweep(consumedTick: consumed)
+        let taken = render.lastTakenPlanFrame
+        control.text.sweep(consumedTick: taken)
+        backend.resources.sweep(consumedTick: taken)
     }
 
     /// Spec 4 §12 — "Metal device lost or command buffer error ... rebuild

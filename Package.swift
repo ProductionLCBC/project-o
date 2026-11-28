@@ -126,7 +126,7 @@ package.targets += [
         dependencies: ["OEngine", "OCore", "OFormats", "OMach"],
         path: "tests/OEngineTests"
     ),
-    // Spec 10 — the operator app's behaviour: the engine connection, the
+    // Spec 10 — the operator app's behavior: the engine connection, the
     // models §3 feeds, what each action sends, the keys, view settings. No
     // AppKit and no SwiftUI (tests/OAppTests/AppImportRuleTests.swift), so
     // every rule is tested without a window.

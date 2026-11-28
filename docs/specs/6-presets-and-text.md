@@ -61,7 +61,7 @@ A text channel on stack 2 with no other preset therefore shows its current and n
 
 ## 4. Text styles, fit and fonts
 
-**Vertical anchor** (P1). The Text Style gains `verticalAlignment`, beside `alignment`: `top`, `center` or `bottom`, defaulting to `center` and written on every style, inline ones included. It places the block of lines in the box: the first line at the box's top, the block centred, or the last line at the box's bottom. A box has no override of its own. A box that needs a different anchor carries its own inline style, as it does for every other field (Spec 1 §2).
+**Vertical anchor** (P1). The Text Style gains `verticalAlignment`, beside `alignment`: `top`, `center` or `bottom`, defaulting to `center` and written on every style, inline ones included. It places the block of lines in the box: the first line at the box's top, the block centered, or the last line at the box's bottom. A box has no override of its own. A box that needs a different anchor carries its own inline style, as it does for every other field (Spec 1 §2).
 
 **Units** (P2). `outline.width`, `shadow.x`, `shadow.y`, `shadow.blur` and `letterSpacing` are points on the 1080-line canvas, scaled with the output's height like a `size` in `pt`. A style therefore looks the same on a 4K wall and a 1080p monitor. `lineSpacing` is a multiple of the font's line height (ascent, descent and leading), where 1.0 is normal, and `fit.minSize` is in points on the same canvas. `main` has drawn this way since Area 4, except for the padding of each line's bitmap. That padding is sized from the unscaled shadow, which can clip a shadow above 1080 lines, so Area 6 scales it too.
 
@@ -74,7 +74,7 @@ A text channel on stack 2 with no other preset therefore shows its current and n
 - If a bundled font's PostScript name is also installed, the engine uses the installed copy and logs the clash once (choice T-7).
 - A missing font falls back to the machine's `fallbackFont` and is recorded for pre-flight (Spec 4 §8). Pre-flight's "fonts not installed" now means fonts that are neither installed nor bundled.
 
-The fonts and their licences sit together in the engine's resources, and which fonts to bundle is choice T-6. The app's font picker lists the engine's fonts, and the app registers the bundled ones for its own process to draw them (Spec 11 §8). Fonts in the media root stay deferred.
+The fonts and their licenses sit together in the engine's resources, and which fonts to bundle is choice T-6. The app's font picker lists the engine's fonts, and the app registers the bundled ones for its own process to draw them (Spec 11 §8). Fonts in the media root stay deferred.
 
 ## 5. Variables
 
@@ -133,7 +133,7 @@ The fonts and their licences sit together in the engine's resources, and which f
 - The clock, a timer or `[Service In]` alone changes the box at most once per wall-clock second, the gate `main` has used since Area 5.
 - A box's first value, and a value going empty, show at once, as on `main`.
 
-A box with `transitionOnVariableChange` runs its box transition between the old text and the new; the rest swap (Spec 4 §8). A value that arrives while that transition still runs starts a new one from the incoming text, as `main` does. A popup box for announcements usually wants the flag on (Spec 1 §2), and a caption box, which changes several times a second, wants it off.
+A box with `transitionOnVariableChange` runs its box transition between the old text and the new, its own when it sets one, else the channel's current transition (Spec 4 §9); the rest swap (Spec 4 §8). A value that arrives while that transition still runs starts a new one from the incoming text, as `main` does. A popup box for announcements usually wants the flag on (Spec 1 §2), and a caption box, which changes several times a second, wants it off.
 
 ## 6. Timers
 
@@ -185,7 +185,7 @@ These are the first-run library and stacks (P13 and the review's note on it). Th
 | Object | First run |
 | --- | --- |
 | Channels | 1 Background (`usualContent` media); 2 Foreground (text); 3 Clock (`usualContent` any, default preset 2). All three are routed to audio output 1, as the UX spec routes every channel |
-| Preset 1, Default | Built in. `"*"`: a pixel box filling the frame, then a fallback body box (Spec 1 §9). `"2"`: a body box for the current cue in the upper part of the frame, and a smaller grey body box at +1 below it |
+| Preset 1, Default | Built in. `"*"`: a pixel box filling the frame, then a fallback body box (Spec 1 §9). `"2"`: a body box for the current cue in the upper part of the frame, and a smaller gray body box at +1 below it |
 | Preset 2, Clock | `"*"`: one static `[Time]` box in the top right corner |
 | Text styles | 1 Body and 2 Caption, as in the fixtures, each with `verticalAlignment` `center` |
 | Stack 1, Main | Channels 1 and 2, no default preset; output 1's default |
@@ -222,7 +222,7 @@ Fixture documents keep the fixed uuids they have, and new ones get fixed uuids i
 }
 ```
 
-The +1 box matches the first apart from `offset` 1, its frame (`y` 0.7, `h` 0.27), the `maxLines` policy with 3 lines, a grey colour (0.7) and a size of 40 points.
+The +1 box matches the first apart from `offset` 1, its frame (`y` 0.7, `h` 0.27), the `maxLines` policy with 3 lines, a gray color (0.7) and a size of 40 points.
 
 **`library/presets/002-clock.json`**
 
@@ -319,7 +319,7 @@ The UX spec stays as written, as before. This spec departs from it in these plac
 
 - §2. "the wall clock is read only to stamp log lines and resolve \[Time\]" becomes "the wall clock is read only to stamp log lines and resolve \[Time\], \[Date\] and \[Service In\]".
 - §4 and §9. "Offset slots" becomes "Offset boxes". In §5's poster frame row, "For offset slots and thumbnails" becomes "For offset boxes and thumbnails".
-- §8, Fit policies. "Horizontal alignment comes from the style; the style has no vertical anchor yet, so the lines are centred vertically in the box until the presets-and-text spec adds one (defaulting to centre, so nothing moves when it does)." becomes "Horizontal and vertical alignment come from the style (`alignment`, `verticalAlignment`). Text that overflows at `minSize`, or N lines taller than the box, keeps the whole lines that fit from the top, the last ending in an ellipsis, and reports the overflow (Spec 6 §4)."
+- §8, Fit policies. "Horizontal alignment comes from the style; the style has no vertical anchor yet, so the lines are centered vertically in the box until the presets-and-text spec adds one (defaulting to center, so nothing moves when it does)." becomes "Horizontal and vertical alignment come from the style (`alignment`, `verticalAlignment`). Text that overflows at `minSize`, or N lines taller than the box, keeps the whole lines that fit from the top, the last ending in an ellipsis, and reports the overflow (Spec 6 §4)."
 - §8, Cache. The key "(field text, text style value, box pixel width, box pixel height, fit policy, output scale)" gains "tabular digits". "Lookahead pre-rasterizes the next cue's text for every due stack" becomes "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each offset box, the text one cue beyond its offset".
 - §8, Variables. "and no more than once a second" becomes "at the pace Spec 6 §5 sets: at once for context values, at most ten times a second for a popup, and at most once a wall-clock second for the clock, timers and `[Service In]`".
 - §8, Fonts. "v1 resolves PostScript names against installed fonts" becomes "v1 resolves PostScript names against installed fonts and the OFL fonts bundled with the engine, which it registers for its own process at launch (Spec 6 §4),".
@@ -347,7 +347,7 @@ Written before the code, from this page, against the fixtures as Area 6 rewrites
 - **Provenance.** A cue's write records its cue and list, and so does a write by a macro that cue ran. An identical text write from another list updates the provenance with no transition, and the same cue firing again stays a `noop` (Spec 3 §9 row 3).
 - **Field fallback.** A text write with no fields, under preset 4, draws the list's metadata, and a write's own field wins. Back-to-back empty-field writes from two lists show the second list's metadata, live and at +1. Content from the UI falls back to the pointer's list. Media draws no field box.
 - **Static boxes.** A static box draws on an empty channel and after `channel N clear`, hides when its slot is muted, and at +1 draws nothing past the end.
-- **Anchor, units, overflow.** Goldens for top, centre and bottom. A style rendered at 1080 and 2160 lines matches within a pixel, shadow included. `shrinkToFit` at `minSize`, and `maxLines` taller than the box, keep the whole lines that fit from the top, end the last in an ellipsis, draw nothing outside the box and report the overflow.
+- **Anchor, units, overflow.** Goldens for top, center and bottom. A style rendered at 1080 and 2160 lines matches within a pixel, shadow included. `shrinkToFit` at `minSize`, and `maxLines` taller than the box, keep the whole lines that fit from the top, end the last in an ellipsis, draw nothing outside the box and report the overflow.
 - **Fonts.** A bundled font resolves with nothing installed. An installed font of the same name wins and is logged once. A missing font falls back and is recorded.
 - **Fixtures.** The rewritten fixtures load and write back byte for byte (Spec 1 §10), and Preset 1's built-in definition matches `001-default.json`.
 
@@ -382,6 +382,6 @@ These are the places where the scope doc and Specs 1–5 left room and the draft
 | T-7 | A bundled font that is also installed | The installed copy wins, and the clash is logged once | The bundled copy wins, so every campus renders alike | Rec |
 | T-8 | Overflow (P3's "clip to the box") | Whole lines: the lines that fit, the last ending in an ellipsis | Clip at the box's edge, which can cut a line through its middle | Rec |
 | T-9 | `[Date]`'s default format | `MMMM d` (November 8) | `yyyy-MM-dd`, as `main` prints today, or `EEEE, MMMM d` | Rec |
-| T-10 | Tabular digits in clock and timer boxes | On, whenever the box names `[Time]`, `[Timer N]` or `[Service In]` and the font has them | Off: digits keep the font's own spacing, and a centred clock shifts as it counts | Rec |
+| T-10 | Tabular digits in clock and timer boxes | On, whenever the box names `[Time]`, `[Timer N]` or `[Service In]` and the font has them | Off: digits keep the font's own spacing, and a centered clock shifts as it counts | Rec |
 | T-11 | `timer N reset` | Back to the set value, stopped, like `set` | Back to the set value, still running if it was | Rec |
 | T-12 | A countdown at zero | Shows `0:00` and keeps running underneath, so `overrun` can count and the feedback keeps coming | Stops at zero as P8 says (state `stopped`, feedback ends), while `overrun` boxes count on from the moment it stopped | Rec |

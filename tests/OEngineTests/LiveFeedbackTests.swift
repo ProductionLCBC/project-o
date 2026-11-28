@@ -8,7 +8,7 @@ import OCore
 /// carry". Spec 7 §10 — "Feedback. `/o/live/item` and `/o/live/cue` follow an
 /// insert above the live item. With the live cue gone they send the number
 /// and label of the cue before the place; with the live item gone, item 0
-/// and the live cue's own number. A retitled playlist and a relabelled live
+/// and the live cue's own number. A retitled playlist and a relabeled live
 /// cue are resent. `/o/live/armed` arrives on arming with the positions and
 /// the milliseconds, again when an edit moves them, and empty on disarm,
 /// lapse and fire. The `live` event carries both handles, the positions,
@@ -87,8 +87,8 @@ final class LiveFeedbackTests: XCTestCase {
         XCTAssertEqual(sent.last?.arguments.prefix(2), [.int32(0), .int32(3)], "the countdown's cue is in the gone item")
     }
 
-    /// "A retitled playlist and a relabelled live cue are resent."
-    func test_aRetitledPlaylistAndARelabelledCueAreResent() {
+    /// "A retitled playlist and a relabeled live cue are resent."
+    func test_aRetitledPlaylistAndARelabeledCueAreResent() {
         fireSecondVerse()
         edit("edit playlist \(Self.night) title \"Sunday Evening\"")
         XCTAssertEqual(sent, positions("Sunday Evening", 2, 2, "Verse 1"))

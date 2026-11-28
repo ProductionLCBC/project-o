@@ -35,7 +35,7 @@ public struct MediaClock: Equatable, Sendable {
 }
 
 /// Spec 4 §6 — a media instance as the engine runs it: its source, its
-/// poster, its clock and its colour description for stage 1.
+/// poster, its clock and its color description for stage 1.
 public struct MediaRuntime: Sendable {
     public var ref: String
     public var handle: InstanceHandle
@@ -55,7 +55,7 @@ public struct MediaRuntime: Sendable {
     public var missing: Bool
     /// Spec 4 §6 — the end-of-media `clear` was issued.
     public var clearIssued: Bool
-    /// The transport and end behaviour last seen in ShowState.
+    /// The transport and end behavior last seen in ShowState.
     public var transport: Transport
     public var endBehavior: EndBehavior
     /// Spec 4 §11 — the instance's sound on every device its channel's
@@ -98,14 +98,18 @@ public enum ContentRuntime: Sendable {
 
 /// Spec 4 §7 — the outgoing of a transition: the previous content, still
 /// playing, or a snapshot of the channel texture as it was (Area 4 reading:
-/// an interrupted or restarted transition freezes the picture it interrupts).
+/// an interrupted or restarted transition freezes the picture it interrupts),
+/// or nothing: "On a channel that held no picture the outgoing is
+/// transparent, so a dissolve fades the new content in" (as corrected
+/// 2026-11-25).
 public enum OutgoingRuntime: Sendable {
     case content(ContentRuntime)
     case snapshot
+    case nothing
 }
 
 /// Spec 4 §4 — "the transition (type, progress 0–1 for this tick, easing,
-/// colour)" tracked by frame on the control thread. `startFrame` is nil
+/// color)" tracked by frame on the control thread. `startFrame` is nil
 /// while a cold write waits for its first decoded frame (Spec 4 §6).
 public struct TransitionRun: Equatable, Sendable {
     public var type: TransitionType
@@ -113,6 +117,25 @@ public struct TransitionRun: Equatable, Sendable {
     public var color: ColorValue?
     public var durationFrames: Int64
     public var startFrame: Int64?
+    /// Spec 4 §11 as corrected 2026-11-27 — a J cut's picture transition starts "that long after" the trigger: no
+    /// earlier than this frame, even when a cold write's first frame comes sooner.
+    public var notBefore: Int64?
+
+    public init(type: TransitionType, easing: Easing, color: ColorValue?, durationFrames: Int64, startFrame: Int64?, notBefore: Int64? = nil) {
+        self.type = type
+        self.easing = easing
+        self.color = color
+        self.durationFrames = durationFrames
+        self.startFrame = startFrame
+        self.notBefore = notBefore
+    }
+
+    /// Whether the picture still holds what the channel showed: a cold write's first frame not yet come, or a J
+    /// cut's delay not yet run.
+    public func isWaiting(at frame: Int64) -> Bool {
+        guard let start = startFrame else { return true }
+        return frame < start
+    }
 
     public func state(at frame: Int64) -> TransitionState? {
         guard let start = startFrame, frame >= start else { return nil }
@@ -128,9 +151,10 @@ public struct TransitionRun: Equatable, Sendable {
         return frame > start && frame - start >= durationFrames
     }
 
+    /// Running, or waiting to run: a write meanwhile interrupts it.
     public func isRunning(at frame: Int64) -> Bool {
-        guard let start = startFrame else { return true }
-        return frame >= start && !isComplete(at: frame)
+        guard startFrame != nil else { return true }
+        return !isComplete(at: frame)
     }
 }
 
@@ -163,8 +187,22 @@ public struct ChannelRuntime: Sendable {
     public var snapshotPending = false
     public var grade: GradeRun = .none
     public var gainDb: Double = 0
+    /// Spec 4 §11 as corrected 2026-11-27 — when the outgoing's part of the audio transition ends, for an outgoing
+    /// with sound.
+    public var outgoingSoundUntil: Int64?
+    /// "an outgoing item's sound plays until its part of the audio transition ends: its video decoder is released
+    /// with its picture, and its sound when the fade ends."
+    public var soundTails: [SoundTail] = []
 
     public init() {}
+}
+
+/// Spec 4 §11 as corrected 2026-11-27 — an outgoing item whose picture is gone and whose sound plays to the end of
+/// its fade: its video decoder released, its audio still attached.
+public struct SoundTail: Sendable {
+    public var media: MediaRuntime
+    /// The frame its fade has ended by.
+    public var until: Int64
 }
 
 /// Spec 4 §10 — "A stack switch mixes old and new stack textures over the
@@ -214,15 +252,66 @@ public struct OutputRuntime: Sendable {
 }
 
 /// Spec 4 §9 — box transitions are tracked per box of a slot of a stack.
+/// The slot is named by its channel, which a stack holds once (Spec 6 §2):
+/// the number stays the slot's when slots are added, removed or moved (Spec
+/// 11 §6), where its place in the stack would not.
 public struct BoxKey: Hashable, Sendable {
     public var stack: Int
+    /// The slot's channel number.
     public var slot: Int
     public var box: Int
 }
 
+/// Spec 4 §9 — which box a run remembers. Runs are kept by a box's place (its
+/// stack, its slot's channel, its index in the layout), and an edit can put
+/// another box in that place: a slot given another preset, a preset given a
+/// layout of its own for the stack, a box inserted or removed before this
+/// one. What the place held before is then not this box's to dissolve from
+/// or to keep drawing. How the box looks (its frame, fit, style, transition)
+/// and a static box's own text are not part of this: an edit of those is an
+/// edit of the same box.
+public struct BoxIdentity: Equatable, Sendable {
+    public enum Bound: Equatable, Sendable {
+        case pixels
+        case field(String)
+        case text
+
+        public init(_ kind: Binding.Kind) {
+            switch kind {
+            case .pixels: self = .pixels
+            case .field(let name): self = .field(name)
+            case .static: self = .text
+            }
+        }
+    }
+
+    public var preset: UUID
+    public var layout: LayoutKey
+    public var bound: Bound
+    public var offset: Int
+
+    public init(preset: UUID, layout: LayoutKey, bound: Bound, offset: Int) {
+        self.preset = preset
+        self.layout = layout
+        self.bound = bound
+        self.offset = offset
+    }
+}
+
 public struct BoxRun: Sendable {
+    /// The box this run is of; a run under the same key for another box starts afresh.
+    public var identity: BoxIdentity?
+    /// Spec 4 §9 as corrected 2026-11-25 — whether the box has drawn nothing since it was claimed: its next text
+    /// "appears from nothing", mixing from transparent, where a box just claimed shows its first text at once.
+    public var wasEmpty = false
     public var previousContent: BoxContent?
     public var previousText: String?
+    /// Spec 4 §9 — whether the text the box took in this build is the text
+    /// it was drawing, before its variables resolve: "When the box has been
+    /// drawing this text and only its raster is missing, the box keeps
+    /// drawing its previous lines". False for a box's first text and for
+    /// "Text a cue has just written", which "still waits for its own raster".
+    public var sameTextAsBefore = false
     /// Spec 4 §8 and Spec 6 §5 — what a text box last adopted: "A box whose
     /// text names variables is laid out again only when its resolved text
     /// changes ... How soon depends on what changed". The text before its
@@ -250,6 +339,11 @@ public struct BoxRun: Sendable {
     public var startFrame: Int64 = 0
     public var durationFrames: Int64 = 0
     public var outgoing: BoxContent?
+    /// Spec 4 §8 — "the result replaces the cache entry": the rasters this
+    /// box's value changes replaced, still in the cache while the box may be
+    /// drawing them (Spec 4 §9, a box "keeps drawing its previous lines until
+    /// the new raster is ready"), released once the new value's raster drew.
+    public var replaced: [TextKey] = []
 
     public func state(at frame: Int64) -> BoxTransitionState? {
         guard let outgoing, durationFrames > 0, frame < startFrame + durationFrames, type != .cut else { return nil }
@@ -273,17 +367,29 @@ public struct ControlModel: Sendable {
 }
 
 /// Spec 1 §2 — "renderSize: the largest output size among stacks that include
-/// the channel"; Spec 4 §5 — stack textures are "The output size".
-public struct MachineGeometry: Sendable {
+/// the channel"; Spec 4 §5 — a stack texture is "The size of the output
+/// showing it". The sizes the engine's textures have, worked out again
+/// whenever a channel, a stack, an output or what an output shows changes.
+public struct MachineGeometry: Equatable, Sendable {
     public let stackSizes: [Int: PixelSize]
     public let channelSizes: [Int: PixelSize]
 
-    public init(library: Library, machine: Machine) {
+    /// Spec 4 §5 — a stack texture is "The size of the output showing it,
+    /// the largest when several do; for a stack no output shows, that of the
+    /// largest output whose default stack it is, else 1920 by 1080 (Spec 11
+    /// §3). The old stack of a running switch keeps its size until the switch
+    /// ends". `state` says which stack each output shows, an output without
+    /// an entry being on its default stack; `switching` names, by output, the
+    /// old stack of a switch still running.
+    public init(library: Library, machine: Machine, state: ShowState? = nil, switching: [Int: Int] = [:]) {
+        func size(_ output: Output) -> PixelSize { PixelSize(width: output.format.width, height: output.format.height) }
         var stacks: [Int: PixelSize] = [:]
         for stack in machine.stacks {
-            let showing = machine.outputs.filter { $0.defaultStack == stack.number }
-            let largest = showing.map { PixelSize(width: $0.format.width, height: $0.format.height) }
-                .max { $0.pixelCount < $1.pixelCount }
+            let showing = machine.outputs.filter {
+                (state?.outputs[$0.number] ?? $0.defaultStack) == stack.number || switching[$0.number] == stack.number
+            }
+            let defaulting = machine.outputs.filter { $0.defaultStack == stack.number }
+            let largest = (showing.isEmpty ? defaulting : showing).map(size).max { $0.pixelCount < $1.pixelCount }
             stacks[stack.number] = largest ?? PixelSize(.hd)
         }
         var channels: [Int: PixelSize] = [:]
@@ -299,6 +405,12 @@ public struct MachineGeometry: Sendable {
         }
         stackSizes = stacks
         channelSizes = channels
+    }
+
+    /// The sizes the textures were made at, when one couldn't be made at the size the rule gives (Spec 4 §12).
+    init(stackSizes: [Int: PixelSize], channelSizes: [Int: PixelSize]) {
+        self.stackSizes = stackSizes
+        self.channelSizes = channelSizes
     }
 
     public func stackSize(_ stack: Int) -> PixelSize { stackSizes[stack] ?? PixelSize(.hd) }

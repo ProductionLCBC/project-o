@@ -2,7 +2,7 @@ import XCTest
 import OCore
 @testable import OEngine
 
-/// Spec 4 §16, Colour — "back through each sink encode to the expected code
+/// Spec 4 §16, Color — "back through each sink encode to the expected code
 /// values": the display's 10-bit codes and the DeckLink v210 words against
 /// the CPU reference; the output transition mix at the sink (Spec 4 §10).
 final class MetalEncodeTests: XCTestCase {
@@ -12,7 +12,7 @@ final class MetalEncodeTests: XCTestCase {
         backend = try MetalHarness.backend()
     }
 
-    /// A 12×2 picture: six known greys and primaries, repeated.
+    /// A 12×2 picture: six known grays and primaries, repeated.
     func picture() -> (CapturedFrame, [LinearPixel]) {
         let values: [LinearPixel] = [
             .black, LinearPixel(r: 1, g: 1, b: 1, a: 1), LinearPixel(r: 0.18, g: 0.18, b: 0.18, a: 1), LinearPixel(r: 0.5, g: 0.5, b: 0.5, a: 1),

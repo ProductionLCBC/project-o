@@ -179,7 +179,9 @@ final class AdoptionTests: XCTestCase {
             engine.send("popup 1 set \"a\"")
             engine.tick()
             XCTAssertEqual(body(engine)?.text, "a")
-            XCTAssertNil(body(engine)?.transition)
+            // Spec 4 §9 as corrected 2026-11-25 — a value appearing from nothing fades in, when the box asks to
+            // transition on a value's change.
+            XCTAssertEqual(body(engine)?.transition?.type, asks ? .dissolve : nil, "a value appears, transitionOnVariableChange \(asks)")
             engine.tick(count: 6)
             engine.send("popup 1 set \"b\"")
             engine.tick()

@@ -23,12 +23,12 @@ final class SurfaceView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    /// Spec 10 §2 — "the engine writes the next frame into the oldest of the
+    /// three": each new frame comes in another surface. Read at the display's
+    /// pace (`ShowWindowView`), the same surface comes back only while no
+    /// newer frame has arrived, so nothing is composited again for it.
     func set(_ surface: IOSurfaceRef?) {
-        guard surface !== shown else {
-            // The same surface with a new frame in it: the layer is told its content changed.
-            if surface != nil { layer?.setNeedsDisplay(); layer?.contents = surface }
-            return
-        }
+        guard surface !== shown else { return }
         shown = surface
         layer?.contents = surface
     }
@@ -111,7 +111,7 @@ final class PreviewView: Surface {
             Kit.content(label)
             let blackout = Kit.label(Strings.text(.previewBlackout), size: 12, weight: .semibold, color: Palette.browsing)
             blackout.alignment = .center
-            // "a blacked-out stack's tile is dimmed and labelled "Blackout"".
+            // "a blacked-out stack's tile is dimmed and labeled "Blackout"".
             let isBlack = model.store.stacks[number]?.blackout ?? false
             blackout.isHidden = !isBlack
             picture.alphaValue = isBlack ? 0.35 : 1
@@ -312,6 +312,8 @@ final class TabsView: Surface {
     private(set) var labels: [NSTextField] = []
     private var drafts: [Int: String] = [:]
     private var clearAfter: [Int: Int?] = [:]
+    /// Spec 10 §7 — a macro tile's Edit: "edit mode's macro editor, which also makes, renames and removes macros, Spec 11 §9".
+    var onEditMacro: ((Int) -> Void)?
     private var durations: [Int: String] = [:]
     private var counting: [Int: Bool] = [:]
     static let barHeight: CGFloat = 34
@@ -423,7 +425,7 @@ final class TabsView: Surface {
                 Actions.transport(playing ? .pause : .play, channels: [channel])
             }
             _ = button(Strings.text(.transportStop), frame: NSRect(x: third + 8, y: 40, width: third, height: 26)) { Actions.transport(.stop, channels: [channel]) }
-            // "its end behaviour as Loop, Hold and Clear".
+            // "its end behavior as Loop, Hold and Clear".
             let ends: [(StringKey, EndBehavior, String)] = [(.transportLoop, .loop, "loop"), (.transportHold, .hold, "hold"), (.transportClear, .clear, "clear")]
             for (index, entry) in ends.enumerated() {
                 let made = button(Strings.text(entry.0), style: .bare, frame: NSRect(x: CGFloat(index) * (third + 8), y: 70, width: third, height: 22)) {
@@ -461,7 +463,7 @@ final class TabsView: Surface {
         }
     }
 
-    // "Macros: the macros of both roots by number, each a tile with its label and colour".
+    // "Macros: the macros of both roots by number, each a tile with its label and color".
     private func buildMacros() {
         let w = contentWidth
         let macros = model.store.catalog?.macros ?? []
@@ -477,11 +479,34 @@ final class TabsView: Surface {
             let made = button(title, frame: frame) { Actions.macro(macro.number) }
             made.fontSize = 11.5
             made.setAccessibilityLabel(Strings.text(.macrosTile, macro.number, macro.label))
+            made.menu = macroMenu(macro.number)
             let stripe = Surface(frame: NSRect(x: frame.minX + 6, y: frame.maxY - 7, width: frame.width - 12, height: 3))
             stripe.radius = 1.5
             stripe.fill = NSColor(srgbRed: macro.color.r, green: macro.color.g, blue: macro.color.b, alpha: 1)
             content.addSubview(stripe)
         }
+    }
+
+    /// Spec 10 §7 — "A tile's menu: Run; Bind a Key… (Settings ▸ Key bindings
+    /// with a new row for it); Edit (edit mode's macro editor ...)". Key
+    /// bindings are Area 17's, so Bind a Key… waits; Edit is disabled under
+    /// the lock with the reason (Spec 11 §2).
+    func macroMenu(_ number: Int) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let run = ClosureMenuItem(title: Strings.text(.editMacroRun)) { [weak model] in model?.send(Actions.macro(number)) }
+        run.isEnabled = model.store.cannotSend == nil
+        menu.addItem(run)
+        let bind = ClosureMenuItem(title: Strings.text(.editMacroBindKey)) {}
+        bind.isEnabled = false
+        bind.toolTip = Strings.text(.unavailableLater)
+        menu.addItem(bind)
+        let edit = ClosureMenuItem(title: Strings.text(.editMacroEdit)) { [weak self] in self?.onEditMacro?(number) }
+        let cannot = model.editing.cannotOpen
+        edit.isEnabled = cannot == nil
+        edit.toolTip = cannot.map(UnavailableWording.sentence)
+        menu.addItem(edit)
+        return menu
     }
 
     // "Popups, one row per popup slot ... Below, the timers (P9): one row per timer slot".

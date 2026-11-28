@@ -13,6 +13,11 @@ final class PictureStore {
     private var pictures: [String: NSImage] = [:]
     private var loading: Set<String> = []
     private var waiting: [String: [(NSImage) -> Void]] = [:]
+    /// Edit mode's pictures (Spec 11 §3), newest last: each answer is a new file and the engine keeps only each
+    /// canvas's newest two, so only the newest are kept here, enough for a connection's eight canvases. A grade's video
+    /// playing (G-43) brings one every few frames.
+    private var renders: [String] = []
+    static let rendersKept = 16
 
     /// The picture at `url` when it has been read; otherwise nil, and `ready` is called once it has.
     func picture(at url: URL, ready: @escaping (NSImage) -> Void) -> NSImage? {
@@ -31,6 +36,7 @@ final class PictureStore {
                         return
                     }
                     self.pictures[key] = picture
+                    if key.contains("/thumbnails/render/") { self.keepRender(key) }
                     for call in self.waiting.removeValue(forKey: key) ?? [] { call(picture) }
                 }
             }
@@ -42,10 +48,22 @@ final class PictureStore {
     func forget(_ url: URL) {
         pictures[url.path] = nil
     }
+
+    /// An edit-mode picture read: the oldest go past the newest sixteen.
+    private func keepRender(_ key: String) {
+        renders.removeAll { $0 == key }
+        renders.append(key)
+        while renders.count > Self.rendersKept {
+            pictures[renders.removeFirst()] = nil
+        }
+    }
+
+    /// How many edit-mode pictures are kept, for the tests.
+    var rendersHeld: Int { renders.filter { pictures[$0] != nil }.count }
 }
 
 /// Spec 10 §6, "The chips" — "each state with its own shape: filled blue for
-/// a new value, outlined grey for held, amber with a diagonal stripe for a
+/// a new value, outlined gray for held, amber with a diagonal stripe for a
 /// redundant write, and struck through for a clear. A dot on a chip marks
 /// attribute writes, listed on hover."
 @MainActor
@@ -328,7 +346,7 @@ final class CueCellView: Surface {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        // "the section's colour as the left edge".
+        // "the section's color as the left edge".
         if let hue = Palette.section(cell.hue) {
             hue.setFill()
             NSBezierPath(roundedRect: NSRect(x: 3, y: 8, width: 3, height: bounds.height - 16), xRadius: 1.5, yRadius: 1.5).fill()
@@ -628,6 +646,12 @@ final class GridDocument: Surface {
         headers.first { $0.section.itemUuid == uuid }?.view.frame.minY
     }
 
+    /// Where a cue's cell sits, for scrolling to it: in the playlist's item, or in the one list a library context shows.
+    func span(ofCue cue: String, item: String?, list: String) -> ClosedRange<Double>? {
+        guard let cell = cells.first(where: { $0.cell.uuid == cue && $0.section.listUuid == list && (item == nil || $0.section.itemUuid == item) }) else { return nil }
+        return Double(cell.frame.minY - 6)...Double(cell.frame.maxY + 6)
+    }
+
     // "It never scrolls while the pointer has moved over the grid in the last second".
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -768,9 +792,9 @@ final class GridView: Surface {
             addSubview(tag)
             browsing = tag
         }
-        // "the grid's edge ... turn[s] amber".
-        outline = model.isBrowsing ? Palette.browsing : nil
-        outlineWidth = 2
+        // "the grid's edge ... turn[s] amber"; otherwise the hairline every panel has (Spec 10 §4).
+        outline = model.isBrowsing ? Palette.browsing : Palette.hairline
+        outlineWidth = model.isBrowsing ? 2 : 1
         empty.isHidden = grid.context != nil
         scroll.isHidden = grid.context == nil
         view.isHidden = grid.context == nil
@@ -847,6 +871,14 @@ final class GridView: Surface {
         scrollBy(FollowLive.leastScroll(toShow: span, in: visibleSpan))
     }
 
+    /// Spec 11 §2, "Leaving it" — "the grid browses where its list came from
+    /// ... and scrolls to it, firing nothing": the cue edit mode had selected, by the least amount.
+    func scrollTo(cue: String, item: String?, list: String) {
+        layoutSubtreeIfNeeded()
+        guard let span = document.span(ofCue: cue, item: item, list: list) else { return }
+        scrollBy(FollowLive.leastScroll(toShow: span, in: visibleSpan))
+    }
+
     /// Spec 10 §5 — "Click an item to browse its playlist and scroll the grid to that list."
     func scrollTo(item uuid: String) {
         layoutSubtreeIfNeeded()
@@ -896,6 +928,9 @@ final class GridView: Surface {
             if let sending = model.fire(cell, in: section) { model.send(sending) }
         case .editText:
             editText(view)
+        case .editCue:
+            // "Edit Cue in a cue's menu, opens the Cues page on that cue" (Spec 11 §2).
+            host?.enterEdit(cue: cell, in: section)
         case .note:
             host?.present(Prompts.note(cell, in: section, model: model), at: view)
         case .triggerGo:
@@ -915,9 +950,9 @@ final class GridView: Surface {
 
     /// Spec 10 §6, "Double-click" — "on a cue with a text write on the text
     /// channel ... edits that text in place (§10); on any other cue it opens
-    /// edit mode's Cues page on it (Spec 11 §2)", which is Area 14's.
+    /// edit mode's Cues page on it (Spec 11 §2)".
     private func doubleClicked(_ view: CueCellView) {
-        if model.textBody(of: view.cell, in: view.section) != nil { editText(view) }
+        if model.textBody(of: view.cell, in: view.section) != nil { editText(view) } else { host?.enterEdit(cue: view.cell, in: view.section) }
     }
 
     /// Spec 10 §10, "In-place text" — "opens a field over the cell holding

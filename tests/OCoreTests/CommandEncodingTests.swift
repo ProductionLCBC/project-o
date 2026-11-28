@@ -131,7 +131,7 @@ final class CommandEncodingTests: XCTestCase {
         XCTAssertEqual(try JSONCoding.encode(flagged), bad)
     }
 
-    /// Spec 1 §8 — a known command object keeps keys it did not recognise.
+    /// Spec 1 §8 — a known command object keeps keys it did not recognize.
     func test_aKnownCommandKeepsUnknownKeys() throws {
         let object: JSONValue = .object(["cmd": .string("channel.clear"), "channel": .number(2), "zz": .array([.number(1)])])
         let entry = try JSONCoding.decode(GuardedCommand.self, from: object)

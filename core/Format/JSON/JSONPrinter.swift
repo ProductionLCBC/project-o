@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Reading of the spec (Area 2 plan, reading 1): a container whose members are
 /// all scalars or empty containers prints on one line, as the §9 examples
-/// show for slots, frames and colours; anything holding a non-empty container
+/// show for slots, frames and colors; anything holding a non-empty container
 /// prints one member per line. Keys sort by UTF-8 byte order. Integral numbers
 /// print without a decimal point; the rest print in Swift's shortest
 /// round-trip form. Strings escape only what JSON requires: never `/`, never

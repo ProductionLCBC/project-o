@@ -60,7 +60,7 @@ final class ProcessTests: XCTestCase {
         XCTAssertTrue(commands.contains(.outputStack(output: 1, stack: 2)))
         XCTAssertTrue(commands.contains(.stackBlackout(stack: .number(1), state: .on)))
         XCTAssertTrue(commands.contains(.stackBlackout(stack: .number(1), state: .off)))
-        XCTAssertEqual(commands.filter { if case .listCue(1, 1) = $0 { return true } else { return false } }.count, 5, "the list restarts five times a loop")
+        XCTAssertEqual(commands.filter { if case .listCue(1, 1, false) = $0 { return true } else { return false } }.count, 5, "the list restarts five times a loop")
         XCTAssertEqual(commands.filter { $0 == .next }.count, scenario.steps.count - 9)
         // The schedule loops: two passes for twenty minutes, and the end is cut at the duration.
         XCTAssertEqual(scenario.schedule(durationMs: 1_200_000).count, scenario.steps.count * 2)
@@ -203,8 +203,8 @@ final class ProcessTests: XCTestCase {
         let still = try StillSource.decode(url: folder.appendingPathComponent("stills/cross.png"), fitWithin: PixelSize(width: 4096, height: 2160))
         XCTAssertEqual(still.width, 640)
         XCTAssertEqual(still.height, 360)
-        let centre = still[320, 180]
-        XCTAssertGreaterThan(centre.r, 0.9, "the cross is white at the centre")
+        let center = still[320, 180]
+        XCTAssertGreaterThan(center.r, 0.9, "the cross is white at the center")
         // The index names what was written, path for path.
         let roots = try Self.roots()
         XCTAssertEqual(Set(roots.library.mediaIndex.entries.map(\.path)), Set(SpikeFixtures.items().map(\.path)))

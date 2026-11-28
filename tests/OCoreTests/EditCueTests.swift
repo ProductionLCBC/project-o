@@ -86,7 +86,7 @@ final class EditCueTests: XCTestCase {
         XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) trigger { \"tc\": \"1:00\", \"type\": \"timecode\" }")?.reason, .badValue)
         XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) advanceAfterMs -5")?.reason, .badValue)
         XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) uuid \"\(Self.c2)\"")?.reason, .readOnlyField)
-        XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) color \"red\"")?.reason, .unknownPath)
         XCTAssertEqual(edits.refuse("edit list 42 cue \(Self.c1) commands.5 { \"cmd\": \"playlist.next\" }")?.reason, .unknownPath)
     }
 

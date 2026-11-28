@@ -212,7 +212,7 @@ final class FirstRunDocumentTests: XCTestCase {
     }
 
     /// "screens left to right, top to bottom where two share a left edge"; "then one stack per further output with
-    /// channels 1 and 2, output N's being stack N + 1, labelled like its output".
+    /// channels 1 and 2, output N's being stack N + 1, labeled like its output".
     func test_screensAreNumberedLeftToRightThenTopToBottomAndEachFurtherOutputHasItsStack() {
         let machine = machine(screens: [
             screen("CC", "Right", x: 3432),
@@ -224,7 +224,7 @@ final class FirstRunDocumentTests: XCTestCase {
         XCTAssertEqual(machine.outputs.map(\.number), [1, 2, 3])
         XCTAssertEqual(machine.outputs.map(\.defaultStack), [1, 3, 4], "output N's being stack N + 1")
         XCTAssertEqual(machine.stacks.map(\.number), [1, 2, 3, 4])
-        XCTAssertEqual(machine.stacks.map(\.label), ["Main", "Confidence", "Lower left", "Right"], "labelled like its output")
+        XCTAssertEqual(machine.stacks.map(\.label), ["Main", "Confidence", "Lower left", "Right"], "labeled like its output")
         XCTAssertEqual(machine.stacks.map { $0.slots.map(\.channel) }, [[1, 2], [2, 3], [1, 2], [1, 2]])
         XCTAssertFalse(machine.outputs.contains { $0.defaultStack == 2 }, "stack 2, Confidence, is on no output")
         XCTAssertEqual(Set(machine.outputs.map(\.uuid)).count, 3)

@@ -274,6 +274,31 @@ final class ProjectionTableTests: XCTestCase {
         XCTAssertEqual(channel(1, in: afterC).content, media(F.mediaC, startedAt: 110))
     }
 
+    /// Spec 3 §4 as corrected 2026-11-27 — the outgoing ends "after the delay a J cut puts before the picture's
+    /// transition when the outgoing or incoming item has sound (Spec 4 §11)". At the fixture's 60 fps: a 1000 ms dissolve
+    /// from frame 100 ends at 160, as in row 14; a J cut of 500 ms puts it at 190, but only when A or B has sound.
+    func test_aJCutsDelayKeepsTheOutgoingWhenEitherSideHasSound() {
+        var library = F.library
+        library.audioTransitions.append(AudioTransition(number: 3, type: .crossfade, ms: 400, offsetMs: -500))
+        library.audioTransitions.append(AudioTransition(number: 4, type: .crossfade, ms: 400, offsetMs: 300))
+        var before = F.fresh()
+        let a = MediaInstance(ref: F.mediaA, startedAtFrame: 50)
+        before.channels[1]?.content = .media(a)
+        func written(_ audio: Int, sound: Bool) -> [OutgoingInstance] {
+            var lib = library
+            lib.mediaIndex = MediaIndex(entries: [F.mediaA, F.mediaB].map {
+                MediaEntry(id: $0, path: "\($0).mov", kind: .video, size: 1, durationMs: 10_000, hasAudio: sound)
+            })
+            let write = F.write(1, media: F.mediaB, riders: Riders(transition: TransitionRider(ref: 2, ms: 1000, scope: .once),
+                                                                   audioTransition: TransitionRider(ref: audio, scope: .once)))
+            return channel(1, in: run(before, [write], frame: 100, library: lib).0).outgoing
+        }
+        XCTAssertEqual(written(3, sound: true), [OutgoingInstance(instance: a, endsAtFrame: 190)], "the picture starts 500 ms late")
+        XCTAssertEqual(written(3, sound: false), [OutgoingInstance(instance: a, endsAtFrame: 160)], "no sound: the offset changes nothing")
+        XCTAssertEqual(written(4, sound: true), [OutgoingInstance(instance: a, endsAtFrame: 160)],
+                       "an L cut's sound outlives its picture with its video decoder released, so it doesn't count")
+    }
+
     /// Row 15 — Tracking switch for grade off: `channel 2 grade 5`, then
     /// `channel 2 write text "y"`. Grade 5 (`once`) after the first; default
     /// after the second.

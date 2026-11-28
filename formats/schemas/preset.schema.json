@@ -73,7 +73,7 @@
         },
         "textStyle": { "oneOf": [{ "$ref": "#/$defs/textStyle" }, { "type": "null" }] },
         "transition": {
-          "type": "object",
+          "type": ["object", "null"],
           "required": ["ref", "ms"],
           "properties": { "ref": { "type": "integer", "minimum": 1 }, "ms": { "type": ["integer", "null"] } }
         },

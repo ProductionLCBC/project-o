@@ -4,7 +4,7 @@ import XCTest
 
 /// Spec 1 §10 — Round trip: "Load every fixture document, write it back, and
 /// diff: byte-identical output, including unknown keys and key order." Also
-/// §8, "every object keeps an opaque bag of keys it did not recognise and
+/// §8, "every object keeps an opaque bag of keys it did not recognize and
 /// writes them back unchanged", and the fixture library itself (§10).
 final class FormatRoundTripTests: XCTestCase {
     typealias F = FixtureLibrary
@@ -48,7 +48,7 @@ final class FormatRoundTripTests: XCTestCase {
     }
 
     /// Spec 1 §8 — unknown keys are preserved on every object that has fields
-    /// of its own. The exceptions are the fixed value shapes (colours, frames,
+    /// of its own. The exceptions are the fixed value shapes (colors, frames,
     /// sizes, rates, outline, shadow, mask), the plain maps (layouts, fields,
     /// variations, overrides, replaced), non-media content, and the ShowState
     /// in `state/last.json`, which Spec 3 owns.

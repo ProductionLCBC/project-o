@@ -7,7 +7,7 @@ import OCore
 /// Spec 10 §2 — "A display output whose screen isn't there stays `absent` and
 /// opens when a screen with its id appears; it never falls back to another
 /// screen." Spec 10 §9 — `releaseScreen` "takes every output off the named
-/// screen for the rest of the run". One place watches the Mac's screens and
+/// screen" until `retakeScreen` puts them back. One place watches the Mac's screens and
 /// gives each display sink the screen `OutputPlacement` says is its own, at
 /// launch and at every change of screens.
 @MainActor
@@ -73,6 +73,24 @@ public final class DisplayOutputs {
         reconcile()
         let numbers = OutputPlacement.outputs(onScreen: uuid, of: outputs)
         log.info("released screen \(uuid.uppercased()): outputs \(numbers)")
+        return numbers
+    }
+
+    /// Spec 10 §9 — "Put Back on This Screen sends `retakeScreen` with it:
+    /// the engine opens those outputs' windows again, reports them
+    /// `presenting`" (corrected 2026-11-24). The screen is no longer
+    /// released; its outputs wait for it again and open on it at once if it
+    /// is there. The outputs put back, in number order: those on the screen
+    /// that were released.
+    @discardableResult
+    public func retake(screen uuid: String) -> [Int] {
+        let key = uuid.uppercased()
+        guard released.remove(key) != nil else { return [] }
+        let numbers = OutputPlacement.outputs(onScreen: uuid, of: outputs)
+        for number in numbers { sinks[number]?.retake() }
+        reconcile()
+        onChange?()
+        log.info("put screen \(key) back: outputs \(numbers)")
         return numbers
     }
 }

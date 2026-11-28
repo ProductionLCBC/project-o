@@ -6,9 +6,12 @@ import OCore
 /// Where a short message stands: "beside what was tried" (Spec 10 §10).
 public enum NoticePlace: Hashable, Sendable, CaseIterable {
     case top, left, grid, pool, strip
+    /// Spec 11 §2 — "The inspector's header keeps one notice line for what the control last used has to say".
+    case inspector
 
     var change: ShowModel.Change {
         switch self {
+        case .inspector: return .edit
         case .top: return .top
         case .left: return .left
         case .grid: return .grid

@@ -19,8 +19,8 @@ final class ShowWordingTests: XCTestCase {
         XCTAssertEqual(ShowWording.position(.ready(playlist: "Sunday")), "Sunday · ready")
         XCTAssertEqual(ShowWording.position(.library(list: "Great Is Thy Faithfulness", number: 3, label: "Verse 2")),
                        "Library · Great Is Thy Faithfulness · 3 Verse 2")
-        XCTAssertEqual(ShowWording.position(.nothing(hint: false)), "Nothing live")
-        XCTAssertEqual(ShowWording.position(.nothing(hint: true)), "Nothing live · Click a cue, or choose Make Live")
+        // Spec 10 §8 as corrected 2026-11-25 — "Nothing live", and nothing more.
+        XCTAssertEqual(ShowWording.position(.nothing), "Nothing live")
         XCTAssertEqual(ShowWording.countdown(ms: 7_200), "Auto in 0:08")
     }
 
@@ -69,7 +69,7 @@ final class ShowWordingTests: XCTestCase {
 
     func test_aCueAndTheGridsCountForVoiceOverAndTheHeader() throws {
         XCTAssertEqual(ShowWording.cue(cell()), "Cue 3, Verse 2")
-        XCTAssertEqual(ShowWording.cue(cell(live: true)), "Cue 3, Verse 2, live", "colour is never the only signal")
+        XCTAssertEqual(ShowWording.cue(cell(live: true)), "Cue 3, Verse 2, live", "color is never the only signal")
         XCTAssertEqual(ShowWording.cue(cell(label: "")), "Cue 3")
         XCTAssertEqual(ShowWording.count(GridModel.make(try Recorded.inputs(.playlist(Recorded.sunday)))), "3 lists")
         XCTAssertEqual(ShowWording.count(GridModel.make(try Recorded.inputs(.list(Recorded.list42)))), "4 cues")

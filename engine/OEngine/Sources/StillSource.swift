@@ -80,7 +80,7 @@ public final class StillSource: ContentSource, @unchecked Sendable {
         let scale = min(1, min(Double(fitWithin.width) / Double(max(1, image.width)), Double(fitWithin.height) / Double(max(1, image.height))))
         let width = max(1, Int((Double(image.width) * scale).rounded()))
         let height = max(1, Int((Double(image.height) * scale).rounded()))
-        guard let space = CGColorSpace(name: CGColorSpace.linearSRGB) else { throw StillError.cannotDecode("no linear colour space") }
+        guard let space = CGColorSpace(name: CGColorSpace.linearSRGB) else { throw StillError.cannotDecode("no linear color space") }
         var halves = [Float16](repeating: 0, count: width * height * 4)
         let drawn = halves.withUnsafeMutableBytes { raw -> Bool in
             let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.floatComponents.rawValue | CGBitmapInfo.byteOrder16Little.rawValue)

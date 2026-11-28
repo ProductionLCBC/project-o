@@ -11,9 +11,9 @@ import OCore
 /// large library is real work.
 enum ApiQueries {
     /// The queries answered from a snapshot. `versions` and `snapshots` read
-    /// files and stay with the area that built them (Spec 9 §6); `render` and
-    /// `uses` are Area 14's (Spec 11 §3).
-    static let fromSnapshot: Set<String> = ["state", "catalog", "list", "media", "mediaUse", "listUse"]
+    /// files and stay with the area that built them (Spec 9 §6); `render`
+    /// draws, on the thumbnail job's queue (Spec 11 §3).
+    static let fromSnapshot: Set<String> = ["state", "catalog", "list", "media", "mediaUse", "listUse", "uses"]
 
     static func answer(_ what: String, _ request: [String: JSONValue], in snapshot: ApiSnapshot, machineRoot: URL?) -> Result<[String: JSONValue], Rejection> {
         switch what {
@@ -23,6 +23,7 @@ enum ApiQueries {
         case "media": return .success(media(in: snapshot, machineRoot: machineRoot))
         case "mediaUse": return mediaUse(request, in: snapshot)
         case "listUse": return listUse(request, in: snapshot)
+        case "uses": return uses(request, in: snapshot)
         default: return .failure(Rejection(reason: .badValue, message: "there is no \(what) query"))
         }
     }
@@ -160,6 +161,31 @@ enum ApiQueries {
                 .object(["uuid": .string(playlist.uuid.uuidString.lowercased()), "title": .string(playlist.title), "archived": .bool(playlist.archived)])
             })])
         }
+    }
+
+    /// Spec 11 §3 — "`uses` lists what refers to a numbered object, counted
+    /// over both roots' documents on this machine": `{ "what": "uses",
+    /// "object": "preset", "preset": 3 }`, the number under the object's own
+    /// name. "The engine answers from its loaded documents, so the answer is
+    /// as fresh as the last `library` event." "`uses` is local and LAN alike."
+    /// A kind that isn't one of the ten, or a number that isn't a whole
+    /// number from 1, is `badValue`; a number no object has is answered for,
+    /// with whatever still names it.
+    static func uses(_ request: [String: JSONValue], in snapshot: ApiSnapshot) -> Result<[String: JSONValue], Rejection> {
+        let names = Uses.objects.keys.sorted().joined(separator: ", ")
+        guard let name = request["object"]?.stringValue else {
+            return .failure(Rejection(reason: .missingArgument, message: "uses names the kind of its object as \"object\": \(names)"))
+        }
+        guard let type = Uses.objects[name] else {
+            return .failure(Rejection(reason: .badValue, message: "uses has no object \"\(name)\": it is one of \(names)"))
+        }
+        guard let given = request[name] else {
+            return .failure(Rejection(reason: .missingArgument, message: "uses names its \(name) by number, as \"\(name)\""))
+        }
+        guard let number = given.intValue, number >= 1 else {
+            return .failure(Rejection(reason: .badValue, message: "uses names its \(name) by number, a whole number from 1"))
+        }
+        return .success(Uses.of(type, number, library: snapshot.library, machine: snapshot.machine).fields)
     }
 
     // MARK: - devices, fonts

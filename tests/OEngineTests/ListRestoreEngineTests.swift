@@ -208,7 +208,7 @@ final class ListRestoreEngineTests: XCTestCase {
         disk.settle()
         let state = disk.engine.state
         XCTAssertNil(run("system restore list 42 version 16"))
-        XCTAssertEqual(disk.engine.state, state, "a restore changes the library and never ShowState")
+        XCTAssertEqual(disk.engine.state, state, "a restore changes the library and never what ShowState holds")
         XCTAssertEqual(disk.engine.state.pointer?.listUuid?.uuidString.lowercased(), Self.list42)
     }
 

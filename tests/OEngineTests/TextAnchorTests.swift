@@ -5,7 +5,7 @@ import OCore
 /// Spec 6 §4 — "Vertical anchor (P1). The Text Style gains
 /// `verticalAlignment`, beside `alignment`: `top`, `center` or `bottom` ... It
 /// places the block of lines in the box: the first line at the box's top, the
-/// block centred, or the last line at the box's bottom." Spec 4 §8 —
+/// block centered, or the last line at the box's bottom." Spec 4 §8 —
 /// "Horizontal and vertical alignment come from the style (`alignment`,
 /// `verticalAlignment`)."
 final class TextAnchorTests: XCTestCase {
@@ -18,14 +18,14 @@ final class TextAnchorTests: XCTestCase {
         try rasterizer.rasterize(T.job(text, style: T.plain(anchor: anchor), box: box)).layout
     }
 
-    func test_theBlockSitsAtTheTopTheCentreOrTheBottomOfTheBox() throws {
+    func test_theBlockSitsAtTheTopTheCenterOrTheBottomOfTheBox() throws {
         let top = try layout(.top)
         let lineHeight = Double(try XCTUnwrap(top.lines.first).origin.height)
         XCTAssertEqual(top.lines.count, 2)
         XCTAssertEqual(Double(top.lines[0].origin.y), 0, accuracy: 0.5, "the first line at the box's top")
 
-        let centre = try layout(.center)
-        XCTAssertEqual(Double(centre.lines[0].origin.y), (864 - 2 * lineHeight) / 2, accuracy: 0.5, "the block centred")
+        let center = try layout(.center)
+        XCTAssertEqual(Double(center.lines[0].origin.y), (864 - 2 * lineHeight) / 2, accuracy: 0.5, "the block centered")
 
         let bottom = try layout(.bottom)
         let last = try XCTUnwrap(bottom.lines.last)

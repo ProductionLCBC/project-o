@@ -13,8 +13,8 @@ public enum LivePosition: Equatable, Sendable {
     case ready(playlist: String)
     /// "Library · Great Is Thy Faithfulness · 3 Verse 2" for a list fired from the library.
     case library(list: String, number: Int, label: String)
-    /// "Nothing live", followed by "Click a cue, or choose Make Live" while a playlist is browsed (§7).
-    case nothing(hint: Bool)
+    /// "Nothing live, and nothing more" (corrected 2026-11-25).
+    case nothing
 
     public static func make(live: LiveStatus, shown: GridContext?) -> LivePosition {
         if live.playlist != nil {
@@ -24,8 +24,7 @@ public enum LivePosition: Equatable, Sendable {
         if live.listUuid != nil {
             return .library(list: live.listTitle, number: live.cuePosition, label: live.label)
         }
-        if case .playlist = shown { return .nothing(hint: true) }
-        return .nothing(hint: false)
+        return .nothing
     }
 }
 
@@ -204,6 +203,49 @@ public struct ViewSettings: Codable, Equatable, Sendable {
     public var lastBrowsedList: String?
     /// "the run whose restore banner was dismissed (§14)".
     public var dismissedRestoreRun: String?
+    /// Spec 11 §2 — "`view.json` (Spec 10 §4) also keeps the last page, each
+    /// page's selection, the Browser's tab and its media view, and the cue
+    /// grid's zoom and folded rows (§4), so edit mode reopens where it was left."
+    public var editPage = EditPage.cues
+    /// The Cues page's selection: where its list came from (a playlist and
+    /// its item, or neither for the Library window), the list, the cue and
+    /// the channel's row.
+    public var editPlaylist: String?
+    public var editItem: String?
+    public var editList: String?
+    public var editCue: String?
+    public var editChannel: Int?
+    /// The Stacks page's selection (Spec 11 §6): the stack, and the output whose properties show.
+    public var editStack: Int?
+    public var editOutput: Int?
+    /// The Channels page's selection (Spec 11 §7): the channel whose form shows.
+    public var editSheetChannel: Int?
+    /// The Presets page's selection (Spec 11 §8): the preset, and its layout's tab, a stack's number or nil for `*`.
+    public var editPreset: Int?
+    public var editLayout: Int?
+    /// Spec 11 §8, "Frame" (G-34) — the box's reference point the Frame fields read, "kept in `view.json`".
+    public var boxAnchor = FrameAnchor.topLeft
+    /// The Objects page's selection (Spec 11 §9): the object's kind and number.
+    public var editObjectKind: ObjectKind?
+    public var editObject: Int?
+    public var browserTab = BrowserTab.playlists
+    public var mediaView = MediaListView.grid
+    /// Spec 11 §4, "Zoom" — "The zoom is one setting for every list".
+    public var gridZoom = CueGridZoom.standard
+    /// Spec 11 §4 — "a row the operator folds or opens stays so for every list, by channel number".
+    public var foldedRows: [Int: Bool] = [:]
+    /// Spec 11 §4, "Tracking" (G-45) — "The switch is off at first, and `view.json` keeps it, one setting for every list."
+    public var gridTracking = false
+    /// Spec 11 §4 — "Hidden rows are kept by channel number for every list, in `view.json`, as folded ones are"
+    /// (corrected 2026-11-24); in number order.
+    public var hiddenRows: [Int] = []
+    /// Spec 11 §2 — "The gaps beside the Browser, the monitors and the
+    /// inspector drag to resize them ... `view.json` keeps the sizes"
+    /// (corrected 2026-11-24). Nil monitors are "a quarter of the window's
+    /// width, from 300 to 380 points".
+    public var editBrowserWidth = EditFrame.browserWidth
+    public var editMonitorsWidth: Double?
+    public var editInspectorHeight = EditFrame.inspectorHeight
 
     public init() {}
 
@@ -245,12 +287,46 @@ public struct ViewSettings: Codable, Equatable, Sendable {
         read(.lastBrowsedPlaylist, into: &lastBrowsedPlaylist)
         read(.lastBrowsedList, into: &lastBrowsedList)
         read(.dismissedRestoreRun, into: &dismissedRestoreRun)
+        read(.editPage, into: &editPage)
+        read(.editPlaylist, into: &editPlaylist)
+        read(.editItem, into: &editItem)
+        read(.editList, into: &editList)
+        read(.editCue, into: &editCue)
+        read(.editChannel, into: &editChannel)
+        read(.editStack, into: &editStack)
+        read(.editOutput, into: &editOutput)
+        read(.editSheetChannel, into: &editSheetChannel)
+        read(.editPreset, into: &editPreset)
+        read(.editLayout, into: &editLayout)
+        read(.boxAnchor, into: &boxAnchor)
+        read(.editObjectKind, into: &editObjectKind)
+        read(.editObject, into: &editObject)
+        read(.browserTab, into: &browserTab)
+        read(.mediaView, into: &mediaView)
+        read(.gridZoom, into: &gridZoom)
+        read(.foldedRows, into: &foldedRows)
+        read(.gridTracking, into: &gridTracking)
+        read(.hiddenRows, into: &hiddenRows)
+        hiddenRows = Array(Set(hiddenRows)).sorted()
+        read(.editBrowserWidth, into: &editBrowserWidth)
+        read(.editMonitorsWidth, into: &editMonitorsWidth)
+        read(.editInspectorHeight, into: &editInspectorHeight)
+        gridZoom = CueGridZoom.clamped(gridZoom)
+        clampEditSizes()
         // What was read is held to what the window allows.
         leftColumnWidth = Self.clampedLeft(leftColumnWidth)
         rightColumnWidth = Self.clampedRight(rightColumnWidth)
         leftSplit = min(0.8, max(0.2, leftSplit))
         if recentMedia.count > 20 { recentMedia.removeLast(recentMedia.count - 20) }
         if let frame = windowFrame, frame.count != 4 || frame.contains(where: { !$0.isFinite }) || frame[2] <= 0 || frame[3] <= 0 { windowFrame = nil }
+    }
+
+    /// Edit mode's sizes held to Spec 11 §2's limits.
+    public mutating func clampEditSizes() {
+        func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double { value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : range.lowerBound }
+        editBrowserWidth = clamp(editBrowserWidth, EditFrame.browserRange)
+        editMonitorsWidth = editMonitorsWidth.map { clamp($0, EditFrame.monitorsRange) }
+        editInspectorHeight = clamp(editInspectorHeight, EditFrame.inspectorRange)
     }
 
     /// "the last thing browsed", as the grid names what it shows.
@@ -318,6 +394,17 @@ public struct PoolTile: Equatable, Sendable {
     public var tile: String?
     public var overlay: Overlay
     public var isOnThisMac: Bool
+
+    /// Spec 11 §2, "Picking media" (G-42) — also the chooser's first tile, which picks nothing.
+    public init(id: String, name: String, kind: MediaKind, durationMs: Int?, tile: String?, overlay: Overlay, isOnThisMac: Bool) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.durationMs = durationMs
+        self.tile = tile
+        self.overlay = overlay
+        self.isOnThisMac = isOnThisMac
+    }
 }
 
 /// Spec 10 §6, "The Media pool panel".

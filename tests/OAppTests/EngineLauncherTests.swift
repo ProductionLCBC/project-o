@@ -94,7 +94,8 @@ final class EngineLauncherTests: XCTestCase {
         let other = try XCTUnwrap(Int32(logText().trimmingCharacters(in: .whitespacesAndNewlines)))
         started.append(other)
         XCTAssertTrue(launcher.isRunning(pid: other))
-        XCTAssertEqual(launcher.executablePath(pid: other), "/bin/sleep", "the id names the program it runs")
+        // The shell prints the id as soon as it forks, perhaps before the child has become the sleep.
+        XCTAssertTrue(waitUntil { self.launcher.executablePath(pid: other) == "/bin/sleep" }, "the id names the program it runs")
 
         let reported = expectation(description: "the other process's end is reported")
         let box = Box<EngineExit?>(nil)

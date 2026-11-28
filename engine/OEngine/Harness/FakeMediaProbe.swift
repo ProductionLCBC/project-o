@@ -5,7 +5,7 @@ import Foundation
 import OCore
 
 /// Spec 8 §11 — the frame a poster is made from, without AVFoundation: a
-/// frame of `size`, grey and opaque, or half transparent when alpha is
+/// frame of `size`, gray and opaque, or half transparent when alpha is
 /// asked for, unless the file's bytes start `NO FRAME`, which can't be
 /// decoded. It records each frame asked for, with its in-point.
 public final class FakeMediaFrames: MediaFrames, @unchecked Sendable {

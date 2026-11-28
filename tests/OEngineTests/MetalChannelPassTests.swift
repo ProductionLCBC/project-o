@@ -3,7 +3,7 @@ import OCore
 @testable import OEngine
 
 /// Spec 4 §7 — the channel pass on the GPU: stage 1 against the CPU reference
-/// for every source layout (Spec 4 §16, Colour), the letterboxed fit, the
+/// for every source layout (Spec 4 §16, Color), the letterboxed fit, the
 /// grade, the three transitions and the snapshot, with goldens (Spec 4 §16:
 /// "each transition type at 0, 0.5 and 1; ... each grade parameter at two
 /// values").
@@ -22,7 +22,7 @@ final class MetalChannelPassTests: XCTestCase {
         SourceBinding(source: .texture(handle), layout: layout, matrix: .bt709, range: .full, size: size)
     }
 
-    // MARK: - Colour through each layout (Spec 4 §16)
+    // MARK: - Color through each layout (Spec 4 §16)
 
     struct LayoutCase {
         var layout: SourceLayout
@@ -73,12 +73,12 @@ final class MetalChannelPassTests: XCTestCase {
     func test_stage1MatchesTheReferenceForEveryLayout() throws {
         let size = PixelSize(width: 8, height: 8)
         var cases: [LayoutCase] = []
-        for (y, cb, cr, name) in [(16, 128, 128, "black"), (235, 128, 128, "white"), (126, 128, 128, "grey"), (63, 102, 240, "red"), (32, 240, 118, "blue")] {
+        for (y, cb, cr, name) in [(16, 128, 128, "black"), (235, 128, 128, "white"), (126, 128, 128, "gray"), (63, 102, 240, "red"), (32, 240, 118, "blue")] {
             cases.append(LayoutCase(layout: .nv12, planes: ycbcrPlanes(.nv12, width: 8, height: 8, y: y, cb: cb, cr: cr), range: .limited,
                                     expected: referenceYCbCr(.nv12, y: y, cb: cb, cr: cr, range: .limited), name: "nv12 " + name))
         }
         for layout in [SourceLayout.p010, .yuv422p10] {
-            for (y, cb, cr, name) in [(64, 512, 512, "black"), (940, 512, 512, "white"), (502, 512, 512, "grey"), (250, 409, 960, "red")] {
+            for (y, cb, cr, name) in [(64, 512, 512, "black"), (940, 512, 512, "white"), (502, 512, 512, "gray"), (250, 409, 960, "red")] {
                 cases.append(LayoutCase(layout: layout, planes: ycbcrPlanes(layout, width: 8, height: 8, y: y, cb: cb, cr: cr), range: .limited,
                                         expected: referenceYCbCr(layout, y: y, cb: cb, cr: cr, range: .limited), name: "\(layout.rawValue) " + name))
             }
@@ -90,7 +90,7 @@ final class MetalChannelPassTests: XCTestCase {
             for i in 0..<(8 * 8 * 4) { p[i] = Float16(0.5) }
         }
         cases.append(LayoutCase(layout: .rgba16, planes: [halves], range: .full, expected: ColorMath.stage1RGBA(r: 0.5, g: 0.5, b: 0.5, a: 0.5), name: "rgba16 half"))
-        // BGRA8 sRGB premultiplied: 128 grey, opaque.
+        // BGRA8 sRGB premultiplied: 128 gray, opaque.
         var bgra = Data(count: 8 * 8 * 4)
         for i in 0..<(8 * 8) {
             bgra[i * 4] = 128
@@ -98,8 +98,8 @@ final class MetalChannelPassTests: XCTestCase {
             bgra[i * 4 + 2] = 128
             bgra[i * 4 + 3] = 255
         }
-        let grey = ColorMath.srgbDecode(128 / 255)
-        cases.append(LayoutCase(layout: .bgra8sRGB, planes: [bgra], range: .full, expected: LinearPixel(r: grey, g: grey, b: grey, a: 1), name: "bgra8 sRGB grey"))
+        let gray = ColorMath.srgbDecode(128 / 255)
+        cases.append(LayoutCase(layout: .bgra8sRGB, planes: [bgra], range: .full, expected: LinearPixel(r: gray, g: gray, b: gray, a: 1), name: "bgra8 sRGB gray"))
         // Linear RGBA16: pass-through.
         var linear = Data(count: 8 * 8 * 8)
         linear.withUnsafeMutableBytes { raw in
@@ -148,10 +148,10 @@ final class MetalChannelPassTests: XCTestCase {
         let size = PixelSize(width: 16, height: 9)
         let pass = ChannelPass(channel: 1, target: target(16, 9), size: size, incoming: binding(still, layout: .linearRGBA16, size: PixelSize(width: 8, height: 6)))
         guard let frame = MetalHarness.render(pass, backend: backend) else { return XCTFail() }
-        // 4:3 into 16:9: the content is 12 pixels wide, centred, with 2-pixel transparent bars.
+        // 4:3 into 16:9: the content is 12 pixels wide, centered, with 2-pixel transparent bars.
         MetalHarness.assertPixel(frame[0, 4], .transparent, "left bar")
         MetalHarness.assertPixel(frame[15, 4], .transparent, "right bar")
-        MetalHarness.assertPixel(frame[8, 4], LinearPixel(r: 1, g: 1, b: 1, a: 1), "centre")
+        MetalHarness.assertPixel(frame[8, 4], LinearPixel(r: 1, g: 1, b: 1, a: 1), "center")
         XCTAssertEqual(ControlLoop.contentRect(source: PixelSize(width: 8, height: 6), channel: size), UVRect(u: 0.125, v: 0, width: 0.75, height: 1))
     }
 

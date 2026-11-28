@@ -246,7 +246,7 @@ final class RestoreRulesTests: XCTestCase {
         let then = snapshot()
         var now = library
         now.info.name = "Renamed Since"
-        now.channels[0].label = "Relabelled"
+        now.channels[0].label = "Relabeled"
         now.textStyles[0].label = "Restyled"
         now.presets.removeAll { $0.number == 4 }
         now.documentPaths.removeValue(forKey: "preset/4")
@@ -392,8 +392,8 @@ final class RestoreRulesTests: XCTestCase {
         XCTAssertEqual(reason(restore(then, machine: macros)), .conflict)
     }
 
-    /// "A restore that would delete a channel with content in a stack an output shows is refused with
-    /// `onAir`, as Spec 5 §6 refuses that delete".
+    /// "A restore that would delete a channel on air, with content in a stack an output shows or
+    /// sounding on an audio output, is refused with `onAir`, as Spec 5 §6 refuses that delete".
     func test_deletingAChannelOnAirRefusesWithOnAir() throws {
         var older = library
         older.channels.removeAll { $0.number == 1 }
@@ -401,38 +401,45 @@ final class RestoreRulesTests: XCTestCase {
         var state = ShowState.fresh(library: library, machine: machine)
         state.channels[1]?.content = .text(TextInstance(fields: ["body": "Great is thy faithfulness"]))
         XCTAssertEqual(reason(restore(then, state: state)), .onAir)
+
+        // Channel 3 is in the confidence stack alone, which no output shows: sound on it is on air all the same
+        // (Adam's answer of 2026-11-18).
+        var silent = library
+        silent.channels.removeAll { $0.number == 3 }
+        var sounding = ShowState.fresh(library: library, machine: machine)
+        let context = ProjectionContext(frame: 0, library: library, machine: machine, source: CommandSource(kind: .osc))
+        sounding = project(sounding, [.channelWrite(ChannelWrite(channel: .number(3), content: .media(MediaContent(ref: F.mountains))))], context: context).0
+        let refused = restore(snapshot(silent), state: sounding)
+        XCTAssertEqual(reason(refused), .onAir)
+        XCTAssertTrue(message(refused).contains("channel 3 is sounding on an audio output"), message(refused))
     }
 
-    /// Adam's answer of 2026-11-14 — a snapshot that adds, removes or resizes a channel is refused with
-    /// `notInV1`, naming the channels, until Area 14; a channel on air still answers `onAir` first.
-    func test_aSnapshotWithAnotherChannelListIsRefusedUntilArea14() throws {
+    /// Spec 9 §6 — "A snapshot that adds, removes or resizes a channel restores like any other: the engine
+    /// rebuilds its channel textures and ShowState's entries between ticks, as it does for an edit of the
+    /// same channels (Spec 5 §2, Spec 4 §5)." Refused with `notInV1` until Area 14 (Adam's answer of
+    /// 2026-11-14); a channel on air still answers `onAir` (the tests above).
+    func test_aSnapshotWithAnotherChannelListRestores() throws {
         let empty = ShowState.fresh(library: library, machine: machine)
         var fewer = library
         fewer.channels.removeAll { $0.number == 3 }
-        let removed = restore(snapshot(fewer), state: empty)
-        XCTAssertEqual(reason(removed), .notInV1)
-        XCTAssertTrue(message(removed).contains("channel 3 removed"), message(removed))
+        XCTAssertEqual(try restore(snapshot(fewer), state: empty).get().library.channels.map(\.number), [1, 2])
 
         var more = library
         var extra = more.channels[2]
         extra.number = 4
         extra.uuid = UUID()
         more.channels.append(extra)
-        let added = restore(snapshot(more), state: empty)
-        XCTAssertEqual(reason(added), .notInV1)
-        XCTAssertTrue(message(added).contains("channel 4 added"), message(added))
+        XCTAssertEqual(try restore(snapshot(more), state: empty).get().library.channels.map(\.number), [1, 2, 3, 4])
 
         var resized = library
-        resized.channels[1].renderSize = resized.channels[1].renderSize == .largest ? .size(width: 640, height: 360) : .largest
-        let size = restore(snapshot(resized), state: empty)
-        XCTAssertEqual(reason(size), .notInV1)
-        XCTAssertTrue(message(size).contains("channel 2 resized"), message(size))
+        let size: RenderSize = resized.channels[1].renderSize == .largest ? .size(width: 640, height: 360) : .largest
+        resized.channels[1].renderSize = size
+        XCTAssertEqual(try restore(snapshot(resized), state: empty).get().library.channels[1].renderSize, size)
 
-        // A label, a default or a decoder cap is read live, so it restores.
-        var relabelled = library
-        relabelled.channels[1].label = "Lyrics Then"
-        relabelled.channels[1].decoderCap = 3
-        XCTAssertEqual(try restore(snapshot(relabelled), state: empty).get().library.channels[1].label, "Lyrics Then")
+        var relabeled = library
+        relabeled.channels[1].label = "Lyrics Then"
+        relabeled.channels[1].decoderCap = 3
+        XCTAssertEqual(try restore(snapshot(relabeled), state: empty).get().library.channels[1].label, "Lyrics Then")
     }
 
     /// "On a `readOnlyMasters` machine only the machine documents are replaced, and the result warns that

@@ -37,8 +37,8 @@ class Surface: NSView {
 
 @MainActor
 enum Kit {
-    /// A line of text that never takes typing. With no colour given it is the
-    /// palette's text colour. (The default is resolved in here and not in
+    /// A line of text that never takes typing. With no color given it is the
+    /// palette's text color. (The default is resolved in here and not in
     /// the signature: Swift 6.0.3's compiler crashes on a main-actor default
     /// argument reached from a stored property's initializer.)
     static func label(_ text: String = "", size: CGFloat = 12, weight: NSFont.Weight = .regular, color: NSColor? = nil, mono: Bool = false) -> NSTextField {
@@ -69,7 +69,7 @@ enum Kit {
     /// draws it measures it now. (Not `intrinsicContentSize`, which AppKit
     /// keeps from before the text last changed; and not the attributed
     /// string's own size, which comes out narrower than the cell draws a
-    /// centred line: the countdown read "…" on a real run for that.)
+    /// centered line: the countdown read "…" on a real run for that.)
     static func width(of field: NSTextField) -> CGFloat {
         guard !field.stringValue.isEmpty, let cell = field.cell else { return 0 }
         let measured = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10_000, height: 200)).width
@@ -169,7 +169,7 @@ final class TagView: Surface {
 @MainActor
 final class FlatButton: NSControl {
     enum Style {
-        /// A raised grey button.
+        /// A raised gray button.
         case plain
         /// The large Next.
         case primary
@@ -179,10 +179,12 @@ final class FlatButton: NSControl {
         case amber
         /// No background until the pointer is over it.
         case bare
+        /// Red in a tint with a red edge: edit mode's Clear All and Fire, "red and set apart" among quiet controls (Spec 11 §2).
+        case dangerTint
     }
 
     var style = Style.plain { didSet { needsDisplay = true } }
-    /// Drawn as a small tag, in that tag's colours: a tag that opens
+    /// Drawn as a small tag, in that tag's colors: a tag that opens
     /// something is a button like any other (Spec 10 §8).
     var tagStyle: TagView.Style? { didSet { refresh() } }
     var title = "" { didSet { refresh() } }
@@ -221,8 +223,14 @@ final class FlatButton: NSControl {
     var fitting: NSSize {
         let width = ceil((title as NSString).size(withAttributes: [.font: font_]).width)
         if tagStyle != nil { return NSSize(width: width + 10, height: 16) }
-        return NSSize(width: width + 22, height: max(24, fontSize + 12))
+        return NSSize(width: width + 22 + (dropMenu == nil || title.isEmpty || !chevron ? 0 : 14), height: max(24, fontSize + 12))
     }
+
+    /// Spec 11 §1, "Adding and choosing" — a button that opens a menu of its choices, never its own name among them:
+    /// a press shows the menu under the button, with a chevron beside the title.
+    var dropMenu: NSMenu? { didSet { needsDisplay = true } }
+    /// Whether the chevron shows: not on a row's ⋯, which says it already.
+    var chevron = true { didSet { needsDisplay = true } }
 
     private func drawAsTag(_ tag: TagView.Style) {
         var fill = Palette.raisedHigh
@@ -296,6 +304,10 @@ final class FlatButton: NSControl {
     /// Presses it, as a click or VoiceOver would.
     func press() {
         guard isEnabled else { return }
+        if let dropMenu {
+            dropMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: bounds.height + 2), in: self)
+            return
+        }
         onPress?()
     }
 
@@ -326,6 +338,10 @@ final class FlatButton: NSControl {
             fill = Palette.browsing.withAlphaComponent(isDown ? 0.32 : 0.2)
             text = Palette.browsing
         case .bare: fill = isHovered || isDown ? Palette.raised : nil
+        case .dangerTint:
+            fill = Palette.live.withAlphaComponent(isDown ? 0.30 : (isHovered ? 0.22 : 0.14))
+            text = NSColor(srgbRed: 1, green: 0x8D / 255, blue: 0x87 / 255, alpha: 1)
+            outline = Palette.live.withAlphaComponent(0.5)
         }
         if isOn {
             // Blue for selection (Spec 10 §4) on a cell; a step lighter for the chosen one of a set.
@@ -362,8 +378,25 @@ final class FlatButton: NSControl {
         }
         let attributes: [NSAttributedString.Key: Any] = [.font: font_, .foregroundColor: text]
         let size = (title as NSString).size(withAttributes: attributes)
-        (title as NSString).draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+        let chevronWidth: CGFloat = dropMenu == nil || title.isEmpty || !chevron ? 0 : 14
+        let x = leading ? 8 : (bounds.width - size.width - chevronWidth) / 2
+        (title as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2), withAttributes: attributes)
+        if dropMenu != nil, chevron {
+            // The chevron: a menu opens under it.
+            let mid = title.isEmpty ? bounds.midX : min(bounds.width - 10, x + size.width + 9)
+            let y = bounds.midY + 1
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: mid - 3.5, y: y - 2))
+            path.line(to: NSPoint(x: mid, y: y + 1.5))
+            path.line(to: NSPoint(x: mid + 3.5, y: y - 2))
+            path.lineWidth = 1.5
+            text.withAlphaComponent(0.8).setStroke()
+            path.stroke()
+        }
     }
+
+    /// Whether the title starts at the left, as a row of a list does, rather than in the middle.
+    var leading = false { didSet { needsDisplay = true } }
 
     /// Whether the title fits the button as it is laid out; the clipping test reads it (Spec 10 §18).
     var titleFits: Bool {
@@ -372,7 +405,7 @@ final class FlatButton: NSControl {
 }
 
 /// A dot: filled, or hollow (Spec 10 §8: "filled green while presenting,
-/// and otherwise a hollow red shape"), so its state isn't told by colour alone.
+/// and otherwise a hollow red shape"), so its state isn't told by color alone.
 @MainActor
 final class DotView: NSView {
     var color = Palette.live { didSet { needsDisplay = true } }

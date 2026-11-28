@@ -150,7 +150,7 @@ final class ApiPreviewTests: XCTestCase {
     func test_aClearStackIsBlackAndATranslucentOneIsOverBlack() throws {
         let clear = try XCTUnwrap(PreviewJPEG.encode(pixels(width: 480, height: 270, blue: 0, green: 0, red: 0, alpha: 0), width: 480, quality: 0.7))
         XCTAssertEqual(try decode(["jpeg": .string(clear.data.base64EncodedString())]).middle.map { $0 < 8 }, [true, true, true])
-        // Premultiplied white at half opacity is mid grey over black.
+        // Premultiplied white at half opacity is mid gray over black.
         let half = try XCTUnwrap(PreviewJPEG.encode(pixels(width: 480, height: 270, blue: 128, green: 128, red: 128, alpha: 128), width: 480, quality: 0.7))
         let picture = try decode(["jpeg": .string(half.data.base64EncodedString())])
         XCTAssertEqual(Double(picture.middle[0]), 128, accuracy: 12)

@@ -6,9 +6,9 @@ import XCTest
 /// treat the list's first cue as a boundary into that list, and fold cue 1
 /// through cue K. The result is what the default stack would show if the
 /// list ran from the start, which is the UX spec's definition of a cue
-/// thumbnail and of the chip colours."
+/// thumbnail and of the chip colors."
 ///
-/// Spec 3 §3, "What a chip colour means" — "An attribute whose value changed
+/// Spec 3 §3, "What a chip color means" — "An attribute whose value changed
 /// and whose origin is `tracked` or `once` from this cue is *new*; one whose
 /// value is unchanged and was not written by this cue is *held*; one written
 /// by this cue to the value it already had is *redundant*, a write worth

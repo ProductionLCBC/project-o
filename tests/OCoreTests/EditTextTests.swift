@@ -214,7 +214,7 @@ final class EditTextTests: XCTestCase {
         XCTAssertEqual(rejection("edit list 42 cue \(Self.c) channel 2 grade 5 once hold")?.reason, .badArgument)
         XCTAssertEqual(rejection("edit list 42 cue \(Self.c) channel 2 paint")?.reason, .badArgument)
         XCTAssertEqual(rejection("edit list 42 cue \(Self.c) channel 2 clear { \"where\": 1 }")?.reason, .badArgument)
-        XCTAssertEqual(rejection("edit playlist \(Self.p) duplicate \"x\" { \"colour\": 1 }")?.reason, .badArgument)
+        XCTAssertEqual(rejection("edit playlist \(Self.p) duplicate \"x\" { \"color\": 1 }")?.reason, .badArgument)
         XCTAssertEqual(rejection("channel 2 write text \"x\" { \"at\": 1 }")?.reason, .unexpectedToken, "a plain write takes no JSON after it")
     }
 

@@ -448,13 +448,15 @@ public final class AudioSystem: @unchecked Sendable {
 
     /// Spec 4 §11 — the audio transition between a channel's outgoing and
     /// incoming instance, on every device either reaches.
-    public func startTransition(outgoing: AudioAttachment?, incoming: AudioAttachment?, type: AudioTransitionType, ms: Int, offsetMs: Int) {
+    public func startTransition(outgoing: AudioAttachment?, incoming: AudioAttachment?, type: AudioTransitionType, ms: Int, offsetMs: Int,
+                                easing: Easing = .linear) {
         var graphs: [AudioGraph] = []
         for member in (outgoing?.members ?? []) + (incoming?.members ?? []) where !graphs.contains(where: { $0 === member.graph }) {
             graphs.append(member.graph)
         }
         for graph in graphs {
-            graph.startTransition(outgoing: outgoing?.instance(on: graph), incoming: incoming?.instance(on: graph), type: type, ms: ms, offsetMs: offsetMs)
+            graph.startTransition(outgoing: outgoing?.instance(on: graph), incoming: incoming?.instance(on: graph), type: type, ms: ms, offsetMs: offsetMs,
+                                  easing: easing)
         }
     }
 

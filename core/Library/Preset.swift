@@ -208,7 +208,10 @@ public struct Box: Codable, Equatable, Sendable {
     public var frame: Frame
     public var fit: BoxFit
     public var textStyle: BoxTextStyle?
-    public var transition: BoxTransition
+    /// Spec 1 §2 as corrected 2026-11-25 — "Null takes the channel's transition (Spec 3 §4). Set on a text or
+    /// static box, it overrides the channel's default transition, never one a cue sets; a pixel box always takes
+    /// the channel's".
+    public var transition: BoxTransition?
     public var transitionOnVariableChange: Bool
     public var fallback: Bool
     public var offset: Int
@@ -216,7 +219,7 @@ public struct Box: Codable, Equatable, Sendable {
     public var extra: [String: JSONValue]
 
     public init(binding: Binding, frame: Frame = .full, fit: BoxFit, textStyle: BoxTextStyle? = nil,
-                transition: BoxTransition = BoxTransition(), transitionOnVariableChange: Bool = false,
+                transition: BoxTransition? = nil, transitionOnVariableChange: Bool = false,
                 fallback: Bool = false, offset: Int = 0, grade: Int? = nil, extra: [String: JSONValue] = [:]) {
         self.binding = binding
         self.frame = frame
@@ -252,7 +255,7 @@ public struct Box: Codable, Equatable, Sendable {
         frame = try c.value(.frame, default: .full)
         fit = try c.value(.fit, default: binding.isText ? .text(TextFit()) : .pixels(.fit))
         textStyle = try c.decodeIfPresent(BoxTextStyle.self, forKey: .textStyle)
-        transition = try c.value(.transition, default: BoxTransition())
+        transition = try c.decodeIfPresent(BoxTransition.self, forKey: .transition)
         transitionOnVariableChange = try c.value(.transitionOnVariableChange, default: false)
         fallback = try c.value(.fallback, default: false)
         offset = try c.value(.offset, default: 0)
@@ -272,7 +275,7 @@ public struct Box: Codable, Equatable, Sendable {
             try c.encodeNullable(textStyle, forKey: .textStyle)
             try c.encode(transitionOnVariableChange, forKey: .transitionOnVariableChange)
         }
-        try c.encode(transition, forKey: .transition)
+        try c.encodeNullable(transition, forKey: .transition)
         try c.encode(fallback, forKey: .fallback)
         try c.encode(offset, forKey: .offset)
         try c.encodeNullable(grade, forKey: .grade)
@@ -343,16 +346,17 @@ public struct Preset: Codable, Equatable, Sendable {
     /// when a library has no preset 1 on disk (§8). `"*"`: "a pixel box filling
     /// the frame, then a fallback body box". `"2"`, the confidence layout:
     /// "a body box for the current cue in the upper part of the frame, and a
-    /// smaller grey body box at +1 below it".
+    /// smaller gray body box at +1 below it".
     public static let builtInDefault = Preset(
         number: 1, label: "Default", uuid: UUID(uuidString: "c0de0000-0000-4000-8000-000000000001") ?? UUID(), builtIn: true,
         layouts: [
             .any: Layout(boxes: [
-                Box(binding: .pixels, frame: .full, fit: .pixels(.fit), transition: BoxTransition(ref: 1)),
+                // Spec 1 §9 as corrected 2026-11-25 — both boxes take the channel's transition.
+                Box(binding: .pixels, frame: .full, fit: .pixels(.fit)),
                 Box(binding: .field(name: "body"), frame: Frame(x: 0.05, y: 0.1, w: 0.9, h: 0.8),
                     fit: .text(TextFit(policy: .shrinkToFit, maxLines: 6, minSize: 24)),
                     textStyle: BoxTextStyle(values: TextStyleValues(shadow: Shadow(x: 0, y: 2, blur: 8, color: Color(r: 0, g: 0, b: 0, a: 0.6))), fromStyle: 1),
-                    transition: BoxTransition(ref: 2, ms: 250), fallback: true),
+                    fallback: true),
             ]),
             .stack(2): Layout(boxes: [
                 Box(binding: .field(name: "body"), frame: Frame(x: 0.03, y: 0.11, w: 0.94, h: 0.56),
@@ -360,7 +364,7 @@ public struct Preset: Codable, Equatable, Sendable {
                     textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 64), alignment: .left, verticalAlignment: .top), fromStyle: 1),
                     transition: BoxTransition(ref: 1)),
                 // "The +1 box matches the first apart from offset 1, its frame (y 0.7, h 0.27), the maxLines policy
-                // with 3 lines, a grey colour (0.7) and a size of 40 points."
+                // with 3 lines, a gray color (0.7) and a size of 40 points."
                 Box(binding: .field(name: "body"), frame: Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27),
                     fit: .text(TextFit(policy: .maxLines, maxLines: 3, minSize: 24)),
                     textStyle: BoxTextStyle(values: TextStyleValues(size: TextSize(value: 40), color: Color(r: 0.7, g: 0.7, b: 0.7),

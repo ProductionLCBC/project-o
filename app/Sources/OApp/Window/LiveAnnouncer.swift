@@ -95,7 +95,7 @@ public enum AnnounceWording {
     public static func text(_ announcement: Announcement) -> String {
         switch announcement {
         case .live(let number, let label, let source):
-            let cue = label.isEmpty ? Strings.text(.gridCueUnlabelled, number) : label
+            let cue = label.isEmpty ? Strings.text(.gridCueUnlabeled, number) : label
             switch source {
             // The app's own: the cue, and no more.
             case nil, "ui"?, "key"?, "commandbar"?: return cue

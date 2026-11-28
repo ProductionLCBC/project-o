@@ -110,10 +110,10 @@ Also in the channel family: `channel N build K` (`channel.build`), which changes
 | Text form | Object | Effect | Lock | Undo |
 | --- | --- | --- | --- | --- |
 | `next`, `previous` | `playlist.next`, `playlist.previous` | Fires the next or previous cue; crosses item boundaries; nothing past the end | passes (the cue's writes obey lock) | runtime |
-| `cue N` | `playlist.cue` | Fires cue N of the live list | passes | runtime |
-| `item N cue M` | `playlist.goto` | Fires that cue and makes its item live | passes | runtime |
+| `cue N [state]` | `playlist.cue` | Fires cue N of the live list; with `state`, after taking up the state its list leaves before it (Spec 3 §5) | passes | runtime |
+| `item N cue M [state]` | `playlist.goto` | Fires that cue and makes its item live; `state` as for `cue` | passes | runtime |
 | `item N section "NAME"` | `playlist.section` | Fires the first cue of that section in item N | passes | runtime |
-| `list N cue M` | `list.goto` | Fires that cue in a library master; the list becomes live with lookahead confined to it | passes | runtime |
+| `list N cue M [state]` | `list.goto` | Fires that cue in a library master; the list becomes live with lookahead confined to it; `state` as for `cue` | passes | runtime |
 | `playlist "TITLE"` | `playlist.load` | Makes a playlist live with no cue fired; the first `next` fires its first cue (Spec 7 §3–§4) | passes | none |
 | `disarm` | `playlist.disarm` | Clears the armed trigger, so nothing fires on its own; the engine sends it when a trigger's cue is no longer next at its time (Spec 7 §4) | passes | none |
 
@@ -220,7 +220,7 @@ The OSC address is the text form with slashes: `/o/TARGET/NUMBER/VERB`, and the 
 | `next` | `/o/next` |
 | `cue 7` | `/o/cue` `i:7` |
 | `item 4 cue 3` | `/o/item/4/cue` `i:3` |
-| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds); `up` follows as `s:"up"` |
+| `timer 1 set 5:00` | `/o/timer/1/set` `s:"5:00"` or `i:300` (seconds); `up` follows as `s:"up"`, as a cue's `state` does (`/o/list/42/cue` `i:3` `s:"state"`) |
 | `popup 3 set "text" clearafter 30` | `/o/popup/3/set` `s:"text"` `i:30` |
 | `macro 12` | `/o/macro/12` |
 | `system clearall` | `/o/system/clearall` |
@@ -271,7 +271,7 @@ when [Channel 2 Content] is empty channel 2 write text "Welcome"
 
 In the object form a guard is a `when` field: `{"var": "Timer 1", "op": "is", "value": "0:00"}`. Values compare as durations when both sides parse as durations, as numbers when both parse as numbers, otherwise as case-insensitive strings. `[Channel N Content]` reads as the content kind plus its label (`"text: Verse 1"`), so `is empty` is the useful comparison.
 
-Guards are evaluated at the moment the command would run, inside the macro's group, against the state as earlier commands in the same group have changed it. The palette shows a guard as a chip; the raw view shows the `when` clause. Guards on cue commands are reserved in the schema and rejected by the v1 validator, so the field exists without the behaviour.
+Guards are evaluated at the moment the command would run, inside the macro's group, against the state as earlier commands in the same group have changed it. The palette shows a guard as a chip; the raw view shows the `when` clause. Guards on cue commands are reserved in the schema and rejected by the v1 validator, so the field exists without the behavior.
 
 ## 8. Execution semantics
 
@@ -289,7 +289,7 @@ A command passes through four stages: parse, validate, execute, log. The first t
 
 **Timing.** Commands take effect on the next engine frame boundary after they are accepted, so a group of writes lands on the same frame. A `transition` rider's duration starts at that boundary; an audio transition offset is measured from the same point, which is what makes J and L cuts identical from a key, a Time trigger or timecode.
 
-**Idempotence rules from the UX spec** are honoured at execution, not at validation: writing the media already on a channel restarts it from its in-point with a dissolve from the current frame; writing identical text is a no-op with no transition; writing the same designed slide with a different build index animates to that build.
+**Idempotence rules from the UX spec** are honored at execution, not at validation: writing the media already on a channel restarts it from its in-point with a dissolve from the current frame; writing identical text is a no-op with no transition; writing the same designed slide with a different build index animates to that build.
 
 **Results.** Every executed command yields one of `ok`, `blocked`, `noop` or `steppedOn`; a rejected command yields `rejected` with a reason and is logged only at the API and command-bar boundary, never in the runtime log.
 

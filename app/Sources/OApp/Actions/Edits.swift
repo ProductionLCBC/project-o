@@ -184,9 +184,10 @@ public enum Edits {
         edit(.list(list), .delete)
     }
 
-    /// "New List ... sends `edit list create folder "PATH"` for the selected folder, or `edit list create` at the top".
-    public static func newList(in folder: String?) -> Sending {
-        edit(.list(nil), .create(body: nil, folder: (folder ?? "").isEmpty ? nil : folder, title: nil))
+    /// Spec 10 §5 — "Return sends `edit list create folder "PATH" {"title": "TITLE"}`, or
+    /// `edit list create {"title": "TITLE"}` at the top" (corrected 2026-11-24).
+    public static func newList(in folder: String?, title: String) -> Sending {
+        edit(.list(nil), .create(body: .object(["title": .string(title)]), folder: (folder ?? "").isEmpty ? nil : folder, title: nil))
     }
 
     // MARK: A cue's menu (Spec 10 §6)

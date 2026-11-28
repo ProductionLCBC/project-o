@@ -46,6 +46,7 @@ public final class RenderLoop: @unchecked Sendable {
     private var previousReceipt: EncodeReceipt?
     private var lastCompletion = GPUCompletion(channelNs: 0, stackNs: 0, sinkNs: 0)
     private let consumedTick = Atomic<Int64>(-1)
+    private let takenPlanFrame = Atomic<Int64>(-1)
     private let consumedAt = Atomic<Int64>(0)
     private let ticksRun = Atomic<Int64>(0)
     private let repeats = Atomic<Int64>(0)
@@ -74,6 +75,12 @@ public final class RenderLoop: @unchecked Sendable {
     /// Spec 4 §12 — for the watchdog: when a plan was last consumed.
     public var lastConsumed: MonotonicTime { MonotonicTime(nanoseconds: consumedAt.load(ordering: .acquiring)) }
     public var lastConsumedTick: Int64 { consumedTick.load(ordering: .acquiring) }
+    /// Spec 4 §3 — the frame the newest plan this thread has taken was built
+    /// for, or -1 before the first. While the control thread is behind, the
+    /// ticks go on and this stays: every pass from here on reads that plan or
+    /// a later one, so whatever only earlier plans name can be freed
+    /// (`ResourceTable.sweep`). Stored as the plan is taken, before it is read.
+    public var lastTakenPlanFrame: Int64 { takenPlanFrame.load(ordering: .acquiring) }
     public var totalTicks: Int64 { ticksRun.load(ordering: .relaxed) }
     public var totalRepeats: Int64 { repeats.load(ordering: .relaxed) }
     public var gpuFailures: Int64 { gpuFailureCount.load(ordering: .relaxed) }
@@ -110,6 +117,7 @@ public final class RenderLoop: @unchecked Sendable {
         var plan: FramePlan
         if let fresh = planRing.take() {
             plan = fresh
+            takenPlanFrame.store(fresh.frame, ordering: .releasing)
         } else if var previous = lastPlan {
             previous.frame = time.tick
             plan = previous
@@ -202,7 +210,7 @@ public final class RenderLoop: @unchecked Sendable {
         consumedTick.store(time.tick, ordering: .releasing)
         consumedAt.store(time.wake.nanoseconds, ordering: .releasing)
         ticksRun.add(1, ordering: .relaxed)
-        picks.clearAll()
+        picks.clear(first: plan.channelPasses.count * 2)
     }
 
     private func pick(_ source: SourceRef, into slot: Int, record: inout TickRecord, channel: Int, instanceIndex: inout Int) -> PickResult {

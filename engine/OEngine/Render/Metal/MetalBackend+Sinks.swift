@@ -7,14 +7,20 @@ import simd
 
 extension MetalBackend {
     /// Spec 4 §10 — the display sink's encode pass into its drawable, on the
-    /// sink's thread: mix, sRGB transfer, 10-bit.
-    public func encodeDisplay(_ frame: CompletedFrame, into drawable: MTLTexture, command: MTLCommandBuffer) {
-        guard let stack = texture(frame.stack) else { return }
+    /// sink's thread: mix, sRGB transfer, 10-bit. False when nothing was
+    /// drawn: the frame's stack texture is gone (its stack was made again and
+    /// the ring it had was freed, Spec 4 §5) or no pipeline could be made.
+    /// The sink then presents nothing, so its last frame stays (Spec 4 §1: "A
+    /// missing frame is a repeat, never black").
+    @discardableResult
+    public func encodeDisplay(_ frame: CompletedFrame, into drawable: MTLTexture, command: MTLCommandBuffer) -> Bool {
+        guard let stack = texture(frame.stack) else { return false }
         let kind: EncodeKind = drawable.pixelFormat == .bgr10a2Unorm ? .display10Bit : .capture
         if pipelines.encodePipeline(kind) == nil { try? pipelines.ensureEncode(kind) }
-        guard let pipeline = pipelines.encodePipeline(kind) else { return }
+        guard let pipeline = pipelines.encodePipeline(kind) else { return false }
         let pass = SinkPass(output: 0, stack: frame.stack, second: frame.second, mix: frame.mix, encode: kind, destination: frame.destination)
         encodeMix(pass, stack: stack, target: drawable, pipeline: pipeline, into: command)
+        return true
     }
 
     /// Spec 4 §10 — a sink registers the v210 ring the render thread writes,

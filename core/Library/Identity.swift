@@ -24,6 +24,16 @@ public enum NumberedType: String, CaseIterable, Sendable {
         guard let type = NumberedType.allCases.first(where: { $0.editWord == editWord.lowercased() }) else { return nil }
         self = type
     }
+
+    /// Spec 5 §4 — "A stack, output, audio output or input belongs to one
+    /// machine, but portable documents name machine-level numbers so that
+    /// they meet them at every campus (Spec 1 §2)."
+    public var isMachineLevel: Bool {
+        switch self {
+        case .stack, .output, .audioOutput, .input: return true
+        case .channel, .preset, .textStyle, .grade, .transition, .audioTransition, .macro, .list: return false
+        }
+    }
 }
 
 /// What `Identity.renumber` and `Identity.swap` did.
@@ -88,7 +98,22 @@ public enum Identity {
     /// §2), and a playlist link follows the list it finds, by its uuid or, in
     /// a hand-made file, by number (Spec 7 §3); commands name numbers, so
     /// they follow `map`.
+    ///
+    /// Spec 5 §4 — "Renumbering a machine-level object therefore rewrites
+    /// references in the machine root only. It leaves portable documents
+    /// alone": for a stack, output, audio output or input the library is
+    /// returned as it came, and `References` finds the portable references
+    /// the edit warns about.
     static func apply(_ type: NumberedType, map: [Int: Int], lists: [UUID: Int] = [:], library: inout Library, machine: inout Machine) {
+        if type.isMachineLevel {
+            var portable = library
+            rewrite(type, map: map, lists: lists, library: &portable, machine: &machine)
+        } else {
+            rewrite(type, map: map, lists: lists, library: &library, machine: &machine)
+        }
+    }
+
+    private static func rewrite(_ type: NumberedType, map: [Int: Int], lists: [UUID: Int], library: inout Library, machine: inout Machine) {
         // Which list each playlist link finds before anything moves.
         let linkTargets: [[UUID?]] = machine.playlists.map { playlist in
             playlist.items.map { item in
@@ -144,7 +169,7 @@ public enum Identity {
             for (key, var layout) in library.presets[i].layouts {
                 for b in layout.boxes.indices {
                     if let from = layout.boxes[b].textStyle?.fromStyle { layout.boxes[b].textStyle?.fromStyle = number(from, .textStyle) }
-                    layout.boxes[b].transition.ref = number(layout.boxes[b].transition.ref, .transition)
+                    if let ref = layout.boxes[b].transition?.ref { layout.boxes[b].transition?.ref = number(ref, .transition) }
                     if let grade = layout.boxes[b].grade { layout.boxes[b].grade = number(grade, .grade) }
                 }
                 if case .stack(let n) = key {
@@ -200,6 +225,10 @@ public enum Identity {
         machine.settings.thumbnailStack = number(machine.settings.thumbnailStack, .stack)
         if let m = machine.settings.startupMacro { machine.settings.startupMacro = number(m, .macro) }
         if let m = machine.settings.shutdownMacro { machine.settings.shutdownMacro = number(m, .macro) }
+        // Spec 8 §8 — the drop channels name channels by number.
+        if let n = machine.settings.dropChannels?.video { machine.settings.dropChannels?.video = number(n, .channel) }
+        if let n = machine.settings.dropChannels?.image { machine.settings.dropChannels?.image = number(n, .channel) }
+        if let n = machine.settings.dropChannels?.audio { machine.settings.dropChannels?.audio = number(n, .channel) }
     }
 
     /// Objects renumbered by `map`, back in number order.

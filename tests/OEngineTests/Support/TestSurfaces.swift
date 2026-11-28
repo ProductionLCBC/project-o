@@ -34,7 +34,7 @@ final class TestSurfaces: @unchecked Sendable {
         return surface
     }
 
-    /// Fills a texture's surface with one colour: blue, green, red, alpha, as the surface holds them.
+    /// Fills a texture's surface with one color: blue, green, red, alpha, as the surface holds them.
     func fill(_ handle: TextureHandle, blue: UInt8, green: UInt8, red: UInt8, alpha: UInt8 = 255) {
         guard let surface = find(handle), IOSurfaceLock(surface, [], nil) == KERN_SUCCESS else { return }
         defer { IOSurfaceUnlock(surface, [], nil) }

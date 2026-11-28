@@ -2,8 +2,8 @@ import XCTest
 import simd
 @testable import OEngine
 
-/// Spec 4 §16, Colour — the CPU reference the shaders are checked against:
-/// "Known pixel values (video range black and white, 50% grey, saturated
+/// Spec 4 §16, Color — the CPU reference the shaders are checked against:
+/// "Known pixel values (video range black and white, 50% gray, saturated
 /// primaries) through each source layout come out at the expected linear
 /// values, and back through each sink encode to the expected code values".
 final class ColorReferenceTests: XCTestCase {
@@ -15,7 +15,7 @@ final class ColorReferenceTests: XCTestCase {
         XCTAssertEqual(ColorMath.srgbEncode(0.18), 0.4613, accuracy: 0.001)
     }
 
-    func test_eightBitLimitedRangeBlackWhiteAndGrey() {
+    func test_eightBitLimitedRangeBlackWhiteAndGray() {
         let black = ColorMath.stage1YCbCr(y: 16 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt709, range: .limited)
         XCTAssertEqual(black.r, 0, accuracy: 0.001)
         XCTAssertEqual(black.g, 0, accuracy: 0.001)
@@ -24,10 +24,10 @@ final class ColorReferenceTests: XCTestCase {
         XCTAssertEqual(white.b, 1, accuracy: 0.001)
         XCTAssertEqual(white.a, 1)
         // Code 126: (126 - 16) / 219 = 0.5023 of the encoded range, 0.2165 linear.
-        let grey = ColorMath.stage1YCbCr(y: 126 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt709, range: .limited)
-        XCTAssertEqual(grey.r, ColorMath.srgbDecode((126 - 16) / 219), accuracy: 0.001)
-        XCTAssertEqual(grey.r, grey.g, accuracy: 0.0001)
-        XCTAssertEqual(grey.g, grey.b, accuracy: 0.0001)
+        let gray = ColorMath.stage1YCbCr(y: 126 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt709, range: .limited)
+        XCTAssertEqual(gray.r, ColorMath.srgbDecode((126 - 16) / 219), accuracy: 0.001)
+        XCTAssertEqual(gray.r, gray.g, accuracy: 0.0001)
+        XCTAssertEqual(gray.g, gray.b, accuracy: 0.0001)
     }
 
     func test_tenBitCodesLeftAlignedInSixteen() {
@@ -56,8 +56,8 @@ final class ColorReferenceTests: XCTestCase {
     }
 
     func test_bt601ForSDSizedSourcesAndBT2020Primaries() {
-        let grey601 = ColorMath.stage1YCbCr(y: 126 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt601, range: .limited)
-        XCTAssertEqual(grey601.r, grey601.g, accuracy: 0.0001)
+        let gray601 = ColorMath.stage1YCbCr(y: 126 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt601, range: .limited)
+        XCTAssertEqual(gray601.r, gray601.g, accuracy: 0.0001)
         let white2020 = ColorMath.stage1YCbCr(y: 235 / 255, cb: 128 / 255, cr: 128 / 255, layout: .nv12, matrix: .bt2020, range: .limited)
         XCTAssertEqual(white2020.r, 1, accuracy: 0.01, "2020 white is 709 white after the primaries matrix")
         XCTAssertEqual(white2020.g, 1, accuracy: 0.01)
@@ -87,16 +87,16 @@ final class ColorReferenceTests: XCTestCase {
         XCTAssertEqual(ColorMath.grade(p, g).r, 1.0, accuracy: 0.0001)
         g = .identity
         g.saturation = 0
-        let grey = ColorMath.grade(p, g)
-        XCTAssertEqual(grey.r, grey.g, accuracy: 0.0001)
-        XCTAssertEqual(grey.g, grey.b, accuracy: 0.0001)
+        let gray = ColorMath.grade(p, g)
+        XCTAssertEqual(gray.r, gray.g, accuracy: 0.0001)
+        XCTAssertEqual(gray.g, gray.b, accuracy: 0.0001)
         g = .identity
         g.contrast = 2
-        XCTAssertEqual(ColorMath.grade(LinearPixel(r: 0.18, g: 0.18, b: 0.18, a: 1), g).r, 0.18, accuracy: 0.0001, "contrast pivots on mid grey")
+        XCTAssertEqual(ColorMath.grade(LinearPixel(r: 0.18, g: 0.18, b: 0.18, a: 1), g).r, 0.18, accuracy: 0.0001, "contrast pivots on mid gray")
         g = .identity
         g.hue = 120
         let rotated = ColorMath.grade(LinearPixel(r: 1, g: 0, b: 0, a: 1), g)
-        XCTAssertEqual(rotated.g, 1, accuracy: 0.001, "a third of a turn about the grey axis takes red to green")
+        XCTAssertEqual(rotated.g, 1, accuracy: 0.001, "a third of a turn about the gray axis takes red to green")
         XCTAssertEqual(rotated.r, 0, accuracy: 0.001)
         g = .identity
         g.tint = ColorValue(r: 1, g: 0, b: 0, a: 1)

@@ -57,7 +57,7 @@ final class PicturePassTests: XCTestCase {
 
     /// A 16:9 channel fills the picture; every picture pixel is the mean of
     /// the block it covers, so a pattern of single-pixel checks comes out an
-    /// even grey instead of the moiré a single tap would give.
+    /// even gray instead of the moiré a single tap would give.
     func test_aSixteenByNineChannelFillsThePictureAndDoesNotAlias() throws {
         var checks = CapturedFrame(width: 1024, height: 576)
         for y in 0..<576 {
@@ -70,14 +70,14 @@ final class PicturePassTests: XCTestCase {
         XCTAssertEqual(picture.width, 256)
         XCTAssertEqual(picture.height, 144)
         for (x, y) in [(3, 3), (60, 70), (126, 140), (17, 101)] {
-            MetalHarness.assertPixel(picture[x, y], LinearPixel(r: 0.5, g: 0.5, b: 0.5, a: 1), accuracy: 0.02, "the checks average to mid grey in linear light at \(x),\(y)")
+            MetalHarness.assertPixel(picture[x, y], LinearPixel(r: 0.5, g: 0.5, b: 0.5, a: 1), accuracy: 0.02, "the checks average to mid gray in linear light at \(x),\(y)")
         }
         MetalHarness.assertPixel(picture[130, 70], green, accuracy: 0.01, "right of the middle, the plain half")
         MetalHarness.assertPixel(picture[255, 143], green, accuracy: 0.01, "to the last pixel: nothing outside the picture")
     }
 
     /// "fit into 256 by 144 over black": a channel of another shape keeps its
-    /// shape, centred, and the rest of the picture is black and opaque.
+    /// shape, centered, and the rest of the picture is black and opaque.
     func test_aChannelOfAnotherShapeIsFitOverBlack() throws {
         let goldens = MetalHarness.goldens("aux")
         // A square channel: 144 by 144 in the middle, columns 56 to 199.
@@ -101,7 +101,7 @@ final class PicturePassTests: XCTestCase {
         try MetalHarness.assertGolden(goldens, "picture-wide", wide)
     }
 
-    /// The channel texture is premultiplied: over black its colour is the
+    /// The channel texture is premultiplied: over black its color is the
     /// picture's, and the picture is opaque wherever the strip shows it.
     func test_aTranslucentChannelIsShownOverBlack() throws {
         let half = MetalHarness.solid(width: 64, height: 36, LinearPixel(r: 0.5, g: 0, b: 0, a: 0.5))   // red at half opacity, premultiplied

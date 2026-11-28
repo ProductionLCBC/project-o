@@ -68,9 +68,16 @@ public struct EngineRequest: Equatable, Sendable {
     public static let stop = EngineRequest(type: "stop")
 
     /// Spec 10 §3 — `releaseScreen`: "Takes every output off the named
-    /// screen for the rest of the run (§9)"; the screen as `display:<uuid>`.
+    /// screen until `retakeScreen` puts them back, or for the rest of the run
+    /// (§9)"; the screen as `display:<uuid>`.
     public static func releaseScreen(_ screen: String) -> EngineRequest {
         EngineRequest(type: "releaseScreen", fields: ["screen": .string(screen)])
+    }
+
+    /// Spec 10 §3 — `retakeScreen`: "Puts back on the named screen every
+    /// output released from it in this run" (corrected 2026-11-24).
+    public static func retakeScreen(_ screen: String) -> EngineRequest {
+        EngineRequest(type: "retakeScreen", fields: ["screen": .string(screen)])
     }
 
     private static func encoded(_ command: Command) -> JSONValue {

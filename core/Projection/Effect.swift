@@ -30,9 +30,13 @@ public struct TransitionEffect: Equatable, Sendable {
     public var audioMs: Int
     public var audioOffsetMs: Int
     public var restart: Bool
+    /// Spec 4 §11 as corrected 2026-11-27 — a J cut's delay: "a negative one starts it at the trigger and the
+    /// channel's picture transition that long after it ... The offset applies only when the channel's outgoing or
+    /// incoming content has sound". 0 for any other.
+    public var pictureDelayMs: Int
 
     public init(channel: Int, from: ContentInstance, to: ContentInstance, transition: Int, ms: Int,
-                audioTransition: Int, audioMs: Int, audioOffsetMs: Int = 0, restart: Bool = false) {
+                audioTransition: Int, audioMs: Int, audioOffsetMs: Int = 0, restart: Bool = false, pictureDelayMs: Int = 0) {
         self.channel = channel
         self.from = from
         self.to = to
@@ -42,6 +46,7 @@ public struct TransitionEffect: Equatable, Sendable {
         self.audioMs = audioMs
         self.audioOffsetMs = audioOffsetMs
         self.restart = restart
+        self.pictureDelayMs = pictureDelayMs
     }
 }
 
@@ -73,7 +78,7 @@ public enum Effect: Equatable, Sendable {
     /// Log records it; the strip shows a lock glint.
     case blocked(channel: Int, command: Command)
     /// The command changed state only, with nothing to animate (transport,
-    /// end behaviour, lock, freeze); the engine reads the new state. Logged
+    /// end behavior, lock, freeze); the engine reads the new state. Logged
     /// as `ok`. Addition flagged for the spec: §6 wants one result per
     /// command, and these verbs have no row in its effects table.
     case applied(Command)

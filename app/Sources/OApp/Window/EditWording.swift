@@ -218,6 +218,43 @@ public enum EditWording {
         case .restoreSnapshot(let takenAt, let mastersReadOnly):
             return ConfirmationWords(title: Strings.text(mastersReadOnly ? .confirmRestoreSnapshotTitleMachine : .confirmRestoreSnapshotTitle, takenAt),
                                      body: [Strings.text(.confirmRestoreSnapshotBody)], button: Strings.text(.confirmRestore))
+        case .deleteCues(let count, let live, let armed, let edits):
+            // Spec 11 §4 — why it asks, then that "undo is the way back".
+            var body: [String] = []
+            if live { body.append(Strings.text(.editConfirmDeleteCuesLive)) }
+            if armed { body.append(Strings.text(.editConfirmDeleteCuesArmed)) }
+            if edits { body.append(Strings.text(.editConfirmDeleteCuesEdits)) }
+            body.append(Strings.text(.editConfirmDeleteCuesUndo))
+            return ConfirmationWords(title: Strings.counted(.editConfirmDeleteCuesTitle, count), body: body, button: Strings.text(.confirmDelete))
+        case .slotOnAir(let channel, let label, let outputs, let adding):
+            let name = label.isEmpty ? String(channel) : "\(channel) \(label)"
+            let on = Strings.text(outputs.count == 1 ? .editConfirmSlotOutput : .editConfirmSlotOutputs, joined(outputs.map(String.init), locale: locale))
+            if adding {
+                return ConfirmationWords(title: Strings.text(.editConfirmSlotAddTitle, name), body: [Strings.text(.editConfirmSlotAddBody, channel, on)],
+                                         button: Strings.text(.editConfirmSlotAdd))
+            }
+            return ConfirmationWords(title: Strings.text(.editConfirmSlotRemoveTitle, name), body: [Strings.text(.editConfirmSlotRemoveBody, channel, on)],
+                                     button: Strings.text(.confirmRemove))
+        case .deleteNumbered(let name, let uses):
+            // "12 cues ... They stay ..., and the reference report flags them until they're edited."
+            let order: [(String, StringKey)] = [("cues", .useCues), ("macros", .useMacros), ("keys", .useKeys), ("presets", .usePresets),
+                                                ("channels", .editUsesChannels), ("stacks", .editUsesStacks), ("boxes", .editUsesBoxes),
+                                                ("outputs", .editUsesOutputs), ("audiooutputs", .editUsesAudioOutputs), ("media", .editUsesMedia),
+                                                ("machine", .editUsesMachine)]
+            let parts = order.compactMap { kind, key in uses[kind].map { Strings.counted(key, $0) } }
+            let body = parts.isEmpty ? [] : [Strings.text(.editConfirmDeleteUsed, joined(parts, locale: locale))]
+            return ConfirmationWords(title: Strings.text(.editConfirmDeleteTitle, name), body: body, button: Strings.text(.confirmDelete))
+        case .removeLayout(let preset, let stack):
+            return ConfirmationWords(title: Strings.text(.editConfirmLayoutTitle, stack, preset), body: [Strings.text(.editConfirmLayoutBody, stack)],
+                                     button: Strings.text(.confirmRemove))
+        case .reapplyStyle(let name, let boxes):
+            return ConfirmationWords(title: Strings.counted(.editConfirmReapplyTitle, boxes, name), body: [Strings.text(.editConfirmReapplyBody)],
+                                     button: Strings.text(.editObjectReapply))
+        case .runMacro(let name, let live, let edits):
+            var body: [String] = []
+            if edits { body.append(Strings.text(.editObjectMacroChangesLibrary)) }
+            if live { body.append(Strings.text(.editConfirmRunLive)) }
+            return ConfirmationWords(title: Strings.text(.editConfirmRunTitle, name), body: body, button: Strings.text(.editObjectRunOnAir))
         }
     }
 

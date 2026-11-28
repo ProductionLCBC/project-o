@@ -91,15 +91,15 @@ final class ShowModelFlowTests: XCTestCase {
     /// "New List ... browses the new, empty list, which its result names (§3)".
     func test_aNewListIsBrowsedOnceItsResultNamesIt() throws {
         let rig = try Rig()
-        XCTAssertNil(rig.model.newList(in: "Hymns"))
-        XCTAssertEqual(rig.commands, [["edit list create folder \"Hymns\""]])
+        XCTAssertNil(rig.model.newList(in: "Hymns", title: "Amazing Grace"))
+        XCTAssertEqual(rig.commands, [["edit list create folder \"Hymns\" { \"title\": \"Amazing Grace\" }"]])
         let made = "a9f00000-0000-4000-8000-000000000039"
         let command: JSONValue = .object(["cmd": .string("edit.create"), "object": .string("list"), "list": .number(57), "folder": .string("Hymns"),
                                           "value": .object(["uuid": .string(made), "number": .number(57)])])
         rig.answers[0](.result(CommandOutcome(kind: .ok, group: "g-2", applied: [AppliedEdit(command: command, inverse: nil)])))
         XCTAssertEqual(rig.model.browse.shown, .list(made))
-        XCTAssertNil(rig.model.newList(in: nil))
-        XCTAssertEqual(rig.commands.last, ["edit list create"])
+        XCTAssertNil(rig.model.newList(in: nil, title: "  "))
+        XCTAssertEqual(rig.commands.last, ["edit list create { \"title\": \"New List\" }"])
     }
 
     func test_addToPlaylistAppendsALinkedItemNamedByItsUuid() throws {

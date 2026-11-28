@@ -305,6 +305,22 @@ final class ReleaseScreenTests: XCTestCase {
         XCTAssertFalse(rig.events.contains("silent"), "an engine that answered isn't silent")
     }
 
+    /// Spec 10 §9 as corrected 2026-11-24 — "Put Back on This Screen sends `retakeScreen` with it ... and the app
+    /// forgets the screen", so neither the next engine nor `--released` takes it off again.
+    func test_aScreenPutBackIsAskedOfTheEngineAndForgotten() {
+        let rig = Rig()
+        rig.releaser.release(screen: main)
+        rig.ok(0)
+        rig.releaser.release(screen: side)
+        rig.releaser.putBack(screen: side.lowercased())
+        XCTAssertEqual(Array(rig.events.suffix(2)), ["dropped", "retakeScreen \(side.lowercased())"],
+                       "the window drops back from a release still unanswered, and the engine is asked")
+        XCTAssertEqual(rig.releaser.released, [main], "the screen named either way is forgotten")
+        XCTAssertFalse(rig.releaser.isRaised)
+        rig.releaser.connected()
+        XCTAssertEqual(rig.events.last, "releaseScreen \(main)", "the next engine is asked for the other screen alone")
+    }
+
     func test_whenTheEngineDoesNotAnswerInTwoSecondsTheWindowStaysRaised() {
         let rig = Rig()
         rig.releaser.release(screen: main)

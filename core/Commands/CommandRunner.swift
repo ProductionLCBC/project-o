@@ -402,6 +402,14 @@ struct Runner {
             if boundary, !position.list.trackThrough { replay.resetAllAttributes() }
             var own = replay.effects
             if boundary { own.append(.boundary(list: position.list.uuid, reset: !position.list.trackThrough)) }
+            // Spec 3 §5 — "Firing with `state` ... takes up, between the boundary and the cue's commands, the state its
+            // list leaves before it": its cuts and attribute changes are the fire's own, on its line, so the engine acts
+            // on them, and the cue's commands run over the state taken up.
+            if command.firesWithState, !projectionContext.firesPlainly {
+                let start = replay.effects.count
+                replay.takeUpState(before: position)
+                own.append(contentsOf: replay.effects[start...])
+            }
             own.append(pointer)
             executed.append(ExecutedCommand(group: group, source: source, command: command, result: .ok, effects: own, fire: fire))
             state = replay.state
@@ -473,6 +481,17 @@ struct Runner {
     /// section verb makes several, Spec 5 §4); "a value equal to the current
     /// one is a `noop`". Refused: held, a `blocked` line with the reason;
     /// sent directly, the group's rejection.
+    /// Spec 5 §1 and §2 — takes the roots an applied edit, undo, redo or
+    /// restore left, for the group's later commands, and brings the state's
+    /// entries along: "a channel or a stack that an edit makes gets its empty
+    /// entry in ShowState, and one that an edit deletes loses it". So a group
+    /// that makes a channel and then writes to it lands the write.
+    mutating func adopt(_ library: Library, _ machine: Machine) {
+        context.library = library
+        context.machine = machine
+        state = state.reconciled(library: library, machine: machine)
+    }
+
     mutating func runEdit(_ edit: EditCommand, group: GroupID, source: CommandSource, fire: FireRecord?,
                           makeUUID: () -> UUID) {
         // Spec 8 §6, Adam's answer 7 — behind a parked delete, held edits wait in the order they arrived.
@@ -487,8 +506,7 @@ struct Runner {
             var fire = fire
             for outcome in outcomes {
                 let before = (library: context.library, machine: context.machine)
-                context.library = outcome.library
-                context.machine = outcome.machine
+                adopt(outcome.library, outcome.machine)
                 let line = ExecutedCommand(group: group, source: source, command: .edit(outcome.logged),
                                            result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
                                            inverse: outcome.inverse.map(Command.edit), changes: outcome.changes,
@@ -532,8 +550,7 @@ struct Runner {
             case .success(let applied):
                 // Spec 8 §2 — "ordinary edits": the roots the group's later commands read, a line with its inverse.
                 let before = (library: context.library, machine: context.machine)
-                context.library = applied.library
-                context.machine = applied.machine
+                adopt(applied.library, applied.machine)
                 let line = ExecutedCommand(group: group, source: source, command: .media(applied.logged),
                                            result: applied.isNoop ? .noop : .ok, effects: [], fire: fire,
                                            inverse: applied.inverse.map(Command.media), changes: applied.changes)
@@ -608,8 +625,7 @@ struct Runner {
             return rejection
         case .success(let outcome):
             let before = (library: context.library, machine: context.machine)
-            context.library = outcome.library
-            context.machine = outcome.machine
+            adopt(outcome.library, outcome.machine)
             let line = ExecutedCommand(group: group, source: source, command: .media(outcome.logged),
                                        result: outcome.isNoop ? .noop : .ok, effects: [], fire: fire,
                                        inverse: outcome.inverse.map(Command.media), changes: outcome.changes)

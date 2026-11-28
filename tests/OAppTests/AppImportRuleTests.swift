@@ -2,7 +2,7 @@ import XCTest
 
 /// Spec 10 §16 — "Area 13's tests drive the app's models against a scripted
 /// engine on a local socket, so no test needs the engine or a GPU." That
-/// holds only while the app's behaviour stays out of its views, so the rule
+/// holds only while the app's behavior stays out of its views, so the rule
 /// is made mechanical, as OCore's is (`ImportRuleTests`): OApp imports no
 /// AppKit, no SwiftUI and nothing of the engine's, and the scripted engine
 /// imports nothing of the app's, so the two can't agree by sharing code.

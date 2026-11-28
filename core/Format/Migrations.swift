@@ -50,7 +50,7 @@ public enum Migrations {
     /// Spec 1 §10 — "A schema-0 fixture (invented for the test)". Schema 0 is
     /// invented: a cue's `trigger` was a bare word with its value beside it
     /// (`triggerMs`, `triggerTc`), and `trackThrough` did not exist. Anything
-    /// the migration does not recognise is left for the unknown-key bag.
+    /// the migration does not recognize is left for the unknown-key bag.
     @Sendable
     static func listZeroToOne(_ tree: JSONValue) -> JSONValue {
         guard let cues = tree["cues"]?.arrayValue else { return tree.setting("trackThrough", to: tree["trackThrough"] ?? .bool(false)) }

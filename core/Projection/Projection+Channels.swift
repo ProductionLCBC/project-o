@@ -42,6 +42,17 @@ extension Fold {
         return (setting.ref, 0, 0)
     }
 
+    /// Spec 4 §11 as corrected 2026-11-27 — "The offset applies only when the channel's outgoing or incoming content
+    /// has sound": the delay a J cut puts before the picture's transition, from the pool entries the two resolve to.
+    func pictureDelayMs(audioOffsetMs: Int, from: ContentInstance, to: ContentInstance) -> Int {
+        guard audioOffsetMs < 0 else { return 0 }
+        func hasSound(_ instance: ContentInstance) -> Bool {
+            guard let ref = instance.media?.ref else { return false }
+            return MediaResolver.resolve(ref, library: context.library, machine: context.machine)?.entry.hasAudio ?? false
+        }
+        return hasSound(from) || hasSound(to) ? -audioOffsetMs : 0
+    }
+
     // MARK: - Decoder budget
 
     /// Spec 3 §4 — "Each media write counts against the channel's cap: the
@@ -173,11 +184,14 @@ extension Fold {
         if let to = newContent {
             let transition = selectTransition(rider: write.riders.transition, attribute: channel.attributes.transition, channel: number)
             let audio = selectAudioTransition(rider: write.riders.audioTransition, attribute: channel.attributes.audioTransition, channel: number)
-            let stepped = replaceContent(of: &channel, number: number, with: to, transitionMs: transition.ms, restart: restart)
+            // Spec 3 §4 as corrected 2026-11-27 — the outgoing ends "after the delay a J cut puts before the
+            // picture's transition".
+            let delay = pictureDelayMs(audioOffsetMs: audio.offsetMs, from: current, to: to)
+            let stepped = replaceContent(of: &channel, number: number, with: to, transitionMs: transition.ms + delay, restart: restart)
             channel.provenance = provenance(source)
             effects.append(.transition(TransitionEffect(
                 channel: number, from: current, to: to, transition: transition.ref, ms: transition.ms,
-                audioTransition: audio.ref, audioMs: audio.ms, audioOffsetMs: audio.offsetMs, restart: restart)))
+                audioTransition: audio.ref, audioMs: audio.ms, audioOffsetMs: audio.offsetMs, restart: restart, pictureDelayMs: delay)))
             for ref in stepped {
                 effects.append(.steppedOn(channel: number, dropped: ref))
             }
@@ -214,12 +228,13 @@ extension Fold {
         guard !current.isEmpty else { return false }
         let transition = selectTransition(rider: nil, attribute: channel.attributes.transition, channel: number)
         let audio = selectAudioTransition(rider: nil, attribute: channel.attributes.audioTransition, channel: number)
-        _ = replaceContent(of: &channel, number: number, with: .empty, transitionMs: transition.ms, restart: false)
+        let delay = pictureDelayMs(audioOffsetMs: audio.offsetMs, from: current, to: .empty)
+        _ = replaceContent(of: &channel, number: number, with: .empty, transitionMs: transition.ms + delay, restart: false)
         channel.provenance = provenance(source)
         state.channels[number] = channel
         effects.append(.transition(TransitionEffect(
             channel: number, from: current, to: .empty, transition: transition.ref, ms: transition.ms,
-            audioTransition: audio.ref, audioMs: audio.ms, audioOffsetMs: audio.offsetMs)))
+            audioTransition: audio.ref, audioMs: audio.ms, audioOffsetMs: audio.offsetMs, pictureDelayMs: delay)))
         return true
     }
 
@@ -301,7 +316,7 @@ extension Fold {
         }
     }
 
-    // MARK: - Transport, end behaviour, lock, freeze, build
+    // MARK: - Transport, end behavior, lock, freeze, build
 
     /// Spec 3 §4 — "`play`, `pause` and `stop` change `transport`; `stop` also
     /// resets the playhead by setting `startedAtFrame` to the landing frame

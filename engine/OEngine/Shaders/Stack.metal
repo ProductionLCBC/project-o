@@ -59,8 +59,8 @@ fragment float4 boxFragment(VertexOut in [[stage_in]],
     float4 c = source.sample(s, in.uv);
     if (kHasGrade) c = grade(c, u);
     if (kGammaBlend) {
-        // Spec 4 §9 — "each box shader applies the sRGB OETF to its sampled colour before
-        // blending": the straight colour is encoded, then premultiplied again, so opacity
+        // Spec 4 §9 — "each box shader applies the sRGB OETF to its sampled color before
+        // blending": the straight color is encoded, then premultiplied again, so opacity
         // and the blend act on encoded values.
         float3 straight = c.a > 0 ? c.rgb / c.a : float3(0);
         c = float4(srgbEncode(straight) * c.a, c.a);

@@ -24,7 +24,7 @@ This spec defines what is on a channel at any moment, how commands change it, an
 | Tracked attributes | `grade`, `transition`, `audioTransition`, `gain`, `chase` (reserved) | Each holds until written again, or until a list boundary resets it to the channel default |
 | Operator state | `lock` | Outside tracking entirely; never reset, never restored by undo |
 
-Each tracked attribute is stored with how it was set: `{value, origin}` where origin is `default`, `tracked` (from a `track` write) or `once` (from a rider on the current content write). The origin is what lets the cue grid colour a chip as new, held or redundant, and what lets a `once` value fall back when the content changes.
+Each tracked attribute is stored with how it was set: `{value, origin}` where origin is `default`, `tracked` (from a `track` write) or `once` (from a rider on the current content write). The origin is what lets the cue grid color a chip as new, held or redundant, and what lets a `once` value fall back when the content changes.
 
 **Content instances**
 
@@ -52,7 +52,7 @@ Tracking is the lighting-console idea that a cue only has to say what changes. T
 8. **Build is an attribute of slide content.** A `build` rider or `channel N build K` changes the build index of the current slide; it has no meaning for other content kinds and is ignored with a `noop` effect.
 9. **Lock is not tracked.** It is operator state, set only by `channel N lock` and `unlock` and by restore-last-state, which brings back the locks it held (Spec 9 §4); it ignores boundaries, resets, clears and the restores of undo.
 
-**What a chip colour means.** The cue grid asks the projection for each cue's state and the state before it. An attribute whose value changed and whose origin is `tracked` or `once` from this cue is *new*; one whose value is unchanged and was not written by this cue is *held*; one written by this cue to the value it already had is *redundant*, a write worth removing. Content follows the same three rules.
+**What a chip color means.** The cue grid asks the projection for each cue's state and the state before it. An attribute whose value changed and whose origin is `tracked` or `once` from this cue is *new*; one whose value is unchanged and was not written by this cue is *held*; one written by this cue to the value it already had is *redundant*, a write worth removing. Content follows the same three rules.
 
 ## 4. Write semantics
 
@@ -70,9 +70,9 @@ A write replaces the channel's content instance, applies its riders, and emits a
 
 **Missing media.** A ref whose file the resolver cannot find still produces the instance, with `missing: true`. The engine renders nothing for the pixel path and the strip shows the badge. The projection does not need the resolver; the caller passes a set of missing ids with the input.
 
-**Decoder budget.** Each media write counts against the channel's cap: the incoming instance plus any outgoing instance still mid-transition. The projection tracks `outgoing` instances with the frame their transition ends, which it can compute from the transition duration and the landing frame. A write that would exceed the cap drops the oldest outgoing instance and emits `steppedOn` with the dropped ref; the engine cuts that content out immediately.
+**Decoder budget.** Each media write counts against the channel's cap: the incoming instance plus any outgoing instance still mid-transition. The projection tracks `outgoing` instances with the frame their transition ends, which it can compute from the transition duration and the landing frame, after the delay a J cut puts before the picture's transition when the outgoing or incoming item has sound (Spec 4 §11, Adam, 2026-11-27). An outgoing item whose sound outlives its picture (an L cut) has released its video decoder and doesn't count. A write that would exceed the cap drops the oldest outgoing instance and emits `steppedOn` with the dropped ref; the engine cuts that content out immediately.
 
-**Transition selection.** The effect's transition is, in order: the write's `once` rider, else the channel's current transition attribute (tracked or default). The same order applies to the audio transition. A `cut` emits a transition effect with zero duration so callers can treat every write uniformly.
+**Transition selection.** The effect's transition is, in order: the write's `once` rider, else the channel's current transition attribute (tracked or default). The same order applies to the audio transition. A box draws the change with the same transition, except where it is the channel's default: there a text or static box's own transition, when it sets one, takes its place (Spec 1 §2, Spec 4 §9; Adam, 2026-11-25). A `cut` emits a transition effect with zero duration so callers can treat every write uniformly.
 
 **Attribute writes without content** (`channel N grade 5`, `channel N gain -6`, `channel N transition 2 500`) change only the attribute, with origin `tracked`, and emit an `attribute` effect. A grade change carries an optional duration: with none it applies on the next frame; with one, the engine interpolates each grade parameter from the old values (none counts as identity) to the new over that time, which is why the attribute effect carries ms. A gain change ramps over 50 ms in the engine to avoid clicks, an engine detail and not state.
 
@@ -85,6 +85,8 @@ A write replaces the channel's content instance, applies its riders, and emits a
 **The pointer** is `{playlist, itemUuid, listUuid, cueUuid}`, where `itemUuid` is the playlist item's uuid, or, when a master was fired directly from the library, `{listUuid, cueUuid}` with no playlist (Spec 7 §4). It names the last cue fired, not a cursor: browsing in the UI never moves it. Firing any cue moves it there and makes that cue's list live.
 
 **Firing** a cue means: compute the list boundary (below), run the cue's commands as one group with source `cue`, set the pointer, then arm the next trigger. A fired cue is logged once with its `fire` record even if every one of its commands was blocked by lock.
+
+**Firing with `state`** (`cue N state`, `item N cue M state`, `list N cue M state`; Adam, 2026-11-24, for edit mode's Live, Spec 11 §2) takes up, between the boundary and the cue's commands, the state its list leaves before it: the cue view of §7 folded through the cue before it. Each channel those cues touched takes that state's content and tracked attributes with a cut (zero-duration `transition` effects and `attribute` effects); a channel already playing the same media (ref, in, out and loop) keeps playing it; a locked channel is left as it is (§8). A channel the list never touched before the cue keeps what is live. Then the cue fires as above, its writes with their own transitions, so what is on air is what its thumbnail shows, but for the channels its list leaves alone. The other commands of the cues before it don't run. The first cue of a list takes up nothing.
 
 **List boundary.** A boundary occurs when the fired cue's `listUuid` differs from the pointer's current one, or when the pointer was empty. At a boundary, before the cue's commands run, every tracked attribute on every channel resets to default unless the list being entered has `trackThrough`. Firing a cue in the same list, in any order, is never a boundary.
 
@@ -130,7 +132,7 @@ func project(_ state: ShowState,
 | `pointer` | old, new, armed | UI moves the live marker; the scheduler arms or disarms its timer |
 | `steppedOn` | channel, dropped ref | Engine cuts the content; strip flashes; log records it |
 | `blocked` | channel, command | Log records it; the strip shows a lock glint |
-| `applied` | command | State changed with nothing to animate (transport, end behaviour, lock, freeze, a text write's provenance alone, §4); logged as `ok` |
+| `applied` | command | State changed with nothing to animate (transport, end behavior, lock, freeze, a text write's provenance alone, §4); logged as `ok` |
 | `noop` | command | Nothing, but logged |
 | `passthrough` | command | The caller (engine, history, scheduler) handles it |
 
@@ -142,9 +144,9 @@ func project(_ state: ShowState,
 
 The same function, run from three different starting states.
 
-**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colours. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states. An offset box in a projected state folds that many more cues of the same list, and draws nothing past its end (Spec 6 §3).
+**Cue view and thumbnails.** Start from a fresh ShowState, treat the list's first cue as a boundary into that list, and fold cue 1 through cue K. The result is what the default stack would show if the list ran from the start, which is the UX spec's definition of a cue thumbnail and of the chip colors. Results are cached per `(cue uuid, stack, library version)` and invalidated when the cue, any preset or any grade it references, or the list's `trackThrough` changes. The fold is cheap enough to run for a whole list on every edit; thumbnails themselves (Spec 4) render lazily from the cached states. An offset box in a projected state folds that many more cues of the same list, and draws nothing past its end (Spec 6 §3).
 
-**Lookahead for offset boxes.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` box shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behaviour a confidence monitor wants. Past the end of the playlist the box is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
+**Lookahead for offset boxes.** Start from the live ShowState and fold the next K cues from the pointer, crossing item boundaries and applying list boundaries exactly as a real fire would, with `frame` held at the current frame so nothing appears to play. A `+1` box shows channel N's content in the resulting state; a channel with no write in those cues shows what it has now, which is the "hold" behavior a confidence monitor wants. Past the end of the playlist the box is empty. Negative offsets (v1.5) read from a ring buffer of the ShowState after each fired cue, kept by the engine, not computed.
 
 **Timecode seek** (v2). Fold the list's cues whose Timecode triggers fall at or before the target time, in order, from the state at the list's start, and apply the result in one step with every transition effect collapsed to a cut, so a seek never replays a minute of dissolves.
 

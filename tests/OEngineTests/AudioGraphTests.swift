@@ -38,6 +38,34 @@ final class AudioGraphTests: XCTestCase {
         XCTAssertEqual(after[0], 0.25, accuracy: 1e-6, "only the incoming remains")
     }
 
+    /// Spec 4 §11 as corrected 2026-11-27 — "The outgoing and incoming gains follow the audio transition's easing, as a
+    /// picture transition's mix follows its own (§7); a fade through silence eases each half."
+    func test_theGainsFollowTheEasing() throws {
+        for easing in [Easing.easeIn, .easeOut, .easeInOut] {
+            let device = SoftwareAudioDevice()
+            let graph = AudioGraph(device: device, outputs: [output()])
+            try graph.start()
+            let a = instance(1, value: 0.5, graph: graph)
+            let b = instance(2, value: 0.25, graph: graph)
+            graph.startTransition(outgoing: a, incoming: b, type: .crossfade, ms: 100, offsetMs: 0, easing: easing)
+            let out = device.pull(frames: 4800)
+            for k in [1200, 2400, 3600] {
+                let e = easing.apply(Float(k) / 4800)
+                XCTAssertEqual(out[k * 2], 0.5 * (1 - e) + 0.25 * e, accuracy: 1e-5, "\(easing) at frame \(k)")
+            }
+            XCTAssertNotEqual(out[1200 * 2], 0.5 * 0.75 + 0.25 * 0.25, accuracy: 1e-4, "\(easing) is not a straight line")
+        }
+        let device = SoftwareAudioDevice()
+        let graph = AudioGraph(device: device, outputs: [output()])
+        try graph.start()
+        let a = instance(1, value: 0.5, graph: graph)
+        let b = instance(2, value: 0.25, graph: graph)
+        graph.startTransition(outgoing: a, incoming: b, type: .fadeThroughSilence, ms: 100, offsetMs: 0, easing: .easeIn)
+        let out = device.pull(frames: 4800)
+        XCTAssertEqual(out[1200 * 2], 0.5 * (1 - Easing.easeIn.apply(0.5)), accuracy: 1e-5, "the first half eased")
+        XCTAssertEqual(out[3600 * 2], 0.25 * Easing.easeIn.apply(0.5), accuracy: 1e-5, "the second half eased")
+    }
+
     func test_fadeThroughSilenceAndTheOffset() throws {
         let device = SoftwareAudioDevice()
         let graph = AudioGraph(device: device, outputs: [output()])

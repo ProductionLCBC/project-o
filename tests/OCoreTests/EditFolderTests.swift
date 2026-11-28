@@ -79,7 +79,7 @@ final class EditFolderTests: XCTestCase {
         edits.library.otherFiles.removeAll()
         edits.apply("edit folder \"Lent/Week 1\" create")
         XCTAssertEqual(edits.refuse("edit folder \"Lent\" delete")?.reason, .notEmpty, "a folder")
-        XCTAssertEqual(edits.refuse("edit folder \"Lent\" colour \"red\"")?.reason, .unknownPath)
+        XCTAssertEqual(edits.refuse("edit folder \"Lent\" color \"red\"")?.reason, .unknownPath)
     }
 
     /// "On a case-sensitive volume two folders can differ only by case ...

@@ -143,14 +143,14 @@ struct Fold {
             fireFollowing(command: command, nesting: nesting)
         case .previous:
             firePreceding(command: command, nesting: nesting)
-        case .cue(let position):
-            fireCue(position, command: command, nesting: nesting)
-        case .itemCue(let item, let position):
-            fireItem(item, cue: position, command: command, nesting: nesting)
+        case .cue(let position, let withState):
+            fireCue(position, withState: withState, command: command, nesting: nesting)
+        case .itemCue(let item, let position, let withState):
+            fireItem(item, cue: position, withState: withState, command: command, nesting: nesting)
         case .itemSection(let item, let section):
             fireSection(item, section, command: command, nesting: nesting)
-        case .listCue(let list, let position):
-            fireList(list, cue: position, command: command, nesting: nesting)
+        case .listCue(let list, let position, let withState):
+            fireList(list, cue: position, withState: withState, command: command, nesting: nesting)
         case .playlistLoad(let title):
             loadPlaylist(title, command: command)
         case .disarm:
@@ -168,7 +168,7 @@ struct Fold {
              .systemPreflight, .systemSnapshot, .systemRestoreList, .systemRestoreSnapshot, .edit, .media:
             // Spec 3 §6 as Spec 8 corrected it — "Commands that do not touch state (`timer`, `history`,
             // `system preflight`, `system snapshot`, `edit`, `media`) pass through". Spec 5 §9 — "A
-            // restore changes the library and never ShowState", so the restore commands pass too.
+            // restore changes the library and never what ShowState holds", so the restore commands pass too.
             effects.append(.passthrough(command))
 
         case .unknown, .invalid:

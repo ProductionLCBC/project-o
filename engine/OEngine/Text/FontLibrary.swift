@@ -30,7 +30,7 @@ public final class FontLibrary: @unchecked Sendable {
     }
 
     /// Spec 6 §4 — the folder of fonts in the engine's resources ("The fonts and
-    /// their licences sit together in the engine's resources").
+    /// their licenses sit together in the engine's resources").
     public static let bundledFolder: URL? = Bundle.module.url(forResource: "Fonts", withExtension: nil)
 
     /// The engine's own library of its bundled fonts, registered at launch.

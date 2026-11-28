@@ -38,7 +38,7 @@ final class FirstRunTests: XCTestCase {
         XCTAssertEqual(current.textStyle?.values.alignment, .left)
         XCTAssertEqual(current.textStyle?.values.size, TextSize(value: 64, unit: .pt))
         // "The +1 box matches the first apart from offset 1, its frame (y 0.7, h 0.27), the maxLines policy
-        // with 3 lines, a grey colour (0.7) and a size of 40 points."
+        // with 3 lines, a gray color (0.7) and a size of 40 points."
         XCTAssertEqual(next.frame, Frame(x: 0.03, y: 0.7, w: 0.94, h: 0.27))
         XCTAssertEqual(next.fit, .text(TextFit(policy: .maxLines, maxLines: 3, minSize: 24)))
         XCTAssertEqual(next.textStyle?.values.color, Color(r: 0.7, g: 0.7, b: 0.7, a: 1))

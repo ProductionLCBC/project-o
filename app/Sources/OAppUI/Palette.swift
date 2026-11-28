@@ -1,16 +1,16 @@
-// OAppUI — Spec 10 §4, the palette as named colours, and the screens by the engine's names.
+// OAppUI — Spec 10 §4, the palette as named colors, and the screens by the engine's names.
 
 import AppKit
 import OCore
 
-/// Spec 10 §4, "Appearance" — "Dark only in v1 ... four colours carry
+/// Spec 10 §4, "Appearance" — "Dark only in v1 ... four colors carry
 /// meaning everywhere: red for live and for errors, green for outputting and
 /// for the selected preview, amber for browsing away from live (§6) and for
 /// warnings, and blue for selection and focus."
 ///
 /// The look is the one Adam approved in layout at Area 13's first stop
 /// (2026-11-17), drawn cleaner as he asked: surfaces told apart by their
-/// fill and not by borders, one hairline where two meet, and colour kept for
+/// fill and not by borders, one hairline where two meet, and color kept for
 /// the four meanings and the section hues. The clickable demo isn't in the
 /// repository, so these are the app's own.
 @MainActor

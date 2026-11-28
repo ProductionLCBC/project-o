@@ -59,6 +59,8 @@ public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable
     private let log: EngineLog?
     /// Handles to release once the render thread has moved past them (Spec 4 §3).
     private var releaseAfterTick: Int64 = 0
+    /// How many callers are holding evictions back (`withoutEviction`).
+    private var holds = 0
 
     /// `synchronous` rasterizes inside `request`, for the harness, so the
     /// second tick after a miss hits as the spec describes.
@@ -171,7 +173,7 @@ public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable
     /// go first, their textures released after the plans that may name them.
     /// Under memory pressure the bound is the ceiling, not the cap (Spec 4 §12).
     private func evictIfNeeded() {
-        guard stats.bytes > ceiling else { return }
+        guard holds == 0, stats.bytes > ceiling else { return }
         let ordered = entries.sorted { $0.value.lastUsed < $1.value.lastUsed }
         for (key, entry) in ordered where stats.bytes > ceiling {
             // Keep what the last few plans used.
@@ -232,6 +234,31 @@ public final class TextCache: TextProvider, ShrinkableCache, @unchecked Sendable
         lock.lock()
         defer { lock.unlock() }
         return entries[key]?.layout
+    }
+
+    /// Spec 4 §8 — the font that stood in for the one a raster asked for, or
+    /// nil when its own font drew it (or the raster isn't in the cache).
+    public func substitutedFont(for key: TextKey) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries[key]?.substitutedFont
+    }
+
+    /// Runs `body` with nothing evicted meanwhile: the thumbnail job builds a
+    /// stack pass from this cache and draws it at once, and a raster made for
+    /// a later box must not push out the lines of an earlier box of the same
+    /// picture. What is over the bound goes when `body` returns.
+    public func withoutEviction<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock()
+        holds += 1
+        lock.unlock()
+        defer {
+            lock.lock()
+            holds -= 1
+            evictIfNeeded()
+            lock.unlock()
+        }
+        return try body()
     }
 
     /// Spec 4 §8 — "recording the substitution for pre-flight": one record per

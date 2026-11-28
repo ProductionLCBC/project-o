@@ -64,6 +64,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// Spec 2 §9 — every executed command's line, in memory (Area 12 writes
     /// the day's file); Spec 5 §5 — typing's runs.
     public let commandLog = CommandLog()
+    /// Each audio instance's underruns as last read, so a rise is said once.
+    private var underrunsSeen: [ObjectIdentifier: Int64] = [:]
     /// Spec 5 §2 — the `library` events of this build, in order, for the
     /// engine to publish once the plan is built. Reset every build.
     public internal(set) var lastLibraryEvents: [LibraryEvent] = []
@@ -83,7 +85,8 @@ public final class ControlLoop: @unchecked Sendable {
     /// roots built in memory, whose edits are never written.
     internal(set) var documents: DocumentStore?
     public let pacing: Pacing
-    public let geometry: MachineGeometry
+    /// Spec 4 §5 — the sizes the textures below have, as the last rebuild left them (`rebuildResources`).
+    public internal(set) var geometry: MachineGeometry
     let backend: any RenderBackend
     let sources: SourceTable
     let sourceFactory: any SourceFactory
@@ -139,35 +142,55 @@ public final class ControlLoop: @unchecked Sendable {
     var heldEvents: [GroupID: HeldEvent] = [:]
     /// Spec 8 §6 (plan) — "no report within ten seconds puts every moved file back".
     public var mediaParkTimeout: Int64 = 10_000_000_000
-    public private(set) var model: ControlModel
+    public internal(set) var model: ControlModel
     let queue = CommandQueue()
     private var handlePool: [Int32]
-    private var pendingSourceRemovals: [(handle: InstanceHandle, afterFrame: Int64)] = []
-    public let channelTextures: [Int: TextureHandle]
-    public let channelSnapshots: [Int: TextureHandle]
-    public let stackRings: [Int: [TextureHandle]]
+    private var pendingSourceRemovals: [(handle: InstanceHandle, releasedAt: Int64)] = []
+    /// Spec 4 §3 — the frame the newest plan the render thread has taken was
+    /// built for; the engine sets it over its render loop. Nil (a control
+    /// loop on its own, in a test) counts every published plan as taken.
+    var planTaken: (@Sendable () -> Int64)?
+    /// Spec 4 §5 — one texture and one snapshot per channel and three per stack, by number. The control thread's
+    /// own, made again between ticks when a channel, a stack or a size changes (`rebuildResources`); other threads
+    /// read `publishedSurfaces`.
+    public internal(set) var channelTextures: [Int: TextureHandle] = [:]
+    public internal(set) var channelSnapshots: [Int: TextureHandle] = [:]
+    public internal(set) var stackRings: [Int: [TextureHandle]] = [:]
     /// Spec 10 §2 — "each stack's preview as three IOSurfaces": the three preview textures of each stack, by stack
     /// number, written in turn.
-    public let previewSurfaces: [Int: [TextureHandle]]
+    public internal(set) var previewSurfaces: [Int: [TextureHandle]] = [:]
     /// Spec 10 §2 — "a live picture of each channel for the strip (§7), 256 by 144 pixels, as three IOSurfaces per
     /// channel": by channel number, written in turn.
-    public let pictureSurfaces: [Int: [TextureHandle]]
+    public internal(set) var pictureSurfaces: [Int: [TextureHandle]] = [:]
+    /// Spec 4 §5 — what this build made again, or nil when it made nothing. Reset every build.
+    public internal(set) var lastRebuild: Rebuild?
+    /// Spec 4 §5 — "the old pools serve until the new ones exist", and for this many frames more: the sinks present
+    /// a frame behind the tick, and the readback thread and the preview topic read on their own time. About two
+    /// seconds; a test may shorten it.
+    public var retireGraceFrames: Int64
+    /// What the outputs showed, and the old stacks of the switches running, when the textures were last sized.
+    var builtShowing: [Int: Int]?
+    var builtSwitching: [Int: Int] = [:]
+    /// Spec 4 §7 — the frozen picture a resized channel's transition is leaving, in the texture it was taken in.
+    var heldSnapshots: [Int: (texture: TextureHandle, size: PixelSize)] = [:]
+    /// Spec 4 §10 — the ring a stack had before the rebuild of `frame`: an interlaced output's first field on that tick.
+    var retiredRings: [Int: (ring: [TextureHandle], frame: Int64)] = [:]
     /// Spec 4 §5 — "256 by 144 channel pictures".
     public static let pictureSize = PixelSize(width: 256, height: 144)
     /// Which of a stack's three preview surfaces the last planned preview writes, and of a channel's three the last
     /// planned picture; the next one takes the surface after it, "the oldest of the three".
-    public private(set) var previewSlots: [Int: Int] = [:]
-    public private(set) var pictureSlots: [Int: Int] = [:]
+    public internal(set) var previewSlots: [Int: Int] = [:]
+    public internal(set) var pictureSlots: [Int: Int] = [:]
     /// How many previews have been planned for each stack: once it is three, every one of its surfaces has been
     /// asked for a frame.
-    public private(set) var previewsPlanned: [Int: Int] = [:]
+    public internal(set) var previewsPlanned: [Int: Int] = [:]
     /// Spec 4 §2 — "While the operator app holds its Mach channel, the strip's channel pictures are a consumer at the
     /// preview rate too": set while a client holds the channel, read by each build. With no client no picture is
     /// planned and no channel pass is added for one.
     public let picturesWanted = Atomic<Bool>(false)
     /// The frame a stack pass last sampled each channel's texture at, for "a channel with pixel content that no stack
     /// pass has sampled since the last [preview tick]".
-    private var lastSampled: [Int: Int64] = [:]
+    var lastSampled: [Int: Int64] = [:]
     public private(set) var lastExecuted: [ExecutedCommand] = []
     /// Spec 2 §8 — the groups this build rejected, with their ids and
     /// sources, so OSC can answer whoever sent them (Spec 2 §6, "Errors go
@@ -182,8 +205,10 @@ public final class ControlLoop: @unchecked Sendable {
     public private(set) var lastPlan: FramePlan?
     public private(set) var rejections: [Rejection] = []
     public private(set) var textLateThisBuild = 0
+    /// Spec 10 §3 as corrected 2026-11-25 — "for content a box draws, as text is, the picture's duration is that of the
+    /// longest box transition the change started": this build's, by channel, in ms.
+    public private(set) var boxTransitionsStarted: [Int: Int] = [:]
     private let builtAt = Atomic<Int64>(0)
-    private var pendingSnapshotWhenReady: Set<Int> = []
     private var slideWarned = false
     /// Spec 2 §3 and Spec 4 §11 — the audio outputs `audio N mute` has muted.
     /// Engine state, not ShowState (Spec 3 §2); the control thread's own.
@@ -287,41 +312,19 @@ public final class ControlLoop: @unchecked Sendable {
         timers = TimerBank(count: machine.settings.timers)
         lastLive = LiveSnapshot.reading(state: model.state, library: library, machine: machine, kept: KeptCopies())
         handlePool = (0..<Int32(sources.capacity)).reversed()
-        // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, a preview per stack.
-        var channelTextures: [Int: TextureHandle] = [:]
-        var channelSnapshots: [Int: TextureHandle] = [:]
-        for channel in library.channels {
-            let size = geometry.channelSize(channel.number)
-            channelTextures[channel.number] = backend.makeTexture(TextureDescriptor(role: .channel, size: size, mipmapped: true, label: "channel \(channel.number)"))
-            channelSnapshots[channel.number] = backend.makeTexture(TextureDescriptor(role: .channel, size: size, label: "channel \(channel.number) snapshot"))
-        }
-        var stackRings: [Int: [TextureHandle]] = [:]
-        var previewSurfaces: [Int: [TextureHandle]] = [:]
-        var pictureSurfaces: [Int: [TextureHandle]] = [:]
-        for channel in library.channels {
-            pictureSurfaces[channel.number] = (0..<FrameRing.depth).map {
-                backend.makeTexture(TextureDescriptor(role: .preview, size: ControlLoop.pictureSize, label: "channel \(channel.number) picture \($0)"))
-            }
-        }
-        for stack in machine.stacks {
-            let size = geometry.stackSize(stack.number)
-            stackRings[stack.number] = (0..<FrameRing.depth).map { backend.makeTexture(TextureDescriptor(role: .stack, size: size, label: "stack \(stack.number) slot \($0)")) }
-            let preview = PixelSize(width: max(16, size.width / 4), height: max(9, size.height / 4))
-            previewSurfaces[stack.number] = (0..<FrameRing.depth).map {
-                backend.makeTexture(TextureDescriptor(role: .preview, size: preview, label: "stack \(stack.number) preview \($0)"))
-            }
-        }
-        self.channelTextures = channelTextures
-        self.channelSnapshots = channelSnapshots
-        self.stackRings = stackRings
-        self.previewSurfaces = previewSurfaces
-        self.pictureSurfaces = pictureSurfaces
+        retireGraceFrames = max(Int64(PlanRing.depth + FrameRing.depth), pacing.frames(forMs: 2000))
+        // Spec 4 §5 — allocation at show load: one texture and one snapshot per channel, three per stack, three
+        // previews per stack and three pictures per channel. The same step that makes them again between ticks.
+        rebuildResources(frame: 0, launching: true)
+        lastRebuild = nil
+        surfacesSnapshot = (previewSurfaces, pictureSurfaces)
     }
 
     /// Spec 4 §12 — for the watchdog: when a plan was last built.
     public var lastBuilt: MonotonicTime { MonotonicTime(nanoseconds: builtAt.load(ordering: .acquiring)) }
 
     private let stateLock = NSLock()
+    private var surfacesSnapshot: (previews: [Int: [TextureHandle]], pictures: [Int: [TextureHandle]]) = ([:], [:])
     private var stateSnapshot = ShowState()
     private var rootsSnapshot: (library: Library, machine: Machine)?
     private var namedSnapshot: Set<String> = []
@@ -371,6 +374,15 @@ public final class ControlLoop: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return stateSnapshot
+    }
+
+    /// Spec 10 §2 — each stack's three preview textures and each channel's
+    /// three picture textures as the last build left them, for the Mach
+    /// channel's thread: an edit or a stack switch can make them again.
+    public var publishedSurfaces: (previews: [Int: [TextureHandle]], pictures: [Int: [TextureHandle]]) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return surfacesSnapshot
     }
 
     /// The roots after the last build, for readers on other threads.
@@ -467,8 +479,11 @@ public final class ControlLoop: @unchecked Sendable {
     /// queued groups, then the runtimes advanced, then the plan.
     public func build(for frame: Int64, now: MonotonicTime) -> FramePlan {
         model.frame = frame
+        // Spec 4 §3 — whatever this build's plan may name waits, when released, for a plan built after it.
+        backend.resources.noteBuild(frame: frame)
         sweepReleases(before: frame)
         advanceRuntimes(frame)
+        noteUnderruns(frame)
         var groups = engineGroups(frame)
         groups += queue.drain()
         lastExecuted = []
@@ -514,6 +529,9 @@ public final class ControlLoop: @unchecked Sendable {
             lastRootsChanged = true
             kept = kept.refreshed(for: model.state.pointer, library: library, machine: machine)
         }
+        // Spec 4 §5 and Spec 5 §2 — "A new channel or stack gets its textures before the tick that first draws
+        // it": whatever this build's commands changed, the plan below names textures that exist, at their sizes.
+        rebuildResources(frame: frame)
         // Spec 9 §3 — "Every ten minutes", when something changed.
         timerSnapshot(now: now)
         // Spec 9 §5 — the `history` topic follows "whenever either stack changes".
@@ -541,6 +559,7 @@ public final class ControlLoop: @unchecked Sendable {
         lastPlan = plan
         stateLock.lock()
         stateSnapshot = model.state
+        if lastRebuild != nil { surfacesSnapshot = (previewSurfaces, pictureSurfaces) }
         if let named { namedSnapshot = named }
         if lastRootsChanged || rootsSnapshot == nil { rootsSnapshot = (library, machine) }
         publishedMediaState = (mediaFiles, mediaTiles)
@@ -553,11 +572,17 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 4 §3 — a source's slot is reused only after every plan that could
-    /// name it was consumed; two ticks is the plan ring's depth of slack.
+    /// name it was consumed; two ticks is the plan ring's depth of slack. And
+    /// only once the render thread has taken a plan built after the release:
+    /// while the control thread is behind, the render thread reuses a plan
+    /// from before it, and can still pick from the source. The control
+    /// thread, catching up, can build twice for one frame, so "after" is a
+    /// later frame.
     private func sweepReleases(before frame: Int64) {
-        var keep: [(handle: InstanceHandle, afterFrame: Int64)] = []
+        let taken = planTaken?() ?? Int64.max
+        var keep: [(handle: InstanceHandle, releasedAt: Int64)] = []
         for entry in pendingSourceRemovals {
-            if entry.afterFrame <= frame {
+            if entry.releasedAt + 2 <= frame, taken > entry.releasedAt {
                 sources.remove(entry.handle)
                 handlePool.append(entry.handle.rawValue)
             } else {
@@ -565,6 +590,33 @@ public final class ControlLoop: @unchecked Sendable {
             }
         }
         pendingSourceRemovals = keep
+    }
+
+    /// Found on the soak of 2026-11-27, which counted 94 underruns in one minute and could not say where: every half
+    /// second, each channel's missed samples since the last look, in the log with the item and the device (Spec 4
+    /// §13: "the log sees the detail").
+    private func noteUnderruns(_ frame: Int64) {
+        guard audio != nil, frame % 30 == 0 else { return }
+        var seen: [ObjectIdentifier: Int64] = [:]
+        for (channel, rt) in model.channels {
+            var media: [MediaRuntime] = rt.soundTails.map(\.media)
+            if case .media(let m) = rt.live { media.append(m) }
+            if case .content(.media(let m))? = rt.outgoing { media.append(m) }
+            for m in media {
+                guard let attachment = m.audio else { continue }
+                for member in attachment.members {
+                    let key = ObjectIdentifier(member.instance)
+                    let count = member.instance.underruns
+                    seen[key] = count
+                    let before = underrunsSeen[key] ?? 0
+                    if count > before {
+                        let name = m.entry.map { URL(fileURLWithPath: $0.path).lastPathComponent } ?? m.ref
+                        log.warning("audio: channel \(channel) missed \(count - before) samples of \(name) on \(member.graph.key)")
+                    }
+                }
+            }
+        }
+        underrunsSeen = seen
     }
 
     /// Spec 4 §6 — readiness of cold writes; Spec 4 §7 — transitions and grades ending.
@@ -579,8 +631,6 @@ public final class ControlLoop: @unchecked Sendable {
                 if !poster.isNone {
                     m.poster = poster
                     rt.live = .media(m)
-                    // As a write that found its poster loaded: the transition starts from the poster.
-                    if !m.ready, let t = rt.transition, t.startFrame == nil, t.durationFrames > 0 { pendingSnapshotWhenReady.insert(channel) }
                 }
             }
             if case .media(var m) = rt.live, !m.missing, !m.ready, let source = m.source, source.isReady {
@@ -593,21 +643,24 @@ public final class ControlLoop: @unchecked Sendable {
                 m.range = source.layout.isYCbCr ? .limited : .full
                 rt.live = .media(m)
                 if var t = rt.transition, t.startFrame == nil {
-                    // Spec 4 §6 — "starts its transition when the first decoded frame arrives".
-                    if pendingSnapshotWhenReady.remove(channel) != nil {
-                        if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
-                        rt.outgoing = .snapshot
-                        rt.snapshotPending = true
-                    }
-                    t.startFrame = frame
+                    // Spec 4 §6 — "starts its transition when the first decoded frame arrives", from the previous
+                    // picture it held while it waited; Spec 4 §11 as corrected 2026-11-27 — a J cut's no earlier
+                    // than its delay.
+                    t.startFrame = max(frame, t.notBefore ?? frame)
                     rt.transition = t
                 }
             }
             if let t = rt.transition, t.isComplete(at: frame) {
-                if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
+                if case .content(let c)? = rt.outgoing { releasePicture(c, frame: frame, soundUntil: rt.outgoingSoundUntil, in: &rt) }
                 rt.outgoing = nil
+                rt.outgoingSoundUntil = nil
                 rt.transition = nil
                 rt.snapshotPending = false
+            }
+            // Spec 4 §11 as corrected 2026-11-27 — a tail's sound goes "when the fade ends".
+            if rt.soundTails.contains(where: { $0.until <= frame }) {
+                for tail in rt.soundTails where tail.until <= frame { release(.media(tail.media), frame: frame) }
+                rt.soundTails.removeAll { $0.until <= frame }
             }
             if rt.grade.isComplete(at: frame), rt.grade.durationFrames > 0 {
                 rt.grade = GradeRun(targetRef: rt.grade.targetRef, from: rt.grade.to, to: rt.grade.to, startFrame: frame, durationFrames: 0)
@@ -1037,24 +1090,32 @@ public final class ControlLoop: @unchecked Sendable {
         var rt = model.channels[e.channel] ?? ChannelRuntime()
         let previous = rt.live
         let interrupted = rt.transition.map { $0.isRunning(at: frame) } ?? false
-        if case .content(let c)? = rt.outgoing { release(c, frame: frame) }
+        if case .content(let c)? = rt.outgoing { releasePicture(c, frame: frame, soundUntil: rt.outgoingSoundUntil, in: &rt) }
         rt.outgoing = nil
+        rt.outgoingSoundUntil = nil
         rt.snapshotPending = false
-        pendingSnapshotWhenReady.remove(e.channel)
 
         let incoming = makeRuntime(for: e.to, channel: e.channel, frame: frame)
-        let cutLike = type == .cut || durationFrames <= 0
         let previousHasPicture = previous.hasPixels
+        // Spec 4 §11 as corrected 2026-11-27 — a J cut "starts it at the trigger and the channel's picture transition
+        // that long after it, ..., the outgoing picture held until then" (the projection's `pictureDelayMs`).
+        let delayFrames = e.pictureDelayMs > 0 ? pacing.frames(forMs: e.pictureDelayMs) : 0
+        let cutLike = (type == .cut || durationFrames <= 0) && delayFrames == 0
 
-        // Spec 4 §11 — the audio transition "between the outgoing and incoming instance of a channel, with its offset".
+        // Spec 4 §11 — the audio transition "between the outgoing and incoming instance of a channel, with its offset",
+        // its gains following its easing; the outgoing's sound plays until its part of it ends.
+        var soundUntil: Int64?
         if let audio, previous.media?.audio != nil || incoming.media?.audio != nil {
             let object = library.audioTransition(e.audioTransition)
             audio.startTransition(outgoing: previous.media?.audio, incoming: incoming.media?.audio, type: object?.type ?? .cut,
-                                  ms: e.audioMs, offsetMs: e.audioOffsetMs)
+                                  ms: e.audioMs, offsetMs: e.audioOffsetMs, easing: object?.easing ?? .linear)
+            if previous.media?.audio != nil {
+                soundUntil = frame + pacing.frames(forMs: max(0, e.audioOffsetMs)) + pacing.frames(forMs: max(0, e.audioMs))
+            }
         }
 
         if case .text = incoming {
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
             rt.live = incoming
             rt.transition = nil
             model.channels[e.channel] = rt
@@ -1062,35 +1123,47 @@ public final class ControlLoop: @unchecked Sendable {
         }
 
         if case .media(let m) = incoming, !m.missing, !m.ready {
-            // Spec 4 §6 — a cold write: "shows the item's poster frame on the
-            // tick it lands and starts its transition when the first decoded
-            // frame arrives"; with no poster, the previous picture holds.
-            if !m.poster.isNone {
-                release(previous, frame: frame)
-                if !cutLike { pendingSnapshotWhenReady.insert(e.channel) }
-            } else if previousHasPicture, !cutLike {
+            // Spec 4 §6 as corrected 2026-11-24 and 25 — a cold write "starts its transition when the first decoded
+            // frame arrives. Until then a cut shows the item's poster frame from the tick it lands; any other
+            // transition holds what the channel showed, the previous content playing on with its sound, or nothing on
+            // an empty channel, so the transition mixes the previous picture with the new item's frames ..., never
+            // with its poster."
+            if cutLike {
+                releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
+            } else if previousHasPicture {
                 rt.outgoing = .content(previous)
+                rt.outgoingSoundUntil = soundUntil
             } else {
-                release(previous, frame: frame)
+                releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
+                rt.outgoing = .nothing
             }
             rt.live = incoming
-            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: cutLike ? 0 : durationFrames, startFrame: nil)
+            let isCut = type == .cut || durationFrames <= 0
+            rt.transition = TransitionRun(type: type, easing: easing, color: color, durationFrames: isCut ? 0 : durationFrames, startFrame: nil,
+                                          notBefore: delayFrames > 0 ? frame + delayFrames : nil)
             model.channels[e.channel] = rt
             return
         }
 
+        // Spec 4 §7 as corrected 2026-11-25 — "On a channel that held no picture the outgoing is transparent, so a
+        // dissolve fades the new content in"; a transition from nothing to nothing (a clear of an empty channel) cuts.
+        let fadesIn = !cutLike && !previousHasPicture && incoming.hasPixels
         if cutLike || !previousHasPicture {
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
+            if fadesIn { rt.outgoing = .nothing }
         } else if interrupted || e.restart {
             rt.outgoing = .snapshot
             rt.snapshotPending = true
-            release(previous, frame: frame)
+            releasePicture(previous, frame: frame, soundUntil: soundUntil, in: &rt)
         } else {
             rt.outgoing = .content(previous)
+            rt.outgoingSoundUntil = soundUntil
         }
         rt.live = incoming
+        let isCut = type == .cut || durationFrames <= 0
         rt.transition = TransitionRun(type: type, easing: easing, color: color,
-                                      durationFrames: (cutLike || !previousHasPicture) ? 0 : durationFrames, startFrame: frame)
+                                      durationFrames: isCut || (!previousHasPicture && !fadesIn) ? 0 : durationFrames, startFrame: frame + delayFrames,
+                                      notBefore: delayFrames > 0 ? frame + delayFrames : nil)
         model.channels[e.channel] = rt
     }
 
@@ -1272,12 +1345,28 @@ public final class ControlLoop: @unchecked Sendable {
         runtime.audioDecoder = nil
     }
 
-    private func release(_ content: ContentRuntime, frame: Int64) {
+    func release(_ content: ContentRuntime, frame: Int64) {
         guard case .media(var m) = content else { return }
         releaseAudio(of: &m)
         guard let source = m.source else { return }
         source.release()
-        pendingSourceRemovals.append((m.handle, frame + 2))
+        pendingSourceRemovals.append((m.handle, frame))
+    }
+
+    /// Spec 4 §11 as corrected 2026-11-27 — "However its picture goes (at the end of a picture transition, at once for
+    /// a cut, or snapshotted when interrupted), an outgoing item's sound plays until its part of the audio transition
+    /// ends: its video decoder is released with its picture, and its sound when the fade ends." Content without sound,
+    /// or whose fade has ended, is released whole.
+    func releasePicture(_ content: ContentRuntime, frame: Int64, soundUntil: Int64?, in rt: inout ChannelRuntime) {
+        guard case .media(var m) = content, m.audio != nil, let until = soundUntil, until > frame else {
+            return release(content, frame: frame)
+        }
+        if let source = m.source {
+            source.release()
+            pendingSourceRemovals.append((m.handle, frame))
+            m.source = nil
+        }
+        rt.soundTails.append(SoundTail(media: m, until: until))
     }
 
     // MARK: - Media time (Spec 4 §2, §6)
@@ -1334,6 +1423,7 @@ public final class ControlLoop: @unchecked Sendable {
     /// (Spec 4 §4 step 5).
     private func buildPlan(_ frame: Int64) -> FramePlan {
         textLateThisBuild = 0
+        boxTransitionsStarted = [:]
         var scratch = BuildScratch()
         // Due outputs and the stacks they consume, including the old stack of a running switch.
         var dueStacks: Set<Int> = []
@@ -1455,8 +1545,14 @@ public final class ControlLoop: @unchecked Sendable {
         switch rt.outgoing {
         case .content(let c)?:
             outgoing = binding(for: c, at: frame)
+        case .nothing?:
+            // "the outgoing is transparent": the shader's own empty outgoing.
+            outgoing = SourceBinding(source: .none, layout: .linearRGBA16, matrix: .bt709, range: .full, size: size)
         case .snapshot?:
-            if let snapshot = channelSnapshots[channel] {
+            if let held = heldSnapshots[channel] {
+                // The channel changed size while this transition ran: its frozen picture is in the texture it was taken in.
+                outgoing = SourceBinding(source: .texture(held.texture), layout: .finished, matrix: .bt709, range: .full, size: held.size)
+            } else if let snapshot = channelSnapshots[channel] {
                 outgoing = SourceBinding(source: .texture(snapshot), layout: .finished, matrix: .bt709, range: .full, size: size)
             }
         case nil:
@@ -1464,8 +1560,11 @@ public final class ControlLoop: @unchecked Sendable {
         }
         let transition = rt.transition?.state(at: frame)
         if transition == nil {
-            // Not running (or waiting on a cold write): hold the previous picture if there is nothing new.
-            if incoming == nil, let held = outgoing { incoming = held }
+            // Not running. A transition waiting on a cold write's first frame holds the previous picture, never the new
+            // item's poster (Spec 4 §6 as corrected 2026-11-24); otherwise the previous picture holds only while there
+            // is nothing new.
+            let waiting = rt.transition.map { $0.isWaiting(at: frame) } ?? false
+            if let held = outgoing, waiting || incoming == nil { incoming = held }
             outgoing = nil
         } else if transition?.type == .cut {
             outgoing = nil
@@ -1610,7 +1709,7 @@ public final class ControlLoop: @unchecked Sendable {
     }
 
     /// Spec 10 §3, the `channels` topic — "for timed media its duration,
-    /// position, loop and end behaviour"; "Timed media's duration and
+    /// position, loop and end behavior"; "Timed media's duration and
     /// position count within its in and out points". By channel, for media
     /// that has a length: not a still, and with an out point or a known
     /// duration. Paused or held media reads where it stands. Control side.
@@ -1643,7 +1742,8 @@ public final class ControlLoop: @unchecked Sendable {
         let inputs = SlotResolver.Inputs(library: library, machine: machine, kept: kept, stack: stack, size: size,
                                          muted: model.state.stacks[stack.number]?.muted ?? [], text: text)
         var boxes: [ResolvedBox] = []
-        for (slotIndex, slot) in stack.effectiveSlots(library: library).enumerated() {
+        for slot in stack.effectiveSlots(library: library) {
+            claimBoxRuns(slot: slot, inputs: inputs, frame: frame)
             // Spec 4 §8 — "Lookahead pre-rasterizes, for every due stack, the next cue's text and, for each
             // offset box, the text one cue beyond its offset".
             for offset in SlotResolver.offsets(of: inputs.layout(for: slot)) where Box.drawnOffsets.contains(offset) {
@@ -1653,7 +1753,7 @@ public final class ControlLoop: @unchecked Sendable {
                 }
             }
             let results = SlotResolver.resolve(
-                inputs, slotIndex: slotIndex, slot: slot,
+                inputs, slot: slot,
                 // Spec 6 §3 — "At 0 the box draws its slot's channel as it is now. At +K it draws the channel as
                 // it will be once the next K cues have fired"; the resolver draws nothing outside 0 to +3.
                 state: { offset in lookaheadState(offset, frame: frame, scratch: &scratch) },
@@ -1665,16 +1765,29 @@ public final class ControlLoop: @unchecked Sendable {
                     return adopt(key, template: template.raw, resolved: resolved, box: box, frame: frame, second: resolving.second,
                                  frameRect: PixelRect(box.frame, in: size), size: size)
                 },
-                onTextMiss: { job in
-                    scratch.jobs.append(job)
-                    textLateThisBuild += 1
-                })
+                onTextMiss: { job in scratch.jobs.append(job) })
             for result in results {
                 guard var box = result.resolved else {
                     // Spec 6 §5 — a box hidden by a value going empty swaps unless it asks to transition.
                     let allowed = result.hiddenByValue ? result.box.transitionOnVariableChange : result.transitionAllowed
                     endBox(result.key, frame: frame, box: result.box, allowed: allowed, slot: slot, inputs: inputs, into: &boxes)
                     continue
+                }
+                if result.textMissed {
+                    // Spec 4 §9 — "When the box has been drawing this text and only its raster is missing, the box
+                    // keeps drawing its previous lines until the new raster is ready and counts nothing late": after
+                    // a look edit, a change of the stack's size, or a variable's new value. Its transition, if the
+                    // change runs one, starts when the raster arrives, so what the run remembers stays as it is.
+                    if let run = model.boxRuns[result.key], run.sameTextAsBefore, let previous = run.previousContent, !previous.isEmpty {
+                        box.content = previous
+                        box.transition = run.state(at: frame)
+                        boxes.append(box)
+                        continue
+                    }
+                    // "a missing cache entry draws nothing this tick and counts `textLate`".
+                    textLateThisBuild += 1
+                } else if box.binding.isText {
+                    settleReplaced(result.key, box: result.box, frame: frame)
                 }
                 // Spec 6 §5 — "A box with `transitionOnVariableChange` runs its box transition between the old text
                 // and the new; the rest swap": a value's change asks the box, new text transitions as any write.
@@ -1774,18 +1887,21 @@ public final class ControlLoop: @unchecked Sendable {
     /// adopts takes every value at its newest. The raster a value's change
     /// replaces goes, its textures freed once any box transition between the
     /// two has run; new text's stays in the cache, where a `previous` finds it.
+    /// Spec 4 §9 — the replaced raster stays while the new value's is missing
+    /// and the box draws the old lines; it goes when the new one has drawn.
     private func adopt(_ key: BoxKey, template: String, resolved: ResolvedText, box: Box, frame: Int64, second: Int64,
                        frameRect: PixelRect, size: PixelSize) -> SlotResolver.BoxText {
         var run = model.boxRuns[key] ?? BoxRun()
         defer { model.boxRuns[key] = run }
+        // Spec 4 §9 — the text the box was drawing, or new text: only the first keeps its previous lines on a miss.
+        run.sameTextAsBefore = run.adoptedText != nil && run.adoptedTemplate == template
         let now = SlotResolver.BoxText(text: resolved.text, tabular: resolved.tabular)
         func take(valueChange: Bool, clocked: Bool) -> SlotResolver.BoxText {
             // Spec 6 §4 — the flag goes with the text it was adopted with, so the raster drawn and the one released
-            // are the ones the cache holds.
+            // are the ones the cache holds. Spec 4 §9 — the box may go on drawing the old value's lines until the
+            // new raster is ready, so the old raster is released once the new one has drawn (`settleReplaced`).
             if valueChange, let old = run.adoptedText, !old.isEmpty, old != now.text || run.adoptedTabular != now.tabular {
-                let ms = box.transition.ms ?? library.transition(box.transition.ref)?.ms ?? 0
-                text.release(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key,
-                             afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+                run.replaced.append(SlotResolver.textJob(old, box: box, frame: frameRect, outputHeight: size.height, tabular: run.adoptedTabular).key)
             }
             run.adoptedTemplate = template
             run.adoptedText = now.text
@@ -1833,6 +1949,38 @@ public final class ControlLoop: @unchecked Sendable {
         return take(valueChange: true, clocked: true)
     }
 
+    /// Spec 4 §9 — each box of a slot claims the run kept under its key: a run
+    /// of another box (`BoxIdentity`) is dropped, so this box starts afresh,
+    /// its first text showing at once with nothing to dissolve from and no
+    /// previous lines to keep.
+    private func claimBoxRuns(slot: StackSlot, inputs: SlotResolver.Inputs, frame: Int64) {
+        let preset = inputs.preset(for: slot)
+        let stack = inputs.stack.number
+        let layout: LayoutKey = preset.layouts[.stack(stack)] != nil ? .stack(stack) : .any
+        for (index, box) in (preset.layout(for: stack)?.boxes ?? []).enumerated() {
+            let key = BoxKey(stack: stack, slot: slot.channel, box: index)
+            let identity = BoxIdentity(preset: preset.uuid, layout: layout, bound: BoxIdentity.Bound(box.binding.kind), offset: box.offset)
+            if let run = model.boxRuns[key] {
+                guard run.identity != identity else { continue }
+                releaseReplaced(run, afterTick: frame + Int64(PlanRing.depth))
+            }
+            var fresh = BoxRun()
+            fresh.identity = identity
+            model.boxRuns[key] = fresh
+        }
+    }
+
+    /// Spec 4 §8 — "the result replaces the cache entry": a text box drew
+    /// from the cache, so the rasters its value changes replaced go, their
+    /// textures freed once any box transition between old and new has run.
+    private func settleReplaced(_ key: BoxKey, box: Box, frame: Int64) {
+        guard var run = model.boxRuns[key], !run.replaced.isEmpty else { return }
+        let ms = boxTransitionMs(box, channel: key.slot)
+        releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+        run.replaced = []
+        model.boxRuns[key] = run
+    }
+
     /// Spec 6 §5 — "at most ten times a second": the frames of the master tick
     /// that make at least 100 ms (six at 60 Hz and at 59.94).
     private var popupSpacingFrames: Int64 {
@@ -1854,24 +2002,48 @@ public final class ControlLoop: @unchecked Sendable {
             run.outgoing = nil
             return nil
         }
-        if run.previousText != nil, run.previousText != text {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: allowed, frame: frame)
+        // Spec 4 §9 as corrected 2026-11-25 — "A box whose content appears from nothing mixes from transparent, so a
+        // dissolve fades it in": a box that drew nothing since it was claimed, now drawing text.
+        let appears = run.previousText == nil && run.wasEmpty && text != nil
+        if (run.previousText != nil && run.previousText != text) || appears {
+            startBoxRun(&run, from: run.previousContent ?? .lines([]), box: box, channel: key.slot, allowed: allowed, frame: frame)
         }
+        if text != nil { run.wasEmpty = false }
         run.previousContent = content
         run.previousText = text
         return run.state(at: frame)
     }
 
-    private func startBoxRun(_ run: inout BoxRun, from previous: BoxContent?, box: Box, allowed: Bool, frame: Int64) {
-        let object = library.transition(box.transition.ref)
-        let ms = box.transition.ms ?? object?.ms ?? 0
+    /// Spec 4 §9 as corrected 2026-11-25 — the transition a box draws a change with: "the write's `once` rider, else
+    /// the channel's tracked transition, else the box's own transition when it sets one, else the channel's default".
+    /// A pixel box's own is never read (Spec 1 §2: "a pixel box always takes the channel's").
+    func boxTransitionSetting(_ box: Box, channel: Int) -> TransitionSetting {
+        let attribute = model.state.channels[channel]?.attributes.transition
+        if let attribute, attribute.origin != .default { return attribute.value }
+        if box.binding.isText, let own = box.transition { return TransitionSetting(ref: own.ref, ms: own.ms) }
+        if let attribute { return attribute.value }
+        return TransitionSetting(ref: library.channels.first { $0.number == channel }?.defaults.transition ?? 1)
+    }
+
+    /// The chosen transition's length in ms: its own duration, else the transition object's.
+    func boxTransitionMs(_ box: Box, channel: Int) -> Int {
+        let setting = boxTransitionSetting(box, channel: channel)
+        return setting.ms ?? library.transition(setting.ref)?.ms ?? 0
+    }
+
+    private func startBoxRun(_ run: inout BoxRun, from previous: BoxContent?, box: Box, channel: Int, allowed: Bool, frame: Int64) {
+        let setting = boxTransitionSetting(box, channel: channel)
+        let object = library.transition(setting.ref)
+        let ms = setting.ms ?? object?.ms ?? 0
         let type = object?.type ?? .cut
-        if allowed, type != .cut, ms > 0, let previous, !previous.isEmpty {
+        // A box mixes from what it drew, or from transparent when it drew nothing (Spec 4 §9 as corrected 2026-11-25).
+        if allowed, type != .cut, ms > 0, let previous {
             run.type = type
             run.easing = object?.easing ?? .linear
             run.startFrame = frame
             run.durationFrames = pacing.frames(forMs: ms)
             run.outgoing = previous
+            boxTransitionsStarted[channel] = max(boxTransitionsStarted[channel] ?? 0, ms)
         } else {
             run.outgoing = nil
             run.durationFrames = 0
@@ -1886,8 +2058,15 @@ public final class ControlLoop: @unchecked Sendable {
                         into boxes: inout [ResolvedBox]) {
         guard var run = model.boxRuns[key] else { return }
         defer { model.boxRuns[key] = run }
+        run.wasEmpty = true
+        if !run.replaced.isEmpty {
+            // The box draws no text now: the rasters its values replaced go once its way out has run.
+            let ms = boxTransitionMs(box, channel: key.slot)
+            releaseReplaced(run, afterTick: frame + pacing.frames(forMs: ms) + Int64(PlanRing.depth))
+            run.replaced = []
+        }
         if run.previousText != nil {
-            startBoxRun(&run, from: run.previousContent, box: box, allowed: box.offset == 0 && allowed, frame: frame)
+            startBoxRun(&run, from: run.previousContent, box: box, channel: key.slot, allowed: box.offset == 0 && allowed, frame: frame)
             run.previousContent = nil
             run.previousText = nil
         }
@@ -1902,19 +2081,26 @@ public final class ControlLoop: @unchecked Sendable {
     /// stack for a switch, black for blackout". An interlaced output's pass
     /// also names the previous tick's stack texture as the first field (and
     /// the old stack's texture of that tick during a switch), with this
-    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03).
+    /// tick's mix for both fields (Area 5 reading, approved 2026-11-03). On
+    /// the tick a stack's ring is made again (Spec 4 §5), the previous
+    /// tick's picture is in the ring it had, and the first field reads that.
     private func sinkPass(_ output: Output, frame: Int64) -> SinkPass? {
         let live = model.state.outputs[output.number] ?? output.defaultStack
-        guard let ring = stackRings[live] else { return nil }
+        guard let ring = stackRings[live], ring.count == FrameRing.depth else { return nil }
         let slot = Int(frame % Int64(FrameRing.depth))
         let previousSlot = Int((frame + Int64(FrameRing.depth) - 1) % Int64(FrameRing.depth))
+        // The ring `stack` wrote on the tick before this one.
+        func before(_ stack: Int, _ current: [TextureHandle]) -> [TextureHandle] {
+            guard let retired = retiredRings[stack], retired.frame == frame, retired.ring.count == FrameRing.depth else { return current }
+            return retired.ring
+        }
         var second: SecondTexture = .none
         var firstFieldSecond: SecondTexture = .none
         var mix: Float = 0
         let ort = model.outputs[output.number] ?? OutputRuntime()
-        if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack] {
+        if let run = ort.switchRun, !run.isComplete(at: frame), let oldRing = stackRings[run.oldStack], oldRing.count == FrameRing.depth {
             second = .stack(oldRing[slot])
-            firstFieldSecond = .stack(oldRing[previousSlot])
+            firstFieldSecond = .stack(before(run.oldStack, oldRing)[previousSlot])
             mix = run.oldMix(at: frame)
         }
         let black = ort.blackout.map { $0.mix(at: frame) } ?? ort.blackoutMix
@@ -1926,7 +2112,7 @@ public final class ControlLoop: @unchecked Sendable {
         let interlaced = pacing.isInterlaced(output: output.number)
         var encode = encodeKinds[output.number] ?? (output.kind == .sdi ? .v210 : .display10Bit)
         if interlaced, encode == .v210 { encode = .v210Interlaced }
-        let firstField = interlaced && frame > 0 ? FieldSources(stack: ring[previousSlot], second: firstFieldSecond) : nil
+        let firstField = interlaced && frame > 0 ? FieldSources(stack: before(live, ring)[previousSlot], second: firstFieldSecond) : nil
         return SinkPass(output: output.number, stack: ring[slot], second: second, mix: mix, encode: encode, destination: slot, firstField: firstField)
     }
 }

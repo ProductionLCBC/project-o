@@ -99,7 +99,7 @@ public struct LiveStatus: Equatable, Sendable {
 
 /// Spec 10 §3, the `channels` topic — a channel's content: "kind, ref,
 /// label, missing, whether it has a picture and whether it has sound, and
-/// for timed media its duration, position, loop and end behaviour; for text
+/// for timed media its duration, position, loop and end behavior; for text
 /// its fields".
 public struct ChannelContent: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {

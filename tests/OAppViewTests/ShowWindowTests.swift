@@ -9,7 +9,7 @@ import OCore
 @MainActor
 enum Audit {
     /// Each visible control or accessibility element under `view` that has no label, by its type.
-    static func unlabelled(in view: NSView) -> [String] {
+    static func unlabeled(in view: NSView) -> [String] {
         var found: [String] = []
         func walk(_ view: NSView) {
             guard !view.isHidden else { return }
@@ -108,12 +108,25 @@ final class ShowWindowTests: XCTestCase {
     func test_theWindowHasItsRegionsAtTheSpecsSizes() throws {
         let rig = try Rig()
         let view = rig.view
-        XCTAssertEqual(view.topBar.frame.height, 38, "Top bar: 38 points high")
-        XCTAssertEqual(view.left.frame.width, 248, "Left column: 248 points wide by default")
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 380, "Right column: 380 points wide by default")
-        XCTAssertEqual(view.grid.frame.minX, 248)
+        // Spec 10 §4 as corrected 2026-11-24 — "Top bar ... 44 points high"; "Both modes draw their regions alike: each a
+        // panel with a hairline outline and rounded corners, on the darker ground between panels, 4 points apart".
+        XCTAssertEqual(view.topBar.frame.height, 44, "Top bar: 44 points high")
+        XCTAssertEqual(view.left.frame.minX, 4, "4 points in from the window's edge")
+        XCTAssertEqual(view.left.frame.minY, view.topBar.frame.maxY + 4)
+        XCTAssertEqual(view.left.frame.width, 248 - 4 - 2, "Left column: 248 points wide by default, its panel inside the gaps")
+        XCTAssertEqual(view.grid.frame.minX, 248 + 2, "4 points apart")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 380 + 2, "Right column: 380 points wide by default")
         XCTAssertEqual(view.pool.frame.minX, view.grid.frame.minX, "the Media pool panel under the grid")
-        XCTAssertEqual(view.pool.frame.minY, view.grid.frame.maxY)
+        XCTAssertEqual(view.pool.frame.minY, view.grid.frame.maxY + 4)
+        XCTAssertEqual(view.pool.frame.maxY, view.bounds.height - 4)
+        XCTAssertEqual(view.fill, Palette.gut, "the darker ground")
+        for panel in [view.left, view.grid, view.pool] as [Surface] {
+            XCTAssertEqual(panel.radius, 6)
+            XCTAssertEqual(panel.layer?.cornerRadius, 6)
+            XCTAssertNotNil(panel.outline, "a hairline outline")
+        }
+        XCTAssertEqual(view.grid.outline, Palette.hairline, "the grid's outline turns amber only while it browses")
+        XCTAssertGreaterThanOrEqual(view.preview.frame.minX, view.grid.frame.maxX + 4 + 8, "the right column's parts sit inside its panel")
         XCTAssertLessThan(view.preview.frame.maxY, view.nextRow.frame.minY + 1, "Preview, next row, tabbed panel, channel strip")
         XCTAssertLessThan(view.nextRow.frame.maxY, view.tabs.frame.minY + 1)
         XCTAssertLessThan(view.tabs.frame.maxY, view.strip.frame.minY + 1)
@@ -144,7 +157,9 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(bar.shownTags, ["Audio lost", "Popup 1"],
                        "each shown only while it applies: the recorded engine has no audio device, so the output channel 1 routes to is silent")
         XCTAssertTrue(bar.backToLive.isHidden, "Back to Live only while browsing")
-        XCTAssertFalse(bar.edit.isEnabled, "edit mode is a later area's")
+        XCTAssertTrue(bar.edit.isEnabled, "Edit in the top bar opens edit mode (Spec 11 §2)")
+        XCTAssertTrue(bar.show.isOn)
+        XCTAssertTrue(bar.pagePicker.isHidden, "the page picker is edit mode's")
         rig.model.browse(.list(Self.list7))
         XCTAssertFalse(bar.backToLive.isHidden)
         bar.backToLive.press()
@@ -185,7 +200,7 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(live.map(\.cell.label), ["Verse 1"], "a red outline on the live cue")
         XCTAssertEqual(live.first?.outlineWidth, 2.5, "heavier than any other outline in the grid")
         XCTAssertEqual(live.first?.shownTags, [], "and no \"Live\" tag (Adam, 2026-11-17)")
-        XCTAssertEqual(live.first?.accessibilityLabel()?.contains("live"), true, "the word is there for VoiceOver: colour is never the only signal")
+        XCTAssertEqual(live.first?.accessibilityLabel()?.contains("live"), true, "the word is there for VoiceOver: color is never the only signal")
         XCTAssertEqual(grid.document.cells[2].trigger.stringValue, "+8 s · adv 12 s")
         XCTAssertEqual(grid.document.cells[4].section.isLocal, true)
         XCTAssertEqual(Audit.all(ListHeaderView.self, in: grid).map(\.title.stringValue), ["Great Is Thy Faithfulness", "Great Is Thy Faithfulness (Manheim)", "Doxology"])
@@ -205,7 +220,7 @@ final class ShowWindowTests: XCTestCase {
 
     func test_browsingTurnsTheGridsEdgeAmberAndItsHeaderSaysSo() throws {
         let rig = try Rig()
-        XCTAssertNil(rig.view.grid.outline)
+        XCTAssertEqual(rig.view.grid.outline, Palette.hairline, "the hairline every panel has (Spec 10 §4)")
         rig.model.browse(.list(Self.list7))
         XCTAssertEqual(rig.view.grid.outline, Palette.browsing)
         XCTAssertEqual(Audit.all(TagView.self, in: rig.view.grid).map(\.text).contains("Browsing"), true)
@@ -331,16 +346,17 @@ final class ShowWindowTests: XCTestCase {
         let view = rig.view
         view.leftDivider.drag(by: 60)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.left.frame.width, 308)
+        // A column's width counts its gaps: its panel is 6 points narrower, and the grid ends half a gap before the right column.
+        XCTAssertEqual(view.left.frame.width, 308 - 6)
         view.leftDivider.drag(by: 400)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.left.frame.width, 360, "Left column: 200 to 360")
+        XCTAssertEqual(view.left.frame.width, 360 - 6, "Left column: 200 to 360")
         view.rightDivider.drag(by: 30)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 350, "dragged right, the right column narrows")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 350 + 2, "dragged right, the right column narrows")
         view.rightDivider.drag(by: 500)
         view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 340, "Right column: 340 to 480")
+        XCTAssertEqual(view.bounds.width - view.grid.frame.maxX, 340 + 2, "Right column: 340 to 480")
         let before = rig.model.settings.leftSplit
         view.left.split.drag(by: 80)
         XCTAssertGreaterThan(rig.model.settings.leftSplit, before, "dragged down, the Playlists window grows")
@@ -381,8 +397,22 @@ final class ShowWindowTests: XCTestCase {
         XCTAssertEqual(details.stack.selectedItem?.title, "Stack 1 Main")
         details.choose(stack: 2)
         XCTAssertEqual(rig.commands, [["output 1 stack 2"]])
-        XCTAssertEqual(Audit.unlabelled(in: details), [])
+        XCTAssertEqual(Audit.unlabeled(in: details), [])
         for row in details.rows { XCTAssertFalse(Audit.isCutOff(row.name), row.name.stringValue) }
+        // Spec 10 §8 as corrected 2026-11-24 — "for an output on a screen, Release This Screen ... or Put Back on This
+        // Screen while they are released".
+        let screen = try XCTUnwrap(rig.model.store.catalog?.outputs.first?.device)
+        var asked: [String] = []
+        rig.view.onScreen = { asked.append(($1 ? "put back " : "release ") + $0) }
+        let release = try XCTUnwrap(details.screenButton, "output 1 is on a screen")
+        XCTAssertEqual(release.title, "Release This Screen")
+        release.press()
+        var released = dot
+        released.state = .released
+        let back = try XCTUnwrap(rig.view.outputDetails(for: released)?.screenButton)
+        XCTAssertEqual(back.title, "Put Back on This Screen")
+        back.press()
+        XCTAssertEqual(asked, ["release " + screen, "put back " + screen])
     }
 
     func test_showInLibraryOpensTheFolderAndMarksTheListsRow() throws {
@@ -401,13 +431,13 @@ final class ShowWindowTests: XCTestCase {
         let rig = try Rig(size: NSSize(width: 1440, height: 1100))
         for tab in TabsView.Tab.allCases {
             rig.view.tabs.show(tab)
-            XCTAssertEqual(Audit.unlabelled(in: rig.view), [], "Spec 10 §15: every control has a label (\(tab))")
+            XCTAssertEqual(Audit.unlabeled(in: rig.view), [], "Spec 10 §15: every control has a label (\(tab))")
         }
         rig.model.selectOnly(1)
         rig.view.tabs.show(.transport)
         rig.model.change { $0.multiviewer = true }
         rig.model.browse(.list(Self.list7))
-        XCTAssertEqual(Audit.unlabelled(in: rig.view), [])
+        XCTAssertEqual(Audit.unlabeled(in: rig.view), [])
     }
 
     func test_nothingOfTheAppsOwnIsClippedAt1440By900UnderEitherPseudolanguage() throws {

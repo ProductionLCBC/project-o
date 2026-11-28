@@ -4,7 +4,7 @@ import Foundation
 import OCore
 
 /// Spec 4 §7 — "Stage 2, grade. Applied in linear RGB: tint (multiply),
-/// brightness (multiply), contrast (scale around linear 0.18 mid-grey),
+/// brightness (multiply), contrast (scale around linear 0.18 mid-gray),
 /// saturation (blend toward luma), hue (rotation matrix), opacity (multiply
 /// all four components). Parameters arrive per tick, already interpolated
 /// by the control thread when a grade write carried a duration, so the shader

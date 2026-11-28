@@ -1,7 +1,7 @@
 import XCTest
 @testable import OCore
 
-/// Behaviour Spec 3 specifies outside the §9 table: macro inlining with
+/// Behavior Spec 3 specifies outside the §9 table: macro inlining with
 /// guards (§6, Spec 2 §7), lock through a macro fired by a cue (§8), output
 /// and stack commands (§6 effects table), popups (§4) and pass-through.
 final class ProjectionSupplementaryTests: XCTestCase {
@@ -248,7 +248,7 @@ final class ProjectionSupplementaryTests: XCTestCase {
 
     func test_passThroughAndUnknownCommands() {
         let passing: [Command] = [.timerStart(timer: 1), .undo, .redo, .historyJump(3), .systemPreflight, .systemSnapshot,
-                                  // Spec 5 §9 — "A restore changes the library and never ShowState."
+                                  // Spec 5 §9 — "A restore changes the library and never what ShowState holds".
                                   .systemRestoreList(list: 42, version: 16), .systemRestoreSnapshot(id: "2026-11-08-085959"),
                                   .audioMute(audio: .all, state: .on),
                                   .edit(EditCommand(.numbered(.channel, 1), .set(path: "label", value: .string("x"))))]

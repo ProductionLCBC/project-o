@@ -65,7 +65,7 @@ fragment float4 encodeFragment(VertexOut in [[stage_in]],
     uint row = uint(in.uv.y * u.size.y);
     float4 c = woven(in.uv, row, stack, second, firstStack, firstSecond, u);
     if (kToDisplay) {
-        // Spec 4 §10 — "pixel format bgr10a2Unorm (10-bit) ... colour space sRGB/Rec.709".
+        // Spec 4 §10 — "pixel format bgr10a2Unorm (10-bit) ... color space sRGB/Rec.709".
         return float4(srgbEncode(c.rgb), c.a);
     }
     return c;

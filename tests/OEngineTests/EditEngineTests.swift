@@ -105,6 +105,25 @@ final class EditEngineTests: XCTestCase {
     }
 
     /// The whole object changed: created, deleted, renumbered or moved.
+    /// Spec 11 §9 as corrected 2026-11-25 (G-38) — a transition made at run time, a fade through its own color, runs
+    /// as the built-in ones do.
+    func test_aNewTransitionRunsWithItsOwnTypeAndColor() throws {
+        try makeEngine()
+        XCTAssertNil(engine.send("edit transition create"))
+        XCTAssertNil(engine.send("edit transition 4 type fadeThroughColor"))
+        XCTAssertNil(engine.send("edit transition 4 color {\"a\": 1, \"b\": 0, \"g\": 0, \"r\": 1}"))
+        XCTAssertNil(engine.send("edit transition 4 ms 400"))
+        engine.tick()
+        XCTAssertEqual(engine.control.library.transition(4)?.type, .fadeThroughColor)
+        engine.send("channel 1 write media \(E.dawn)")
+        engine.tick()
+        XCTAssertNil(engine.send("channel 1 write media \(E.cross) transition 4 once"))
+        engine.tick()
+        let pass = try XCTUnwrap(engine.lastPlan?.channelPasses.first)
+        XCTAssertEqual(pass.transition?.type, .fadeThroughColor)
+        XCTAssertEqual(pass.transition?.color, ColorValue(r: 1, g: 0, b: 0, a: 1))
+    }
+
     func test_aCreatedObjectIsNamedWithNoPaths() throws {
         engine.send("edit playlist create \"Easter\"", source: .ui)
         engine.tick()

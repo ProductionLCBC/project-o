@@ -3,7 +3,7 @@
 import Foundation
 import OCore
 
-/// Spec 10 §6, "The edge and the tags" — "the section's colour as the left
+/// Spec 10 §6, "The edge and the tags" — "the section's color as the left
 /// edge, from a fixed palette of eight hues that are neither the live red
 /// nor the browse amber, common section names (Verse, Chorus, Bridge,
 /// Pre-chorus, Tag, Intro, Outro) always taking the same hue and other names
@@ -167,7 +167,7 @@ public struct GridSection: Equatable, Sendable {
     public var isUpdated = false
     /// ""missing" in red, with no cues, when its list is gone".
     public var isMissing = false
-    /// "dimmed and labelled "Removed: finishing", with the live cue marked, until the pointer leaves it (Spec 7 §4)".
+    /// "dimmed and labeled "Removed: finishing", with the live cue marked, until the pointer leaves it (Spec 7 §4)".
     public var isRemoved = false
     /// Why its cues can't be fired, or nil when they can (Spec 10 §6, "Clicking").
     public var refusal: FireRefusal?

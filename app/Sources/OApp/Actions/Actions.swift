@@ -53,17 +53,18 @@ public enum Actions {
     /// Spec 10 §5 — "Make Live (`playlist "TITLE"`, Spec 2 §3: live with no cue fired".
     public static func makeLive(title: String) -> Sending { Sending([.playlistLoad(title: title)]) }
 
-    /// Spec 10 §6 — "in the live playlist, `item N cue M`".
-    public static func fire(item: Int, cue: Int) -> Sending { Sending([.itemCue(item: item, cue: cue)]) }
+    /// Spec 10 §6 — "in the live playlist, `item N cue M`". `state`: Spec 2 §3's `[state]`, which edit mode's Live
+    /// sends (Spec 11 §2).
+    public static func fire(item: Int, cue: Int, state: Bool = false) -> Sending { Sending([.itemCue(item: item, cue: cue, state: state)]) }
 
     /// Spec 10 §6 — "in a playlist that isn't loaded, `playlist "TITLE"` then
     /// `item N cue M`, one group that lands on one frame (Spec 2 §8)".
-    public static func fire(loading title: String, item: Int, cue: Int) -> Sending {
-        Sending([.playlistLoad(title: title), .itemCue(item: item, cue: cue)])
+    public static func fire(loading title: String, item: Int, cue: Int, state: Bool = false) -> Sending {
+        Sending([.playlistLoad(title: title), .itemCue(item: item, cue: cue, state: state)])
     }
 
     /// Spec 10 §6 — "in a list from the library, `list N cue M`".
-    public static func fire(list: Int, cue: Int) -> Sending { Sending([.listCue(list: list, cue: cue)]) }
+    public static func fire(list: Int, cue: Int, state: Bool = false) -> Sending { Sending([.listCue(list: list, cue: cue, state: state)]) }
 
     // MARK: Transport (Spec 10 §7)
 
@@ -73,9 +74,9 @@ public enum Actions {
         Sending(Selection.expand(channels) { .channelTransport(channel: .number($0), mode: mode) })
     }
 
-    /// "its end behaviour as Loop, Hold and Clear (`channel N end loop | hold | clear`)".
-    public static func end(_ behaviour: EndBehavior, channel: Int) -> Sending {
-        Sending([.channelEndBehavior(channel: .number(channel), mode: behaviour)])
+    /// "its end behavior as Loop, Hold and Clear (`channel N end loop | hold | clear`)".
+    public static func end(_ behavior: EndBehavior, channel: Int) -> Sending {
+        Sending([.channelEndBehavior(channel: .number(channel), mode: behavior)])
     }
 
     // MARK: Clears (Spec 10 §7, choice U-4)
@@ -185,10 +186,10 @@ public enum GridFire {
     /// playlist that isn't loaded, `playlist "TITLE"` then `item N cue M`".
     /// "A playlist whose title another shares can be fired or made live only
     /// if its title loads it, which the `catalog` says (Spec 7 §3)".
-    public static func playlistCue(_ playlist: CatalogPlaylist, item: Int, cue: Int, live: LiveStatus) -> Result<Sending, FireRefusal> {
-        if live.playlist == playlist.playlist.uuid.uuidString.lowercased() { return .success(Actions.fire(item: item, cue: cue)) }
+    public static func playlistCue(_ playlist: CatalogPlaylist, item: Int, cue: Int, live: LiveStatus, state: Bool = false) -> Result<Sending, FireRefusal> {
+        if live.playlist == playlist.playlist.uuid.uuidString.lowercased() { return .success(Actions.fire(item: item, cue: cue, state: state)) }
         guard playlist.named else { return .failure(.renameToFire) }
-        return .success(Actions.fire(loading: playlist.playlist.title, item: item, cue: cue))
+        return .success(Actions.fire(loading: playlist.playlist.title, item: item, cue: cue, state: state))
     }
 
     /// Make Live, on the same condition.
@@ -197,7 +198,7 @@ public enum GridFire {
     }
 
     /// A cue of a list opened from the library: "`list N cue M`".
-    public static func libraryCue(_ list: ListSummary, cue: Int) -> Result<Sending, FireRefusal> {
-        list.named ? .success(Actions.fire(list: list.number, cue: cue)) : .failure(.renumberToFire)
+    public static func libraryCue(_ list: ListSummary, cue: Int, state: Bool = false) -> Result<Sending, FireRefusal> {
+        list.named ? .success(Actions.fire(list: list.number, cue: cue, state: state)) : .failure(.renumberToFire)
     }
 }

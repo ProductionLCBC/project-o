@@ -155,6 +155,8 @@ extension Engine {
         // Spec 10 §3 — the `engine` topic carries "the last state this run", and files are named from the machine root.
         launchReport = report
         machineRoot = options.machineRoot
+        // Spec 11 §3 — the `render` query's folder, "emptied at launch".
+        setUpRenders()
         return report
     }
 

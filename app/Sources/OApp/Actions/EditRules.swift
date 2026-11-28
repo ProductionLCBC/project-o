@@ -261,9 +261,12 @@ public enum Menus {
         /// "Hold, on the armed cue".
         public var isArmed: Bool
         public var cannotSend: Unavailable?
+        /// Why Edit Cue can't open edit mode: Spec 11 §2 — "While operator lock is on ... every entry above [is] disabled with the reason".
+        public var editCue: CannotEdit?
 
         public init(fire: CannotEdit? = nil, edit: CannotEdit? = nil, hasText: Bool = false, trigger: CueTrigger.Kind = .go, advanceAfterMs: Int? = nil,
-                    isArmed: Bool = false, cannotSend: Unavailable? = nil) {
+                    isArmed: Bool = false, cannotSend: Unavailable? = nil, editCue: CannotEdit? = nil) {
+            self.editCue = editCue
             self.fire = fire
             self.edit = edit
             self.hasText = hasText
@@ -287,7 +290,7 @@ public enum Menus {
                        MenuEntry(.triggerTime, reason: context.edit, isOn: isTime),
                        .separator,
                        MenuEntry(.advanceAfter, reason: context.edit, isOn: context.advanceAfterMs != nil)]
-        entries += [MenuEntry(.editCue, reason: .later), .separator, MenuEntry(.note, reason: context.edit),
+        entries += [MenuEntry(.editCue, reason: context.editCue), .separator, MenuEntry(.note, reason: context.edit),
                     MenuEntry(.triggerMenu, children: trigger), MenuEntry(.duplicateSection, reason: context.edit)]
         if context.isArmed { entries += [.separator, MenuEntry(.hold, reason: reason(context.cannotSend))] }
         return entries
@@ -368,4 +371,26 @@ public enum Confirmation: Equatable, Sendable {
     case restoreVersion(version: Int, title: String, keptAt: String, cues: Int, onAir: Bool)
     /// Spec 10 §14 — "Replace the library, and this machine's playlists, key bindings and macros, with the copies from ...?"
     case restoreSnapshot(takenAt: String, mastersReadOnly: Bool)
+    /// Spec 11 §4 — "Deleting cues asks first only when the cues hold edits,
+    /// or include the live cue or the armed one (choice A-11)": how many
+    /// cues, and which of those reasons apply.
+    case deleteCues(count: Int, live: Bool, armed: Bool, edits: Bool)
+    /// Spec 11 §6 — "On a stack an output shows, adding or removing a slot
+    /// asks first, since it changes the picture at once": "Channel 3's content
+    /// and its static boxes will show on output 1 now" or "Channel 2 is on air
+    /// on output 1; removing its slot takes it off."
+    case slotOnAir(channel: Int, label: String, outputs: [Int], adding: Bool)
+    /// Spec 11 §6, §7, §8 — Delete of a stack, channel or preset, "asking
+    /// first ..., with the counts from `uses`": "12 cues in 3 lists write
+    /// channel 5. They stay in the lists, and the reference report flags them
+    /// until they're edited." `uses` is the answer's non-zero counts by kind.
+    case deleteNumbered(name: String, uses: [String: Int])
+    /// Spec 11 §8 — "A stack's own layout offers Remove This Stack's Layout
+    /// (`edit preset P unset layouts.S`), asking first."
+    case removeLayout(preset: Int, stack: Int)
+    /// Spec 11 §9 — "Re-apply to Boxes copies the style's value into every one of them ..., after saying how many."
+    case reapplyStyle(name: String, boxes: Int)
+    /// Spec 11 §9 — "Run on Air ... at once while nothing is live, and after asking while something is. A macro that
+    /// holds an edit says first "This also changes the library.""
+    case runMacro(name: String, live: Bool, edits: Bool)
 }

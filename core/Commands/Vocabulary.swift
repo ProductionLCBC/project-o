@@ -207,13 +207,14 @@ enum Vocabulary {
         VocabularyRow("playlist.next", target: "next", lock: .passes, undo: .runtime),
         VocabularyRow("playlist.previous", target: "previous", lock: .passes, undo: .runtime),
         // Spec 2 §6 — `cue 7` is `/o/cue` `i:7`: the number is an argument, not an address part.
-        VocabularyRow("playlist.cue", target: "cue", args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
+        // Spec 2 §3 — `[state]` (Spec 3 §5, "Firing with `state`"), a word at the end as a timer's `up` is.
+        VocabularyRow("playlist.cue", target: "cue", args: [Arg("cue", .int), Arg("state", .flag("state"))], lock: .passes, undo: .runtime),
         VocabularyRow("playlist.goto", target: "item", number: .int("item"), verb: .word("cue"),
-                      args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
+                      args: [Arg("cue", .int), Arg("state", .flag("state"))], lock: .passes, undo: .runtime),
         VocabularyRow("playlist.section", target: "item", number: .int("item"), verb: .word("section"),
                       args: [Arg("section", .string)], lock: .passes, undo: .runtime),
         VocabularyRow("list.goto", target: "list", number: .int("list"), verb: .word("cue"),
-                      args: [Arg("cue", .int)], lock: .passes, undo: .runtime),
+                      args: [Arg("cue", .int), Arg("state", .flag("state"))], lock: .passes, undo: .runtime),
         // Spec 7 §3 — "Spec 2 §3 loses its `[DATE]` argument."
         VocabularyRow("playlist.load", target: "playlist", args: [Arg("title", .string)], lock: .passes, undo: .none),
         // Spec 2 §3, Spec 7 §4 — `disarm`, `/o/disarm`.

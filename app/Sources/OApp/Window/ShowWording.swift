@@ -16,7 +16,7 @@ public enum ShowWording {
         case .cue(let playlist, let list, let number, let label): return Strings.text(.topPositionCue, playlist, list, number, label)
         case .ready(let playlist): return Strings.text(.topPositionReady, playlist)
         case .library(let list, let number, let label): return Strings.text(.topPositionLibrary, list, number, label)
-        case .nothing(let hint): return Strings.text(hint ? .topPositionHint : .topPositionNothing)
+        case .nothing: return Strings.text(.topPositionNothing)
         }
     }
 
@@ -110,7 +110,7 @@ public enum ShowWording {
 
     /// A cue, for VoiceOver: "Cue 3, Verse 2", and that it is live.
     public static func cue(_ cell: CueCell) -> String {
-        let text = cell.label.isEmpty ? Strings.text(.gridCueUnlabelled, cell.number) : Strings.text(.gridCue, cell.number, cell.label)
+        let text = cell.label.isEmpty ? Strings.text(.gridCueUnlabeled, cell.number) : Strings.text(.gridCue, cell.number, cell.label)
         return cell.isLive ? text + ", " + Strings.text(.tagLive) : text
     }
 

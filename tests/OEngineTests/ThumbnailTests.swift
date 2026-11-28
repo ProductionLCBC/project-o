@@ -153,9 +153,10 @@ final class ThumbnailTests: XCTestCase {
         XCTAssertNotEqual(found, base, "dawn's poster found: list 42's thumbnails redraw")
         XCTAssertEqual(LibraryVersion.hash(library: library, machine: machine, list: list, missing: [], posters: [dawnPoster, mountainsPoster]),
                        found, "a poster arriving for an item list 42 doesn't use redraws none of its thumbnails")
+        // Spec 4 §10 as corrected 2026-11-24 — "the list's own fields other than its version number".
         var newer = list
         newer.version += 1
-        XCTAssertNotEqual(version(library, newer), base, "the list's version, incremented on every save")
+        XCTAssertEqual(version(library, newer), base, "a save that changed nothing draws nothing again")
         // Spec 6 §3 — field boxes fall back to the list's title, author, copyright and ccli, so they are in it.
         for edit in [\List.title, \List.author, \List.copyright, \List.ccli] {
             var changed = list
@@ -164,7 +165,53 @@ final class ThumbnailTests: XCTestCase {
         }
         var renoted = list
         renoted.cues[0].note = "A new note"
-        XCTAssertEqual(version(library, renoted), base, "the cues' own text is covered by the list's version")
+        XCTAssertNotEqual(version(library, renoted), base, "the cues themselves are in it")
+    }
+
+    /// Spec 4 §10 as corrected 2026-11-24 — "an edit to a cue redraws its thumbnail and those of the cues after it,
+    /// and the cues before it stay cached"; a stack whose boxes look ahead redraws as many cues before the edit.
+    func test_anEditRedrawsTheEditedCueAndThoseAfterItAndNoneBefore() throws {
+        let library = try EngineFixtures.library()
+        let machine = try EngineFixtures.fixtureMachine()
+        let list = try XCTUnwrap(library.list(number: 42))
+        let count = list.cues.count
+        XCTAssertGreaterThanOrEqual(count, 3)
+        func versions(_ list: List, lookAhead: Int = 0) -> [String] {
+            LibraryVersion.versions(library: library, machine: machine, list: list, missing: [], lookAhead: lookAhead)
+        }
+        let before = versions(list)
+        XCTAssertEqual(before.count, count)
+        XCTAssertEqual(Set(before).count, count, "each cue has its own")
+        XCTAssertEqual(before.last, LibraryVersion.hash(library: library, machine: machine, list: list, missing: []),
+                       "the list's version is its last cue's")
+        var edited = list
+        edited.cues[1].label += " (edited)"
+        edited.version += 1
+        let after = versions(edited)
+        XCTAssertEqual(after[0], before[0], "cue 1, before the edit, keeps its thumbnail")
+        for k in 1..<count { XCTAssertNotEqual(after[k], before[k], "cue \(k + 1) draws again") }
+        // A +1 box shows the next cue: cue 1 shows cue 2's edit, and cue 2's thumbnail shows cue 3.
+        XCTAssertNotEqual(versions(edited, lookAhead: 1)[0], versions(list, lookAhead: 1)[0], "cue 1 shows cue 2 in its +1 box")
+        // An insert at position 2 moves every cue from there on, and none before.
+        var inserted = list
+        inserted.cues.insert(list.cues[2], at: 1)
+        inserted.cues[1].uuid = UUID()
+        let moved = versions(inserted)
+        XCTAssertEqual(moved[0], before[0])
+        XCTAssertNotEqual(moved[2], before[1], "the old cue 2, now third, follows another cue")
+        // The service draws again only what changed.
+        let service = try service()
+        let stackObject = try XCTUnwrap(service.machine.stack(service.stack))
+        let ahead = service.furthestOffset(of: stackObject, library: service.library)
+        for k in 1...count { _ = try service.render(cue: k, of: list) }
+        var last = list
+        last.cues[count - 1].label += " (edited)"
+        last.version += 1
+        for k in 1...count {
+            let outcome = try service.render(cue: k, of: last).outcome
+            XCTAssertEqual(outcome, k >= count - ahead ? .rendered : .cached, "cue \(k) of \(count), the stack looking \(ahead) ahead")
+        }
+        XCTAssertEqual(service.thumbnailURL(forCue: list.cues[0].uuid, in: last), service.thumbnailURL(forCue: list.cues[0].uuid, in: list))
     }
 
     /// Spec 6 §3 — a field box in a projected state reads the list whose cue
