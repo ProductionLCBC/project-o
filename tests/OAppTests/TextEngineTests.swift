@@ -60,6 +60,43 @@ final class TextEngineTests: XCTestCase {
         XCTAssertEqual(try chunk(try list42(), 1).text, original)
     }
 
+    /// Spec 5 §5 — "The edits in a group share one log group id, one `library` event and one undo step": a split,
+    /// a merge and a moved break each apply whole and come back whole with one undo.
+    func test_aSplitAMergeAndAMovedBreakEachUndoAsOneStep() throws {
+        let original = try list42()
+        func side(_ list: List, _ index: Int) throws -> TextSide {
+            let chunk = try chunk(list, index)
+            return TextSide(chunk: chunk, cue: list.cues[index], text: chunk.text)
+        }
+        let made = try XCTUnwrap(UUID(uuidString: "eeee0020-0000-4000-8000-000000000000"))
+        // Split cue 2 after its first line.
+        let split = TextBreaks.split(try side(original, 1), at: ("There is no shadow\n" as NSString).length, index: 1, uuid: made, list: 42, channel: 2)
+        try send(split.sending)
+        var after = try list42()
+        XCTAssertEqual(after.cues.map(\.uuid), [original.cues[0].uuid, original.cues[1].uuid, made, original.cues[2].uuid, original.cues[3].uuid])
+        XCTAssertEqual(try chunk(after, 1).text, "There is no shadow")
+        XCTAssertEqual(try chunk(after, 2).text, "of turning with Thee")
+        XCTAssertEqual(after.cues[2].label, "Verse 1")
+        try send(Sending([.undo]))
+        XCTAssertEqual(try list42().cues, original.cues, "one undo takes the split back")
+        // Merge cue 2 into cue 1.
+        let merge = TextBreaks.merge(upper: try side(original, 0), lower: try side(original, 1), list: 42, channel: 2)
+        try send(merge.sending)
+        after = try list42()
+        XCTAssertEqual(after.cues.count, 3)
+        XCTAssertEqual(try chunk(after, 0).text, "Great is Thy faithfulness,\nO God my Father\nThere is no shadow\nof turning with Thee")
+        try send(Sending([.undo]))
+        XCTAssertEqual(try list42().cues, original.cues, "one undo takes the merge back")
+        // Move cue 2's first line up to cue 1.
+        let move = try XCTUnwrap(TextBreaks.move(1, upper: try side(original, 0), lower: try side(original, 1), list: 42, channel: 2))
+        try send(move.sending)
+        after = try list42()
+        XCTAssertEqual(try chunk(after, 0).text, "Great is Thy faithfulness,\nO God my Father\nThere is no shadow")
+        XCTAssertEqual(try chunk(after, 1).text, "of turning with Thee")
+        try send(Sending([.undo]))
+        XCTAssertEqual(try list42().cues, original.cues, "one undo takes the moved break back")
+    }
+
     func test_anEmptiedChunksClearKeepsItsTrackRiderAsTheEngineStoresIt() throws {
         let list = try list42()
         try send(TextEdits.emptied(cue: list.cues[3], list: 42, channel: 2))

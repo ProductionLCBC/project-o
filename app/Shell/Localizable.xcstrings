@@ -12157,6 +12157,30 @@
         }
       }
     },
+    "menu.moveLineNext" : {
+      "comment" : "Edit menu, in the text editor: the caret's last line moves to the start of the cue below.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Line to Next Cue"
+          }
+        }
+      }
+    },
+    "menu.moveLinePrevious" : {
+      "comment" : "Edit menu, in the text editor: the caret's first line moves to the end of the cue above.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Line to Previous Cue"
+          }
+        }
+      }
+    },
     "menu.multiviewer" : {
       "comment" : "View menu: shows every stack's preview at once.",
       "extractionState" : "manual",
@@ -12441,6 +12465,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Show in Library"
+          }
+        }
+      }
+    },
+    "menu.splitCue" : {
+      "comment" : "Edit menu, in the text editor: a new cue takes the text after the caret.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split Cue"
           }
         }
       }
@@ -15277,6 +15313,210 @@
         }
       }
     },
+    "text.merge.advance" : {
+      "comment" : "The merge question, in a list: the cue has an advance-after time.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "advances to the next cue by itself"
+          }
+        }
+      }
+    },
+    "text.merge.also" : {
+      "comment" : "The merge question: what else the cue that goes does. %2$@ is a list such as \"writes channel 1 and runs macro 3\".",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld also %2$@."
+          }
+        }
+      }
+    },
+    "text.merge.armed" : {
+      "comment" : "The merge question: the cue that goes is about to fire by itself.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %lld is armed to fire next."
+          }
+        }
+      }
+    },
+    "text.merge.button" : {
+      "comment" : "The button that merges two cues; never the sheet's default.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge"
+          }
+        }
+      }
+    },
+    "text.merge.changes" : {
+      "comment" : "The merge question, in a list: riders or attribute writes on the text editor's channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "changes how channel %lld plays"
+          }
+        }
+      }
+    },
+    "text.merge.live" : {
+      "comment" : "The merge question: the cue that goes is the one on air now.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %lld is the live cue."
+          }
+        }
+      }
+    },
+    "text.merge.note" : {
+      "comment" : "The merge question, in a list: the cue has a note.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "has a note"
+          }
+        }
+      }
+    },
+    "text.merge.otherCommands" : {
+      "comment" : "The merge question, in a list: commands for stacks, outputs, timers, popups or the system.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "has %lld other command"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "has %lld other commands"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "text.merge.removesIt" : {
+      "comment" : "The merge question's last sentence, after it says the cue is live or armed.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merging removes it."
+          }
+        }
+      }
+    },
+    "text.merge.removesThem" : {
+      "comment" : "The merge question's last sentence, after what else the cue does.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merging removes them."
+          }
+        }
+      }
+    },
+    "text.merge.runsMacro" : {
+      "comment" : "The merge question, in a list: the cue runs a macro.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "runs macro %lld"
+          }
+        }
+      }
+    },
+    "text.merge.runsMacros" : {
+      "comment" : "The merge question, in a list: the cue runs macros. %@ is their numbers, already joined.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "runs macros %@"
+          }
+        }
+      }
+    },
+    "text.merge.title" : {
+      "comment" : "The question before a merge in the text editor. %1$lld is the cue that goes, %2$lld the cue its text joins.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge cue %1$lld into cue %2$lld?"
+          }
+        }
+      }
+    },
+    "text.merge.trigger" : {
+      "comment" : "The merge question, in a list: the cue's trigger isn't Go.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "has a trigger of its own"
+          }
+        }
+      }
+    },
+    "text.merge.writesChannel" : {
+      "comment" : "The merge question, in a list: the cue writes or changes one other channel.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes channel %lld"
+          }
+        }
+      }
+    },
+    "text.merge.writesChannels" : {
+      "comment" : "The merge question, in a list: the cue writes or changes other channels. %@ is their numbers, already joined.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "writes channels %@"
+          }
+        }
+      }
+    },
     "text.noList" : {
       "comment" : "The text editor when no list is chosen.",
       "extractionState" : "manual",
@@ -15285,6 +15525,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose a list in the Browser to edit its text"
+          }
+        }
+      }
+    },
+    "text.said.merge" : {
+      "comment" : "VoiceOver, after a merge in the text editor: the cue removed and the cue its text joined.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cue %1$lld joined to cue %2$lld"
+          }
+        }
+      }
+    },
+    "text.said.moved" : {
+      "comment" : "VoiceOver, after a cue break moved in the text editor: how many lines, and the cue they went to.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Moved %lld line to cue %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Moved %lld lines to cue %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "text.said.split" : {
+      "comment" : "VoiceOver, after a split in the text editor: the new cue's number and the cue it was split from.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New cue %1$lld after cue %2$lld"
           }
         }
       }

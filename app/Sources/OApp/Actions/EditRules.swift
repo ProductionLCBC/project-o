@@ -358,6 +358,10 @@ public enum Menus {
 /// sheets ask before a delete or a restore, and "A button that deletes,
 /// restores or quits is never a sheet's default" (§9).
 public enum Confirmation: Equatable, Sendable {
+    /// Spec 11 §5, "Merge" — "The editor asks first when the second cue has
+    /// anything beyond its text on this channel ... or is the live or the
+    /// armed cue ... Merge is never the sheet's default."
+    case mergeCues(MergeQuestion)
     /// "Delete… (`… delete`, after a confirmation, which says the service
     /// keeps running from the engine's copy when it is live, Spec 7 §4)".
     case deletePlaylist(title: String, isLive: Bool)

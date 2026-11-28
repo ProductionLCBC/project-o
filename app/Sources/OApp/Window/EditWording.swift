@@ -185,6 +185,34 @@ public enum EditWording {
         return formatter.string(from: parts) ?? parts.joined(separator: ", ")
     }
 
+    /// Spec 11 §5, "Merge" — ""Cue 5 also writes channel 1 and runs macro 3.
+    /// Merging removes them."" Whether the cue is live or armed comes first, in
+    /// a sentence of its own.
+    static func mergeWords(_ question: MergeQuestion, locale: Locale) -> ConfirmationWords {
+        var body: [String] = []
+        var parts: [String] = []
+        for reason in question.reasons {
+            switch reason {
+            case .live: body.append(Strings.text(.textMergeLive, question.cue))
+            case .armed: body.append(Strings.text(.textMergeArmed, question.cue))
+            case .writes(let channels):
+                parts.append(channels.count == 1 ? Strings.text(.textMergeWritesChannel, channels[0])
+                             : Strings.text(.textMergeWritesChannels, joined(channels.map(String.init), locale: locale)))
+            case .runs(let macros):
+                parts.append(macros.count == 1 ? Strings.text(.textMergeRunsMacro, macros[0])
+                             : Strings.text(.textMergeRunsMacros, joined(macros.map(String.init), locale: locale)))
+            case .otherCommands(let count): parts.append(Strings.counted(.textMergeOtherCommands, count))
+            case .changes(let channel): parts.append(Strings.text(.textMergeChanges, channel))
+            case .trigger: parts.append(Strings.text(.textMergeTrigger))
+            case .advanceAfter: parts.append(Strings.text(.textMergeAdvance))
+            case .note: parts.append(Strings.text(.textMergeNote))
+            }
+        }
+        if !parts.isEmpty { body.append(Strings.text(.textMergeAlso, question.cue, joined(parts, locale: locale))) }
+        body.append(Strings.text(parts.isEmpty ? .textMergeRemovesIt : .textMergeRemovesThem))
+        return ConfirmationWords(title: Strings.text(.textMergeTitle, question.cue, question.into), body: body, button: Strings.text(.textMergeButton))
+    }
+
     /// "12 cues, 1 macro and 2 keys": the counts that aren't zero.
     public static func uses(_ use: MediaUseCount, locale: Locale = .current) -> String {
         var parts: [String] = []
@@ -197,6 +225,8 @@ public enum EditWording {
 
     public static func words(_ confirmation: Confirmation, locale: Locale = .current) -> ConfirmationWords {
         switch confirmation {
+        case .mergeCues(let question):
+            return mergeWords(question, locale: locale)
         case .deletePlaylist(let title, let isLive):
             return ConfirmationWords(title: Strings.text(.confirmDeletePlaylistTitle, title),
                                      body: [Strings.text(isLive ? .confirmDeletePlaylistLive : .confirmDeletePlaylistBody)], button: Strings.text(.confirmDelete))
