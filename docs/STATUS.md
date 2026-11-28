@@ -166,8 +166,10 @@ has sound, and an outgoing item's sound plays to the end of its fade however its
 goes, which an L cut needed (it was cut short with the picture, at once after a cut); and
 the engine keeps the last 500 command-log lines in memory, not 10,000 (Spec 9 §2;
 3df85af). The bench's golden images run green on the branch (46 tests; none to
-regenerate). The three-hour soak is still owed: on 2026-11-27 a remote-control session
-was capturing the screens, so it waits for a window with none; American
+regenerate). The three-hour soak of 3df85af ran on his go after he disconnected
+(2026-11-27 18:44:45 to 21:44:59, `tests/soak-output/2026-11-27-184445`, the run's files in
+the worktree's `.build/area-edit-scratch/soak-1127/`) and fails three lines by their letter
+(below, Needs Adam); American
 spellings throughout the app's wording and the code (c3d415a); and new transitions, as objects of the three types, made, copied, renumbered
 and deleted as grades are, 1–3 protected with their type fixed (Spec 11 §9 corrected
 first, G-38; `core/` b197b06, app dfaed29; `swift test` and hosted CI green). The try-out
@@ -248,9 +250,23 @@ the pilot.
   - *The soak before the merge.* The frame path changed after the soaks of 2026-11-21
     (the media transitions, the fade-in from empty, a box's transition as an override, and
     on 2026-11-27 the J cut's held picture and the sound tails), so a green soak is owed.
-    He said go on 2026-11-27 and the command log now keeps 500 lines (decided); it was not
-    started because a remote-control session was capturing both screens, which the soak
-    covers and which spoils its GPU line. It waits for a window with no remote session.
+    It ran on 2026-11-27, 18:44 to 21:44, in the configuration of 2026-11-21. Held: no frame
+    dropped or presented late on either screen (re-presented 3 and 2), watchdog 3 events of
+    the known kind and no recovery, text late only in the first minute, 180 of 180 edit
+    groups and pictures, heap live flat (80 to 82 MB: the 500-line command log did it).
+    Failed: *GPU p99 12.82 ms*, all of it in one stretch, 19:33:52 to 19:52:01, where the
+    stack pass went from 1.4 to 5.9 ms with the channel pass unchanged, starting the second
+    ScreenConnect took a screen capture (it takes one every twenty minutes even with nobody
+    connected); every other ten minutes read 6.2 to 6.3 ms. *Audio underruns 94*, all in
+    one minute (19:59:45 to 20:00:45), in a sequence of writes the scenario ran some 36
+    times clean; cause not found, nothing in the system log, and the soak never reached the
+    J or L paths (the fixture's channels default to a cut, and its J-cut object is never
+    called), so of the 2026-11-27 audio change it ran only the eased crossfade. The
+    2026-11-21 soaks had none. *Footprint less graphics 318 to 336 MB (+5.8%)*, the
+    purgeable zone rising to its 57 MB cap as on every soak since 2026-11-16.
+    Recommended: count the purgeable zone out of §13's footprint line (the system takes it
+    back under pressure), quit ScreenConnect for the run rather than disconnect, and run
+    once more to see whether the underruns come back.
   - *The bench's golden images:* run on the branch on 2026-11-27, 46 tests green, none to
     regenerate. Done.
   - *The engine's audio transitions:* fixed on his go of 2026-11-27 (96d6afc), with a
